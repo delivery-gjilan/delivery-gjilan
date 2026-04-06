@@ -3,14 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { GET_BANNERS, CREATE_BANNER, UPDATE_BANNER, DELETE_BANNER, UPDATE_BANNER_ORDER } from '@/graphql/operations/banners';
-import { GET_BUSINESSES_LIST, GET_BUSINESS_PRODUCTS } from '@/graphql/operations/banners/businessProducts';
+import { GET_BUSINESSES_LIST, GET_BUSINESS_PRODUCTS, GET_BUSINESS_PERFORMANCE_STATS } from '@/graphql/operations/banners/businessProducts';
 import { GET_PROMOTIONS } from '@/graphql/operations/promotions/queries';
 import Button from '@/components/ui/Button';
 import { Table, Th, Td } from '@/components/ui/Table';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
-import { Image, Plus, Edit, Trash2, GripVertical, ExternalLink, Calendar, Tag, Store, Package } from 'lucide-react';
+import { Image, Plus, Edit, Trash2, GripVertical, ExternalLink, Calendar, Tag, Store, Package, TrendingUp, Star, ShoppingCart, DollarSign, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Banner {
@@ -91,6 +91,17 @@ export default function BannersPage() {
 
   // Fetch businesses for dropdown
   const { data: businessesData } = useQuery(GET_BUSINESSES_LIST);
+
+  // Business performance stats for the leaderboard
+  const [statsDays, setStatsDays] = useState(30);
+  const [statsOpen, setStatsOpen] = useState(true);
+  const { data: statsData, loading: statsLoading } = useQuery(GET_BUSINESS_PERFORMANCE_STATS, {
+    variables: { days: statsDays },
+  });
+  const perfStats: Array<{
+    businessId: string; businessName: string; imageUrl?: string | null;
+    isFeatured: boolean; totalOrders: number; totalRevenue: number; avgOrderValue: number;
+  }> = (statsData as any)?.businessPerformanceStats ?? [];
 
   // Fetch products for selected business
   const { data: productsData, refetch: refetchProducts } = useQuery(GET_BUSINESS_PRODUCTS, {
@@ -349,6 +360,101 @@ export default function BannersPage() {
           <Plus className="w-4 h-4 mr-2" />
           Create Banner
         </Button>
+      </div>
+
+      {/* ── Business Performance Leaderboard ── */}
+      <div className="border border-zinc-800 rounded-xl bg-[#0f0f0f] overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setStatsOpen((v) => !v)}
+          className="w-full flex items-center justify-between px-5 py-4 hover:bg-zinc-900/40 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <TrendingUp size={16} className="text-violet-400" />
+            <span className="text-sm font-semibold text-zinc-200">Business Performance</span>
+            <span className="text-xs text-zinc-500">— helps you decide who to feature</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+              {([7, 30, 90] as const).map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setStatsDays(d)}
+                  className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                    statsDays === d
+                      ? 'bg-violet-900/60 text-violet-300 border border-violet-700/40'
+                      : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  {d}d
+                </button>
+              ))}
+            </div>
+            <ChevronDown size={14} className={`text-zinc-500 transition-transform ${statsOpen ? 'rotate-180' : ''}`} />
+          </div>
+        </button>
+
+        {statsOpen && (
+          <div className="border-t border-zinc-800">
+            {statsLoading ? (
+              <div className="px-5 py-8 text-center text-zinc-600 text-sm">Loading stats...</div>
+            ) : (
+              <div className="divide-y divide-zinc-900">
+                {/* Header */}
+                <div className="grid grid-cols-[2rem_1fr_7rem_7rem_7rem_5rem] gap-3 px-5 py-2 text-[11px] font-medium text-zinc-600 uppercase tracking-wider">
+                  <span>#</span>
+                  <span>Business</span>
+                  <span className="text-right">Orders</span>
+                  <span className="text-right">Revenue</span>
+                  <span className="text-right">Avg Order</span>
+                  <span className="text-center">Featured</span>
+                </div>
+                {perfStats.map((stat, idx) => (
+                  <div
+                    key={stat.businessId}
+                    className={`grid grid-cols-[2rem_1fr_7rem_7rem_7rem_5rem] gap-3 px-5 py-3 items-center transition-colors hover:bg-zinc-900/30 ${
+                      idx === 0 ? 'bg-violet-950/20' : ''
+                    }`}
+                  >
+                    <span className={`text-sm font-bold ${
+                      idx === 0 ? 'text-violet-400' : idx === 1 ? 'text-zinc-400' : idx === 2 ? 'text-amber-700' : 'text-zinc-700'
+                    }`}>
+                      {idx + 1}
+                    </span>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {stat.imageUrl ? (
+                        <img src={stat.imageUrl} alt="" className="w-7 h-7 rounded-lg object-cover flex-shrink-0 bg-zinc-800" />
+                      ) : (
+                        <div className="w-7 h-7 rounded-lg bg-zinc-800 flex items-center justify-center flex-shrink-0">
+                          <Store size={13} className="text-zinc-600" />
+                        </div>
+                      )}
+                      <span className="text-sm text-zinc-200 truncate font-medium">{stat.businessName}</span>
+                    </div>
+                    <div className="flex items-center justify-end gap-1">
+                      <ShoppingCart size={12} className="text-zinc-600" />
+                      <span className="text-sm text-white font-semibold">{stat.totalOrders.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-end gap-1">
+                      <DollarSign size={12} className="text-zinc-600" />
+                      <span className="text-sm text-green-400 font-semibold">€{stat.totalRevenue.toFixed(0)}</span>
+                    </div>
+                    <div className="text-sm text-right text-zinc-400">€{stat.avgOrderValue.toFixed(1)}</div>
+                    <div className="flex justify-center">
+                      {stat.isFeatured && (
+                        <Star size={14} className="text-amber-400 fill-amber-400" />
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {perfStats.length === 0 && (
+                  <div className="px-5 py-8 text-center text-zinc-600 text-sm">No order data for this period.</div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Filters */}

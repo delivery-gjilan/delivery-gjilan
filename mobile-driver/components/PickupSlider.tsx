@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated, PanResponder } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useTranslations } from '@/hooks/useTranslations';
 
 const PICKUP_TRACK_H = 62;
 const PICKUP_THUMB = 52;
@@ -23,6 +24,8 @@ export function PickupSlider({
     onConfirm,
     onCancel,
 }: Props) {
+    const { t } = useTranslations();
+    const s = t.pickup;
     const trackWidth = useRef(0);
     const translateX = useRef(new Animated.Value(0)).current;
     const confirmed  = useRef(false);
@@ -122,7 +125,7 @@ export function PickupSlider({
                     <Ionicons name="bag-check-outline" size={22} color="#3b82f6" />
                 </View>
                 <View style={{ flex: 1 }}>
-                    <Text style={styles.title}>Arrived at Pickup</Text>
+                    <Text style={styles.title}>{s.arrived_at_pickup}</Text>
                     <Text style={styles.sub} numberOfLines={1}>{businessName}</Text>
                 </View>
                 {etaMins != null && (
@@ -133,8 +136,8 @@ export function PickupSlider({
                         ]}
                     >
                         <Ionicons name="navigate-circle-outline" size={20} color="#0ea5e9" />
-                        <Text style={styles.etaValue}>{etaMins} min</Text>
-                        <Text style={styles.etaLabel}>to dropoff</Text>
+                        <Text style={styles.etaValue}>{etaMins} {s.min}</Text>
+                        <Text style={styles.etaLabel}>{s.to_dropoff}</Text>
                     </Animated.View>
                 )}
             </View>
@@ -144,8 +147,8 @@ export function PickupSlider({
                     <Ionicons name="restaurant-outline" size={14} color="#06b6d4" />
                     <Text style={styles.prepText}>
                         {prepMinsLeft === 0
-                            ? 'Food is almost ready — standby'
-                            : `Food ready in ~${prepMinsLeft} min — standby`}
+                            ? s.food_almost_ready
+                            : s.food_ready_in.replace('{{min}}', String(prepMinsLeft))}
                     </Text>
                 </View>
             )}
@@ -156,7 +159,7 @@ export function PickupSlider({
             >
                 <Animated.View style={[styles.fill, { opacity: fillOpacity }]} />
                 <Animated.Text style={[styles.trackLabel, { opacity: labelOpacity }]}>
-                    Slide to confirm pickup →
+                    {s.slide_confirm}
                 </Animated.Text>
                 <Animated.View
                     style={[styles.thumb, done && styles.thumbDone, { transform: [{ translateX }] }]}
@@ -168,7 +171,7 @@ export function PickupSlider({
 
             {!done && (
                 <Pressable style={styles.secondary} onPress={onCancel}>
-                    <Text style={styles.secondaryText}>Cancel navigation</Text>
+                    <Text style={styles.secondaryText}>{s.cancel_navigation}</Text>
                 </Pressable>
             )}
 
@@ -208,11 +211,11 @@ export function PickupSlider({
                         <View style={styles.splashIconRing}>
                             <Ionicons name="navigate" size={42} color="#fff" />
                         </View>
-                        <Text style={styles.splashTitle}>On your way!</Text>
+                        <Text style={styles.splashTitle}>{s.on_your_way}</Text>
                         {etaMins != null && (
                             <View style={styles.splashBadge}>
-                                <Text style={styles.splashEtaNum}>{etaMins} min</Text>
-                                <Text style={styles.splashEtaLabel}>to dropoff</Text>
+                                <Text style={styles.splashEtaNum}>{etaMins} {s.min}</Text>
+                                <Text style={styles.splashEtaLabel}>{s.to_dropoff}</Text>
                             </View>
                         )}
                     </Animated.View>

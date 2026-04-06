@@ -159,12 +159,19 @@ export const cache = new InMemoryCache({
  * Restore the Apollo cache from AsyncStorage on cold start.
  * Call (await) this before rendering the first screen so data is available
  * before the first paint. 5 MB cap prevents runaway growth.
+ *
+ * Bump CACHE_VERSION when the GraphQL schema changes in a way that
+ * invalidates cached data (e.g. renamed fields, removed types).
+ * On version mismatch the persisted cache is automatically discarded.
  */
+const CACHE_VERSION = 'v1';
+
 export const cacheReady: Promise<void> = persistCache({
     cache,
     storage: new AsyncStorageWrapper(AsyncStorage),
     maxSize: 5 * 1024 * 1024,
     debug: __DEV__,
+    key: `apollo-cache-${CACHE_VERSION}`,
 }).catch((err) => {
     // Persistence failure is non-fatal — the app works with an empty cache.
     console.warn('[ApolloCache] Failed to persist cache:', err);

@@ -12,6 +12,7 @@ import type { AlertType } from '@/components/DriverMessageBanner';
 import { useSubscription } from '@apollo/client/react';
 import { DRIVER_MESSAGE_RECEIVED_SUB } from '@/graphql/operations/driverMessages';
 import { useGlobalOrderAccept } from '@/hooks/useGlobalOrderAccept';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { OrderAcceptSheet } from '@/components/OrderAcceptSheet';
 import { OrderPoolSheet } from '@/components/OrderPoolSheet';
 import { useOrderAcceptStore } from '@/store/orderAcceptStore';
@@ -26,15 +27,18 @@ function AppContent() {
     // Start heartbeat as soon as auth is established
     useDriverTracking();
     useNotifications();
+    useNetworkStatus();
+    const isNetworkConnected = useAuthStore((s) => s.isNetworkConnected);
     const { isAdminTalking } = useDriverPttReceiver();
     const { pendingOrder, autoCountdown, accepting, acceptError, takenByOther, availableOrders, poolOrders, handleAcceptOrder, handleSkipOrder, handleAcceptAndNavigate } =
         useGlobalOrderAccept();
 
     const isOnline = useAuthStore((s) => s.isOnline);
+    const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
     const { dispatchModeEnabled } = useStoreStatus();
     const [poolOpen, setPoolOpen] = useState(false);
 
-    const showPoolFab = !dispatchModeEnabled && isOnline && poolOrders.length > 0;
+    const showPoolFab = isAuthenticated && !dispatchModeEnabled && isOnline && poolOrders.length > 0;
 
     // Vibrate when a new order pops up for the driver
     useEffect(() => {
@@ -78,6 +82,14 @@ function AppContent() {
 
     return (
         <>
+            {!isNetworkConnected && (
+                <View className="absolute top-12 left-4 right-4 z-50 rounded-xl border border-yellow-500/40 bg-yellow-900/80 px-4 py-3 flex-row items-center gap-3">
+                    <Ionicons name="cloud-offline-outline" size={18} color="#fbbf24" />
+                    <Text className="text-yellow-200 text-sm font-semibold flex-1">
+                        No internet connection
+                    </Text>
+                </View>
+            )}
             {isAdminTalking && (
                 <View className="absolute top-12 left-4 right-4 z-50 rounded-xl border border-red-500/40 bg-red-500/15 px-4 py-3 flex-row items-center gap-3">
                     <ActivityIndicator color="#fca5a5" size="small" />
@@ -96,7 +108,7 @@ function AppContent() {
                     onDismiss={() => setIncomingMessage(null)}
                 />
             )}
-            {acceptError && (
+            {isAuthenticated && acceptError && (
                 <View style={{
                     position: 'absolute',
                     bottom: 170,
@@ -117,7 +129,7 @@ function AppContent() {
                     </Pressable>
                 </View>
             )}
-            {pendingOrder && (
+            {isAuthenticated && pendingOrder && (
                 <OrderAcceptSheet
                     order={pendingOrder}
                     onAccept={handleAcceptOrder}
@@ -185,7 +197,7 @@ function AppContent() {
                     </View>
                 </Pressable>
             )}
-            {poolOpen && (
+            {isAuthenticated && poolOpen && (
                 <OrderPoolSheet
                     orders={poolOrders}
                     accepting={accepting}

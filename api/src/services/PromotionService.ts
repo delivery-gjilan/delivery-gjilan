@@ -348,7 +348,7 @@ export class PromotionService {
             type: CreatePromotionInput['type'];
             discountValue?: number;
             userIds: string[];
-            orderId: string;
+            orderId?: string;
             reason: string;
             expiresAt?: string;
         },

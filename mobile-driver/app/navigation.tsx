@@ -1,5 +1,5 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ActivityIndicator, Animated, Alert } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, Animated, Alert, ScrollView, Linking } from 'react-native';
 import { PickupSlider } from '@/components/PickupSlider';
 import { DeliverySlider } from '@/components/DeliverySlider';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { MapboxNavigationView } from '@badatgil/expo-mapbox-navigation';
 import { useApolloClient, useMutation, useQuery, useSubscription } from '@apollo/client/react';
-import { GET_ORDERS, UPDATE_ORDER_STATUS, DRIVER_NOTIFY_CUSTOMER, ALL_ORDERS_UPDATED } from '@/graphql/operations/orders';
+import { GET_ORDERS, UPDATE_ORDER_STATUS, DRIVER_NOTIFY_CUSTOMER } from '@/graphql/operations/orders';
 import { buildNavOrder, orderToPhase } from '@/utils/orderToNavOrder';
 import { GET_MY_DRIVER_METRICS } from '@/graphql/operations/driver';
 import { useNavigationStore } from '@/store/navigationStore';
@@ -27,14 +27,8 @@ const STATUS_COLORS: Record<string, string> = {
     OUT_FOR_DELIVERY: '#22C55E',
 };
 
-const STATUS_LABELS: Record<string, string> = {
-    PENDING: 'Pending',
-    PREPARING: 'Preparing',
-    READY: 'Ready',
-    OUT_FOR_DELIVERY: 'Delivering',
-};
-
 export default function NavigationScreen() {
+    const { t } = useTranslations();
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const lastProgressRef = useRef(0);
@@ -121,17 +115,6 @@ export default function NavigationScreen() {
     const { data } = useQuery(GET_ORDERS, {
         fetchPolicy: 'cache-and-network',
         nextFetchPolicy: 'cache-first',
-    });
-
-    useSubscription(ALL_ORDERS_UPDATED, {
-        skip: !currentDriverId,
-        onData: ({ data: subData }) => {
-            const incomingOrders = (subData.data as any)?.allOrdersUpdated as any[] | undefined;
-            if (incomingOrders === undefined || incomingOrders === null) return;
-            apolloClient.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
-                return { ...(existing ?? {}), orders: incomingOrders };
-            });
-        },
     });
 
     /* â”€â”€ Filter assigned orders â”€â”€ */
@@ -231,9 +214,9 @@ export default function NavigationScreen() {
         if (reassignedAway && !reassignedAlertShownRef.current) {
             reassignedAlertShownRef.current = true;
             Alert.alert(
-                'Order Reassigned',
-                'This order has been reassigned to another driver by an admin.',
-                [{ text: 'OK', onPress: () => {
+                t.navigation.order_reassigned,
+                t.navigation.order_reassigned_msg,
+                [{ text: t.common.ok, onPress: () => {
                     setShowDeliveryPanel(false);
                     setShowPickupPanel(false);
                     clearNavigationLocation();
@@ -327,7 +310,9 @@ export default function NavigationScreen() {
         setMarkingPickedUpIds(prev => new Set(prev).add(orderId));
         try {
             await updateOrderStatus({ variables: { id: orderId, status: 'OUT_FOR_DELIVERY' } });
-        } catch { /* ignore */ } finally {
+        } catch {
+            Alert.alert(t.common.error, t.navigation.status_update_failed);
+        } finally {
             setMarkingPickedUpIds(prev => { const s = new Set(prev); s.delete(orderId); return s; });
         }
     }, [updateOrderStatus]);
@@ -422,7 +407,7 @@ export default function NavigationScreen() {
             {navIncomingMessage && (
                 <DriverMessageBanner
                     key={navIncomingMessage.id}
-                    senderName="Dispatcher"
+                    senderName={t.navigation.dispatcher}
                     body={navIncomingMessage.body}
                     alertType={navIncomingMessage.alertType}
                     adminId={navIncomingMessage.adminId}
@@ -435,7 +420,7 @@ export default function NavigationScreen() {
                 <View style={[styles.newOrderToast, { top: insets.top + 12 }]}>
                     <Ionicons name="bag-add-outline" size={18} color="#fff" />
                     <View style={{ flex: 1 }}>
-                        <Text style={styles.newOrderToastTitle}>New order assigned</Text>
+                        <Text style={styles.newOrderToastTitle}>{t.navigation.new_order_assigned}</Text>
                         <Text style={styles.newOrderToastSub} numberOfLines={1}>
                             {newOrderToast.businessName}
                         </Text>
@@ -454,7 +439,7 @@ export default function NavigationScreen() {
                 return (
                     <View style={[styles.earningsPill, { top: insets.top + 12 }]}>
                         <Ionicons name="wallet-outline" size={14} color="#22c55e" />
-                        <Text style={styles.earningsPillAmount}>â‚¬{net}</Text>
+                        <Text style={styles.earningsPillAmount}>€{net}</Text>
                         <View style={styles.earningsPillDivider} />
                         <Ionicons name="bicycle-outline" size={13} color="#94a3b8" />
                         <Text style={styles.earningsPillCount}>{count}</Text>
@@ -468,11 +453,11 @@ export default function NavigationScreen() {
                     <Ionicons name="time-outline" size={13} color="#38bdf8" />
                     <Text style={styles.etaPillText}>
                         {durationRemainingS < 60
-                            ? '<1 min'
-                            : `${Math.ceil(durationRemainingS / 60)} min`}
+                            ? t.navigation.less_than_one_min
+                            : `${Math.ceil(durationRemainingS / 60)} ${t.navigation.min}`}
                     </Text>
                     <Text style={styles.etaPillLabel}>
-                        {phase === 'to_pickup' ? 'to pickup' : 'to dropoff'}
+                        {phase === 'to_pickup' ? t.navigation.to_pickup : t.navigation.to_dropoff}
                     </Text>
                 </View>
             )}
@@ -527,7 +512,7 @@ export default function NavigationScreen() {
                                             ) : null}
                                         </View>
                                         <View style={styles.barEarnings}>
-                                            <Text style={styles.barEarningsText}>â‚¬{earnings}</Text>
+                                            <Text style={styles.barEarningsText}>€{earnings}</Text>
                                         </View>
                                     </View>
 
@@ -536,7 +521,7 @@ export default function NavigationScreen() {
                                         <View style={[styles.barStatusBadge, { backgroundColor: statusColor + '22' }]}>
                                             <View style={[styles.barStatusDot, { backgroundColor: statusColor }]} />
                                             <Text style={[styles.barStatusText, { color: statusColor }]}>
-                                                {STATUS_LABELS[o.status] ?? o.status}
+                                                {({ PENDING: t.map.status_pending, PREPARING: t.map.status_preparing, READY: t.map.status_ready, OUT_FOR_DELIVERY: t.map.status_delivering } as Record<string, string>)[o.status] ?? o.status}
                                             </Text>
                                         </View>
                                         <View style={styles.barActions}>
@@ -561,10 +546,10 @@ export default function NavigationScreen() {
                                             <Ionicons name="restaurant-outline" size={11} color="#06b6d4" />
                                             <Text style={styles.prepText}>
                                                 {prepMinsLeft === null
-                                                    ? 'Preparingâ€¦'
+                                                    ? t.navigation.preparing_ellipsis
                                                     : prepMinsLeft === 0
-                                                    ? 'Almost ready'
-                                                    : `Ready in ~${prepMinsLeft} min`}
+                                                    ? t.navigation.almost_ready
+                                                    : t.navigation.ready_in.replace('{{min}}', String(prepMinsLeft))}
                                             </Text>
                                         </View>
                                     )}
@@ -585,7 +570,7 @@ export default function NavigationScreen() {
                             onPress={() => Linking.openURL(`tel:${order.customerPhone}`)}
                         >
                             <Ionicons name="call-outline" size={18} color="#22d3ee" />
-                            <Text style={styles.nearEndBtnText}>Call Customer</Text>
+                            <Text style={styles.nearEndBtnText}>{t.navigation.call_customer}</Text>
                         </Pressable>
                     )}
                 </View>
@@ -611,7 +596,9 @@ export default function NavigationScreen() {
                         onConfirm={async () => {
                             try {
                                 await updateOrderStatus({ variables: { id: order?.id, status: 'OUT_FOR_DELIVERY' } });
-                            } catch { /* may already be updated */ }
+                            } catch {
+                                Alert.alert(t.common.error, t.navigation.status_update_failed);
+                            }
                             advanceToDropoff();
                             setShowPickupPanel(false);
                         }}
@@ -681,11 +668,11 @@ export default function NavigationScreen() {
                         <View style={styles.successCardCircle}>
                             <Ionicons name="checkmark" size={52} color="#fff" />
                         </View>
-                        <Text style={styles.successCardTitle}>Delivered!</Text>
+                        <Text style={styles.successCardTitle}>{t.navigation.delivered}</Text>
                         <View style={styles.successCardBadge}>
                             <Ionicons name="cash" size={26} color="#78350f" />
-                            <Text style={styles.successCardAmount}>+â‚¬{successCardPrice.toFixed(2)}</Text>
-                            <Text style={styles.successCardLabel}>delivery earned ðŸŽ‰</Text>
+                            <Text style={styles.successCardAmount}>+€{successCardPrice.toFixed(2)}</Text>
+                            <Text style={styles.successCardLabel}>{t.navigation.delivery_earned}</Text>
                         </View>
                     </Animated.View>
                 </View>
@@ -726,7 +713,9 @@ export default function NavigationScreen() {
                             await updateOrderStatus({ variables: { id: deliveredId, status: 'DELIVERED' } });
                             driverNotifyCustomer({ variables: { orderId: deliveredId, kind: 'DELIVERED' } })
                                 .catch(() => {});
-                        } catch { /* navigate home regardless */ }
+                        } catch {
+                            Alert.alert(t.common.error, t.navigation.status_update_failed);
+                        }
                         // Eagerly remove the delivered order from Apollo cache so the
                         // drive tab doesn't wait for a subscription round-trip to clear it.
                         if (deliveredId) {
@@ -792,7 +781,9 @@ export default function NavigationScreen() {
                     onCancel={async (reason) => {
                         try {
                             await updateOrderStatus({ variables: { id: order?.id, status: 'CANCELLED' } });
-                        } catch { /* navigate home regardless */ }
+                        } catch {
+                            Alert.alert(t.common.error, t.navigation.status_update_failed);
+                        }
                         // Clean up success animation state
                         setShowSuccessCard(false);
                         mapDimOpacity.setValue(0);
@@ -960,7 +951,12 @@ const styles = StyleSheet.create({
         position: 'absolute',
         left: 16,
         zIndex: 100,
-        padding: 8,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(0,0,0,0.55)',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
 
     /* â”€â”€ Cancel button (loading state) â”€â”€ */

@@ -128,7 +128,7 @@ export default function PromotionsPage() {
         onCompleted: () => refetch(),
     });
     const [deletePromotion, { loading: deleting }] = useMutation(DELETE_PROMOTION, {
-        onCompleted: () => refetch(),
+        onCompleted: () => { refetch(); refetchRecovery(); },
     });
 
     const [activeTab, setActiveTab] = useState<"promotions" | "compensations">("promotions");
@@ -140,7 +140,7 @@ export default function PromotionsPage() {
     const [searchTerm, setSearchTerm] = useState("");
     const [wizardStep, setWizardStep] = useState(1);
 
-    const { data: recoveryData, loading: recoveryLoading } = useQuery<GetRecoveryPromotionsQuery>(GET_RECOVERY_PROMOTIONS, {
+    const { data: recoveryData, loading: recoveryLoading, refetch: refetchRecovery } = useQuery<GetRecoveryPromotionsQuery>(GET_RECOVERY_PROMOTIONS, {
         fetchPolicy: "cache-and-network",
     });
     const recoveryPromotions = useMemo(() => (recoveryData as any)?.getRecoveryPromotions ?? [], [recoveryData]);
@@ -460,6 +460,7 @@ export default function PromotionsPage() {
                                         <Th>Status</Th>
                                         <Th>Usage</Th>
                                         <Th>Expires</Th>
+                                        <Th></Th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -532,6 +533,16 @@ export default function PromotionsPage() {
                                                         ) : (
                                                             <span className="text-zinc-600 text-sm">No expiry</span>
                                                         )}
+                                                    </Td>
+                                                    <Td>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleDeleteRequest(promo)}
+                                                            className="p-1.5 rounded text-zinc-600 hover:text-red-400 hover:bg-red-900/20 transition-colors"
+                                                            title="Delete compensation"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
                                                     </Td>
                                                 </tr>
                                             );

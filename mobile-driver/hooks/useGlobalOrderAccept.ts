@@ -230,8 +230,9 @@ export function useGlobalOrderAccept() {
         if (!currentDriverId) return;
         // Debounce: block if a mutation is already in-flight
         if (!useOrderAcceptStore.getState().tryLockAccept()) return;
-        // Offline guard
-        if (!useAuthStore.getState().isOnline) {
+        // Offline guard — check both driver toggle and OS network state
+        const authState = useAuthStore.getState();
+        if (!authState.isOnline || !authState.isNetworkConnected) {
             useOrderAcceptStore.getState().setAcceptError('You are offline. Please check your connection.');
             useOrderAcceptStore.getState().setAccepting(false);
             (useOrderAcceptStore.getState() as any)._acceptingRef = false;
@@ -277,7 +278,9 @@ export function useGlobalOrderAccept() {
     const handleAcceptAndNavigate = useCallback(async (orderId: string) => {
         if (!currentDriverId) return;
         if (!useOrderAcceptStore.getState().tryLockAccept()) return;
-        if (!useAuthStore.getState().isOnline) {
+        // Offline guard — check both driver toggle and OS network state
+        const authState = useAuthStore.getState();
+        if (!authState.isOnline || !authState.isNetworkConnected) {
             useOrderAcceptStore.getState().setAcceptError('You are offline. Please check your connection.');
             useOrderAcceptStore.getState().setAccepting(false);
             (useOrderAcceptStore.getState() as any)._acceptingRef = false;

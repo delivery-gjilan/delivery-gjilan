@@ -1,6 +1,6 @@
 # Order Creation
 
-<!-- MDS:B2 | Domain: Backend | Updated: 2026-04-04 -->
+<!-- MDS:B2 | Domain: Backend | Updated: 2026-05-28 -->
 <!-- Depends-On: B1, B3, B6, BL1 -->
 <!-- Depended-By: M4, BL3, O8 -->
 <!-- Nav: Payment collection changes → update BL1 (Settlements), M4 (Mobile Audit). Preflight changes → update O8 (Testing). Pricing logic → update B3 (Validation). -->
@@ -197,3 +197,13 @@ Output is human-readable with:
 1. Preflight output can be noisy due promotion debug logs in dev logging profile.
 2. The strict mode (`npm run test:api:strict`) currently fails because of existing unrelated type issues outside order creation/settlements.
 3. Mobile checkout currently does not expose a payment-collection selector, so backend defaults are often used.
+
+---
+
+## OrderLifecycleModule — Dispatch Notification Side-Effects
+
+`OrderLifecycleModule.startPreparingWithSideEffects()` schedules an early dispatch push notification using a Redis key `dispatch:early:{orderId}`. The key is set to `'fired'` once the notification is sent, preventing duplicate dispatches.
+
+**READY revert guard:** When an admin reverts an order from `READY` back to `PENDING` or `PREPARING`, the `dispatch:early:{orderId}` Redis key is cleared. This ensures the driver receives a fresh notification when the order becomes `READY` again — without the clear, the stale `'fired'` value would suppress re-notification.
+
+**Re-entry guard:** `startPreparingWithSideEffects` also clears any stale `'fired'` key before scheduling a new dispatch timer, handling the case where an order cycles through `PREPARING` multiple times.

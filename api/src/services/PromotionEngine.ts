@@ -599,7 +599,22 @@ export class PromotionEngine {
             return false;
         }
 
-        // Per-user limit already checked in checkCodeEligibility
+        // Per-user limit (applies to all promos, including code-less SPECIFIC_USERS/recovery ones)
+        if (promo.maxUsagePerUser) {
+            const [usage] = await this.db
+                .select({ count: sql<number>`count(*)` })
+                .from(promotionUsage)
+                .where(
+                    and(
+                        eq(promotionUsage.promotionId, promo.id),
+                        eq(promotionUsage.userId, userId)
+                    )
+                );
+            if (Number(usage?.count || 0) >= promo.maxUsagePerUser) {
+                return false;
+            }
+        }
+
         return true;
     }
 

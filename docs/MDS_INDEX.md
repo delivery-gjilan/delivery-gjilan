@@ -16,7 +16,7 @@
 |----|------|--------|-------------|
 | A1 | [ARCHITECTURE.md](ARCHITECTURE.md) | System | Monorepo shape, layers, realtime topology |
 | B1 | [BACKEND/API.md](BACKEND/API.md) | Backend | Express, Yoga, graphql-ws, Drizzle, auth model |
-| B2 | [BACKEND/ORDER_CREATION.md](BACKEND/ORDER_CREATION.md) | Backend | OrderService facade + 6 domain modules (`order/`), IOrderService, AWAITING_APPROVAL, locationFlagged, service-zone coverage, payment collection, preflight gate |
+| B2 | [BACKEND/ORDER_CREATION.md](BACKEND/ORDER_CREATION.md) | Backend | OrderService facade + 6 domain modules (`order/`), IOrderService, AWAITING_APPROVAL, locationFlagged, service-zone coverage, payment collection, preflight gate, dispatch notification side-effects (Redis `dispatch:early`) |
 | B3 | [BACKEND/ORDER_TOTAL_PRICE_VALIDATION.md](BACKEND/ORDER_TOTAL_PRICE_VALIDATION.md) | Backend | Price integrity, epsilon, promo application, one-directional delivery validation |
 | B4 | [BACKEND/WATCHDOG_HEARTBEAT.md](BACKEND/WATCHDOG_HEARTBEAT.md) | Backend | DriverHeartbeatHandler, DriverWatchdogService, connection states |
 | B5 | [BACKEND/AUTH_AND_USERS.md](BACKEND/AUTH_AND_USERS.md) | Backend | JWT model, signup steps, token rotation, roles, password rules |
@@ -44,7 +44,7 @@
 | M5 | [MOBILE/ORDER_INPUT_VARIANT_OFFER_FLOW_SNAPSHOT.md](MOBILE/ORDER_INPUT_VARIANT_OFFER_FLOW_SNAPSHOT.md) | Mobile | CreateOrderInput, variants, offers, options |
 | M6 | [MOBILE/ADMIN_PANEL_MOBILE_REFACTOR_TRACKER.md](MOBILE/ADMIN_PANEL_MOBILE_REFACTOR_TRACKER.md) | Mobile | Admin-panel to mobile parity tracker (business/admin flows) |
 | M7 | [MOBILE/ORDER_SUBSCRIPTION_SYNC_MB.md](MOBILE/ORDER_SUBSCRIPTION_SYNC_MB.md) | Mobile | Subscription-first order sync, cache/store update contract, fallback refetch rules |
-| M8 | [MOBILE/DRIVER_APP.md](MOBILE/DRIVER_APP.md) | Mobile | Driver app deep-dive: heartbeat, navigation, PTT, battery, auth, stores, GraphQL ops, refactor candidates |
+| M8 | [MOBILE/DRIVER_APP.md](MOBILE/DRIVER_APP.md) | Mobile | Driver app deep-dive: heartbeat (exp. backoff), navigation (PickupSlider, DeliverySlider), OrderPoolSheet, PTT, battery, auth, stores, GraphQL ops, full i18n (EN/AL), error feedback, cancel enum keys, network state detection (NetInfo), Apollo cache versioning, route cache limits, offline connection banner |
 | M9 | [MOBILE/MOBILE_ADMIN_DEEP_DIVE.md](MOBILE/MOBILE_ADMIN_DEEP_DIVE.md) | Mobile | Mobile-admin deep-dive: all screens, GraphQL ops, real-time arch, theme, i18n, refactor candidates |
 | M10 | [MOBILE/REALTIME_SUBSCRIPTIONS_CUSTOMER.md](MOBILE/REALTIME_SUBSCRIPTIONS_CUSTOMER.md) | Mobile | Subscription topology audit, connection count, payload sizing, duplicate subscriptions, optimization roadmap |
 | M11 | [MOBILE/PUSH_AND_LIVE_ACTIVITY_REFACTOR_PLAN.md](MOBILE/PUSH_AND_LIVE_ACTIVITY_REFACTOR_PLAN.md) | Mobile | Full audit of all push notifications and Live Activity; copy refinements; Android notification icon wiring; brand logo in Lock Screen widget; Albanian copy corrections |

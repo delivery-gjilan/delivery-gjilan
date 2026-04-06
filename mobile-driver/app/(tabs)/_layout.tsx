@@ -21,8 +21,11 @@ export default function TabLayout() {
     useEffect(() => {
         if (isNavigating) {
             router.replace('/navigation' as any);
+        } else {
+            // Always open on the map tab at startup
+            router.replace('/(tabs)/drive' as any);
         }
-    // Only run on mount — we don't want to force-redirect every time isNavigating changes
+    // Only run on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 

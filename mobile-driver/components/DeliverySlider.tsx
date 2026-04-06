@@ -2,19 +2,12 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, Animated, PanResponder, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useTranslations } from '@/hooks/useTranslations';
 
 const THUMB = 56;
 const TRACK_H = 62;
 const PING_UNLOCK_S = 180;   // 3 min after I'm Here
 const CANCEL_UNLOCK_S = 600; // 10 min after arrival
-
-const CANCEL_REASONS = [
-    'Customer not responding',
-    'Wrong address',
-    'Customer refused delivery',
-    'Safety concern',
-    'Other',
-];
 
 interface Props {
     customerName: string;
@@ -53,6 +46,15 @@ export function DeliverySlider({
     onDismiss,
     onSuccessAnimStart,
 }: Props) {
+    const { t } = useTranslations();
+    const s = t.delivery;
+    const CANCEL_REASONS = [
+        { key: 'NOT_RESPONDING', label: s.reason_not_responding },
+        { key: 'WRONG_ADDRESS', label: s.reason_wrong_address },
+        { key: 'REFUSED', label: s.reason_refused },
+        { key: 'SAFETY', label: s.reason_safety },
+        { key: 'OTHER', label: s.reason_other },
+    ];
     const trackWidth = useRef(0);
     const cancelTrackWidth = useRef(0);
     const translateX = useRef(new Animated.Value(0)).current;
@@ -61,7 +63,7 @@ export function DeliverySlider({
     const cancelConfirmed = useRef(false);
     const [done, setDone] = useState(false);
     const [showCancelSheet, setShowCancelSheet] = useState(false);
-    const [selectedReason, setSelectedReason] = useState<string | null>(null);
+    const [selectedReason, setSelectedReason] = useState<{ key: string; label: string } | null>(null);
 
     const [, setTick] = useState(0);
     useEffect(() => {
@@ -128,7 +130,7 @@ export function DeliverySlider({
                 if (gs.dx >= max * 0.82 && selectedReason && !cancelConfirmed.current) {
                     cancelConfirmed.current = true;
                     Animated.timing(cancelTranslateX, { toValue: max, duration: 120, useNativeDriver: true })
-                        .start(() => onCancel(selectedReason));
+                        .start(() => onCancel(selectedReason.key));
                 } else {
                     Animated.spring(cancelTranslateX, { toValue: 0, useNativeDriver: true, tension: 80, friction: 12 }).start();
                 }
@@ -154,7 +156,7 @@ export function DeliverySlider({
                                 <Ionicons name="checkmark-circle-outline" size={22} color="#22c55e" />
                             </View>
                             <View style={{ flex: 1 }}>
-                                <Text style={styles.title}>Arrived at Dropoff</Text>
+                                <Text style={styles.title}>{s.arrived_at_dropoff}</Text>
                                 <Text style={styles.sub} numberOfLines={1}>{customerName}</Text>
                             </View>
                             {!!customerPhone && (
@@ -177,7 +179,7 @@ export function DeliverySlider({
                                     color={arrivedNotifSent ? '#22c55e' : '#f1f5f9'}
                                 />
                                 <Text style={[styles.notifText, arrivedNotifSent && { color: '#22c55e' }]}>
-                                    {arrivedNotifSent ? 'Notified' : "I'm Here"}
+                                    {arrivedNotifSent ? s.notified : s.im_here}
                                 </Text>
                             </Pressable>
                         </View>
@@ -194,15 +196,15 @@ export function DeliverySlider({
                                     ))}
                                 </ScrollView>
                                 <View style={styles.pricingRow}>
-                                    <Text style={styles.pricingLabel}>Subtotal</Text>
+                                    <Text style={styles.pricingLabel}>{s.subtotal}</Text>
                                     <Text style={styles.pricingValue}>€{orderPrice.toFixed(2)}</Text>
                                 </View>
                                 <View style={styles.pricingRow}>
-                                    <Text style={styles.pricingLabel}>Delivery</Text>
+                                    <Text style={styles.pricingLabel}>{s.delivery_fee}</Text>
                                     <Text style={styles.pricingValue}>€{deliveryPrice.toFixed(2)}</Text>
                                 </View>
                                 <View style={[styles.pricingRow, styles.pricingTotal]}>
-                                    <Text style={styles.pricingTotalLabel}>Total</Text>
+                                    <Text style={styles.pricingTotalLabel}>{s.total}</Text>
                                     <Text style={styles.pricingTotalValue}>€{totalPrice.toFixed(2)}</Text>
                                 </View>
                             </View>
@@ -215,7 +217,7 @@ export function DeliverySlider({
                         >
                             <Animated.View style={[styles.fill, { opacity: fillOpacity }]} />
                             <Animated.Text style={[styles.trackLabel, { opacity: labelOpacity }]}>
-                                Slide to confirm delivery →
+                                {s.slide_confirm}
                             </Animated.Text>
                             <Animated.View
                                 style={[styles.thumb, { transform: [{ translateX }] }]}
@@ -227,7 +229,7 @@ export function DeliverySlider({
 
                         {/* Trouble row */}
                         <View style={styles.troubleRow}>
-                            <Text style={styles.troubleLabel}>Customer not here?</Text>
+                            <Text style={styles.troubleLabel}>{s.customer_not_here}</Text>
 
                             <Pressable
                                 style={[styles.troubleBtn, !pingUnlocked && styles.troubleBtnLocked]}
@@ -241,8 +243,8 @@ export function DeliverySlider({
                                 />
                                 <Text style={[styles.troubleBtnText, { color: pingUnlocked ? '#f59e0b' : '#475569' }]}>
                                     {pingUnlocked
-                                        ? 'Ping Again'
-                                        : (!arrivedNotifSent ? 'Ping' : `Ping ${fmtTime(pingRemaining)}`)}
+                                        ? s.ping_again
+                                        : (!arrivedNotifSent ? s.ping : s.ping_time.replace('{{time}}', fmtTime(pingRemaining)))}
                                 </Text>
                             </Pressable>
 
@@ -261,7 +263,7 @@ export function DeliverySlider({
                                     color={cancelUnlocked ? '#ef4444' : '#475569'}
                                 />
                                 <Text style={[styles.troubleBtnText, { color: cancelUnlocked ? '#ef4444' : '#475569' }]}>
-                                    {cancelUnlocked ? 'Cancel Order' : `Cancel ${fmtTime(cancelRemaining)}`}
+                                    {cancelUnlocked ? s.cancel_order : s.cancel_time.replace('{{time}}', fmtTime(cancelRemaining))}
                                 </Text>
                             </Pressable>
                         </View>
@@ -274,20 +276,20 @@ export function DeliverySlider({
                             <Pressable onPress={() => setShowCancelSheet(false)} hitSlop={10}>
                                 <Ionicons name="arrow-back" size={20} color="#94a3b8" />
                             </Pressable>
-                            <Text style={styles.cancelTitle}>Cancel Order</Text>
+                            <Text style={styles.cancelTitle}>{s.cancel_order}</Text>
                             <View style={{ width: 20 }} />
                         </View>
-                        <Text style={styles.cancelSubtitle}>Select a reason</Text>
+                        <Text style={styles.cancelSubtitle}>{s.select_reason}</Text>
                         <View style={styles.reasonList}>
                             {CANCEL_REASONS.map((r) => (
                                 <Pressable
-                                    key={r}
-                                    style={[styles.reasonRow, selectedReason === r && styles.reasonRowSelected]}
+                                    key={r.key}
+                                    style={[styles.reasonRow, selectedReason?.key === r.key && styles.reasonRowSelected]}
                                     onPress={() => setSelectedReason(r)}
                                 >
-                                    <View style={[styles.reasonDot, selectedReason === r && styles.reasonDotSelected]} />
-                                    <Text style={[styles.reasonText, selectedReason === r && { color: '#f1f5f9' }]}>
-                                        {r}
+                                    <View style={[styles.reasonDot, selectedReason?.key === r.key && styles.reasonDotSelected]} />
+                                    <Text style={[styles.reasonText, selectedReason?.key === r.key && { color: '#f1f5f9' }]}>
+                                        {r.label}
                                     </Text>
                                 </Pressable>
                             ))}
@@ -299,7 +301,7 @@ export function DeliverySlider({
                         >
                             <Animated.View style={[styles.fill, styles.cancelFill, { opacity: cancelFillOpacity }]} />
                             <Animated.Text style={[styles.trackLabel, { opacity: cancelLabelOpacity }]}>
-                                {selectedReason ? 'Slide to cancel order →' : 'Select a reason first'}
+                                {selectedReason ? s.slide_cancel : s.select_reason_first}
                             </Animated.Text>
                             <Animated.View
                                 style={[styles.thumb, styles.cancelThumb, { transform: [{ translateX: cancelTranslateX }] }]}

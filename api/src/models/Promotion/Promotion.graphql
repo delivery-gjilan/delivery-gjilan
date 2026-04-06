@@ -189,8 +189,8 @@ input IssueRecoveryPromotionInput {
   # User(s) to compensate
   userIds: [ID!]!
 
-  # The order this compensation is for
-  orderId: ID!
+  # The order this compensation is for (optional when issuing from notifications page)
+  orderId: ID
 
   # Human-readable reason (used as promotion name/description internally)
   reason: String!

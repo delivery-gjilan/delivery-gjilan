@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { fetchRouteGeometry } from '@/utils/mapbox';
 import { buildNavOrder, orderToPhase } from '@/utils/orderToNavOrder';
 import { useOrderAcceptStore } from '@/store/orderAcceptStore';
+import { useTranslations } from '@/hooks/useTranslations';
 import type { Feature, LineString } from 'geojson';
 
 /* ─── Constants ─── */
@@ -30,13 +31,6 @@ const STATUS_COLORS: Record<string, string> = {
     OUT_FOR_DELIVERY: '#8B5CF6',
 };
 
-const STATUS_LABELS: Record<string, string> = {
-    PENDING: 'Pending',
-    PREPARING: 'Preparing',
-    READY: 'Ready',
-    OUT_FOR_DELIVERY: 'Delivering',
-};
-
 const STATUS_ICONS: Record<string, string> = {
     PENDING: 'time-outline',
     PREPARING: 'restaurant-outline',
@@ -45,6 +39,13 @@ const STATUS_ICONS: Record<string, string> = {
 };
 
 export default function MapScreen() {
+    const { t } = useTranslations();
+    const STATUS_LABELS: Record<string, string> = {
+        PENDING: t.map.status_pending,
+        PREPARING: t.map.status_preparing,
+        READY: t.map.status_ready,
+        OUT_FOR_DELIVERY: t.map.status_delivering,
+    };
     const apolloClient = useApolloClient();
     const theme = useTheme();
     const insets = useSafeAreaInsets();
@@ -701,9 +702,9 @@ export default function MapScreen() {
                     connectionStatus === 'CONNECTED' ? '#22c55e' :
                     connectionStatus === 'STALE' ? '#f59e0b' : '#ef4444';
                 const connLabel =
-                    connectionStatus === 'CONNECTED' ? (isOnline ? 'Online' : 'Offline') :
-                    connectionStatus === 'STALE' ? 'Weak signal' :
-                    connectionStatus === 'LOST' ? 'Signal lost' : 'Offline';
+                    connectionStatus === 'CONNECTED' ? (isOnline ? t.home.online : t.home.offline) :
+                    connectionStatus === 'STALE' ? t.home.signal_weak :
+                    connectionStatus === 'LOST' ? t.home.signal_lost : t.home.offline;
                 return (
                     <View style={[styles.connPill, { top: insets.top + 12 }]}>
                         <View style={[styles.connDot, { backgroundColor: connColor }]} />
@@ -739,7 +740,7 @@ export default function MapScreen() {
                 const total = assignedOrders.length;
 
                 return (
-                    <View style={[styles.singleCardWrap, { bottom: 0 }]}>
+                    <View style={[styles.singleCardWrap, { bottom: 12 + insets.bottom }]}>
                         {/* Stack depth shadow (visible when 2+ orders) */}
                         {total > 1 && (
                             <View style={styles.cardStackBehind} pointerEvents="none" />
@@ -788,18 +789,18 @@ export default function MapScreen() {
                             {routeInfo && focusedOrderId === order.id && (
                                 <Text style={styles.cardEtaText}>
                                     {order.status === 'OUT_FOR_DELIVERY'
-                                        ? `~${Math.ceil(routeInfo.durationMin)} min to drop`
-                                        : `~${Math.ceil(routeInfo.durationMin)} min to pickup`}
+                                        ? t.drive.min_to_drop.replace('{{min}}', String(Math.ceil(routeInfo.durationMin)))
+                                        : t.drive.min_to_pickup.replace('{{min}}', String(Math.ceil(routeInfo.durationMin)))}
                                 </Text>
                             )}
                             {isPreparing && prepMinsLeft !== null && (
                                 <Text style={styles.cardEtaText}>
-                                    {prepMinsLeft === 0 ? 'Almost ready' : `Ready ~${prepMinsLeft} min`}
+                                    {prepMinsLeft === 0 ? t.drive.almost_ready : t.drive.ready_min.replace('{{min}}', String(prepMinsLeft))}
                                 </Text>
                             )}
                             {/* Swipe hint — only when multiple orders */}
                             {total > 1 && (
-                                <Text style={styles.cardSwipeHint}>swipe ›</Text>
+                                <Text style={styles.cardSwipeHint}>{t.drive.swipe_hint}</Text>
                             )}
                         </View>
 
@@ -811,7 +812,7 @@ export default function MapScreen() {
                                     onPress={() => handleStartNavigation(order)}
                                 >
                                     <Ionicons name="navigate" size={18} color="#fff" />
-                                    <Text style={styles.cardCtaText}>Pickup</Text>
+                                    <Text style={styles.cardCtaText}>{t.drive.pickup}</Text>
                                 </Pressable>
                                 <Pressable
                                     style={[styles.cardCta, styles.cardCtaHalf, { backgroundColor: '#16a34a' }]}
@@ -823,7 +824,7 @@ export default function MapScreen() {
                                     ) : (
                                         <>
                                             <Ionicons name="checkmark-circle" size={18} color="#fff" />
-                                            <Text style={styles.cardCtaText}>Arrived</Text>
+                                            <Text style={styles.cardCtaText}>{t.drive.arrived}</Text>
                                         </>
                                     )}
                                 </Pressable>
@@ -834,7 +835,7 @@ export default function MapScreen() {
                                 onPress={() => handleStartNavigation(order)}
                             >
                                 <Ionicons name="navigate" size={18} color="#fff" />
-                                <Text style={styles.cardCtaText}>Resume Navigation</Text>
+                                <Text style={styles.cardCtaText}>{t.drive.resume_navigation}</Text>
                             </Pressable>
                         ) : (
                             <Pressable
@@ -842,7 +843,7 @@ export default function MapScreen() {
                                 onPress={() => handleStartNavigation(order)}
                             >
                                 <Ionicons name="navigate" size={18} color="#fff" />
-                                <Text style={styles.cardCtaText}>Navigate to Pickup</Text>
+                                <Text style={styles.cardCtaText}>{t.drive.navigate_to_pickup}</Text>
                             </Pressable>
                         )}
                     </View>
@@ -1043,9 +1044,6 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(255,255,255,0.06)',
     },
     singleCard: {
-        position: 'absolute',
-        left: 12,
-        right: 12,
         backgroundColor: 'rgba(10,12,24,0.93)',
         borderRadius: 20,
         borderWidth: 1,

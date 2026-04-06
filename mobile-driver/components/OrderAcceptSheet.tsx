@@ -4,6 +4,8 @@ import Svg, { Circle } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslations } from '@/hooks/useTranslations';
+import { calculateRouteDistance } from '@/utils/mapbox';
 
 const COUNTDOWN_DURATION = 15;
 const RING_R = 20;
@@ -33,6 +35,8 @@ export function OrderAcceptSheet({
     takenByOther = false,
 }: Props) {
     const insets = useSafeAreaInsets();
+    const { t } = useTranslations();
+    const s = t.orderAccept;
     const [countdown, setCountdown] = useState(COUNTDOWN_DURATION);
     const [itemsExpanded, setItemsExpanded] = useState(false);
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -40,10 +44,29 @@ export function OrderAcceptSheet({
     // Tick every 30s so ETA display stays live
     const [nowTs, setNowTs] = useState(() => Date.now());
 
+    // Route distance (driver → business → customer)
+    const [routeInfo, setRouteInfo] = useState<{ distanceKm: number; durationMin: number } | null>(null);
+
     useEffect(() => {
         const id = setInterval(() => setNowTs(Date.now()), 30_000);
         return () => clearInterval(id);
     }, []);
+
+    // Compute total route distance: business → customer dropoff
+    useEffect(() => {
+        setRouteInfo(null);
+        const bizLoc = order?.businesses?.[0]?.business?.location;
+        const dropLoc = order?.dropOffLocation;
+        if (!bizLoc?.latitude || !dropLoc?.latitude) return;
+        let cancelled = false;
+        calculateRouteDistance(
+            { latitude: bizLoc.latitude, longitude: bizLoc.longitude },
+            { latitude: dropLoc.latitude, longitude: dropLoc.longitude },
+        ).then((result) => {
+            if (!cancelled && result) setRouteInfo(result);
+        });
+        return () => { cancelled = true; };
+    }, [order?.id]);
 
     useEffect(() => {
         // Collapse items on new order
@@ -126,18 +149,18 @@ export function OrderAcceptSheet({
     const allItems = (order.businesses ?? []).flatMap((b: any) => b.items ?? []);
     const itemCount = allItems.length;
     const dropAddress = order.dropOffLocation?.address ?? '';
-    const shortAddress = dropAddress.split(',')[0] || 'See map';
+    const shortAddress = dropAddress.split(',')[0] || s.see_map;
     const deliveryFee = Number(order.deliveryPrice ?? 0).toFixed(2);
 
     // ETA: descriptive label for food readiness
     const etaLabel = (() => {
-        if (order.status === 'READY') return 'Ready now';
+        if (order.status === 'READY') return s.ready_now;
         if (order.estimatedReadyAt) {
             const diff = Math.ceil((new Date(order.estimatedReadyAt).getTime() - nowTs) / 60_000);
-            if (diff > 0) return `Ready in ~${diff} min`;
-            return 'Almost ready';
+            if (diff > 0) return s.ready_in.replace('{{min}}', String(diff));
+            return s.almost_ready;
         }
-        if (order.status === 'PREPARING') return 'Preparing';
+        if (order.status === 'PREPARING') return s.preparing;
         return null;
     })();
     const etaIsReady = order.status === 'READY';
@@ -181,30 +204,39 @@ export function OrderAcceptSheet({
                         ) : null}
 
                         <View style={styles.headerTextBlock}>
-                            <Text style={styles.headerLabel}>New Order</Text>
+                            <Text style={styles.headerLabel}>{s.new_order}</Text>
                             <Text style={styles.bizName} numberOfLines={1}>{bizName}</Text>
                         </View>
                     </View>
 
-                    {/* Info row: earnings / ETA / drop-off */}
+                    {/* Info row: earnings / ETA / distance / drop-off */}
                     <View style={styles.infoRow}>
                         <View style={styles.infoItem}>
                             <Text style={styles.infoValue}>€{deliveryFee}</Text>
-                            <Text style={styles.infoLabel}>You earn</Text>
+                            <Text style={styles.infoLabel}>{s.you_earn}</Text>
                         </View>
                         <View style={styles.infoDivider} />
                         {etaLabel ? (
                             <>
                                 <View style={styles.infoItem}>
                                     <Text style={[styles.infoValue, etaIsReady && { color: '#10B981' }]}>{etaLabel}</Text>
-                                    <Text style={styles.infoLabel}>Food status</Text>
+                                    <Text style={styles.infoLabel}>{s.food_status}</Text>
+                                </View>
+                                <View style={styles.infoDivider} />
+                            </>
+                        ) : null}
+                        {routeInfo ? (
+                            <>
+                                <View style={styles.infoItem}>
+                                    <Text style={styles.infoValue}>{routeInfo.distanceKm.toFixed(1)} km</Text>
+                                    <Text style={styles.infoLabel}>{s.total_route}</Text>
                                 </View>
                                 <View style={styles.infoDivider} />
                             </>
                         ) : null}
                         <View style={[styles.infoItem, { flex: 1 }]}>
                             <Text style={styles.infoValue} numberOfLines={1}>{shortAddress}</Text>
-                            <Text style={styles.infoLabel}>Drop-off</Text>
+                            <Text style={styles.infoLabel}>{s.dropoff}</Text>
                         </View>
                     </View>
 
@@ -216,7 +248,7 @@ export function OrderAcceptSheet({
                         <View style={styles.itemsToggleLeft}>
                             <Ionicons name="bag-handle-outline" size={15} color="#6B7280" />
                             <Text style={styles.itemsToggleText}>
-                                {itemCount} {itemCount === 1 ? 'item' : 'items'}
+                                {itemCount} {itemCount === 1 ? s.item : s.items}
                             </Text>
                         </View>
                         <Ionicons
@@ -238,7 +270,7 @@ export function OrderAcceptSheet({
                                 </View>
                             ))}
                             {allItems.length > 8 && (
-                                <Text style={styles.itemsMore}>+{allItems.length - 8} more</Text>
+                                <Text style={styles.itemsMore}>{s.more.replace('{{count}}', String(allItems.length - 8))}</Text>
                             )}
                         </View>
                     )}
@@ -262,7 +294,7 @@ export function OrderAcceptSheet({
                         ) : (
                             <>
                                 <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                                <Text style={styles.acceptText}>Accept Order</Text>
+                                <Text style={styles.acceptText}>{s.accept_order}</Text>
                             </>
                         )}
                     </Pressable>
@@ -275,13 +307,13 @@ export function OrderAcceptSheet({
                             style={[styles.navBtn, accepting && { opacity: 0.6 }]}
                         >
                             <Ionicons name="navigate-outline" size={16} color="#10B981" />
-                            <Text style={styles.navBtnText}>Accept & Navigate</Text>
+                            <Text style={styles.navBtnText}>{s.accept_navigate}</Text>
                         </Pressable>
                     )}
 
                     {/* Skip / Close link */}
                     <Pressable onPress={onSkip} style={styles.skipBtn} disabled={accepting} hitSlop={8}>
-                        <Text style={styles.skipText}>{autoCountdown ? 'Skip for now' : 'Close'}</Text>
+                        <Text style={styles.skipText}>{autoCountdown ? s.skip : s.close}</Text>
                     </Pressable>
                 </View>
 
@@ -294,10 +326,10 @@ export function OrderAcceptSheet({
                         <View style={styles.takenIconWrap}>
                             <Ionicons name="flash" size={28} color="#fbbf24" />
                         </View>
-                        <Text style={styles.takenTitle}>Order taken</Text>
-                        <Text style={styles.takenSub}>Another driver accepted this order first</Text>
+                        <Text style={styles.takenTitle}>{s.order_taken}</Text>
+                        <Text style={styles.takenSub}>{s.taken_sub}</Text>
                         <View style={styles.takenDivider} />
-                        <Text style={styles.takenHint}>Finding you the next one…</Text>
+                        <Text style={styles.takenHint}>{s.taken_hint}</Text>
                     </View>
                 )}
             </View>

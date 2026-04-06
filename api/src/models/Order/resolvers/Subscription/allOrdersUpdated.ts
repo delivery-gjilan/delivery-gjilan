@@ -31,16 +31,12 @@ export const allOrdersUpdated: NonNullable<SubscriptionResolvers['allOrdersUpdat
                 if (!userData.businessId) {
                     return [];
                 }
-                
-                const filteredOrders = [];
-                for (const order of allOrders) {
-                    const containsBusiness = await orderService.orderContainsBusiness(order.id, userData.businessId);
-                    if (containsBusiness) {
-                        filteredOrders.push(order);
-                    }
-                }
-                
-                return filteredOrders;
+
+                if (allOrders.length === 0) return [];
+
+                const orderIds = allOrders.map((o: any) => o.id) as string[];
+                const businessOrderIds = await orderService.getOrderIdsForBusiness(orderIds, userData.businessId);
+                return allOrders.filter((o: any) => businessOrderIds.has(o.id));
 
             default:
                 return [];

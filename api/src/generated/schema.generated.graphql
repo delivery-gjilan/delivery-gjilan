@@ -305,6 +305,16 @@ type BusinessMessageUser {
   lastName: String!
 }
 
+type BusinessPerformanceStat {
+  avgOrderValue: Float!
+  businessId: ID!
+  businessName: String!
+  imageUrl: String
+  isFeatured: Boolean!
+  totalOrders: Int!
+  totalRevenue: Float!
+}
+
 type BusinessPromotion {
   description: String
   discountValue: Float
@@ -900,7 +910,7 @@ input InitiateSignupInput {
 input IssueRecoveryPromotionInput {
   discountValue: Float
   expiresAt: String
-  orderId: ID!
+  orderId: ID
   reason: String!
   type: PromotionType!
   userIds: [ID!]!
@@ -1560,6 +1570,7 @@ type Query {
 
   """Admin: full conversation with a specific business user"""
   businessMessages(businessUserId: ID!, limit: Int, offset: Int): [BusinessMessage!]!
+  businessPerformanceStats(days: Int): [BusinessPerformanceStat!]!
   businesses: [Business!]!
   calculateDeliveryPrice(businessId: ID!, dropoffLat: Float!, dropoffLng: Float!): DeliveryPriceResult!
   cancelledOrders(limit: Int, offset: Int): [Order!]!

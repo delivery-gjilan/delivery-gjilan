@@ -328,6 +328,17 @@ export type BusinessMessageUser = {
   lastName: Scalars['String']['output'];
 };
 
+export type BusinessPerformanceStat = {
+  __typename?: 'BusinessPerformanceStat';
+  avgOrderValue: Scalars['Float']['output'];
+  businessId: Scalars['ID']['output'];
+  businessName: Scalars['String']['output'];
+  imageUrl?: Maybe<Scalars['String']['output']>;
+  isFeatured: Scalars['Boolean']['output'];
+  totalOrders: Scalars['Int']['output'];
+  totalRevenue: Scalars['Float']['output'];
+};
+
 export type BusinessPromotion = {
   __typename?: 'BusinessPromotion';
   description?: Maybe<Scalars['String']['output']>;
@@ -899,7 +910,7 @@ export type InitiateSignupInput = {
 export type IssueRecoveryPromotionInput = {
   discountValue?: InputMaybe<Scalars['Float']['input']>;
   expiresAt?: InputMaybe<Scalars['String']['input']>;
-  orderId: Scalars['ID']['input'];
+  orderId?: InputMaybe<Scalars['ID']['input']>;
   reason: Scalars['String']['input'];
   type: PromotionType;
   userIds: Array<Scalars['ID']['input']>;
@@ -2201,6 +2212,7 @@ export type Query = {
   businessMessageThreads: Array<BusinessMessageThread>;
   /** Admin: full conversation with a specific business user */
   businessMessages: Array<BusinessMessage>;
+  businessPerformanceStats: Array<BusinessPerformanceStat>;
   businesses: Array<Business>;
   calculateDeliveryPrice: DeliveryPriceResult;
   cancelledOrders: Array<Order>;
@@ -2326,6 +2338,11 @@ export type QuerybusinessMessagesArgs = {
   businessUserId: Scalars['ID']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
+export type QuerybusinessPerformanceStatsArgs = {
+  days?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -3416,6 +3433,7 @@ export type ResolversTypes = {
   BusinessMessage: ResolverTypeWrapper<Omit<BusinessMessage, 'alertType'> & { alertType: ResolversTypes['MessageAlertType'] }>;
   BusinessMessageThread: ResolverTypeWrapper<Omit<BusinessMessageThread, 'lastMessage'> & { lastMessage?: Maybe<ResolversTypes['BusinessMessage']> }>;
   BusinessMessageUser: ResolverTypeWrapper<BusinessMessageUser>;
+  BusinessPerformanceStat: ResolverTypeWrapper<BusinessPerformanceStat>;
   BusinessPromotion: ResolverTypeWrapper<Omit<BusinessPromotion, 'type'> & { type: ResolversTypes['PromotionType'] }>;
   BusinessType: ResolverTypeWrapper<'MARKET' | 'PHARMACY' | 'RESTAURANT'>;
   CampaignStatus: ResolverTypeWrapper<'DRAFT' | 'SENDING' | 'SENT' | 'FAILED'>;
@@ -3612,6 +3630,7 @@ export type ResolversParentTypes = {
   BusinessMessage: BusinessMessage;
   BusinessMessageThread: Omit<BusinessMessageThread, 'lastMessage'> & { lastMessage?: Maybe<ResolversParentTypes['BusinessMessage']> };
   BusinessMessageUser: BusinessMessageUser;
+  BusinessPerformanceStat: BusinessPerformanceStat;
   BusinessPromotion: BusinessPromotion;
   CartContextInput: CartContextInput;
   CartItemInput: CartItemInput;
@@ -3956,6 +3975,17 @@ export type BusinessMessageUserResolvers<ContextType = GraphQLContext, ParentTyp
   firstName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   lastName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type BusinessPerformanceStatResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['BusinessPerformanceStat'] = ResolversParentTypes['BusinessPerformanceStat']> = {
+  avgOrderValue?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  businessId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  businessName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  isFeatured?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  totalOrders?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  totalRevenue?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -4745,6 +4775,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   businessKPIs?: Resolver<Array<ResolversTypes['BusinessKPI']>, ParentType, ContextType, RequireFields<QuerybusinessKPIsArgs, 'endDate' | 'startDate'>>;
   businessMessageThreads?: Resolver<Array<ResolversTypes['BusinessMessageThread']>, ParentType, ContextType>;
   businessMessages?: Resolver<Array<ResolversTypes['BusinessMessage']>, ParentType, ContextType, RequireFields<QuerybusinessMessagesArgs, 'businessUserId'>>;
+  businessPerformanceStats?: Resolver<Array<ResolversTypes['BusinessPerformanceStat']>, ParentType, ContextType, Partial<QuerybusinessPerformanceStatsArgs>>;
   businesses?: Resolver<Array<ResolversTypes['Business']>, ParentType, ContextType>;
   calculateDeliveryPrice?: Resolver<ResolversTypes['DeliveryPriceResult'], ParentType, ContextType, RequireFields<QuerycalculateDeliveryPriceArgs, 'businessId' | 'dropoffLat' | 'dropoffLng'>>;
   cancelledOrders?: Resolver<Array<ResolversTypes['Order']>, ParentType, ContextType, Partial<QuerycancelledOrdersArgs>>;
@@ -5173,6 +5204,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   BusinessMessage?: BusinessMessageResolvers<ContextType>;
   BusinessMessageThread?: BusinessMessageThreadResolvers<ContextType>;
   BusinessMessageUser?: BusinessMessageUserResolvers<ContextType>;
+  BusinessPerformanceStat?: BusinessPerformanceStatResolvers<ContextType>;
   BusinessPromotion?: BusinessPromotionResolvers<ContextType>;
   BusinessType?: BusinessTypeResolvers;
   CampaignStatus?: CampaignStatusResolvers;

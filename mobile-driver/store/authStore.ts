@@ -23,6 +23,8 @@ interface AuthState {
     isOnline: boolean;
     /** Live heartbeat connection status, updated after every successful heartbeat response. */
     connectionStatus: DriverConnectionStatus;
+    /** OS-level network connectivity (from NetInfo). */
+    isNetworkConnected: boolean;
 
     // Actions
     setToken: (token: string | null) => void;
@@ -30,6 +32,7 @@ interface AuthState {
     setLoading: (loading: boolean) => void;
     setOnline: (online: boolean) => void;
     setConnectionStatus: (status: DriverConnectionStatus) => void;
+    setNetworkConnected: (connected: boolean) => void;
     login: (token: string, user: User) => void;
     logout: () => void;
 }
@@ -53,6 +56,7 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: false,
             isOnline: false,
             connectionStatus: 'DISCONNECTED' as DriverConnectionStatus,
+            isNetworkConnected: true,
 
             setToken: (token) => {
                 set((state) => ({
@@ -75,6 +79,8 @@ export const useAuthStore = create<AuthState>()(
             setOnline: (isOnline) => set({ isOnline }),
 
             setConnectionStatus: (connectionStatus) => set({ connectionStatus }),
+
+            setNetworkConnected: (isNetworkConnected) => set({ isNetworkConnected }),
 
             login: (token, user) => {
                 const onlinePref = (user as any)?.driverConnection?.onlinePreference;

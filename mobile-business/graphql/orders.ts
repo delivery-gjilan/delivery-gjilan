@@ -102,6 +102,8 @@ export const ORDERS_SUBSCRIPTION = graphql(`
             status
             preparationMinutes
             estimatedReadyAt
+            preparingAt
+            readyAt
             user {
                 id
                 firstName

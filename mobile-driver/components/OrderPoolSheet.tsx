@@ -2,6 +2,7 @@
 import { View, Text, Pressable, ScrollView, StyleSheet, Animated, Image, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslations } from '@/hooks/useTranslations';
 
 interface Props {
     orders: any[];
@@ -13,6 +14,8 @@ interface Props {
 
 export function OrderPoolSheet({ orders, accepting = false, onAccept, onAcceptAndNavigate, onClose }: Props) {
     const insets = useSafeAreaInsets();
+    const { t } = useTranslations();
+    const s = t.orderPool;
     const slideAnim = useRef(new Animated.Value(500)).current;
     const backdropAnim = useRef(new Animated.Value(0)).current;
 
@@ -51,7 +54,7 @@ export function OrderPoolSheet({ orders, accepting = false, onAccept, onAcceptAn
                 <View style={styles.header}>
                     <View style={styles.headerLeft}>
                         <View style={styles.headerDot} />
-                        <Text style={styles.headerTitle}>Available Orders</Text>
+                        <Text style={styles.headerTitle}>{s.available_orders}</Text>
                         <View style={styles.countBadge}>
                             <Text style={styles.countText}>{orders.length}</Text>
                         </View>
@@ -66,8 +69,8 @@ export function OrderPoolSheet({ orders, accepting = false, onAccept, onAcceptAn
                         <View style={styles.emptyIconWrap}>
                             <Ionicons name="storefront-outline" size={28} color="#334155" />
                         </View>
-                        <Text style={styles.emptyTitle}>No orders right now</Text>
-                        <Text style={styles.emptySubtitle}>New orders will appear here automatically</Text>
+                        <Text style={styles.emptyTitle}>{s.no_orders_title}</Text>
+                        <Text style={styles.emptySubtitle}>{s.no_orders_sub}</Text>
                     </View>
                 ) : (
                     <ScrollView
@@ -85,17 +88,17 @@ export function OrderPoolSheet({ orders, accepting = false, onAccept, onAcceptAn
                                 (acc: number, b: any) => acc + (b.items?.length ?? 0), 0,
                             );
                             const dropAddress = order.dropOffLocation?.address ?? '';
-                            const shortAddress = dropAddress.split(',')[0] || 'See map';
+                            const shortAddress = dropAddress.split(',')[0] || s.see_map;
                             const deliveryFee = Number(order.deliveryPrice ?? 0).toFixed(2);
                             const isReady = order.status === 'READY';
                             const etaLabel = (() => {
-                                if (isReady) return 'Ready now';
+                                if (isReady) return s.ready_now;
                                 if (order.estimatedReadyAt) {
                                     const diff = Math.ceil((new Date(order.estimatedReadyAt).getTime() - Date.now()) / 60_000);
-                                    if (diff > 0) return `~${diff} min`;
-                                    return 'Almost ready';
+                                    if (diff > 0) return s.min.replace('{{min}}', String(diff));
+                                    return s.almost_ready;
                                 }
-                                return 'Preparing';
+                                return s.preparing;
                             })();
 
                             return (
@@ -128,7 +131,7 @@ export function OrderPoolSheet({ orders, accepting = false, onAccept, onAcceptAn
 
                                             {/* Earnings */}
                                             <View style={styles.earningsBadge}>
-                                                <Text style={styles.earningsLabel}>earn</Text>
+                                                <Text style={styles.earningsLabel}>{s.earn}</Text>
                                                 <Text style={styles.earningsValue}>€{deliveryFee}</Text>
                                             </View>
                                         </View>
@@ -145,7 +148,7 @@ export function OrderPoolSheet({ orders, accepting = false, onAccept, onAcceptAn
                                             <View style={styles.chip}>
                                                 <Ionicons name="bag-handle-outline" size={11} color="#64748b" />
                                                 <Text style={styles.chipText}>
-                                                    {itemCount} {itemCount === 1 ? 'item' : 'items'}
+                                                    {itemCount} {itemCount === 1 ? s.item : s.items}
                                                 </Text>
                                             </View>
 
@@ -167,7 +170,7 @@ export function OrderPoolSheet({ orders, accepting = false, onAccept, onAcceptAn
                                                 ) : (
                                                     <Ionicons name="checkmark" size={14} color="#fff" />
                                                 )}
-                                                <Text style={styles.ctaBtnText}>Accept</Text>
+                                                <Text style={styles.ctaBtnText}>{s.accept}</Text>
                                             </Pressable>
                                             <Pressable
                                                 style={[styles.ctaBtn, styles.ctaBtnNavigate]}
@@ -179,7 +182,7 @@ export function OrderPoolSheet({ orders, accepting = false, onAccept, onAcceptAn
                                                 ) : (
                                                     <Ionicons name="navigate" size={14} color="#fff" />
                                                 )}
-                                                <Text style={styles.ctaBtnText}>Accept & Go</Text>
+                                                <Text style={styles.ctaBtnText}>{s.accept_go}</Text>
                                             </Pressable>
                                         </View>
                                     </View>

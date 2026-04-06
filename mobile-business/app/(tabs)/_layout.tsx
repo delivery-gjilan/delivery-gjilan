@@ -12,7 +12,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 export default function TabLayout() {
     const { t } = useTranslation();
     const { user } = useAuthStore();
-    const { data } = useQuery(GET_BUSINESS_ORDERS, { pollInterval: 15000 });
+    const { data } = useQuery(GET_BUSINESS_ORDERS);
     const insets = useSafeAreaInsets();
     const canManageProducts = hasBusinessPermission(user, UserPermission.ManageProducts);
     const canManageSettings = hasBusinessPermission(user, UserPermission.ManageSettings);
@@ -59,7 +59,7 @@ export default function TabLayout() {
                                         position: 'absolute',
                                         top: -4,
                                         right: -8,
-                                        backgroundColor: '#f59e0b',
+                                        backgroundColor: '#ef4444',
                                         borderRadius: 10,
                                         minWidth: 20,
                                         height: 20,
@@ -68,7 +68,7 @@ export default function TabLayout() {
                                         paddingHorizontal: 4,
                                     }}
                                 >
-                                    <Text style={{ color: '#000', fontSize: 11, fontWeight: '800' }}>
+                                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>
                                         {pendingCount}
                                     </Text>
                                 </View>

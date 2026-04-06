@@ -134,6 +134,7 @@ export function useDriverHeartbeat() {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('DISCONNECTED');
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const lastHeartbeatSentRef = useRef<number>(0);
+  const consecutiveFailuresRef = useRef<number>(0);
 
   const getHeartbeatIntervalMs = useCallback(() => {
     const navState = useNavigationStore.getState();
@@ -375,8 +376,8 @@ export function useDriverHeartbeat() {
     }
   }, []);
 
-  // Send heartbeat to server with retry logic
-  const doHeartbeat = useCallback(async (isRetry = false) => {
+  // Send heartbeat to server with exponential backoff retry
+  const doHeartbeat = useCallback(async () => {
     try {
       const location = await getCurrentLocation(); // Now always returns a location
 
@@ -396,27 +397,33 @@ export function useDriverHeartbeat() {
       const data = (result.data as any)?.driverHeartbeat;
       if (data?.success) {
         lastHeartbeatSentRef.current = Date.now();
+        consecutiveFailuresRef.current = 0; // Reset backoff on success
         setConnectionStatus(data.connectionStatus as ConnectionStatus);
         useAuthStore.getState().setConnectionStatus(data.connectionStatus);
         console.log('[Heartbeat] Sent', {
           status: data.connectionStatus,
           locationUpdated: data.locationUpdated,
-          isRetry,
         });
       } else {
         console.warn('[Heartbeat] Failed:', result.error);
       }
     } catch (err: any) {
-      console.error('[Heartbeat] Error:', err.message);
-      
-      // Retry once after 1 second if this wasn't already a retry
-      if (!isRetry) {
-        console.log('[Heartbeat] Retrying in 1s...');
-        setTimeout(() => doHeartbeat(true), 1000);
-      } else {
-        // Only mark as potentially stale after retry also fails
+      consecutiveFailuresRef.current += 1;
+      const failures = consecutiveFailuresRef.current;
+
+      // Exponential backoff: 2s, 4s, 8s, 16s, cap 30s + jitter (±20%)
+      const baseDelay = Math.min(2000 * Math.pow(2, failures - 1), 30_000);
+      const jitter = baseDelay * (0.8 + Math.random() * 0.4);
+      const retryDelay = Math.round(jitter);
+
+      console.error(`[Heartbeat] Error (failure #${failures}), retrying in ${retryDelay}ms:`, err.message);
+
+      // Mark as STALE after 3 consecutive failures
+      if (failures >= 3) {
         setConnectionStatus((prev) => (prev === 'CONNECTED' ? 'STALE' : prev));
       }
+
+      setTimeout(() => doHeartbeat(), retryDelay);
     }
   }, [getCurrentLocation, getNavigationEtaPayload, sendHeartbeat]);
 

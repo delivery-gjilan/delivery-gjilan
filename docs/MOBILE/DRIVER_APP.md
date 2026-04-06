@@ -1,6 +1,6 @@
 # Mobile Driver App
 
-<!-- MDS:M8 | Domain: Mobile | Updated: 2026-05-27 -->
+<!-- MDS:M8 | Domain: Mobile | Updated: 2026-04-06 -->
 <!-- Depends-On: A1, B1, B4, B5, B7, BL1 -->
 <!-- Depended-By: M1, O4 -->
 <!-- Nav: Heartbeat changes → also update B4 (Watchdog). Auth changes → also update B5. Subscription shape changes → verify map.tsx and navigation.tsx cache update logic. -->
@@ -30,10 +30,12 @@ mobile-driver/
 │       └── profile.tsx         # User info, language toggle
 ├── components/
 │   ├── navigation/             # FloatingMapButtons, InstructionBanner, NavigationBottomPanel, RecenterButton
+│   ├── PickupSlider.tsx        # Extracted pickup‐arrival CTA (pickup confirm/cancel)
+│   ├── DeliverySlider.tsx      # Extracted delivery‐arrival CTA (confirm delivery, cancel reasons, ping/cancel timers)
+│   ├── OrderPoolSheet.tsx      # Bottom‐sheet pool of available orders (FAB trigger in _layout.tsx)
 │   ├── Badge, Button, Card, DateTimePicker, InfoBanner, Input, TrendIndicator
 ├── graphql/operations/
 │   ├── auth/login.ts           # LOGIN_MUTATION (generic, role-checked)
-│   ├── auth/driverLogin.ts     # DRIVER_LOGIN_MUTATION — dead code, not imported anywhere
 │   ├── driver.ts               # GET_MY_DRIVER_METRICS, GET_MY_SETTLEMENTS, GET_MY_SETTLEMENT_SUMMARY
 │   ├── driverLocation.ts       # UPDATE_DRIVER_ONLINE_STATUS
 │   ├── driverTelemetry.ts      # DRIVER_UPDATE_BATTERY_STATUS, DRIVER_PTT_SIGNAL_SUBSCRIPTION, GET_AGORA_RTC_CREDENTIALS
@@ -44,8 +46,7 @@ mobile-driver/
 ├── lib/graphql/
 │   ├── apolloClient.ts         # Apollo setup, cache, WS client
 │   ├── authSession.ts          # JWT validation, token refresh, refresh dedup lock
-│   ├── providers.tsx           # ApolloProvider + ThemeProvider + SafeAreaProvider
-│   └── driverSocket.ts         # Empty file — dead code
+│   └── providers.tsx           # ApolloProvider + ThemeProvider + SafeAreaProvider
 ├── store/
 │   ├── authStore.ts            # Auth state + online preference (Zustand persist)
 │   ├── navigationStore.ts      # Active navigation state machine (Zustand)
@@ -54,7 +55,7 @@ mobile-driver/
 │   ├── useLocaleStore.ts       # Language preference
 │   └── useThemeStore.ts        # Theme preference
 ├── utils/
-│   ├── mapbox.ts               # Directions API calls, route cache (TTL 5–10 min), in-flight dedup
+│   ├── mapbox.ts               # Directions API calls, route cache (TTL 5–10 min, 50-entry cap), in-flight dedup
 │   ├── routeProgress.ts        # Haversine ETA computation (no API calls)
 │   ├── secureTokenStore.ts     # SecureStore (native) / AsyncStorage (web) token persistence
 │   ├── environment.ts          # Environment enum
@@ -85,10 +86,13 @@ index.tsx
             └── <AppContent>
                  ├── useDriverTracking()   → heartbeat + battery reporting
                  ├── useNotifications()    → FCM token registration
+                 ├── useNetworkStatus()    → OS-level connectivity → authStore.isNetworkConnected
                  ├── useDriverPttReceiver() → Agora RTC PTT listener
                  ├── useStoreStatus()      → GET_STORE_STATUS poll (30s)
                  ├── useGlobalOrderAccept() → single ALL_ORDERS_UPDATED subscription + OrderAcceptSheet
-                 └── <Stack> screens
+                 ├── <Stack> screens
+                 ├── Pool FAB button       → opens OrderPoolSheet (rendered AFTER Stack so it overlays screens)
+                 └── <OrderPoolSheet>      → props: onAccept, onAcceptAndNavigate, accepting
 ```
 
 ---
@@ -122,10 +126,11 @@ index.tsx
 | `user` | `User \| null` | Full user object inc. `driverConnection` |
 | `isAuthenticated` | `boolean` | `!!(token && user && role === DRIVER)` |
 | `isOnline` | `boolean` | Driver's manual preference toggle (≠ backend's `connectionStatus`) |
+| `isNetworkConnected` | `boolean` | OS-level connectivity from `@react-native-community/netinfo` |
 | `isLoading` | `boolean` | Request in-flight |
 | `hasHydrated` | `boolean` | Zustand persist hydration gate |
 
-**Important distinction**: `isOnline` is the driver's intent ("I want to work"). The backend's `connectionStatus` (CONNECTED/STALE/LOST/DISCONNECTED) is the system's computed presence based on heartbeat recency.
+**Important distinction**: `isOnline` is the driver's intent ("I want to work"). The backend's `connectionStatus` (CONNECTED/STALE/LOST/DISCONNECTED) is the system's computed presence based on heartbeat recency. `isNetworkConnected` is the OS-reported internet reachability from `@react-native-community/netinfo`.
 
 ---
 
@@ -171,7 +176,7 @@ The `Query.order` field has a local-only read resolver that resolves individual 
 
 ### Persistence
 
-`apollo3-cache-persist` serializes the InMemoryCache to AsyncStorage. On cold start, the cached data is available before the first network response, eliminating skeleton flash. A 2s timeout in `providers.tsx` ensures startup never hangs if the cache is corrupt or AsyncStorage is slow.
+`apollo3-cache-persist` serializes the InMemoryCache to AsyncStorage under key `apollo-cache-v1`. Bump the version suffix in `CACHE_VERSION` to discard stale cache after schema changes. On cold start, the cached data is available before the first network response, eliminating skeleton flash. A 2s timeout in `providers.tsx` ensures startup never hangs if the cache is corrupt or AsyncStorage is slow.
 
 ### Error Handling
 
@@ -217,6 +222,8 @@ mutation DriverHeartbeat(
 - Default: every **5 seconds** in foreground
 - Active delivery (status `OUT_FOR_DELIVERY`): every **2 seconds**
 - Interval is re-evaluated on each tick by reading `navigationStore` state directly (avoids stale closures)
+
+**Retry strategy:** Exponential backoff with jitter on consecutive failures: 2 s → 4 s → 8 s → 16 s, capped at 30 s. Jitter is ±20% to prevent thundering herd. After 3 consecutive failures the heartbeat `connectionStatus` transitions to `STALE`. Backoff resets on next successful heartbeat.
 
 **Location source priority:**
 1. `navigationLocationStore` — live feed from `MapboxNavigationView` SDK (when navigating)
@@ -307,6 +314,9 @@ When `dispatchModeEnabled` is `true` (broadcast via `storeStatusUpdated` subscri
 - The global `useGlobalOrderAccept` hook suppresses auto-present
 - An amber “Admin is dispatching orders” pill appears on the home screen
 
+**Order card rendering:**
+Cards sit at the bottom of the map in a `singleCardWrap` container positioned at `bottom: 12 + insets.bottom` (above the tab bar). The `singleCard` itself uses normal flow layout (not absolute) to ensure proper height contribution. Multi-order stacks use a `cardStackBehind` shadow view for depth effect.
+
 **Order accept sheet:**
 The `OrderAcceptSheet` is rendered globally in `AppContent` (`_layout.tsx`), not in drive.tsx or navigation.tsx. When a driver selects an order from the pool FAB, `drive.tsx` calls `useOrderAcceptStore.getState().setPendingOrder(order, false)` directly.
 
@@ -317,7 +327,24 @@ The `OrderAcceptSheet` is rendered globally in `AppContent` (`_layout.tsx`), not
 - `OrderAcceptSheet` renders a dark overlay with a flash icon, "Order taken" title, "Another driver accepted this order first" subtitle, and "Finding you the next one…" hint when `takenByOther` is true
 
 **OrderPoolSheet:**
-Full redesign — business images, left accent bar (green=`READY`, indigo=`PREPARING`), earnings badge with large green value, animated ETA chips, drop-off location chip, cyan circle-arrow CTA button. Sheet header shows teal dot + order count badge.
+Full redesign — business images, left accent bar (green=`READY`, indigo=`PREPARING`), earnings badge with large green value, animated ETA chips, drop-off location chip, cyan circle-arrow CTA button. Sheet header shows teal dot + order count badge. All strings translated (EN/AL) via `useTranslations()` → `t.orderPool`.
+
+### Localisation (i18n) Coverage
+
+All driver-facing UI strings in the following components are translated to English and Albanian via the `useTranslations()` hook. Translation keys live in `localization/en.json` and `localization/al.json` under these sections:
+
+| Section | Component(s) |
+|---------|-------------|
+| `orderAccept` | `OrderAcceptSheet` |
+| `orderPool` | `OrderPoolSheet` |
+| `pickup` | `PickupSlider` |
+| `delivery` | `DeliverySlider` |
+| `navigation` | `navigation.tsx` |
+| `drive` | `drive.tsx` |
+| `map` | Status labels in `navigation.tsx` + `drive.tsx` |
+| `home` | Connection status pill in `drive.tsx` |
+
+The `OrderAcceptSheet` also displays route distance (km) between pickup and dropoff, computed via `calculateRouteDistance()` from `utils/mapbox.ts`. The distance pill appears in the info row when business and dropoff locations are available.
 
 ---
 
@@ -342,12 +369,14 @@ The `navigationStore.advanceToDropoff()` action transitions the phase. `stopNavi
 
 | Layer | zIndex | Description |
 |-------|--------|-------------|
+| Back button | 150 | Top-left 44×44 circle, `rgba(0,0,0,0.55)` bg, white chevron icon — ensures visibility over dark map tiles |
 | Floating bottom bar | 100 | Status colour, phase label, distance, ETA, exit button |
+| Earnings pill | 100 | Green badge showing delivery fee + tip total (€ symbol) |
 | Recenter button | 50 | Right side — calls `mapViewRef.current?.recenterMap()` |
 | New order toast | 150 | Compact navy banner (top of screen) — appears when a new order is assigned while navigating; auto-dismisses after 6 s |
 | Avatar sidebar | 50 | Discord-style order switcher — only visible when `assignedOrders.length > 1` |
-| Pickup arrival panel | 200 | Slides from bottom on `onWaypointArrival` — "Picked Up" CTA |
-| Delivery arrival panel | 200 | Slides from bottom on `onFinalDestinationArrival` — "Confirm Delivery" CTA |
+| `<PickupSlider>` | 200 | Slides from bottom on `onWaypointArrival` — extracted component (`components/PickupSlider.tsx`). Props: `businessName`, `etaMins`, `prepMinsLeft`, `insetBottom`, `onConfirm`, `onCancel` |
+| `<DeliverySlider>` | 200 | Slides from bottom on `onFinalDestinationArrival` — extracted component (`components/DeliverySlider.tsx`). Full delivery panel: confirm delivery CTA, cancel reason selector (sends enum key like `NOT_RESPONDING`, not translated label), ping/cancel unlock timers |
 
 ### New Order Toast
 
@@ -360,7 +389,7 @@ When a new order is assigned to the driver during active navigation (dispatch mo
 
 ### Real-time Subscription
 
-`navigation.tsx` runs its own `ALL_ORDERS_UPDATED` subscription (`useSubscription`, skipped when `!currentDriverId`) that writes payloads into the Apollo cache. This keeps the displayed order card and multi-order switcher current without relying solely on the global `useGlobalOrderAccept` subscription. `GET_ORDERS` is queried with `cache-first` (no poll interval).
+`navigation.tsx` relies on the global `useGlobalOrderAccept` subscription (running in `_layout.tsx`) which writes `ALL_ORDERS_UPDATED` payloads into the Apollo cache. The `GET_ORDERS` query in `navigation.tsx` uses `cache-and-network` / `cache-first` so it reactively picks up cache changes from the global subscription. The duplicate `ALL_ORDERS_UPDATED` subscription that previously ran in `navigation.tsx` was removed to avoid double cache writes.
 
 ### Heartbeat Integration
 
@@ -378,15 +407,17 @@ Both phase transitions fire `UPDATE_ORDER_STATUS` mutation:
 - "Picked Up" → status `OUT_FOR_DELIVERY`
 - "Delivered" → status `DELIVERED`
 
+All status mutation catch blocks show `Alert.alert(t.common.error, t.navigation.status_update_failed)` so the driver sees feedback on failure.
+
 After delivery, `DRIVER_NOTIFY_CUSTOMER` mutation fires with `kind: DELIVERED`.
 
 **Post-delivery cache eviction:** After `updateOrderStatus` resolves, the delivered order is immediately removed from `GET_ORDERS` cache via `apolloClient.cache.updateQuery`. This ensures the drive tab removes the card without waiting for a subscription round-trip.
 
-**External delivery detection:** The `ALL_ORDERS_UPDATED` subscription in `navigation.tsx` and the `GET_ORDERS` cache query together detect when the active order is externally completed by an admin. If `order.id` is absent or has status `DELIVERED`/`CANCELLED`, `stopNavigation()` is called and the screen navigates to `/(tabs)/drive`.
+**External delivery detection:** The `GET_ORDERS` cache query detects when the active order is externally completed by an admin. If `order.id` is absent or has status `DELIVERED`/`CANCELLED`, `stopNavigation()` is called and the screen navigates to `/(tabs)/drive`.
 
 ### Navigation Hooks (prepared but not yet integrated)
 
-These hooks exist in `hooks/` and are exported from `hooks/index.ts` but are **not used** by `navigation.tsx` or `map.tsx`:
+These hooks exist in `hooks/` but are **not exported** from `hooks/index.ts` and are **not used** by any screen:
 
 | Hook | Purpose | Status |
 |------|---------|--------|
@@ -400,6 +431,8 @@ These hooks exist in `hooks/` and are exported from `hooks/index.ts` but are **n
 | `useNavigationState` | Local state machine (`idle/navigating/arrived`) | Unused (navigationStore covers this) |
 
 These hooks were built for a custom `@rnmapbox/maps` navigation view and remain ready for a potential refactor away from the `@badatgil/expo-mapbox-navigation` SDK.
+
+`hooks/index.ts` exports only `useDriverLocation` and `useNotifications`. The unused hooks are still available via direct file import if needed.
 
 ---
 
@@ -426,6 +459,7 @@ The driver can receive real-time voice broadcasts from admin via **Agora RTC**.
 - On iOS: APNs token fetched via `getAPNSTokenAsync()` first, then FCM registration
 - Device token registered with `REGISTER_DEVICE_TOKEN(input: { token, platform, appType: 'DRIVER', deviceId })`
 - On logout: `UNREGISTER_DEVICE_TOKEN(token)` fires
+- Foreground data refresh: certain notification types (`ORDER_ASSIGNED` and others) trigger an automatic `GET_ORDERS` refetch so the map and cards update without manual pull-to-refresh
 - Background tap: notification data is inspected for `data.orderId` or `data.screen`; the app performs a `GET_ORDERS` network fetch (bounded to ~1.5s) before routing so order status/ETA is current on open
 - Cold-start open path also consumes `getLastNotificationResponseAsync()` so launch-from-push follows the same refresh-first behavior
 - All lifecycle events emit `TRACK_PUSH_TELEMETRY`: `TOKEN_REGISTERED`, `TOKEN_REFRESHED`, `TOKEN_UNREGISTERED`, `RECEIVED`, `OPENED`
@@ -553,6 +587,7 @@ When `dispatchModeEnabled` is `true` and the driver is online, an amber pill is 
 | `useDriverLocation` | `map.tsx`, `navigation.tsx` | GPS watch with EMA smoothing |
 | `useDriverPttReceiver` | `_layout.tsx` | Agora PTT subscription + engine |
 | `useNotifications` | `_layout.tsx` | FCM token lifecycle |
+| `useNetworkStatus` | `_layout.tsx` | OS-level connectivity via `@react-native-community/netinfo` → `authStore.isNetworkConnected` |
 | `useStoreStatus` | `_layout.tsx`, `map.tsx`, `home.tsx` | Store banner poll + real-time subscription; exposes `dispatchModeEnabled` |
 | `useGlobalOrderAccept` | `_layout.tsx` | Single `ALL_ORDERS_UPDATED` subscription + capacity-aware auto-present + accept/skip handlers; passive snatch detection (`takenByOther`); renders `OrderAcceptSheet` globally |
 | `useTheme` | Many | Theme token access |
@@ -580,6 +615,7 @@ Wraps the Mapbox Directions API v5.
 
 - `fetchRouteGeometry(from, to)` — simple route for map preview (10 min TTL cache)
 - `fetchNavigationRoute(from, to, waypoints?)` — full route with steps for navigation (5 min TTL cache)
+- Both caches are capped at **50 entries**; oldest entries are evicted on insert
 - In-flight deduplication: concurrent identical requests share one `fetch` via a `Map<key, Promise>`
 - Call counter: `getDirectionsApiCallCount()` for instrumentation
 - Token: `EXPO_PUBLIC_MAPBOX_TOKEN`

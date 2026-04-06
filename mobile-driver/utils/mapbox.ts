@@ -54,6 +54,8 @@ interface CacheEntry<T> {
 /** TTL in ms: 10 min for simple geometry, 5 min for navigation (steps may drift). */
 const SIMPLE_TTL = 10 * 60 * 1000;
 const NAV_TTL = 5 * 60 * 1000;
+/** Max entries per route cache. Oldest entries are evicted when limit is reached. */
+const MAX_CACHE_ENTRIES = 50;
 
 const simpleCache = new Map<string, CacheEntry<{
     coordinates: Array<[number, number]>;
@@ -84,6 +86,19 @@ const navInFlight = new Map<string, Promise<{
 export function clearRouteCache(): void {
     simpleCache.clear();
     navCache.clear();
+}
+
+/** Evict oldest entries when cache exceeds MAX_CACHE_ENTRIES. */
+function evictOldest<T>(cache: Map<string, CacheEntry<T>>): void {
+    if (cache.size <= MAX_CACHE_ENTRIES) return;
+    // Map iterates in insertion order — first key is oldest
+    const toRemove = cache.size - MAX_CACHE_ENTRIES;
+    let removed = 0;
+    for (const key of cache.keys()) {
+        if (removed >= toRemove) break;
+        cache.delete(key);
+        removed++;
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -151,7 +166,10 @@ async function _fetchSimpleRoute(from: Coord, to: Coord): Promise<{
 
     const promise = _doFetchSimpleRoute(url, key, token).then((result) => {
         simpleInFlight.delete(key);
-        if (result) simpleCache.set(key, { result, expiresAt: now + SIMPLE_TTL });
+        if (result) {
+            simpleCache.set(key, { result, expiresAt: now + SIMPLE_TTL });
+            evictOldest(simpleCache);
+        }
         return result;
     });
 
@@ -260,6 +278,7 @@ export async function fetchNavigationRoute(
             };
 
             navCache.set(key, { result, expiresAt: now + NAV_TTL });
+            evictOldest(navCache);
             return result;
         } catch (error) {
             console.error('[MAPBOX] Navigation fetch error:', error);

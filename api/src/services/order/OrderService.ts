@@ -118,6 +118,9 @@ export class OrderService implements IOrderService {
     orderContainsBusiness(orderId: string, businessId: string): Promise<boolean> {
         return this.query.orderContainsBusiness(orderId, businessId);
     }
+    getOrderIdsForBusiness(orderIds: string[], businessId: string): Promise<Set<string>> {
+        return this.query.getOrderIdsForBusiness(orderIds, businessId);
+    }
 
     // ── Mapping ──
     mapToOrderPublic(dbOrder: DbOrder): Promise<Order> {

@@ -42,6 +42,17 @@ type Query {
     businesses: [Business!]! @skipAuth
     business(id: ID!): Business @skipAuth
     featuredBusinesses: [Business!]! @skipAuth
+    businessPerformanceStats(days: Int): [BusinessPerformanceStat!]!
+}
+
+type BusinessPerformanceStat {
+    businessId: ID!
+    businessName: String!
+    imageUrl: String
+    isFeatured: Boolean!
+    totalOrders: Int!
+    totalRevenue: Float!
+    avgOrderValue: Float!
 }
 
 input CreateBusinessInput {

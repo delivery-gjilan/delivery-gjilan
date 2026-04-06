@@ -434,7 +434,6 @@ export default function NotificationsPage() {
   const [previewUsers, setPreviewUsers] = useState<UserItem[]>([]);
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [campaignPromoId, setCampaignPromoId] = useState<string>("");
-  const [showNewPromoForm, setShowNewPromoForm] = useState(false);
   const [newPromoType, setNewPromoType] = useState<"FREE_DELIVERY" | "FIXED_AMOUNT" | "PERCENTAGE">("PERCENTAGE");
   const [newPromoValue, setNewPromoValue] = useState("");
   const [newPromoName, setNewPromoName] = useState("");
@@ -531,7 +530,7 @@ export default function NotificationsPage() {
     setCampaignImageUrl(""); setCampaignCategory(""); setCampaignTimeSensitive(false);
     setCampaignRelevanceScore(""); setPreviewCount(null); setPreviewUsers([]);
     setQueryGroup(createDefaultGroup()); setCampaignPromoId("");
-    setShowNewPromoForm(false); setNewPromoType("PERCENTAGE"); setNewPromoValue(""); setNewPromoName(""); setNewPromoExpiry("");
+    setNewPromoType("PERCENTAGE"); setNewPromoValue(""); setNewPromoName(""); setNewPromoExpiry("");
   };
 
   const handleCreate = async () => {
@@ -1214,121 +1213,94 @@ export default function NotificationsPage() {
 
             {/* Attach promotion */}
             <div className="border border-zinc-800 rounded-xl p-4 space-y-3 bg-zinc-950">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Gift size={14} className="text-violet-400" />
-                  <span className="text-xs font-medium text-zinc-300">Attach a promotion <span className="text-zinc-600 font-normal">(optional)</span></span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => { setShowNewPromoForm((v) => !v); setCampaignPromoId(""); }}
-                  className="text-[11px] text-violet-500 hover:text-violet-400 transition-colors flex items-center gap-1"
-                >
-                  <span className="text-base leading-none">+</span> Create new
-                </button>
+              <div className="flex items-center gap-2">
+                <Gift size={14} className="text-violet-400" />
+                <span className="text-xs font-medium text-zinc-300">Attach a promotion <span className="text-zinc-600 font-normal">(optional)</span></span>
               </div>
-
-              {!showNewPromoForm ? (
-                <>
-                  <p className="text-[11px] text-zinc-600 leading-relaxed">
-                    Select an existing active promotion to assign to every matched user when this campaign sends.
-                  </p>
+              <p className="text-[11px] text-zinc-600 leading-relaxed">
+                Create a temporary promotion — it will be assigned to every matched user when this campaign sends.
+              </p>
+              <Input
+                label="Promotion name"
+                value={newPromoName}
+                onChange={(e) => setNewPromoName(e.target.value)}
+                placeholder="e.g., Weekend 20% off"
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-400 mb-1.5">Type</label>
                   <select
-                    value={campaignPromoId}
-                    onChange={(e) => setCampaignPromoId(e.target.value)}
+                    value={newPromoType}
+                    onChange={(e) => setNewPromoType(e.target.value as typeof newPromoType)}
                     className="w-full bg-[#0f0f0f] border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-violet-600"
                   >
-                    <option value="">No promotion</option>
-                    {allPromotions
-                      .filter((p) => p.isActive)
-                      .map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}{p.code ? ` (${p.code})` : ""} — {p.type === "PERCENTAGE" ? `${p.discountValue}%` : p.type === "FIXED_AMOUNT" ? `€${p.discountValue}` : "Free delivery"}
-                        </option>
-                      ))}
+                    <option value="PERCENTAGE">Percentage off</option>
+                    <option value="FIXED_AMOUNT">Fixed amount off</option>
+                    <option value="FREE_DELIVERY">Free delivery</option>
                   </select>
-                </>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-[11px] text-zinc-600 leading-relaxed">
-                    Create a temporary promotion — it will be assigned to every matched user on send.
-                  </p>
-                  <Input
-                    label="Promotion name"
-                    value={newPromoName}
-                    onChange={(e) => setNewPromoName(e.target.value)}
-                    placeholder="e.g., Weekend 20% off"
-                  />
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-zinc-400 mb-1.5">Type</label>
-                      <select
-                        value={newPromoType}
-                        onChange={(e) => setNewPromoType(e.target.value as typeof newPromoType)}
-                        className="w-full bg-[#0f0f0f] border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-violet-600"
-                      >
-                        <option value="PERCENTAGE">Percentage off</option>
-                        <option value="FIXED_AMOUNT">Fixed amount off</option>
-                        <option value="FREE_DELIVERY">Free delivery</option>
-                      </select>
-                    </div>
-                    {newPromoType !== "FREE_DELIVERY" && (
-                      <Input
-                        label={newPromoType === "PERCENTAGE" ? "Discount %" : "Amount (€)"}
-                        type="number"
-                        min="0"
-                        value={newPromoValue}
-                        onChange={(e) => setNewPromoValue(e.target.value)}
-                        placeholder={newPromoType === "PERCENTAGE" ? "e.g., 20" : "e.g., 5"}
-                      />
-                    )}
-                  </div>
-                  <Input
-                    label="Expires at (optional)"
-                    type="date"
-                    value={newPromoExpiry}
-                    onChange={(e) => setNewPromoExpiry(e.target.value)}
-                  />
-                  {campaignPromoId && (
-                    <div className="flex items-center gap-2 text-[11px] text-green-400 bg-green-950/40 border border-green-900/40 rounded-lg px-3 py-2">
-                      <CheckCircle2 size={12} />
-                      Promotion created and ready to attach
-                    </div>
-                  )}
-                  {!campaignPromoId && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={creatingPromo || !newPromoName.trim() || (newPromoType !== "FREE_DELIVERY" && !newPromoValue.trim())}
-                      onClick={async () => {
-                        try {
-                          const { data } = await createPromotionMut({
-                            variables: {
-                              input: {
-                                name: newPromoName.trim(),
-                                type: newPromoType,
-                                target: "ALL_USERS",
-                                discountValue: newPromoValue.trim() ? Number(newPromoValue) : undefined,
-                                isActive: true,
-                                isStackable: false,
-                                priority: 1,
-                                creatorType: "ADMIN",
-                                endsAt: newPromoExpiry ? new Date(newPromoExpiry).toISOString() : undefined,
-                              },
-                            },
-                          });
-                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                          const id = (data as any)?.createPromotion?.id;
-                          if (id) setCampaignPromoId(id);
-                        } catch (err) { console.error("Create promo failed:", err); }
-                      }}
-                    >
-                      {creatingPromo ? "Creating..." : "Create promotion"}
-                    </Button>
-                  )}
                 </div>
+                {newPromoType !== "FREE_DELIVERY" && (
+                  <Input
+                    label={newPromoType === "PERCENTAGE" ? "Discount %" : "Amount (€)"}
+                    type="number"
+                    min="0"
+                    value={newPromoValue}
+                    onChange={(e) => setNewPromoValue(e.target.value)}
+                    placeholder={newPromoType === "PERCENTAGE" ? "e.g., 20" : "e.g., 5"}
+                  />
+                )}
+              </div>
+              <Input
+                label="Expires at (optional)"
+                type="date"
+                value={newPromoExpiry}
+                onChange={(e) => setNewPromoExpiry(e.target.value)}
+              />
+              {campaignPromoId ? (
+                <div className="flex items-center gap-2 text-[11px] text-green-400 bg-green-950/40 border border-green-900/40 rounded-lg px-3 py-2">
+                  <CheckCircle2 size={12} />
+                  Promotion created — will be assigned on send
+                  <button
+                    type="button"
+                    className="ml-auto text-zinc-600 hover:text-red-400 transition-colors"
+                    onClick={() => { setCampaignPromoId(""); setNewPromoName(""); setNewPromoValue(""); setNewPromoExpiry(""); setNewPromoType("PERCENTAGE"); }}
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ) : (
+                newPromoName.trim() && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={creatingPromo || (newPromoType !== "FREE_DELIVERY" && !newPromoValue.trim())}
+                    onClick={async () => {
+                      try {
+                        const { data } = await createPromotionMut({
+                          variables: {
+                            input: {
+                              name: newPromoName.trim(),
+                              type: newPromoType,
+                              target: "ALL_USERS",
+                              discountValue: newPromoValue.trim() ? Number(newPromoValue) : undefined,
+                              isActive: true,
+                              isStackable: false,
+                              priority: 1,
+                              creatorType: "ADMIN",
+                              endsAt: newPromoExpiry ? new Date(newPromoExpiry).toISOString() : undefined,
+                            },
+                          },
+                        });
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        const id = (data as any)?.createPromotion?.id;
+                        if (id) setCampaignPromoId(id);
+                      } catch (err) { console.error("Create promo failed:", err); }
+                    }}
+                  >
+                    {creatingPromo ? "Creating..." : "Create promotion"}
+                  </Button>
+                )
               )}
-
               {campaignPromoId && (
                 <div className="flex items-center gap-1.5 text-[11px] text-amber-400">
                   <Zap size={11} />
