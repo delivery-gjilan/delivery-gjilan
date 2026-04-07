@@ -16,6 +16,8 @@ export function useHasActiveOrder(): { hasActiveOrder: boolean; isLoading: boole
     const orders: Array<{ status: string }> = (data as any)?.orders ?? [];
     return {
         hasActiveOrder: orders.some((o) => ACTIVE_STATUSES.has(o.status)),
-        isLoading: loading && !data,
+        // Keep loading true during cache-and-network refresh so callers can avoid
+        // making one-time decisions from potentially stale cached order status.
+        isLoading: loading,
     };
 }

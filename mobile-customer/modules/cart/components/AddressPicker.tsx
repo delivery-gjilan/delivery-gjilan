@@ -44,8 +44,14 @@ interface GeocodingFeature {
     properties?: { address?: string; category?: string };
 }
 
-async function searchPlaces(query: string, signal?: AbortSignal): Promise<GeocodingFeature[]> {
+let searchAbortController: AbortController | null = null;
+
+async function searchPlaces(query: string): Promise<GeocodingFeature[]> {
     if (!query.trim() || query.length < 2) return [];
+
+    // Cancel previous request
+    if (searchAbortController) searchAbortController.abort();
+    searchAbortController = new AbortController();
 
     try {
         const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?` +
@@ -56,7 +62,7 @@ async function searchPlaces(query: string, signal?: AbortSignal): Promise<Geocod
             `&types=address,poi,place,locality,neighborhood` +
             `&language=en,sq`;
 
-        const res = await fetch(url, { signal });
+        const res = await fetch(url, { signal: searchAbortController.signal });
         if (!res.ok) return [];
         const data = await res.json();
         return data.features ?? [];
@@ -85,13 +91,6 @@ async function reverseGeocode(lat: number, lng: number): Promise<string> {
         return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
     }
 }
-
-const getAddressIcon = (name: string): keyof typeof Ionicons.glyphMap => {
-    const lower = name.toLowerCase();
-    if (lower.includes('home') || lower.includes('shtepi') || lower.includes('shtëpi')) return 'home';
-    if (lower.includes('work') || lower.includes('office') || lower.includes('pun')) return 'briefcase';
-    return 'location';
-};
 
 // ─── Mapbox Style ───────────────────────────────────────────
 const MAPBOX_STYLE = 'mapbox://styles/mapbox/dark-v11';
@@ -190,10 +189,7 @@ export default function AddressPicker({
         () => activeZones.filter((z: any) => z.isServiceZone === true),
         [activeZones],
     );
-    const effectiveZones = useMemo(
-        () => (serviceZones.length > 0 ? serviceZones : activeZones),
-        [serviceZones, activeZones],
-    );
+    const effectiveZones = serviceZones.length > 0 ? serviceZones : activeZones;
 
     const zoneFillFeature = useMemo(() => {
         if (effectiveZones.length === 0) return null;
@@ -297,7 +293,6 @@ export default function AddressPicker({
     const [showResults, setShowResults] = useState(false);
     const searchInputRef = useRef<TextInput>(null);
     const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const searchAbortRef = useRef<AbortController | null>(null);
 
     // Map state
     const [mapCenter, setMapCenter] = useState<[number, number]>([
@@ -340,21 +335,17 @@ export default function AddressPicker({
         );
     }, [pinLocation, effectiveZones]);
 
-    const isConfirmDisabled = useMemo(
-        () =>
-            reverseLoading ||
-            pinElevated ||
-            zonesLoading ||
-            !pinLocation ||
-            !isPinWithinDeliveryZone ||
-            !hasResolvedPinAddress ||
-            !geocodedLocation ||
-            Math.abs(pinLocation.latitude - geocodedLocation.latitude) >= 0.0001 ||
-            Math.abs(pinLocation.longitude - geocodedLocation.longitude) >= 0.0001 ||
-            !pinAddress.trim(),
-        [reverseLoading, pinElevated, zonesLoading, pinLocation, isPinWithinDeliveryZone,
-            hasResolvedPinAddress, geocodedLocation, pinAddress],
-    );
+    const isConfirmDisabled =
+        reverseLoading ||
+        pinElevated ||
+        zonesLoading ||
+        !pinLocation ||
+        !isPinWithinDeliveryZone ||
+        !hasResolvedPinAddress ||
+        !geocodedLocation ||
+        Math.abs(pinLocation.latitude - geocodedLocation.latitude) >= 0.0001 ||
+        Math.abs(pinLocation.longitude - geocodedLocation.longitude) >= 0.0001 ||
+        !pinAddress.trim();
 
     // Reset when opened
     useEffect(() => {
@@ -379,7 +370,36 @@ export default function AddressPicker({
                 lastGeocodedPos.current = null;
 
                 // Auto-detect current GPS location on open
-                flyToCurrentLocation();
+                (async () => {
+                    try {
+                        const { status } = await Location.requestForegroundPermissionsAsync();
+                        if (status !== 'granted') return;
+
+                        let current: Location.LocationObject | null = null;
+                        try {
+                            current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+                        } catch {
+                            current = await Location.getLastKnownPositionAsync();
+                        }
+                        if (!current) return;
+
+                        const { latitude, longitude } = current.coords;
+                        setPinLocation({ latitude, longitude });
+                        setMapCenter([longitude, latitude]);
+
+                        cameraRef.current?.setCamera({
+                            centerCoordinate: [longitude, latitude],
+                            zoomLevel: 16,
+                            animationDuration: 600,
+                        });
+
+                        const address = await reverseGeocode(latitude, longitude);
+                        setPinAddress(address);
+                        setHasResolvedPinAddress(true);
+                        setGeocodedLocation({ latitude, longitude });
+                        lastGeocodedPos.current = { lat: latitude, lng: longitude };
+                    } catch { /* best-effort */ }
+                })();
             }
         } else {
             // Cleanup on close
@@ -397,13 +417,12 @@ export default function AddressPicker({
             }
             mapDidMoveRef.current = false;
         }
-    }, [visible, flyToCurrentLocation]);
+    }, [visible]);
 
     // Cleanup on unmount
     useEffect(() => {
         return () => {
             if (geocodeAbortRef.current) geocodeAbortRef.current.abort();
-            if (searchAbortRef.current) searchAbortRef.current.abort();
             if (geocodeDebounceRef.current) clearTimeout(geocodeDebounceRef.current);
             if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
             if (buttonEnableTimeoutRef.current) clearTimeout(buttonEnableTimeoutRef.current);
@@ -414,7 +433,6 @@ export default function AddressPicker({
     const handleSearchChange = useCallback((text: string) => {
         setSearchQuery(text);
         if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-        if (searchAbortRef.current) searchAbortRef.current.abort();
 
         if (text.length < 2) {
             setSearchResults([]);
@@ -425,13 +443,9 @@ export default function AddressPicker({
         setShowResults(true);
         setSearching(true);
         searchTimeoutRef.current = setTimeout(async () => {
-            const controller = new AbortController();
-            searchAbortRef.current = controller;
-            const results = await searchPlaces(text, controller.signal);
-            if (!controller.signal.aborted) {
-                setSearchResults(results);
-                setSearching(false);
-            }
+            const results = await searchPlaces(text);
+            setSearchResults(results);
+            setSearching(false);
         }, 350);
     }, []);
 
@@ -456,96 +470,27 @@ export default function AddressPicker({
         });
     }, []);
 
-    // Region change handlers (extracted to avoid re-subscribing on every render)
-    const handleRegionWillChange = useCallback(() => {
-        regionSettleTokenRef.current += 1;
-        mapDidMoveRef.current = true;
-        setIsMapInMotion(true);
-        setPinElevated(true);
-        if (geocodeAbortRef.current) geocodeAbortRef.current.abort();
-        if (buttonEnableTimeoutRef.current) clearTimeout(buttonEnableTimeoutRef.current);
-    }, []);
-
-    const handleRegionDidChange = useCallback(async (feature: any) => {
-        let longitude: number | null = null;
-        let latitude: number | null = null;
-
-        try {
-            const center = await mapRef.current?.getCenter?.();
-            if (Array.isArray(center) && center.length >= 2) {
-                longitude = Number(center[0]);
-                latitude = Number(center[1]);
-            }
-        } catch { /* fallback to event payload */ }
-
-        if (longitude == null || latitude == null) {
-            const coords = feature?.geometry?.coordinates;
-            if (!coords) return;
-            longitude = Number(coords[0]);
-            latitude = Number(coords[1]);
-        }
-
-        const last = lastGeocodedPos.current;
-        if (
-            last &&
-            Math.abs(last.lat - latitude) < MIN_GEOCODE_DELTA &&
-            Math.abs(last.lng - longitude) < MIN_GEOCODE_DELTA
-        ) {
-            setReverseLoading(false);
-            setIsMapInMotion(false);
-            buttonEnableTimeoutRef.current = setTimeout(() => setPinElevated(false), 50);
-            return;
-        }
-
-        if (buttonEnableTimeoutRef.current) clearTimeout(buttonEnableTimeoutRef.current);
-        if (geocodeDebounceRef.current) clearTimeout(geocodeDebounceRef.current);
-
-        setPinLocation({ latitude, longitude });
-        setPinAddress('');
-        setHasResolvedPinAddress(false);
-        setGeocodedLocation(null);
-        setReverseLoading(true);
-
-        const settleToken = ++regionSettleTokenRef.current;
-
-        geocodeDebounceRef.current = setTimeout(async () => {
-            if (settleToken !== regionSettleTokenRef.current) return;
-
-            if (geocodeAbortRef.current) geocodeAbortRef.current.abort();
-            const controller = new AbortController();
-            geocodeAbortRef.current = controller;
-            try {
-                const address = await reverseGeocode(latitude!, longitude!);
-                if (!controller.signal.aborted) {
-                    setPinAddress(address);
-                    setHasResolvedPinAddress(true);
-                    setGeocodedLocation({ latitude: latitude!, longitude: longitude! });
-                    lastGeocodedPos.current = { lat: latitude!, lng: longitude! };
-                    setSearchQuery('');
-                }
-            } catch { /* ignore aborted / failed */ } finally {
-                if (!controller.signal.aborted) {
-                    setReverseLoading(false);
-                    setIsMapInMotion(false);
-                    buttonEnableTimeoutRef.current = setTimeout(() => setPinElevated(false), 50);
-                }
-            }
-        }, 250);
-    }, []);
-
     // Map tap
-    const handleMapPress = useCallback(async (_event: any) => {
+    const handleMapPress = useCallback(async (event: any) => {
         Keyboard.dismiss();
         setShowResults(false);
         setShowSavedAddresses(false);
         // Note: Pin stays centered, so we'll update location on region change instead
     }, []);
 
-    // Shared GPS → pin helper used by auto-detect on open and "use current location"
-    const flyToCurrentLocation = useCallback(async (): Promise<boolean> => {
+    // Use current location
+    const handleUseCurrentLocation = useCallback(async () => {
+        setLocatingCurrent(true);
+        Keyboard.dismiss();
+        setShowResults(false);
+        setShowSavedAddresses(false);
+
         try {
             const { status } = await Location.requestForegroundPermissionsAsync();
-            if (status !== 'granted') return false;
+            if (status !== 'granted') {
+                setLocatingCurrent(false);
+                return;
+            }
 
             let current: Location.LocationObject | null = null;
             try {
@@ -553,12 +498,15 @@ export default function AddressPicker({
             } catch {
                 current = await Location.getLastKnownPositionAsync();
             }
-            if (!current) return false;
+
+            if (!current) {
+                setLocatingCurrent(false);
+                return;
+            }
 
             const { latitude, longitude } = current.coords;
             const newLocation = { latitude, longitude };
             setPinLocation(newLocation);
-            setMapCenter([longitude, latitude]);
 
             cameraRef.current?.setCamera({
                 centerCoordinate: [longitude, latitude],
@@ -570,23 +518,11 @@ export default function AddressPicker({
             setPinAddress(address);
             setHasResolvedPinAddress(true);
             setGeocodedLocation(newLocation);
-            lastGeocodedPos.current = { lat: latitude, lng: longitude };
+            lastGeocodedPos.current = { lat: latitude, lng: longitude }; // Mark as geocoded
             setSearchQuery('');
-            return true;
-        } catch {
-            return false;
-        }
-    }, []);
-
-    // Use current location
-    const handleUseCurrentLocation = useCallback(async () => {
-        setLocatingCurrent(true);
-        Keyboard.dismiss();
-        setShowResults(false);
-        setShowSavedAddresses(false);
-        await flyToCurrentLocation();
+        } catch { /* ignore */ }
         setLocatingCurrent(false);
-    }, [flyToCurrentLocation]);
+    }, []);
 
     // Select saved address
     const handleSelectSaved = useCallback((addr: UserAddress) => {
@@ -629,6 +565,13 @@ export default function AddressPicker({
 
     if (!visible) return null;
 
+    const getAddressIcon = (name: string): keyof typeof Ionicons.glyphMap => {
+        const lower = name.toLowerCase();
+        if (lower.includes('home') || lower.includes('shtepi') || lower.includes('shtëpi')) return 'home';
+        if (lower.includes('work') || lower.includes('office') || lower.includes('pun')) return 'briefcase';
+        return 'location';
+    };
+
     const Wrapper = embedded ? View : SafeAreaView;
     const wrapperStyle = embedded ? { flex: 1 as const } : { flex: 1 as const, backgroundColor: theme.colors.background };
     const searchTop = embedded ? 8 : insets.top + 8;
@@ -646,8 +589,99 @@ export default function AddressPicker({
                         style={StyleSheet.absoluteFill}
                         styleURL={MAPBOX_STYLE}
                         onPress={handleMapPress}
-                        onRegionWillChange={handleRegionWillChange}
-                        onRegionDidChange={handleRegionDidChange}
+                        onRegionWillChange={() => {
+                            // Map started moving — lift pin, cancel any in-flight geocode
+                            regionSettleTokenRef.current += 1;
+                            mapDidMoveRef.current = true; // Mark that map moved
+                            setIsMapInMotion(true);
+                            setPinElevated(true);
+                            if (geocodeAbortRef.current) geocodeAbortRef.current.abort();
+                            if (buttonEnableTimeoutRef.current) clearTimeout(buttonEnableTimeoutRef.current);
+                        }}
+                        onRegionDidChange={async (feature: any) => {
+                            // Map stopped moving. Always prefer camera center over region payload geometry,
+                            // because payload coordinates can drift from the visual center pin on some devices.
+                            let longitude: number | null = null;
+                            let latitude: number | null = null;
+
+                            try {
+                                const center = await mapRef.current?.getCenter?.();
+                                if (Array.isArray(center) && center.length >= 2) {
+                                    longitude = Number(center[0]);
+                                    latitude = Number(center[1]);
+                                }
+                            } catch {
+                                // Fallback to event payload below.
+                            }
+
+                            if (longitude == null || latitude == null) {
+                                const coords = feature?.geometry?.coordinates;
+                                if (!coords) return;
+                                longitude = Number(coords[0]);
+                                latitude = Number(coords[1]);
+                            }
+
+                            const last = lastGeocodedPos.current;
+                            if (
+                                last &&
+                                Math.abs(last.lat - latitude) < MIN_GEOCODE_DELTA &&
+                                Math.abs(last.lng - longitude) < MIN_GEOCODE_DELTA
+                            ) {
+                                setReverseLoading(false);
+                                setIsMapInMotion(false);
+                                buttonEnableTimeoutRef.current = setTimeout(() => {
+                                    setPinElevated(false);
+                                }, 50);
+                                return;
+                            }
+                            
+                            // Clear any pending button enable timeout (from tap without drag)
+                            if (buttonEnableTimeoutRef.current) clearTimeout(buttonEnableTimeoutRef.current);
+                            
+                            // Region settled — the finger must be off the map (or momentum ended).
+                            // Clear any pending debounce
+                            if (geocodeDebounceRef.current) clearTimeout(geocodeDebounceRef.current);
+
+                            // Keep button disabled during entire geocoding process
+                            setPinLocation({ latitude, longitude });
+                            setPinAddress('');
+                            setHasResolvedPinAddress(false);
+                            setGeocodedLocation(null);
+                            setReverseLoading(true);
+
+                            const settleToken = ++regionSettleTokenRef.current;
+
+                            // Wait for map movement to fully settle before geocoding.
+                            geocodeDebounceRef.current = setTimeout(async () => {
+                                if (settleToken !== regionSettleTokenRef.current) return;
+
+                                // Abort previous geocode if still running
+                                if (geocodeAbortRef.current) geocodeAbortRef.current.abort();
+                                const controller = new AbortController();
+                                geocodeAbortRef.current = controller;
+                                try {
+                                    const address = await reverseGeocode(latitude, longitude);
+                                    if (!controller.signal.aborted) {
+                                        setPinAddress(address);
+                                        setHasResolvedPinAddress(true);
+                                        setGeocodedLocation({ latitude, longitude });
+                                        lastGeocodedPos.current = { lat: latitude, lng: longitude };
+                                        setSearchQuery('');
+                                    }
+                                } catch {
+                                    // ignore aborted / failed
+                                } finally {
+                                    if (!controller.signal.aborted) {
+                                        setReverseLoading(false);
+                                        setIsMapInMotion(false);
+                                        // Keep button disabled for 50ms after geocoding completes
+                                        buttonEnableTimeoutRef.current = setTimeout(() => {
+                                            setPinElevated(false);
+                                        }, 50);
+                                    }
+                                }
+                            }, 250);
+                        }}
                         logoEnabled={false}
                         attributionEnabled={false}
                         scaleBarEnabled={false}
@@ -693,7 +727,14 @@ export default function AddressPicker({
                     </MapLibreGL.MapView>
 
                     {/* ─── Fixed Center Pin ──────────────── */}
-                    <View style={styles.centeredPinContainer}>
+                    <View style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        marginLeft: -12,
+                        marginTop: -37,
+                        pointerEvents: 'none',
+                    }}>
                         <CenteredPin elevated={pinElevated} />
                     </View>
 
@@ -1100,13 +1141,5 @@ const styles = StyleSheet.create({
     },
     emptySubtitle: {
         fontSize: 13, textAlign: 'center',
-    },
-    centeredPinContainer: {
-        position: 'absolute',
-        top: '50%' as any,
-        left: '50%' as any,
-        marginLeft: -12,
-        marginTop: -37,
-        pointerEvents: 'none' as any,
     },
 });

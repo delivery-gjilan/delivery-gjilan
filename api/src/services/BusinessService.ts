@@ -211,6 +211,7 @@ export class BusinessService {
     async setBusinessFeatured(id: string, isFeatured: boolean, sortOrder: number): Promise<Business> {
         const updated = await this.businessRepository.setFeatured(id, isFeatured, sortOrder);
         if (!updated) throw AppError.notFound('Business');
+        await cache.invalidateBusiness(id);
         const schedule = await this.businessHoursRepository.findByBusinessId(id);
         return this.mapToBusiness(updated, schedule);
     }

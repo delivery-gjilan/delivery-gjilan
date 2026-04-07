@@ -23,6 +23,8 @@ export const GET_BUSINESS_PRODUCTS_AND_CATEGORIES = graphql(`
                 description
                 imageUrl
                 price
+                markupPrice
+                nightMarkedupPrice
                 isOnSale
                 saleDiscountPercentage
                 isAvailable
@@ -40,6 +42,8 @@ export const GET_BUSINESS_PRODUCTS_AND_CATEGORIES = graphql(`
                 description
                 imageUrl
                 price
+                markupPrice
+                nightMarkedupPrice
                 isOnSale
                 saleDiscountPercentage
                 isAvailable

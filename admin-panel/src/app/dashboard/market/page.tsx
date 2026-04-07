@@ -88,6 +88,8 @@ interface Product {
     name: string;
     description?: string | null;
     price: number;
+    markupPrice?: number | null;
+    nightMarkedupPrice?: number | null;
     imageUrl?: string | null;
     isOffer: boolean;
     isOnSale: boolean;
@@ -571,6 +573,12 @@ function MarketContent({ businessId }: { businessId: string }) {
                                             Price
                                         </th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            Markup
+                                        </th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            Night
+                                        </th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                                             On Sale
                                         </th>
                                         <th className="px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider w-24">
@@ -1013,6 +1021,28 @@ function ProductRow({
                 </div>
             </td>
 
+            {/* Markup Price */}
+            <td className="px-4 py-3">
+                {product.markupPrice != null && product.markupPrice > 0 ? (
+                    <span className="font-medium text-zinc-200 tabular-nums">
+                        €{product.markupPrice.toFixed(2)}
+                    </span>
+                ) : (
+                    <span className="text-amber-400/70 text-xs">Not set</span>
+                )}
+            </td>
+
+            {/* Night Price */}
+            <td className="px-4 py-3">
+                {product.nightMarkedupPrice != null && product.nightMarkedupPrice > 0 ? (
+                    <span className="font-medium text-zinc-200 tabular-nums">
+                        €{product.nightMarkedupPrice.toFixed(2)}
+                    </span>
+                ) : (
+                    <span className="text-amber-400/70 text-xs">Not set</span>
+                )}
+            </td>
+
             {/* On Sale Toggle */}
             <td className="px-4 py-3 text-center">
                 <button
@@ -1316,6 +1346,8 @@ function ProductModal({
         name: '',
         description: '',
         price: '',
+        markupPrice: '',
+        nightMarkedupPrice: '',
         saleDiscountPercentage: '',
         imageUrl: '',
         isOffer: false,
@@ -1346,6 +1378,8 @@ function ProductModal({
                     name: modal.data.name,
                     description: modal.data.description || '',
                     price: modal.data.price.toString(),
+                    markupPrice: modal.data.markupPrice != null && modal.data.markupPrice > 0 ? modal.data.markupPrice.toString() : '',
+                    nightMarkedupPrice: modal.data.nightMarkedupPrice != null && modal.data.nightMarkedupPrice > 0 ? modal.data.nightMarkedupPrice.toString() : '',
                     saleDiscountPercentage: modal.data.saleDiscountPercentage?.toString() || '',
                     imageUrl: modal.data.imageUrl || '',
                     isOffer: modal.data.isOffer || false,
@@ -1362,6 +1396,8 @@ function ProductModal({
                     name: '',
                     description: '',
                     price: '',
+                    markupPrice: '',
+                    nightMarkedupPrice: '',
                     saleDiscountPercentage: '',
                     imageUrl: '',
                     isOffer: false,
@@ -1466,6 +1502,8 @@ function ProductModal({
             description: form.description || undefined,
             imageUrl: imageUrl || undefined,
             price: parseFloat(form.price),
+            markupPrice: form.markupPrice ? parseFloat(form.markupPrice) : null,
+            nightMarkedupPrice: form.nightMarkedupPrice ? parseFloat(form.nightMarkedupPrice) : null,
             isOffer: form.isOffer,
             isOnSale: form.isOnSale,
             saleDiscountPercentage: form.isOnSale && form.saleDiscountPercentage ? parseFloat(form.saleDiscountPercentage) : undefined,
@@ -1582,6 +1620,38 @@ function ProductModal({
                             onChange={(e) => setForm({ ...form, saleDiscountPercentage: e.target.value })}
                             disabled={!form.isOnSale}
                         />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                            Markup Price (€)
+                        </label>
+                        <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="Settlement price"
+                            value={form.markupPrice}
+                            onChange={(e) => setForm({ ...form, markupPrice: e.target.value })}
+                        />
+                        <p className="text-[11px] text-gray-600 mt-0.5">For driver settlements only</p>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                            Night Price (€)
+                        </label>
+                        <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="23:00–06:00 price"
+                            value={form.nightMarkedupPrice}
+                            onChange={(e) => setForm({ ...form, nightMarkedupPrice: e.target.value })}
+                        />
+                        <p className="text-[11px] text-gray-600 mt-0.5">Active 23:00–06:00</p>
                     </div>
                 </div>
 

@@ -91,6 +91,7 @@ export default function SubcategoriesBlock({ businessId }: { businessId: string 
 
         const { success, error: updateErr } = await updateSubcategory(editForm.id, {
             name: editForm.name,
+            categoryId: editForm.categoryId,
         });
 
         if (success) {
@@ -114,75 +115,70 @@ export default function SubcategoriesBlock({ businessId }: { businessId: string 
         }
     };
 
-    if (loading || categoriesLoading) return <p className="text-gray-400">Loading subcategories...</p>;
+    if (loading || categoriesLoading) return <div className="h-24 rounded-xl bg-zinc-900 border border-zinc-800 animate-pulse" />;
     if (error || categoriesError) return <p className="text-red-400">Error: {error || categoriesError}</p>;
 
     return (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+        <div>
             <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">Subcategories</h2>
-                <Button variant="primary" onClick={() => setCreateOpen(true)} disabled={createLoading}>
-                    {createLoading ? "Adding..." : "+ Add Subcategory"}
-                </Button>
+                <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Subcategories</h2>
+                <div className="flex items-center gap-2">
+                    {categories.length > 0 && (
+                        <Select value={selectedCategoryId} onChange={(e) => setSelectedCategoryId(e.target.value)}>
+                            <option value="">All categories</option>
+                            {categories.map((category) => (
+                                <option key={category.id} value={category.id}>{category.name}</option>
+                            ))}
+                        </Select>
+                    )}
+                    <Button variant="primary" size="sm" onClick={() => setCreateOpen(true)} disabled={createLoading || categories.length === 0}>
+                        + Add Subcategory
+                    </Button>
+                </div>
             </div>
-
-            <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-400 mb-2">Filter by Category</label>
-                <Select value={selectedCategoryId} onChange={(e) => setSelectedCategoryId(e.target.value)} className="max-w-md">
-                    <option value="">All categories</option>
-                    {categories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                            {category.name}
-                        </option>
-                    ))}
-                </Select>
-            </div>
+            {categories.length === 0 && (
+                <p className="text-sm text-zinc-500 py-4">Create at least one category first before adding subcategories.</p>
+            )}
 
             <Table>
                 <thead>
                     <tr>
                         <Th>Name</Th>
                         <Th>Category</Th>
-                        <Th>Actions</Th>
+                        <Th className="text-right">Actions</Th>
                     </tr>
                 </thead>
 
                 <tbody>
-                    {filteredSubcategories.map((subcategory: ProductSubcategory) => (
-                        <tr key={subcategory.id}>
-                            <Td>{subcategory.name}</Td>
-                            <Td>{categoryMap.get(subcategory.categoryId) || "Unknown"}</Td>
-                            <Td>
-                                <div className="flex gap-2">
-                                    <Button
-                                        variant="outline"
-                                        onClick={() => openEditModal(subcategory)}
-                                        disabled={updateLoading}
-                                    >
-                                        Edit
-                                    </Button>
-                                    <Button
-                                        variant="danger"
-                                        onClick={() => setDeleteId(subcategory.id)}
-                                        disabled={deleteLoading}
-                                    >
-                                        Delete
-                                    </Button>
-                                </div>
+                    {filteredSubcategories.length === 0 ? (
+                        <tr>
+                            <Td colSpan={3}>
+                                <div className="text-center text-zinc-500 py-4">No subcategories yet.</div>
                             </Td>
                         </tr>
-                    ))}
+                    ) : (
+                        filteredSubcategories.map((subcategory: ProductSubcategory) => (
+                            <tr key={subcategory.id}>
+                                <Td>{subcategory.name}</Td>
+                                <Td><span className="text-zinc-400">{categoryMap.get(subcategory.categoryId) || "Unknown"}</span></Td>
+                                <Td className="text-right">
+                                    <div className="flex items-center justify-end gap-2">
+                                        <Button variant="outline" size="sm" onClick={() => openEditModal(subcategory)} disabled={updateLoading}>Edit</Button>
+                                        <Button variant="danger" size="sm" onClick={() => setDeleteId(subcategory.id)} disabled={deleteLoading}>Delete</Button>
+                                    </div>
+                                </Td>
+                            </tr>
+                        ))
+                    )}
                 </tbody>
             </Table>
 
-            {filteredSubcategories.length === 0 && (
-                <p className="text-gray-500 text-center py-4">No subcategories yet.</p>
-            )}
+
 
             <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Create Subcategory">
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">Category *</label>
+                        <label className="block text-sm font-medium text-zinc-400 mb-1">Category</label>
                         <Select
                             value={createForm.categoryId}
                             onChange={(e) => setCreateForm({ ...createForm, categoryId: e.target.value })}
@@ -197,7 +193,7 @@ export default function SubcategoriesBlock({ businessId }: { businessId: string 
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">Subcategory Name *</label>
+                        <label className="block text-sm font-medium text-zinc-400 mb-1">Name</label>
                         <Input
                             placeholder="Subcategory name"
                             value={createForm.name}
@@ -216,14 +212,19 @@ export default function SubcategoriesBlock({ businessId }: { businessId: string 
             <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Edit Subcategory">
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">Category</label>
-                        <div className="text-gray-200">
-                            {categoryMap.get(editForm.categoryId) || "Unknown"}
-                        </div>
+                        <label className="block text-sm font-medium text-zinc-400 mb-1">Category</label>
+                        <Select
+                            value={editForm.categoryId}
+                            onChange={(e) => setEditForm({ ...editForm, categoryId: e.target.value })}
+                        >
+                            {categories.map((category) => (
+                                <option key={category.id} value={category.id}>{category.name}</option>
+                            ))}
+                        </Select>
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">Subcategory Name *</label>
+                        <label className="block text-sm font-medium text-zinc-400 mb-1">Name</label>
                         <Input
                             placeholder="Subcategory name"
                             value={editForm.name}
@@ -240,17 +241,11 @@ export default function SubcategoriesBlock({ businessId }: { businessId: string 
             </Modal>
 
             <Modal open={deleteId !== null} onClose={() => setDeleteId(null)} title="Delete Subcategory">
-                <p className="text-gray-300 mb-4">Are you sure you want to delete this subcategory?</p>
-
+                <p className="text-zinc-300 text-sm mb-4">Are you sure you want to delete this subcategory? Products assigned to it will lose their subcategory assignment.</p>
                 {deleteError && <p className="text-red-400 text-sm mb-4">{deleteError}</p>}
-
-                <div className="flex justify-end gap-3">
-                    <Button variant="outline" onClick={() => setDeleteId(null)} disabled={deleteLoading}>
-                        Cancel
-                    </Button>
-                    <Button variant="danger" onClick={handleDelete} disabled={deleteLoading}>
-                        {deleteLoading ? "Deleting..." : "Delete"}
-                    </Button>
+                <div className="flex gap-3">
+                    <Button variant="outline" className="flex-1" onClick={() => setDeleteId(null)} disabled={deleteLoading}>Cancel</Button>
+                    <Button variant="danger" className="flex-1" onClick={handleDelete} disabled={deleteLoading}>{deleteLoading ? "Deleting..." : "Delete"}</Button>
                 </div>
             </Modal>
         </div>

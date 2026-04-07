@@ -4,9 +4,12 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@apollo/client/react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import { Table, Th, Td } from "@/components/ui/Table";
+import { Badge } from "@/components/ui/badge";
 import { GET_BUSINESSES } from "@/graphql/operations/businesses";
 import ProductsBlock from "@/components/businesses/ProductsBlock";
 import { useAuth } from "@/lib/auth-context";
+import { ChevronLeft } from "lucide-react";
 
 interface Business {
     id: string;
@@ -17,6 +20,12 @@ interface Business {
 interface GetBusinessesData {
     businesses: Business[];
 }
+
+const TYPE_BADGE: Record<string, string> = {
+    RESTAURANT: "bg-orange-500/10 text-orange-400 border-orange-500/30",
+    MARKET: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
+    PHARMACY: "bg-sky-500/10 text-sky-400 border-sky-500/30",
+};
 
 export default function ProductsPage() {
     const [selectedBusinessId, setSelectedBusinessId] = useState<string>("");
@@ -49,12 +58,19 @@ export default function ProductsPage() {
     );
 
     if (loading) {
-        return <p className="text-gray-400">Loading businesses...</p>;
+        return (
+            <div className="text-white">
+                <div className="flex justify-between items-center mb-5">
+                    <h1 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Products</h1>
+                </div>
+                <div className="h-64 rounded-xl bg-zinc-900 border border-zinc-800 animate-pulse" />
+            </div>
+        );
     }
 
     return (
         <div className="text-white">
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex justify-between items-center mb-5">
                 <h1 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Products</h1>
             </div>
 
@@ -64,74 +80,84 @@ export default function ProductsPage() {
                     {effectiveBusinessId ? (
                         <ProductsBlock businessId={effectiveBusinessId} />
                     ) : (
-                        <div className="bg-gray-900 border border-gray-800 rounded-xl p-12 text-center">
-                            <p className="text-gray-400">Your business profile is missing a business ID.</p>
+                        <div className="bg-[#111113] border border-[#1e1e22] rounded-xl p-12 text-center">
+                            <p className="text-zinc-500">Your business profile is missing a business ID.</p>
                         </div>
                     )}
                 </>
             )}
 
-            {/* Super Admin/Staff: business list first, then details view */}
+            {/* Super Admin/Staff: business list */}
             {!isBusinessOwner && !selectedBusinessId && (
                 <div className="space-y-4">
-                    <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                        <label className="block text-sm font-medium text-gray-400 mb-2">Search Businesses</label>
-                        <Input
-                            placeholder="Search by business name or type..."
-                            value={businessSearch}
-                            onChange={(e) => setBusinessSearch(e.target.value)}
-                            className="max-w-lg"
-                        />
-                    </div>
+                    <Input
+                        placeholder="Search businesses by name or type..."
+                        value={businessSearch}
+                        onChange={(e) => setBusinessSearch(e.target.value)}
+                    />
 
-                    <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-                        {filteredBusinesses.length === 0 ? (
-                            <div className="p-10 text-center text-gray-400">No businesses match your search.</div>
-                        ) : (
-                            <table className="w-full">
-                                <thead className="bg-gray-800/50 border-b border-gray-700">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Business</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Type</th>
-                                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Action</th>
+                    <Table>
+                        <thead>
+                            <tr>
+                                <Th>Business</Th>
+                                <Th>Type</Th>
+                                <Th className="text-right">Action</Th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredBusinesses.length === 0 ? (
+                                <tr>
+                                    <Td colSpan={3}>
+                                        <div className="text-center text-zinc-500 py-6">
+                                            {businesses.length === 0 ? "No businesses found." : "No businesses match your search."}
+                                        </div>
+                                    </Td>
+                                </tr>
+                            ) : (
+                                filteredBusinesses.map((business) => (
+                                    <tr key={business.id}>
+                                        <Td>
+                                            <span className="font-medium text-zinc-100">{business.name}</span>
+                                        </Td>
+                                        <Td>
+                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${TYPE_BADGE[business.businessType] ?? "bg-zinc-800 text-zinc-400 border-zinc-700"}`}>
+                                                {business.businessType.charAt(0) + business.businessType.slice(1).toLowerCase()}
+                                            </span>
+                                        </Td>
+                                        <Td className="text-right">
+                                            <Button
+                                                variant="primary"
+                                                size="sm"
+                                                onClick={() => setSelectedBusinessId(business.id)}
+                                            >
+                                                Open Products
+                                            </Button>
+                                        </Td>
                                     </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-800">
-                                    {filteredBusinesses.map((business) => (
-                                        <tr key={business.id} className="hover:bg-gray-800/40 transition-colors">
-                                            <td className="px-4 py-3 text-sm font-medium text-white">{business.name}</td>
-                                            <td className="px-4 py-3 text-sm text-gray-300">{business.businessType}</td>
-                                            <td className="px-4 py-3 text-right">
-                                                <Button
-                                                    variant="primary"
-                                                    size="sm"
-                                                    onClick={() => setSelectedBusinessId(business.id)}
-                                                >
-                                                    Open Products
-                                                </Button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        )}
-                    </div>
+                                ))
+                            )}
+                        </tbody>
+                    </Table>
                 </div>
             )}
 
+            {/* Selected business: product block */}
             {!isBusinessOwner && selectedBusinessId && (
                 <div className="space-y-4">
-                    <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex items-center justify-between">
-                        <div>
-                            <p className="text-xs uppercase tracking-wider text-gray-500">Business</p>
-                            <p className="text-lg font-semibold text-white">{selectedBusiness?.name || "Selected Business"}</p>
-                            <p className="text-sm text-gray-400">Product search is available inside the products table below.</p>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => setSelectedBusinessId("")}
+                                className="flex items-center gap-1 text-zinc-400 hover:text-zinc-200 text-sm transition-colors"
+                            >
+                                <ChevronLeft size={16} />
+                                All businesses
+                            </button>
+                            <span className="text-zinc-700">/</span>
+                            <span className="text-zinc-100 font-semibold">{selectedBusiness?.name}</span>
                         </div>
-                        <Button
-                            variant="outline"
-                            onClick={() => setSelectedBusinessId("")}
-                        >
-                            Back to Businesses
+                        <Button variant="outline" size="sm" onClick={() => setSelectedBusinessId("")}>
+                            Back
                         </Button>
                     </div>
                     <ProductsBlock businessId={selectedBusinessId} />

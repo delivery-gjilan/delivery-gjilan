@@ -207,6 +207,7 @@ This document is a fast context handoff for future UI changes across `admin-pane
 - Home out-of-zone prompt evaluation is session-scoped for the running app process (module-level gate), not component-mount scoped.
 - If the user has had an active order during the current app session, the out-of-zone prompt stays suppressed for the rest of that session.
 - The out-of-zone prompt can appear again only after full app re-init (fresh JS runtime), matching "show once per app init" behavior.
+- Active-order suppression waits for the active-orders query refresh to settle, preventing stale cache snapshots from incorrectly suppressing the out-of-zone sheet for the whole session.
 
 ## Mobile Customer Address Picker Geocoding (Current State)
 

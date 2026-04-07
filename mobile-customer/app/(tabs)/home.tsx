@@ -23,7 +23,6 @@ import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { useServiceZoneCheck } from '@/hooks/useServiceZoneCheck';
 import { useHasActiveOrder } from '@/hooks/useHasActiveOrder';
 import { OutOfZoneSheet } from '@/components/OutOfZoneSheet';
-import { useActiveOrdersStore } from '@/modules/orders/store/activeOrdersStore';
 import { useAuthStore } from '@/store/authStore';
 
 // Keep prompt evaluation session-scoped per user identity.
@@ -67,9 +66,7 @@ export default function Discover() {
 
     // Out-of-zone modal
     const zoneStatus = useServiceZoneCheck();
-    const { hasActiveOrder: queriedHasActiveOrder, isLoading: hasActiveOrderLoading } = useHasActiveOrder();
-    const storeHasActiveOrders = useActiveOrdersStore((state) => state.hasActiveOrders);
-    const hasActiveOrder = queriedHasActiveOrder || storeHasActiveOrders;
+    const { hasActiveOrder, isLoading: hasActiveOrderLoading } = useHasActiveOrder();
     const [zoneSheetVisible, setZoneSheetVisible] = useState(false);
     const userId = useAuthStore((state) => state.user?.id);
 
@@ -83,10 +80,10 @@ export default function Discover() {
     }, [userId]);
 
     useEffect(() => {
-        if (hasActiveOrder) {
+        if (!hasActiveOrderLoading && hasActiveOrder) {
             sessionPromptSuppressedForSession = true;
         }
-    }, [hasActiveOrder]);
+    }, [hasActiveOrder, hasActiveOrderLoading]);
 
     // Evaluate this only once per user session. We do not re-open the sheet during this session
     // when order state changes (e.g. delivered while user is already in-app).

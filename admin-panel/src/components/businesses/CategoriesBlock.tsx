@@ -198,9 +198,9 @@ export default function CategoriesBlock({
     if (error) return <p className="text-red-400">Error: {error}</p>;
 
     return (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+        <div>
             <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">Categories</h2>
+                <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Categories</h2>
                 <div className="flex items-center gap-2">
                     <Button
                         variant={sortMode ? "primary" : "outline"}

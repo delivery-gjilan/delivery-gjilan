@@ -9,6 +9,7 @@ import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Modal from "@/components/ui/Modal";
 import { Table, Th, Td } from "@/components/ui/Table";
+import { Badge } from "@/components/ui/badge";
 import {
     CREATE_BUSINESS,
     CREATE_BUSINESS_WITH_OWNER,
@@ -401,7 +402,14 @@ export default function BusinessesPage() {
   --------------------------- */
 
     if (loading) {
-        return <p className="text-gray-400">Loading...</p>;
+        return (
+            <div className="text-white">
+                <div className="flex justify-between items-center mb-5">
+                    <h1 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Businesses</h1>
+                </div>
+                <div className="h-64 rounded-xl bg-zinc-900 border border-zinc-800 animate-pulse" />
+            </div>
+        );
     }
 
     const businesses: Business[] = data?.businesses || [];
@@ -415,6 +423,12 @@ export default function BusinessesPage() {
             business.location?.address.toLowerCase().includes(query)
         );
     });
+
+    const TYPE_BADGE: Record<string, string> = {
+        RESTAURANT: "bg-orange-500/10 text-orange-400 border-orange-500/30",
+        MARKET: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
+        PHARMACY: "bg-sky-500/10 text-sky-400 border-sky-500/30",
+    };
 
     return (
         <div className="text-white">
@@ -435,84 +449,84 @@ export default function BusinessesPage() {
             </div>
 
             {/* TABLE */}
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                <Table>
-                    <thead>
+            <Table>
+                <thead>
+                    <tr>
+                        <Th>Business</Th>
+                        <Th>Type</Th>
+                        <Th>Address</Th>
+                        <Th>Status</Th>
+                        <Th className="text-right">Actions</Th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {filteredBusinesses.length === 0 ? (
                         <tr>
-                            <Th>Name</Th>
-                            <Th>Type</Th>
-                            <Th>Image</Th>
-                            <Th>Status</Th>
-                            <Th>Actions</Th>
+                            <Td colSpan={5}>
+                                <div className="text-center text-zinc-500 py-6">
+                                    {businesses.length === 0 ? "No businesses yet." : "No businesses match your search."}
+                                </div>
+                            </Td>
                         </tr>
-                    </thead>
-
-                    <tbody>
-                        {filteredBusinesses.length === 0 ? (
-                            <tr>
-                                <Td colSpan={5}>
-                                    <div className="text-center text-gray-500 py-4">
-                                        No businesses found
+                    ) : (
+                        filteredBusinesses.map((b) => (
+                            <tr key={b.id}>
+                                <Td>
+                                    <div className="flex items-center gap-3">
+                                        {b.imageUrl ? (
+                                            <img
+                                                src={b.imageUrl}
+                                                alt=""
+                                                className="h-9 w-9 rounded-lg object-cover flex-shrink-0 border border-zinc-800"
+                                            />
+                                        ) : (
+                                            <div className="h-9 w-9 rounded-lg bg-zinc-800 border border-zinc-700 flex-shrink-0" />
+                                        )}
+                                        <span className="font-medium text-zinc-100">{b.name}</span>
                                     </div>
                                 </Td>
-                            </tr>
-                        ) : (
-                            filteredBusinesses.map((b) => (
-                            <tr key={b.id}>
-                                <Td>{b.name}</Td>
-                                <Td>{b.businessType}</Td>
-
                                 <Td>
-                                    {b.imageUrl ? (
-                                        <img
-                                            src={b.imageUrl}
-                                            alt=""
-                                            className="h-10 w-10 rounded object-cover"
-                                        />
-                                    ) : (
-                                        <span className="text-gray-500">
-                                            No image
-                                        </span>
-                                    )}
+                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${TYPE_BADGE[b.businessType] ?? "bg-zinc-800 text-zinc-400 border-zinc-700"}`}>
+                                        {b.businessType.charAt(0) + b.businessType.slice(1).toLowerCase()}
+                                    </span>
                                 </Td>
-
+                                <Td>
+                                    <span className="text-zinc-400 text-sm truncate max-w-[200px] block">
+                                        {b.location?.address || <span className="text-zinc-600">—</span>}
+                                    </span>
+                                </Td>
                                 <Td>
                                     {b.isActive ? (
-                                        <span className="text-green-400">
+                                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-green-400">
+                                            <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
                                             Active
                                         </span>
                                     ) : (
-                                        <span className="text-red-400">
+                                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-red-400">
+                                            <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
                                             Inactive
                                         </span>
                                     )}
                                 </Td>
-
-                                <Td>
-                                    <div className="flex gap-2">
+                                <Td className="text-right">
+                                    <div className="flex items-center justify-end gap-2">
                                         <Button
-                                            variant="primary"
-                                            className="text-xs px-3"
-                                            onClick={() =>
-                                                router.push(
-                                                    `/dashboard/businesses/${b.id}`
-                                                )
-                                            }
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => router.push(`/dashboard/businesses/${b.id}`)}
                                         >
                                             View
                                         </Button>
-
                                         <Button
                                             variant="outline"
-                                            className="text-xs px-3"
+                                            size="sm"
                                             onClick={() => openEditModal(b)}
                                         >
                                             Edit
                                         </Button>
-
                                         <Button
                                             variant="danger"
-                                            className="text-xs px-3"
+                                            size="sm"
                                             onClick={() => setDeleteId(b.id)}
                                         >
                                             Delete
@@ -521,16 +535,9 @@ export default function BusinessesPage() {
                                 </Td>
                             </tr>
                         ))
-                        )}
-                    </tbody>
-                </Table>
-
-                {businesses.length === 0 && (
-                    <p className="text-gray-400 text-center py-6">
-                        No businesses found.
-                    </p>
-                )}
-            </div>
+                    )}
+                </tbody>
+            </Table>
 
             {/* ---------------------------------------------------------
          CREATE MODAL

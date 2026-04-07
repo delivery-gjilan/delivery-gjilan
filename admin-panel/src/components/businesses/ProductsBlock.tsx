@@ -935,9 +935,9 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
     }
 
     return (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold">Products</h2>
+        <div>
+            <div className="flex justify-between items-center mb-4">
+                <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Products</h2>
                 <div className="flex items-center gap-2">
                     <Button
                         variant="outline"
@@ -1000,7 +1000,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
 
                 return (
                     <div key={cat.id} className="mb-10">
-                        <h3 className="text-lg font-semibold text-purple-300 mb-3">
+                        <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">
                             {cat.name}
                         </h3>
 
@@ -1065,7 +1065,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                             </span>
                                                         )}
                                                         {p.hasOptionGroups && (
-                                                            <span className="inline-flex items-center rounded-full bg-blue-500/20 border border-blue-500/40 px-2 py-0.5 text-[10px] font-medium text-blue-300">
+                                                            <span className="inline-flex items-center rounded-full bg-zinc-500/20 border border-zinc-500/40 px-2 py-0.5 text-[10px] font-medium text-zinc-300">
                                                                 Has Options
                                                             </span>
                                                         )}
