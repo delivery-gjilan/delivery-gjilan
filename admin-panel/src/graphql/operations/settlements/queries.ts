@@ -190,37 +190,20 @@ export const CREATE_SETTLEMENT_REQUEST = graphql(`
         $businessId: ID
         $driverId: ID
         $amount: Float!
-        $periodStart: Date!
-        $periodEnd: Date!
         $note: String
     ) {
         createSettlementRequest(
             businessId: $businessId
             driverId: $driverId
             amount: $amount
-            periodStart: $periodStart
-            periodEnd: $periodEnd
             note: $note
         ) {
             id
             entityType
             status
             amount
-            currency
-            periodStart
-            periodEnd
             note
-            expiresAt
             createdAt
-        }
-    }
-`);
-
-export const CANCEL_SETTLEMENT_REQUEST = graphql(`
-    mutation CancelSettlementRequest($requestId: ID!) {
-        cancelSettlementRequest(requestId: $requestId) {
-            id
-            status
         }
     }
 `);
@@ -231,15 +214,11 @@ export const GET_SETTLEMENT_REQUESTS = graphql(`
             id
             entityType
             amount
-            currency
-            periodStart
-            periodEnd
             note
             status
-            expiresAt
+            reason
             createdAt
             respondedAt
-            disputeReason
             business {
                 id
                 name
@@ -249,15 +228,16 @@ export const GET_SETTLEMENT_REQUESTS = graphql(`
                 firstName
                 lastName
             }
-            requestedBy {
-                id
-                firstName
-                lastName
-            }
             respondedBy {
                 id
                 firstName
                 lastName
+            }
+            settlementPayment {
+                id
+                amount
+                direction
+                createdAt
             }
         }
     }

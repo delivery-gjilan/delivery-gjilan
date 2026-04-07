@@ -145,7 +145,7 @@ export default function FinancesScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [disputeModalRequestId, setDisputeModalRequestId] = useState<string | null>(null);
-    const [disputeReason, setDisputeReason] = useState('');
+    const [rejectReason, setRejectReason] = useState('');
     const [respondingId, setRespondingId] = useState<string | null>(null);
     const [selectedSettlement, setSelectedSettlement] = useState<any | null>(null);
 
@@ -166,7 +166,7 @@ export default function FinancesScreen() {
         loading: requestsLoading,
         refetch: refetchRequests,
     } = useQuery(GET_MY_SETTLEMENT_REQUESTS, {
-        variables: { businessId, status: 'PENDING_APPROVAL', limit: 20 },
+        variables: { businessId, status: 'PENDING', limit: 20 },
         skip: !businessId,
         fetchPolicy: 'network-only',
     });
@@ -343,25 +343,25 @@ export default function FinancesScreen() {
     };
 
     const handleOpenDisputeModal = (requestId: string) => {
-        setDisputeReason('');
+        setRejectReason('');
         setDisputeModalRequestId(requestId);
     };
 
-    const handleSubmitDispute = async () => {
+    const handleSubmitReject = async () => {
         if (!disputeModalRequestId) return;
         try {
             setRespondingId(disputeModalRequestId);
             await respondToRequest({
                 variables: {
                     requestId: disputeModalRequestId,
-                    action: 'DISPUTE',
-                    disputeReason: disputeReason.trim() || undefined,
+                    action: 'REJECT',
+                    reason: rejectReason.trim() || undefined,
                 },
             });
             setDisputeModalRequestId(null);
             await refetchRequests();
         } catch (err: any) {
-            Alert.alert('Error', err?.message ?? 'Failed to dispute request');
+            Alert.alert('Error', err?.message ?? 'Failed to reject request');
         } finally {
             setRespondingId(null);
         }
@@ -646,18 +646,6 @@ export default function FinancesScreen() {
                             <View style={{ gap: 10 }}>
                                 {pendingRequests.map((req: any) => {
                                     const isResponding = respondingId === req.id;
-                                    const periodStart = req.periodStart
-                                        ? format(new Date(req.periodStart), 'MMM d, yyyy')
-                                        : null;
-                                    const periodEnd = req.periodEnd
-                                        ? format(new Date(req.periodEnd), 'MMM d, yyyy')
-                                        : null;
-                                    const expiresAt = req.expiresAt
-                                        ? format(new Date(req.expiresAt), 'MMM d, yyyy HH:mm')
-                                        : null;
-                                    const requestedBy = req.requestedBy
-                                        ? `${req.requestedBy.firstName ?? ''} ${req.requestedBy.lastName ?? ''}`.trim()
-                                        : 'Admin';
 
                                     return (
                                         <View
@@ -726,16 +714,6 @@ export default function FinancesScreen() {
 
                                             {/* Details */}
                                             <View style={{ gap: 4, marginBottom: 14 }}>
-                                                {periodStart && periodEnd && (
-                                                    <Text
-                                                        style={{
-                                                            fontSize: 12,
-                                                            color: '#9ca3af',
-                                                        }}
-                                                    >
-                                                        Period: {periodStart} — {periodEnd}
-                                                    </Text>
-                                                )}
                                                 {req.note ? (
                                                     <Text
                                                         style={{
@@ -753,8 +731,7 @@ export default function FinancesScreen() {
                                                         color: '#6b7280',
                                                     }}
                                                 >
-                                                    Requested by {requestedBy}
-                                                    {expiresAt ? ` · Expires ${expiresAt}` : ''}
+                                                    {format(new Date(req.createdAt), 'MMM d, yyyy')}
                                                 </Text>
                                             </View>
 
@@ -819,7 +796,7 @@ export default function FinancesScreen() {
                                                             color: '#ef4444',
                                                         }}
                                                     >
-                                                        {t('finances.dispute', 'Dispute')}
+                                                        {t('finances.reject', 'Reject')}
                                                     </Text>
                                                 </Pressable>
                                             </View>
@@ -1469,7 +1446,7 @@ export default function FinancesScreen() {
                 </Pressable>
             </Modal>
 
-            {/* ── Dispute Modal ── */}
+            {/* ── Reject Modal ── */}
             <Modal
                 visible={disputeModalRequestId !== null}
                 transparent
@@ -1503,7 +1480,7 @@ export default function FinancesScreen() {
                                 marginBottom: 6,
                             }}
                         >
-                            {t('finances.dispute', 'Dispute')} {t('finances.settlement_requests', 'Settlement Requests')}
+                            {t('finances.reject', 'Reject')} {t('finances.settlement_requests', 'Settlement Requests')}
                         </Text>
                         <Text
                             style={{
@@ -1512,12 +1489,12 @@ export default function FinancesScreen() {
                                 marginBottom: 18,
                             }}
                         >
-                            Optionally explain why you are disputing this request.
+                            Optionally explain why you are rejecting this request.
                         </Text>
                         <TextInput
-                            value={disputeReason}
-                            onChangeText={setDisputeReason}
-                            placeholder="Reason for dispute (optional)…"
+                            value={rejectReason}
+                            onChangeText={setRejectReason}
+                            placeholder="Reason for rejection (optional)…"
                             placeholderTextColor="#4b5563"
                             multiline
                             numberOfLines={4}
@@ -1559,7 +1536,7 @@ export default function FinancesScreen() {
                                 </Text>
                             </Pressable>
                             <Pressable
-                                onPress={handleSubmitDispute}
+                                onPress={handleSubmitReject}
                                 disabled={respondingId === disputeModalRequestId}
                                 style={{
                                     flex: 1,
@@ -1583,7 +1560,7 @@ export default function FinancesScreen() {
                                             color: '#ef4444',
                                         }}
                                     >
-                                        {t('finances.dispute', 'Dispute')}
+                                        {t('finances.reject', 'Reject')}
                                     </Text>
                                 )}
                             </Pressable>

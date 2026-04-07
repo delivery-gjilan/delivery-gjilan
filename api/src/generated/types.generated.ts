@@ -978,8 +978,6 @@ export type Mutation = {
   businessDeviceHeartbeat: Scalars['Boolean']['output'];
   businessDeviceOrderSignal: Scalars['Boolean']['output'];
   cancelOrder: Order;
-  /** Admin cancels an outstanding settlement request. */
-  cancelSettlementRequest: SettlementRequest;
   changeMyPassword: Scalars['Boolean']['output'];
   createBanner: Banner;
   createBusiness: Business;
@@ -1055,7 +1053,7 @@ export type Mutation = {
   /** Driver replies to admin */
   replyToDriverMessage: DriverMessage;
   resendEmailVerification: SignupStepResponse;
-  /** Business owner accepts or disputes a pending settlement request. */
+  /** Business/driver accepts or rejects a pending settlement request. */
   respondToSettlementRequest: SettlementRequest;
   runSettlementScenarioHarness: SettlementScenarioHarnessResult;
   /** Admin sends a message to a business user */
@@ -1199,11 +1197,6 @@ export type MutationcancelOrderArgs = {
 };
 
 
-export type MutationcancelSettlementRequestArgs = {
-  requestId: Scalars['ID']['input'];
-};
-
-
 export type MutationchangeMyPasswordArgs = {
   currentPassword: Scalars['String']['input'];
   newPassword: Scalars['String']['input'];
@@ -1286,8 +1279,6 @@ export type MutationcreateSettlementRequestArgs = {
   businessId?: InputMaybe<Scalars['ID']['input']>;
   driverId?: InputMaybe<Scalars['ID']['input']>;
   note?: InputMaybe<Scalars['String']['input']>;
-  periodEnd: Scalars['Date']['input'];
-  periodStart: Scalars['Date']['input'];
 };
 
 
@@ -1512,7 +1503,7 @@ export type MutationreplyToDriverMessageArgs = {
 
 export type MutationrespondToSettlementRequestArgs = {
   action: SettlementRequestAction;
-  disputeReason?: InputMaybe<Scalars['String']['input']>;
+  reason?: InputMaybe<Scalars['String']['input']>;
   requestId: Scalars['ID']['input'];
 };
 
@@ -2834,32 +2825,26 @@ export type SettlementRequest = {
   amount: Scalars['Float']['output'];
   business?: Maybe<Business>;
   createdAt: Scalars['Date']['output'];
-  currency: Scalars['String']['output'];
-  disputeReason?: Maybe<Scalars['String']['output']>;
   driver?: Maybe<User>;
   entityType: SettlementType;
-  expiresAt: Scalars['Date']['output'];
   id: Scalars['ID']['output'];
   note?: Maybe<Scalars['String']['output']>;
-  periodEnd: Scalars['Date']['output'];
-  periodStart: Scalars['Date']['output'];
-  requestedBy?: Maybe<User>;
+  reason?: Maybe<Scalars['String']['output']>;
   respondedAt?: Maybe<Scalars['Date']['output']>;
   respondedBy?: Maybe<User>;
+  settlementPayment?: Maybe<SettlementPayment>;
   status: SettlementRequestStatus;
   updatedAt: Scalars['Date']['output'];
 };
 
 export type SettlementRequestAction =
   | 'ACCEPT'
-  | 'DISPUTE';
+  | 'REJECT';
 
 export type SettlementRequestStatus =
   | 'ACCEPTED'
-  | 'CANCELLED'
-  | 'DISPUTED'
-  | 'EXPIRED'
-  | 'PENDING_APPROVAL';
+  | 'PENDING'
+  | 'REJECTED';
 
 export type SettlementRule = {
   __typename?: 'SettlementRule';
@@ -3575,9 +3560,9 @@ export type ResolversTypes = {
   SettlementEntityType: ResolverTypeWrapper<'DRIVER' | 'BUSINESS'>;
   SettlementPayment: ResolverTypeWrapper<Omit<SettlementPayment, 'business' | 'createdBy' | 'direction' | 'driver' | 'entityType'> & { business?: Maybe<ResolversTypes['Business']>, createdBy?: Maybe<ResolversTypes['User']>, direction?: Maybe<ResolversTypes['SettlementPaymentDirection']>, driver?: Maybe<ResolversTypes['User']>, entityType: ResolversTypes['SettlementType'] }>;
   SettlementPaymentDirection: ResolverTypeWrapper<'ENTITY_TO_PLATFORM' | 'PLATFORM_TO_ENTITY'>;
-  SettlementRequest: ResolverTypeWrapper<Omit<SettlementRequest, 'business' | 'driver' | 'entityType' | 'requestedBy' | 'respondedBy' | 'status'> & { business?: Maybe<ResolversTypes['Business']>, driver?: Maybe<ResolversTypes['User']>, entityType: ResolversTypes['SettlementType'], requestedBy?: Maybe<ResolversTypes['User']>, respondedBy?: Maybe<ResolversTypes['User']>, status: ResolversTypes['SettlementRequestStatus'] }>;
-  SettlementRequestAction: ResolverTypeWrapper<'ACCEPT' | 'DISPUTE'>;
-  SettlementRequestStatus: ResolverTypeWrapper<'PENDING_APPROVAL' | 'ACCEPTED' | 'DISPUTED' | 'EXPIRED' | 'CANCELLED'>;
+  SettlementRequest: ResolverTypeWrapper<Omit<SettlementRequest, 'business' | 'driver' | 'entityType' | 'respondedBy' | 'settlementPayment' | 'status'> & { business?: Maybe<ResolversTypes['Business']>, driver?: Maybe<ResolversTypes['User']>, entityType: ResolversTypes['SettlementType'], respondedBy?: Maybe<ResolversTypes['User']>, settlementPayment?: Maybe<ResolversTypes['SettlementPayment']>, status: ResolversTypes['SettlementRequestStatus'] }>;
+  SettlementRequestAction: ResolverTypeWrapper<'ACCEPT' | 'REJECT'>;
+  SettlementRequestStatus: ResolverTypeWrapper<'PENDING' | 'ACCEPTED' | 'REJECTED'>;
   SettlementRule: ResolverTypeWrapper<Omit<SettlementRule, 'amountType' | 'business' | 'direction' | 'entityType' | 'promotion' | 'type'> & { amountType: ResolversTypes['SettlementAmountType'], business?: Maybe<ResolversTypes['Business']>, direction: ResolversTypes['SettlementDirection'], entityType: ResolversTypes['SettlementEntityType'], promotion?: Maybe<ResolversTypes['Promotion']>, type: ResolversTypes['SettlementRuleType'] }>;
   SettlementRuleFilterInput: SettlementRuleFilterInput;
   SettlementRuleScope: ResolverTypeWrapper<'GLOBAL' | 'BUSINESS' | 'PROMOTION' | 'BUSINESS_PROMOTION'>;
@@ -3751,7 +3736,7 @@ export type ResolversParentTypes = {
   Settlement: Omit<Settlement, 'business' | 'driver' | 'order' | 'rule' | 'settlementPayment' | 'sourcePayment'> & { business?: Maybe<ResolversParentTypes['Business']>, driver?: Maybe<ResolversParentTypes['User']>, order?: Maybe<ResolversParentTypes['Order']>, rule?: Maybe<ResolversParentTypes['SettlementRule']>, settlementPayment?: Maybe<ResolversParentTypes['SettlementPayment']>, sourcePayment?: Maybe<ResolversParentTypes['SettlementPayment']> };
   SettlementBreakdownItem: SettlementBreakdownItem;
   SettlementPayment: Omit<SettlementPayment, 'business' | 'createdBy' | 'driver'> & { business?: Maybe<ResolversParentTypes['Business']>, createdBy?: Maybe<ResolversParentTypes['User']>, driver?: Maybe<ResolversParentTypes['User']> };
-  SettlementRequest: Omit<SettlementRequest, 'business' | 'driver' | 'requestedBy' | 'respondedBy'> & { business?: Maybe<ResolversParentTypes['Business']>, driver?: Maybe<ResolversParentTypes['User']>, requestedBy?: Maybe<ResolversParentTypes['User']>, respondedBy?: Maybe<ResolversParentTypes['User']> };
+  SettlementRequest: Omit<SettlementRequest, 'business' | 'driver' | 'respondedBy' | 'settlementPayment'> & { business?: Maybe<ResolversParentTypes['Business']>, driver?: Maybe<ResolversParentTypes['User']>, respondedBy?: Maybe<ResolversParentTypes['User']>, settlementPayment?: Maybe<ResolversParentTypes['SettlementPayment']> };
   SettlementRule: Omit<SettlementRule, 'business' | 'promotion'> & { business?: Maybe<ResolversParentTypes['Business']>, promotion?: Maybe<ResolversParentTypes['Promotion']> };
   SettlementRuleFilterInput: SettlementRuleFilterInput;
   SettlementScenarioDefinition: SettlementScenarioDefinition;
@@ -4295,7 +4280,6 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   businessDeviceHeartbeat?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationbusinessDeviceHeartbeatArgs, 'input'>>;
   businessDeviceOrderSignal?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationbusinessDeviceOrderSignalArgs, 'deviceId'>>;
   cancelOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationcancelOrderArgs, 'id'>>;
-  cancelSettlementRequest?: Resolver<ResolversTypes['SettlementRequest'], ParentType, ContextType, RequireFields<MutationcancelSettlementRequestArgs, 'requestId'>>;
   changeMyPassword?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationchangeMyPasswordArgs, 'currentPassword' | 'newPassword'>>;
   createBanner?: Resolver<ResolversTypes['Banner'], ParentType, ContextType, RequireFields<MutationcreateBannerArgs, 'input'>>;
   createBusiness?: Resolver<ResolversTypes['Business'], ParentType, ContextType, RequireFields<MutationcreateBusinessArgs, 'input'>>;
@@ -4311,7 +4295,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   createProductSubcategory?: Resolver<ResolversTypes['ProductSubcategory'], ParentType, ContextType, RequireFields<MutationcreateProductSubcategoryArgs, 'input'>>;
   createProductVariantGroup?: Resolver<ResolversTypes['ProductVariantGroup'], ParentType, ContextType, RequireFields<MutationcreateProductVariantGroupArgs, 'input'>>;
   createPromotion?: Resolver<ResolversTypes['Promotion'], ParentType, ContextType, RequireFields<MutationcreatePromotionArgs, 'input'>>;
-  createSettlementRequest?: Resolver<ResolversTypes['SettlementRequest'], ParentType, ContextType, RequireFields<MutationcreateSettlementRequestArgs, 'amount' | 'periodEnd' | 'periodStart'>>;
+  createSettlementRequest?: Resolver<ResolversTypes['SettlementRequest'], ParentType, ContextType, RequireFields<MutationcreateSettlementRequestArgs, 'amount'>>;
   createSettlementRule?: Resolver<ResolversTypes['SettlementRule'], ParentType, ContextType, RequireFields<MutationcreateSettlementRuleArgs, 'input'>>;
   createTestOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType>;
   createUser?: Resolver<ResolversTypes['AuthResponse'], ParentType, ContextType, RequireFields<MutationcreateUserArgs, 'input'>>;
@@ -4981,26 +4965,22 @@ export type SettlementRequestResolvers<ContextType = GraphQLContext, ParentType 
   amount?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   business?: Resolver<Maybe<ResolversTypes['Business']>, ParentType, ContextType>;
   createdAt?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
-  currency?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
-  disputeReason?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   driver?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType>;
   entityType?: Resolver<ResolversTypes['SettlementType'], ParentType, ContextType>;
-  expiresAt?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   note?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
-  periodEnd?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
-  periodStart?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
-  requestedBy?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType>;
+  reason?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   respondedAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
   respondedBy?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType>;
+  settlementPayment?: Resolver<Maybe<ResolversTypes['SettlementPayment']>, ParentType, ContextType>;
   status?: Resolver<ResolversTypes['SettlementRequestStatus'], ParentType, ContextType>;
   updatedAt?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
-export type SettlementRequestActionResolvers = EnumResolverSignature<{ ACCEPT?: any, DISPUTE?: any }, ResolversTypes['SettlementRequestAction']>;
+export type SettlementRequestActionResolvers = EnumResolverSignature<{ ACCEPT?: any, REJECT?: any }, ResolversTypes['SettlementRequestAction']>;
 
-export type SettlementRequestStatusResolvers = EnumResolverSignature<{ ACCEPTED?: any, CANCELLED?: any, DISPUTED?: any, EXPIRED?: any, PENDING_APPROVAL?: any }, ResolversTypes['SettlementRequestStatus']>;
+export type SettlementRequestStatusResolvers = EnumResolverSignature<{ ACCEPTED?: any, PENDING?: any, REJECTED?: any }, ResolversTypes['SettlementRequestStatus']>;
 
 export type SettlementRuleResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['SettlementRule'] = ResolversParentTypes['SettlementRule']> = {
   amount?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;

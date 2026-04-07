@@ -22,7 +22,7 @@ CREATE TYPE "public"."settlement_type" AS ENUM('DRIVER', 'BUSINESS');--> stateme
 CREATE TYPE "public"."settlement_entity_type" AS ENUM('DRIVER', 'BUSINESS');--> statement-breakpoint
 CREATE TYPE "public"."settlement_rule_amount_type" AS ENUM('FIXED', 'PERCENT');--> statement-breakpoint
 CREATE TYPE "public"."settlement_rule_type" AS ENUM('ORDER_PRICE', 'DELIVERY_PRICE');--> statement-breakpoint
-CREATE TYPE "public"."settlement_request_status" AS ENUM('PENDING_APPROVAL', 'ACCEPTED', 'DISPUTED', 'EXPIRED', 'CANCELLED');--> statement-breakpoint
+CREATE TYPE "public"."settlement_request_status" AS ENUM('PENDING', 'ACCEPTED', 'REJECTED');--> statement-breakpoint
 CREATE TYPE "public"."promotion_creator_type" AS ENUM('PLATFORM', 'BUSINESS');--> statement-breakpoint
 CREATE TYPE "public"."promotion_target" AS ENUM('ALL_USERS', 'SPECIFIC_USERS', 'FIRST_ORDER', 'CONDITIONAL');--> statement-breakpoint
 CREATE TYPE "public"."promotion_type" AS ENUM('FIXED_AMOUNT', 'PERCENTAGE', 'FREE_DELIVERY', 'SPEND_X_GET_FREE', 'SPEND_X_PERCENT', 'SPEND_X_FIXED');--> statement-breakpoint
@@ -361,17 +361,13 @@ CREATE TABLE "settlement_requests" (
 	"entity_type" "settlement_entity_type" DEFAULT 'BUSINESS' NOT NULL,
 	"business_id" uuid,
 	"driver_id" uuid,
-	"requested_by_user_id" uuid,
 	"amount" numeric(10, 2) NOT NULL,
-	"currency" varchar(3) DEFAULT 'EUR' NOT NULL,
-	"period_start" timestamp with time zone NOT NULL,
-	"period_end" timestamp with time zone NOT NULL,
 	"note" text,
-	"status" "settlement_request_status" DEFAULT 'PENDING_APPROVAL' NOT NULL,
+	"status" "settlement_request_status" DEFAULT 'PENDING' NOT NULL,
 	"responded_at" timestamp with time zone,
 	"responded_by_user_id" uuid,
-	"dispute_reason" text,
-	"expires_at" timestamp with time zone NOT NULL,
+	"reason" text,
+	"settlement_payment_id" uuid,
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
@@ -707,8 +703,8 @@ ALTER TABLE "settlement_rules" ADD CONSTRAINT "settlement_rules_business_id_busi
 ALTER TABLE "settlement_rules" ADD CONSTRAINT "settlement_rules_promotion_id_promotions_id_fk" FOREIGN KEY ("promotion_id") REFERENCES "public"."promotions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "settlement_requests" ADD CONSTRAINT "settlement_requests_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "settlement_requests" ADD CONSTRAINT "settlement_requests_driver_id_drivers_id_fk" FOREIGN KEY ("driver_id") REFERENCES "public"."drivers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "settlement_requests" ADD CONSTRAINT "settlement_requests_requested_by_user_id_users_id_fk" FOREIGN KEY ("requested_by_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "settlement_requests" ADD CONSTRAINT "settlement_requests_responded_by_user_id_users_id_fk" FOREIGN KEY ("responded_by_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "settlement_requests" ADD CONSTRAINT "settlement_requests_settlement_payment_id_settlement_payments_id_fk" FOREIGN KEY ("settlement_payment_id") REFERENCES "public"."settlement_payments"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "settlement_payments" ADD CONSTRAINT "settlement_payments_driver_id_drivers_id_fk" FOREIGN KEY ("driver_id") REFERENCES "public"."drivers"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "settlement_payments" ADD CONSTRAINT "settlement_payments_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "settlement_payments" ADD CONSTRAINT "settlement_payments_created_by_user_id_users_id_fk" FOREIGN KEY ("created_by_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint

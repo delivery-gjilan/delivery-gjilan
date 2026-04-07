@@ -8,7 +8,7 @@ import { eq } from 'drizzle-orm';
 
 export const respondToSettlementRequest: NonNullable<
     MutationResolvers['respondToSettlementRequest']
-> = async (_parent, { requestId, action, disputeReason }, ctx): Promise<any> => {
+> = async (_parent, { requestId, action, reason }, ctx): Promise<any> => {
     const { db, userData, notificationService } = ctx;
 
     if (!userData?.userId) {
@@ -29,7 +29,7 @@ export const respondToSettlementRequest: NonNullable<
         });
     }
 
-    if (existing.status !== 'PENDING_APPROVAL') {
+    if (existing.status !== 'PENDING') {
         throw new GraphQLError(
             `Cannot respond to a request with status ${existing.status}`,
             { extensions: { code: 'BAD_REQUEST' } },
@@ -50,7 +50,6 @@ export const respondToSettlementRequest: NonNullable<
         }
     } else if (entityType === 'DRIVER') {
         if (userData.role === 'DRIVER') {
-            // Verify this driver owns the request
             const driverRecord = await db.query.drivers.findFirst({
                 where: eq(driversTable.userId, userData.userId),
             });
@@ -65,15 +64,15 @@ export const respondToSettlementRequest: NonNullable<
     if (action === 'ACCEPT') {
         const requestedAmount = Number(existing.amount ?? 0);
         const settlingService = new SettlingService(db);
+        let paymentId: string;
 
         if (entityType === 'BUSINESS' && existing.businessId) {
             const settleResult = await settlingService.settleWithBusiness(
                 existing.businessId,
                 requestedAmount,
                 userData.userId,
-                'SETTLEMENT_REQUEST_ACCEPTED',
-                `request:${requestId}`,
             );
+            paymentId = settleResult.paymentId;
 
             logger.info(
                 {
@@ -83,7 +82,7 @@ export const respondToSettlementRequest: NonNullable<
                     settledCount: settleResult.settledCount,
                     netAmount: settleResult.netAmount,
                     remainderAmount: settleResult.remainderAmount,
-                    paymentId: settleResult.paymentId,
+                    paymentId,
                 },
                 'settlementRequest:accept — settled business via SettlingService',
             );
@@ -92,9 +91,8 @@ export const respondToSettlementRequest: NonNullable<
                 existing.driverId,
                 userData.userId,
                 requestedAmount,
-                'SETTLEMENT_REQUEST_ACCEPTED',
-                `request:${requestId}`,
             );
+            paymentId = settleResult.paymentId;
 
             logger.info(
                 {
@@ -104,13 +102,17 @@ export const respondToSettlementRequest: NonNullable<
                     settledCount: settleResult.settledCount,
                     netAmount: settleResult.netAmount,
                     remainderAmount: settleResult.remainderAmount,
-                    paymentId: settleResult.paymentId,
+                    paymentId,
                 },
                 'settlementRequest:accept — settled driver via SettlingService',
             );
+        } else {
+            throw new GraphQLError('Invalid settlement request: missing entity ID', {
+                extensions: { code: 'BAD_REQUEST' },
+            });
         }
 
-        const updated = await repo.accept(requestId, userData.userId);
+        const updated = await repo.accept(requestId, userData.userId, paymentId);
 
         // Notify admins
         try {
@@ -118,7 +120,7 @@ export const respondToSettlementRequest: NonNullable<
                 const entityLabel = entityType === 'BUSINESS' ? 'Business' : 'Driver';
                 await notificationService.sendToTopic('admins', {
                     title: 'Settlement Accepted',
-                    body: `${entityLabel} accepted settlement of EUR ${requestedAmount.toFixed(2)}.`,
+                    body: `${entityLabel} accepted settlement of €${requestedAmount.toFixed(2)}.`,
                     data: {
                         type: 'SETTLEMENT_REQUEST_ACCEPTED',
                         requestId,
@@ -133,24 +135,24 @@ export const respondToSettlementRequest: NonNullable<
         return updated;
     }
 
-    // DISPUTE
-    const updated = await repo.dispute(requestId, userData.userId, disputeReason);
+    // REJECT
+    const updated = await repo.reject(requestId, userData.userId, reason);
 
     try {
         if (notificationService) {
             const entityLabel = entityType === 'BUSINESS' ? 'Business' : 'Driver';
             await notificationService.sendToTopic('admins', {
-                title: 'Settlement Disputed',
-                body: `${entityLabel} disputed settlement of EUR ${Number(existing.amount).toFixed(2)}. Reason: ${disputeReason ?? 'No reason provided'}`,
+                title: 'Settlement Rejected',
+                body: `${entityLabel} rejected settlement of €${Number(existing.amount).toFixed(2)}. Reason: ${reason ?? 'No reason provided'}`,
                 data: {
-                    type: 'SETTLEMENT_REQUEST_DISPUTED',
+                    type: 'SETTLEMENT_REQUEST_REJECTED',
                     requestId,
                     screen: 'settlements',
                 },
             });
         }
     } catch (err) {
-        logger.error({ err, requestId }, 'settlementRequest:dispute — failed to notify admin (non-fatal)');
+        logger.error({ err, requestId }, 'settlementRequest:reject — failed to notify admin (non-fatal)');
     }
 
     return updated;

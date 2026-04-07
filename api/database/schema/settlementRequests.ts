@@ -1,16 +1,15 @@
-import { pgTable, uuid, numeric, varchar, text, timestamp, pgEnum, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, numeric, text, timestamp, pgEnum, index } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 import { businesses } from './businesses';
 import { drivers } from './drivers';
 import { users } from './users';
 import { settlementEntityType } from './settlementRules';
+import { settlementPayments } from './settlementPayments';
 
 const settlementRequestStatusValues = [
-    'PENDING_APPROVAL',
+    'PENDING',
     'ACCEPTED',
-    'DISPUTED',
-    'EXPIRED',
-    'CANCELLED',
+    'REJECTED',
 ] as const;
 
 export const settlementRequestStatus = pgEnum(
@@ -22,15 +21,16 @@ export type SettlementRequestStatusValue = (typeof settlementRequestStatusValues
 
 /**
  * settlement_requests — admin-initiated requests asking a business or driver
- * to acknowledge and approve a financial settlement for a given period.
+ * to acknowledge and approve a financial settlement.
  *
  * Flow:
- *  1. Admin calls createSettlementRequest  → row inserted (PENDING_APPROVAL),
+ *  1. Admin calls createSettlementRequest  → row inserted (PENDING),
  *     push notification sent to business/driver.
  *  2. Entity taps Accept                   → status becomes ACCEPTED,
- *     matching unsettled settlements are settled via SettlingService.
- *  3. Entity taps Dispute                  → status becomes DISPUTED,
- *     admin notified for manual review.
+ *     all unsettled settlements are settled via SettlingService,
+ *     settlement_payment_id is linked.
+ *  3. Entity taps Reject                   → status becomes REJECTED,
+ *     reason is stored, admin notified.
  */
 export const settlementRequests = pgTable(
     'settlement_requests',
@@ -46,34 +46,27 @@ export const settlementRequests = pgTable(
         driverId: uuid('driver_id')
             .references(() => drivers.id, { onDelete: 'cascade' }),
 
-        requestedByUserId: uuid('requested_by_user_id').references(() => users.id, {
-            onDelete: 'set null',
-        }),
-
-        /** The total commission amount the admin is requesting settlement for */
+        /** The total amount the admin is requesting settlement for */
         amount: numeric('amount', { precision: 10, scale: 2 }).notNull(),
-        currency: varchar('currency', { length: 3 }).default('EUR').notNull(),
-
-        /** Inclusive date range this settlement covers */
-        periodStart: timestamp('period_start', { withTimezone: true, mode: 'string' }).notNull(),
-        periodEnd: timestamp('period_end', { withTimezone: true, mode: 'string' }).notNull(),
 
         /** Optional message from the admin */
         note: text('note'),
 
-        status: settlementRequestStatus('status').default('PENDING_APPROVAL').notNull(),
+        status: settlementRequestStatus('status').default('PENDING').notNull(),
 
-        /** When the business owner responded */
+        /** When the business/driver responded */
         respondedAt: timestamp('responded_at', { withTimezone: true, mode: 'string' }),
         respondedByUserId: uuid('responded_by_user_id').references(() => users.id, {
             onDelete: 'set null',
         }),
 
-        /** Reason supplied by the business when disputing */
-        disputeReason: text('dispute_reason'),
+        /** Reason supplied when rejecting */
+        reason: text('reason'),
 
-        /** Request auto-expires after this timestamp */
-        expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'string' }).notNull(),
+        /** The payment created when this request is accepted */
+        settlementPaymentId: uuid('settlement_payment_id').references(() => settlementPayments.id, {
+            onDelete: 'set null',
+        }),
 
         createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
             .default(sql`CURRENT_TIMESTAMP`)
@@ -101,15 +94,13 @@ export const settlementRequestsRelations = relations(settlementRequests, ({ one 
         fields: [settlementRequests.driverId],
         references: [drivers.id],
     }),
-    requestedBy: one(users, {
-        fields: [settlementRequests.requestedByUserId],
-        references: [users.id],
-        relationName: 'requestedBy',
-    }),
     respondedBy: one(users, {
         fields: [settlementRequests.respondedByUserId],
         references: [users.id],
-        relationName: 'respondedBy',
+    }),
+    settlementPayment: one(settlementPayments, {
+        fields: [settlementRequests.settlementPaymentId],
+        references: [settlementPayments.id],
     }),
 }));
 

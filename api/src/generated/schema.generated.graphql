@@ -997,9 +997,6 @@ type Mutation {
   businessDeviceHeartbeat(input: BusinessDeviceHeartbeatInput!): Boolean!
   businessDeviceOrderSignal(deviceId: String!, orderId: ID): Boolean!
   cancelOrder(id: ID!): Order!
-
-  """Admin cancels an outstanding settlement request."""
-  cancelSettlementRequest(requestId: ID!): SettlementRequest!
   changeMyPassword(currentPassword: String!, newPassword: String!): Boolean!
   createBanner(input: CreateBannerInput!): Banner!
   createBusiness(input: CreateBusinessInput!): Business!
@@ -1019,7 +1016,7 @@ type Mutation {
   """
   Admin creates a settlement request, notifying the business or driver via push.
   """
-  createSettlementRequest(amount: Float!, businessId: ID, driverId: ID, note: String, periodEnd: Date!, periodStart: Date!): SettlementRequest!
+  createSettlementRequest(amount: Float!, businessId: ID, driverId: ID, note: String): SettlementRequest!
   createSettlementRule(input: CreateSettlementRuleInput!): SettlementRule!
   createTestOrder: Order!
   createUser(input: CreateUserInput!): AuthResponse!
@@ -1090,8 +1087,8 @@ type Mutation {
   replyToDriverMessage(adminId: ID!, body: String!): DriverMessage!
   resendEmailVerification: SignupStepResponse!
 
-  """Business owner accepts or disputes a pending settlement request."""
-  respondToSettlementRequest(action: SettlementRequestAction!, disputeReason: String, requestId: ID!): SettlementRequest!
+  """Business/driver accepts or rejects a pending settlement request."""
+  respondToSettlementRequest(action: SettlementRequestAction!, reason: String, requestId: ID!): SettlementRequest!
   runSettlementScenarioHarness(scenarioIds: [String!]): SettlementScenarioHarnessResult!
 
   """Admin sends a message to a business user"""
@@ -1820,33 +1817,27 @@ type SettlementRequest {
   amount: Float!
   business: Business
   createdAt: Date!
-  currency: String!
-  disputeReason: String
   driver: User
   entityType: SettlementType!
-  expiresAt: Date!
   id: ID!
   note: String
-  periodEnd: Date!
-  periodStart: Date!
-  requestedBy: User
+  reason: String
   respondedAt: Date
   respondedBy: User
+  settlementPayment: SettlementPayment
   status: SettlementRequestStatus!
   updatedAt: Date!
 }
 
 enum SettlementRequestAction {
   ACCEPT
-  DISPUTE
+  REJECT
 }
 
 enum SettlementRequestStatus {
   ACCEPTED
-  CANCELLED
-  DISPUTED
-  EXPIRED
-  PENDING_APPROVAL
+  PENDING
+  REJECTED
 }
 
 type SettlementRule {

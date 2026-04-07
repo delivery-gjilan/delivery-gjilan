@@ -63,7 +63,7 @@ export default function EarningsScreen() {
     const [period, setPeriod] = useState<Period>('today');
     const [refreshing, setRefreshing] = useState(false);
     const [disputeModalRequestId, setDisputeModalRequestId] = useState<string | null>(null);
-    const [disputeReason, setDisputeReason] = useState('');
+    const [rejectReason, setRejectReason] = useState('');
     const [respondingId, setRespondingId] = useState<string | null>(null);
 
     const PERIODS: { key: Period; label: string }[] = [
@@ -94,7 +94,7 @@ export default function EarningsScreen() {
 
     const { data: requestsData, loading: requestsLoading, refetch: refetchRequests } = useQuery(
         GET_MY_SETTLEMENT_REQUESTS,
-        { variables: { status: 'PENDING_APPROVAL', limit: 20 }, fetchPolicy: 'network-only' },
+        { variables: { status: 'PENDING', limit: 20 }, fetchPolicy: 'network-only' },
     );
 
     const [respondToRequest] = useMutation(RESPOND_TO_SETTLEMENT_REQUEST);
@@ -144,15 +144,15 @@ export default function EarningsScreen() {
         );
     };
 
-    const handleSubmitDispute = async () => {
+    const handleSubmitReject = async () => {
         if (!disputeModalRequestId) return;
         try {
             setRespondingId(disputeModalRequestId);
             await respondToRequest({
                 variables: {
                     requestId: disputeModalRequestId,
-                    action: 'DISPUTE',
-                    disputeReason: disputeReason.trim() || undefined,
+                    action: 'REJECT',
+                    reason: rejectReason.trim() || undefined,
                 },
             });
             setDisputeModalRequestId(null);
@@ -322,12 +322,6 @@ export default function EarningsScreen() {
                             <View style={{ gap: 10, marginTop: 12 }}>
                                 {pendingRequests.map((req: any) => {
                                     const isResponding = respondingId === req.id;
-                                    const periodStart = req.periodStart ? format(new Date(req.periodStart), "MMM d, yyyy") : null;
-                                    const periodEnd = req.periodEnd ? format(new Date(req.periodEnd), "MMM d, yyyy") : null;
-                                    const expiresAt = req.expiresAt ? format(new Date(req.expiresAt), "MMM d, HH:mm") : null;
-                                    const requestedBy = req.requestedBy
-                                        ? `${req.requestedBy.firstName ?? ""} ${req.requestedBy.lastName ?? ""}`.trim()
-                                        : "Admin";
                                     return (
                                         <View key={req.id} style={es.requestCard}>
                                             <View style={es.requestCardHeader}>
@@ -341,13 +335,9 @@ export default function EarningsScreen() {
                                             </View>
 
                                             <View style={{ gap: 3, marginBottom: 14 }}>
-                                                {periodStart && periodEnd && (
-                                                    <Text style={es.requestMeta}>{periodStart} — {periodEnd}</Text>
-                                                )}
                                                 {req.note ? <Text style={es.requestNote}>"{req.note}"</Text> : null}
                                                 <Text style={es.requestFooter}>
-                                                    {t.earnings.requested_by} {requestedBy}
-                                                    {expiresAt ? ` · ${t.earnings.expires} ${expiresAt}` : ""}
+                                                    {formatDate(req.createdAt)}
                                                 </Text>
                                             </View>
 
@@ -362,10 +352,10 @@ export default function EarningsScreen() {
                                                     )}
                                                 </Pressable>
                                                 <Pressable
-                                                    onPress={() => { setDisputeReason(""); setDisputeModalRequestId(req.id); }}
+                                                    onPress={() => { setRejectReason(""); setDisputeModalRequestId(req.id); }}
                                                     style={[es.reqActionBtn, { backgroundColor: "#3b0000", borderColor: "#ef444440", opacity: isResponding ? 0.5 : 1 }]}
                                                 >
-                                                    <Text style={[es.reqActionText, { color: "#ef4444" }]}>{t.earnings.dispute}</Text>
+                                                    <Text style={[es.reqActionText, { color: "#ef4444" }]}>{t.earnings.reject ?? t.earnings.dispute}</Text>
                                                 </Pressable>
                                             </View>
                                         </View>
@@ -444,11 +434,11 @@ export default function EarningsScreen() {
                 >
                     <Pressable style={es.modalBackdrop} onPress={() => setDisputeModalRequestId(null)} />
                     <View style={[es.modalSheet, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-                        <Text style={[es.modalTitle, { color: theme.colors.text }]}>{t.earnings.dispute_title}</Text>
+                        <Text style={[es.modalTitle, { color: theme.colors.text }]}>{t.earnings.reject_title ?? t.earnings.dispute_title}</Text>
                         <TextInput
-                            value={disputeReason}
-                            onChangeText={setDisputeReason}
-                            placeholder={t.earnings.dispute_placeholder}
+                            value={rejectReason}
+                            onChangeText={setRejectReason}
+                            placeholder={t.earnings.reject_placeholder ?? t.earnings.dispute_placeholder}
                             placeholderTextColor={theme.colors.subtext}
                             multiline
                             numberOfLines={3}
@@ -466,14 +456,14 @@ export default function EarningsScreen() {
                                 <Text style={[es.modalCancelText, { color: theme.colors.subtext }]}>{t.common.cancel}</Text>
                             </Pressable>
                             <Pressable
-                                onPress={handleSubmitDispute}
+                                onPress={handleSubmitReject}
                                 disabled={respondingId !== null}
                                 style={[es.modalSubmitBtn, { opacity: respondingId ? 0.6 : 1 }]}
                             >
                                 {respondingId ? (
                                     <ActivityIndicator size="small" color="#fff" />
                                 ) : (
-                                    <Text style={es.modalSubmitText}>{t.earnings.dispute_submit}</Text>
+                                    <Text style={es.modalSubmitText}>{t.earnings.reject_submit ?? t.earnings.dispute_submit}</Text>
                                 )}
                             </Pressable>
                         </View>

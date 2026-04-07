@@ -32,7 +32,6 @@ import {
   GET_BUSINESS_BALANCE,
   GET_SETTLEMENT_REQUESTS,
   CREATE_SETTLEMENT_REQUEST,
-  CANCEL_SETTLEMENT_REQUEST,
 } from '@/graphql/operations/settlements/queries';
 
 type SettlementRecord = SettlementsPageQuery['settlements'][number];
@@ -65,10 +64,6 @@ export default function BusinessSettlementsPage() {
   // Request settlement dialog
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
   const [reqAmount, setReqAmount] = useState('');
-  const [reqPeriodStart, setReqPeriodStart] = useState(() =>
-    new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-  );
-  const [reqPeriodEnd, setReqPeriodEnd] = useState(() => new Date().toISOString().split('T')[0]);
   const [reqNote, setReqNote] = useState('');
   const [reqSubmitting, setReqSubmitting] = useState(false);
 
@@ -97,7 +92,6 @@ export default function BusinessSettlementsPage() {
   });
 
   const [createSettlementRequest] = useMutation(CREATE_SETTLEMENT_REQUEST);
-  const [cancelSettlementRequest] = useMutation(CANCEL_SETTLEMENT_REQUEST);
 
   const settlements: SettlementRecord[] = data?.settlements ?? [];
   const balance = balanceData?.businessBalance;
@@ -118,10 +112,6 @@ export default function BusinessSettlementsPage() {
   const openRequestDialog = () => {
     const pending = balance?.totalPending ?? 0;
     setReqAmount(Number(pending) > 0 ? Number(pending).toFixed(2) : '');
-    setReqPeriodStart(
-      new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-    );
-    setReqPeriodEnd(new Date().toISOString().split('T')[0]);
     setReqNote('');
     setRequestDialogOpen(true);
   };
@@ -132,18 +122,12 @@ export default function BusinessSettlementsPage() {
       toast({ title: 'Invalid amount', description: 'Enter a valid amount greater than 0.', variant: 'destructive' });
       return;
     }
-    if (!reqPeriodStart || !reqPeriodEnd) {
-      toast({ title: 'Missing dates', description: 'Period start and end are required.', variant: 'destructive' });
-      return;
-    }
     setReqSubmitting(true);
     try {
       await createSettlementRequest({
         variables: {
           businessId,
           amount,
-          periodStart: new Date(reqPeriodStart).toISOString(),
-          periodEnd: new Date(reqPeriodEnd + 'T23:59:59').toISOString(),
           note: reqNote.trim() || undefined,
         },
       });
@@ -157,15 +141,7 @@ export default function BusinessSettlementsPage() {
     }
   };
 
-  const handleCancelRequest = async (requestId: string) => {
-    try {
-      await cancelSettlementRequest({ variables: { requestId } });
-      toast({ title: 'Cancelled', description: 'Settlement request cancelled.' });
-      await refetchRequests();
-    } catch (err: any) {
-      toast({ title: 'Error', description: err?.message ?? 'Failed to cancel', variant: 'destructive' });
-    }
-  };
+
 
   if (!businessId) {
     return (
@@ -232,30 +208,20 @@ export default function BusinessSettlementsPage() {
                 <div key={req.id} className="flex items-center justify-between rounded-lg border border-gray-800 bg-gray-950 px-3 py-2">
                   <div>
                     <span className="text-sm font-medium text-white">€{Number(req.amount).toFixed(2)}</span>
-                    <span className="text-xs text-gray-400 ml-3">{req.periodStart?.slice(0, 10)} → {req.periodEnd?.slice(0, 10)}</span>
+                    <span className="text-xs text-gray-400 ml-3">{new Date(req.createdAt).toLocaleDateString()}</span>
                     {req.note && <span className="text-xs text-gray-500 ml-3">"{req.note}"</span>}
+                    {req.reason && <span className="text-xs text-red-400 ml-3">Reason: {req.reason}</span>}
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge
                       className={cn(
                         req.status === 'PENDING' && 'bg-yellow-600 text-white',
-                        req.status === 'APPROVED' && 'bg-green-600 text-white',
+                        req.status === 'ACCEPTED' && 'bg-green-600 text-white',
                         req.status === 'REJECTED' && 'bg-red-600 text-white',
-                        req.status === 'CANCELLED' && 'bg-gray-600 text-white',
                       )}
                     >
                       {req.status}
                     </Badge>
-                    {req.status === 'PENDING' && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-400 hover:text-red-300 h-7 px-2"
-                        onClick={() => handleCancelRequest(req.id)}
-                      >
-                        Cancel
-                      </Button>
-                    )}
                   </div>
                 </div>
               ))
@@ -385,26 +351,6 @@ export default function BusinessSettlementsPage() {
                 className="mt-1 bg-gray-800 border-gray-700 text-white"
                 placeholder="0.00"
               />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-gray-300">Period Start</Label>
-                <Input
-                  type="date"
-                  value={reqPeriodStart}
-                  onChange={(e) => setReqPeriodStart(e.target.value)}
-                  className="mt-1 bg-gray-800 border-gray-700 text-white"
-                />
-              </div>
-              <div>
-                <Label className="text-gray-300">Period End</Label>
-                <Input
-                  type="date"
-                  value={reqPeriodEnd}
-                  onChange={(e) => setReqPeriodEnd(e.target.value)}
-                  className="mt-1 bg-gray-800 border-gray-700 text-white"
-                />
-              </div>
             </div>
             <div>
               <Label className="text-gray-300">Note (optional)</Label>

@@ -105,20 +105,17 @@ export const GET_MY_SETTLEMENT_REQUESTS = gql`
         settlementRequests(status: $status, limit: $limit) {
             id
             amount
-            currency
-            periodStart
-            periodEnd
             note
             status
-            expiresAt
+            reason
             createdAt
-            requestedBy {
-                id
-                firstName
-                lastName
-            }
             respondedAt
-            disputeReason
+            settlementPayment {
+                id
+                amount
+                direction
+                createdAt
+            }
         }
     }
 `;
@@ -127,17 +124,17 @@ export const RESPOND_TO_SETTLEMENT_REQUEST = gql`
     mutation RespondToSettlementRequest(
         $requestId: ID!
         $action: SettlementRequestAction!
-        $disputeReason: String
+        $reason: String
     ) {
         respondToSettlementRequest(
             requestId: $requestId
             action: $action
-            disputeReason: $disputeReason
+            reason: $reason
         ) {
             id
             status
             respondedAt
-            disputeReason
+            reason
         }
     }
 `;

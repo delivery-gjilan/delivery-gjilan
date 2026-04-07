@@ -15,22 +15,20 @@ export const SettlementRequest: SettlementRequestResolvers = {
         return loaders.businessByIdLoader.load(req.businessId) as any;
     },
 
-    driver: async (req, _, { db, loaders }) => {
+    driver: async (req, _, { db }) => {
         const driverId = (req as any).driverId;
         if (!driverId) return null;
-        // Load driver to get its userId, then load the user
         const { drivers: driversTable } = await import('@/database/schema');
         const { eq } = await import('drizzle-orm');
         const driverRecord = await db.query.drivers.findFirst({
             where: eq(driversTable.id, driverId),
         });
         if (!driverRecord?.userId) return null;
-        return loaders.userLoader.load(driverRecord.userId) as any;
-    },
-
-    requestedBy: async (req, _, { loaders }) => {
-        if (!req.requestedByUserId) return null;
-        return loaders.userLoader.load(req.requestedByUserId) as any;
+        const { users } = await import('@/database/schema');
+        const user = await db.query.users.findFirst({
+            where: eq(users.id, driverRecord.userId),
+        });
+        return user ?? null;
     },
 
     respondedBy: async (req, _, { loaders }) => {
@@ -38,10 +36,20 @@ export const SettlementRequest: SettlementRequestResolvers = {
         return loaders.userLoader.load(req.respondedByUserId) as any;
     },
 
-    periodStart: (req) => normalizeDate(req.periodStart),
-    periodEnd: (req) => normalizeDate(req.periodEnd),
+    settlementPayment: async (req, _, { db }) => {
+        const paymentId = (req as any).settlementPaymentId;
+        if (!paymentId) return null;
+        const { settlementPayments } = await import('@/database/schema');
+        const { eq } = await import('drizzle-orm');
+        const result = await db
+            .select()
+            .from(settlementPayments)
+            .where(eq(settlementPayments.id, paymentId))
+            .limit(1);
+        return result[0] ?? null;
+    },
+
     respondedAt: (req) => normalizeDate(req.respondedAt ?? null),
-    expiresAt: (req) => normalizeDate(req.expiresAt),
     createdAt: (req) => normalizeDate(req.createdAt),
     updatedAt: (req) => normalizeDate(req.updatedAt),
 } as any;

@@ -7,7 +7,7 @@ import { eq } from 'drizzle-orm';
 
 export const createSettlementRequest: NonNullable<
     MutationResolvers['createSettlementRequest']
-> = async (_parent, { businessId, driverId, amount, periodStart, periodEnd, note }, ctx): Promise<any> => {
+> = async (_parent, { businessId, driverId, amount, note }, ctx): Promise<any> => {
     const { db, userData, notificationService } = ctx;
 
     if (!userData?.role) {
@@ -46,16 +46,25 @@ export const createSettlementRequest: NonNullable<
         }
     }
 
+    // Check that there is no existing PENDING request for this entity
     const repo = new SettlementRequestRepository(db);
+    const existing = await repo.getMany({
+        businessId: businessId ?? undefined,
+        driverId: resolvedDriverId ?? undefined,
+        status: 'PENDING',
+        limit: 1,
+    });
+    if (existing.length > 0) {
+        throw new GraphQLError('There is already a pending settlement request for this entity', {
+            extensions: { code: 'BAD_REQUEST' },
+        });
+    }
 
     const request = await repo.create({
         entityType,
         businessId: businessId ?? null,
         driverId: resolvedDriverId,
-        requestedByUserId: userData.userId ?? null,
         amount,
-        periodStart: periodStart as any,
-        periodEnd: periodEnd as any,
         note,
     });
 
@@ -70,13 +79,11 @@ export const createSettlementRequest: NonNullable<
                         'BUSINESS',
                         {
                             title: 'Settlement Request',
-                            body: `Admin is requesting a settlement of EUR ${Number(amount).toFixed(2)}. Tap to review and approve.`,
+                            body: `Admin is requesting a settlement of €${Number(amount).toFixed(2)}. Tap to review.`,
                             data: {
                                 type: 'SETTLEMENT_REQUEST',
                                 requestId: request.id,
                                 amount: String(amount),
-                                periodStart: String(periodStart),
-                                periodEnd: String(periodEnd),
                                 screen: 'finances',
                             },
                             timeSensitive: true,
@@ -92,14 +99,12 @@ export const createSettlementRequest: NonNullable<
                         'DRIVER',
                         {
                             title: 'Settlement Request',
-                            body: `Admin is requesting a settlement of EUR ${Number(amount).toFixed(2)}. Tap to review and approve.`,
+                            body: `Admin is requesting a settlement of €${Number(amount).toFixed(2)}. Tap to review.`,
                             data: {
                                 type: 'SETTLEMENT_REQUEST',
                                 requestId: request.id,
                                 amount: String(amount),
-                                periodStart: String(periodStart),
-                                periodEnd: String(periodEnd),
-                                screen: 'finances',
+                                screen: 'earnings',
                             },
                             timeSensitive: true,
                         },

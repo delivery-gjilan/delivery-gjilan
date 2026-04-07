@@ -1,5 +1,5 @@
 {
-  "id": "5a9d57dd-bd62-4672-95b8-36b7d5bf1e96",
+  "id": "1cf014c7-1282-46a8-a0f7-cbbaad596b1c",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -2983,34 +2983,9 @@
           "primaryKey": false,
           "notNull": false
         },
-        "requested_by_user_id": {
-          "name": "requested_by_user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "amount": {
           "name": "amount",
           "type": "numeric(10, 2)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "currency": {
-          "name": "currency",
-          "type": "varchar(3)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'EUR'"
-        },
-        "period_start": {
-          "name": "period_start",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "period_end": {
-          "name": "period_end",
-          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true
         },
@@ -3026,7 +3001,7 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true,
-          "default": "'PENDING_APPROVAL'"
+          "default": "'PENDING'"
         },
         "responded_at": {
           "name": "responded_at",
@@ -3040,17 +3015,17 @@
           "primaryKey": false,
           "notNull": false
         },
-        "dispute_reason": {
-          "name": "dispute_reason",
+        "reason": {
+          "name": "reason",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp with time zone",
+        "settlement_payment_id": {
+          "name": "settlement_payment_id",
+          "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -3171,12 +3146,12 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "settlement_requests_requested_by_user_id_users_id_fk": {
-          "name": "settlement_requests_requested_by_user_id_users_id_fk",
+        "settlement_requests_responded_by_user_id_users_id_fk": {
+          "name": "settlement_requests_responded_by_user_id_users_id_fk",
           "tableFrom": "settlement_requests",
           "tableTo": "users",
           "columnsFrom": [
-            "requested_by_user_id"
+            "responded_by_user_id"
           ],
           "columnsTo": [
             "id"
@@ -3184,12 +3159,12 @@
           "onDelete": "set null",
           "onUpdate": "no action"
         },
-        "settlement_requests_responded_by_user_id_users_id_fk": {
-          "name": "settlement_requests_responded_by_user_id_users_id_fk",
+        "settlement_requests_settlement_payment_id_settlement_payments_id_fk": {
+          "name": "settlement_requests_settlement_payment_id_settlement_payments_id_fk",
           "tableFrom": "settlement_requests",
-          "tableTo": "users",
+          "tableTo": "settlement_payments",
           "columnsFrom": [
-            "responded_by_user_id"
+            "settlement_payment_id"
           ],
           "columnsTo": [
             "id"
@@ -6388,11 +6363,9 @@
       "name": "settlement_request_status",
       "schema": "public",
       "values": [
-        "PENDING_APPROVAL",
+        "PENDING",
         "ACCEPTED",
-        "DISPUTED",
-        "EXPIRED",
-        "CANCELLED"
+        "REJECTED"
       ]
     },
     "public.promotion_creator_type": {

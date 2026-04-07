@@ -224,14 +224,11 @@ export default function SettlementsPage() {
     }
     setSettleSubmitting(true);
     try {
-      const now = new Date().toISOString();
       const { data } = await createSettlementRequest({
         variables: {
           businessId: settleEntityType === 'BUSINESS' ? settleEntityId : undefined,
           driverId: settleEntityType === 'DRIVER' ? settleEntityId : undefined,
           amount,
-          periodStart: now,
-          periodEnd: now,
           note: settleNote.trim() || undefined,
         },
       });

@@ -15,7 +15,7 @@ import { GET_MY_SETTLEMENT_REQUESTS } from '@/graphql/settlements';
 import { useAuthStore } from '@/store/authStore';
 import { useTranslation } from '@/hooks/useTranslation';
 
-type HistoryStatus = 'ALL' | 'ACCEPTED' | 'DISPUTED' | 'EXPIRED' | 'CANCELLED';
+type HistoryStatus = 'ALL' | 'ACCEPTED' | 'REJECTED';
 
 function formatCurrency(amount: number) {
     return `€${amount.toFixed(2)}`;
@@ -52,7 +52,7 @@ export default function SettlementHistoryScreen() {
     const allRequests: any[] = (data as any)?.settlementRequests ?? [];
 
     const historyRequests = useMemo(() => {
-        const base = allRequests.filter((r: any) => r.status !== 'PENDING_APPROVAL');
+        const base = allRequests.filter((r: any) => r.status !== 'PENDING');
         if (statusFilter === 'ALL') {
             return base;
         }
@@ -68,9 +68,7 @@ export default function SettlementHistoryScreen() {
     const filters: Array<{ key: HistoryStatus; label: string }> = [
         { key: 'ALL', label: t('common.all', 'All') },
         { key: 'ACCEPTED', label: t('finances.accepted', 'Accepted') },
-        { key: 'DISPUTED', label: t('finances.disputed', 'Disputed') },
-        { key: 'EXPIRED', label: t('finances.expired', 'Expired') },
-        { key: 'CANCELLED', label: t('finances.cancelled', 'Cancelled') },
+        { key: 'REJECTED', label: t('finances.rejected', 'Rejected') },
     ];
 
     return (
@@ -138,19 +136,15 @@ export default function SettlementHistoryScreen() {
                                 const amount = formatCurrency(Number(req.amount ?? 0));
                                 const requestedAt = formatDateTime(req.createdAt);
                                 const respondedAt = formatDateTime(req.respondedAt);
-                                const periodStart = formatDateTime(req.periodStart);
-                                const periodEnd = formatDateTime(req.periodEnd);
                                 const note = req.note ? String(req.note) : null;
-                                const disputeReason = req.disputeReason ? String(req.disputeReason) : null;
+                                const reason = req.reason ? String(req.reason) : null;
 
                                 const statusColor =
                                     status === 'ACCEPTED'
                                         ? '#22c55e'
-                                        : status === 'DISPUTED'
+                                        : status === 'REJECTED'
                                             ? '#ef4444'
-                                            : status === 'EXPIRED'
-                                                ? '#f59e0b'
-                                                : '#94a3b8';
+                                            : '#94a3b8';
 
                                 return (
                                     <View
@@ -187,9 +181,6 @@ export default function SettlementHistoryScreen() {
                                         <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
                                             {t('finances.responded_on', 'Responded')}: {respondedAt}
                                         </Text>
-                                        <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
-                                            {t('finances.period', 'Period')}: {periodStart} → {periodEnd}
-                                        </Text>
 
                                         {note ? (
                                             <Text style={{ fontSize: 12, color: '#cbd5e1', marginTop: 6 }}>
@@ -197,9 +188,9 @@ export default function SettlementHistoryScreen() {
                                             </Text>
                                         ) : null}
 
-                                        {disputeReason ? (
+                                        {reason ? (
                                             <Text style={{ fontSize: 12, color: '#fca5a5', marginTop: 4 }}>
-                                                {t('finances.dispute_reason', 'Dispute reason')}: "{disputeReason}"
+                                                {t('finances.reject_reason', 'Rejection reason')}: "{reason}"
                                             </Text>
                                         ) : null}
                                     </View>

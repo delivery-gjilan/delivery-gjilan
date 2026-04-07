@@ -185,20 +185,15 @@ type Mutation {
         businessId: ID
         driverId: ID
         amount: Float!
-        periodStart: Date!
-        periodEnd: Date!
         note: String
     ): SettlementRequest!
 
-    """Business owner accepts or disputes a pending settlement request."""
+    """Business/driver accepts or rejects a pending settlement request."""
     respondToSettlementRequest(
         requestId: ID!
         action: SettlementRequestAction!
-        disputeReason: String
+        reason: String
     ): SettlementRequest!
-
-    """Admin cancels an outstanding settlement request."""
-    cancelSettlementRequest(requestId: ID!): SettlementRequest!
 
     """Settle unsettled settlements for a driver. Supports partial payment."""
     settleWithDriver(
@@ -222,16 +217,14 @@ type Mutation {
 # ─── Settlement Requests ─────────────────────────────────────────────────────
 
 enum SettlementRequestStatus {
-    PENDING_APPROVAL
+    PENDING
     ACCEPTED
-    DISPUTED
-    EXPIRED
-    CANCELLED
+    REJECTED
 }
 
 enum SettlementRequestAction {
     ACCEPT
-    DISPUTE
+    REJECT
 }
 
 type SettlementRequest {
@@ -239,17 +232,13 @@ type SettlementRequest {
     entityType: SettlementType!
     business: Business
     driver: User
-    requestedBy: User
     amount: Float!
-    currency: String!
-    periodStart: Date!
-    periodEnd: Date!
     note: String
     status: SettlementRequestStatus!
     respondedAt: Date
     respondedBy: User
-    disputeReason: String
-    expiresAt: Date!
+    reason: String
+    settlementPayment: SettlementPayment
     createdAt: Date!
     updatedAt: Date!
 }

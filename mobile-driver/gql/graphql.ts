@@ -992,8 +992,6 @@ export type Mutation = {
   businessDeviceHeartbeat: Scalars['Boolean']['output'];
   businessDeviceOrderSignal: Scalars['Boolean']['output'];
   cancelOrder: Order;
-  /** Admin cancels an outstanding settlement request. */
-  cancelSettlementRequest: SettlementRequest;
   changeMyPassword: Scalars['Boolean']['output'];
   createBanner: Banner;
   createBusiness: Business;
@@ -1069,7 +1067,7 @@ export type Mutation = {
   /** Driver replies to admin */
   replyToDriverMessage: DriverMessage;
   resendEmailVerification: SignupStepResponse;
-  /** Business owner accepts or disputes a pending settlement request. */
+  /** Business/driver accepts or rejects a pending settlement request. */
   respondToSettlementRequest: SettlementRequest;
   runSettlementScenarioHarness: SettlementScenarioHarnessResult;
   /** Admin sends a message to a business user */
@@ -1213,11 +1211,6 @@ export type MutationCancelOrderArgs = {
 };
 
 
-export type MutationCancelSettlementRequestArgs = {
-  requestId: Scalars['ID']['input'];
-};
-
-
 export type MutationChangeMyPasswordArgs = {
   currentPassword: Scalars['String']['input'];
   newPassword: Scalars['String']['input'];
@@ -1300,8 +1293,6 @@ export type MutationCreateSettlementRequestArgs = {
   businessId?: InputMaybe<Scalars['ID']['input']>;
   driverId?: InputMaybe<Scalars['ID']['input']>;
   note?: InputMaybe<Scalars['String']['input']>;
-  periodEnd: Scalars['Date']['input'];
-  periodStart: Scalars['Date']['input'];
 };
 
 
@@ -1526,7 +1517,7 @@ export type MutationReplyToDriverMessageArgs = {
 
 export type MutationRespondToSettlementRequestArgs = {
   action: SettlementRequestAction;
-  disputeReason?: InputMaybe<Scalars['String']['input']>;
+  reason?: InputMaybe<Scalars['String']['input']>;
   requestId: Scalars['ID']['input'];
 };
 
@@ -2861,33 +2852,27 @@ export type SettlementRequest = {
   amount: Scalars['Float']['output'];
   business?: Maybe<Business>;
   createdAt: Scalars['Date']['output'];
-  currency: Scalars['String']['output'];
-  disputeReason?: Maybe<Scalars['String']['output']>;
   driver?: Maybe<User>;
   entityType: SettlementType;
-  expiresAt: Scalars['Date']['output'];
   id: Scalars['ID']['output'];
   note?: Maybe<Scalars['String']['output']>;
-  periodEnd: Scalars['Date']['output'];
-  periodStart: Scalars['Date']['output'];
-  requestedBy?: Maybe<User>;
+  reason?: Maybe<Scalars['String']['output']>;
   respondedAt?: Maybe<Scalars['Date']['output']>;
   respondedBy?: Maybe<User>;
+  settlementPayment?: Maybe<SettlementPayment>;
   status: SettlementRequestStatus;
   updatedAt: Scalars['Date']['output'];
 };
 
 export enum SettlementRequestAction {
   Accept = 'ACCEPT',
-  Dispute = 'DISPUTE'
+  Reject = 'REJECT'
 }
 
 export enum SettlementRequestStatus {
   Accepted = 'ACCEPTED',
-  Cancelled = 'CANCELLED',
-  Disputed = 'DISPUTED',
-  Expired = 'EXPIRED',
-  PendingApproval = 'PENDING_APPROVAL'
+  Pending = 'PENDING',
+  Rejected = 'REJECTED'
 }
 
 export type SettlementRule = {
