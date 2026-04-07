@@ -39,7 +39,9 @@ export default function DashboardScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const businessId = useAuthStore((state) => state.user?.businessId);
 
-    const { data: ordersData, loading: ordersLoading, refetch: refetchOrders } = useQuery(GET_BUSINESS_ORDERS);
+    const { data: ordersData, loading: ordersLoading, refetch: refetchOrders } = useQuery(GET_BUSINESS_ORDERS, {
+        pollInterval: 30000,
+    });
 
     const { data: productsData, loading: productsLoading, refetch: refetchProducts } = useQuery(GET_BUSINESS_PRODUCTS, {
         variables: { businessId: businessId || '' },

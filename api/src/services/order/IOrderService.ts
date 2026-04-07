@@ -42,7 +42,6 @@ export interface IOrderService {
     getOrdersByBusinessId(businessId: string): Promise<Order[]>;
     getOrdersByBusinessIdAndStatus(businessId: string, status: OrderStatus): Promise<Order[]>;
     orderContainsBusiness(orderId: string, businessId: string): Promise<boolean>;
-    getOrderIdsForBusiness(orderIds: string[], businessId: string): Promise<Set<string>>;
 
     // ── Mapping ──
     mapToOrderPublic(dbOrder: DbOrder): Promise<Order>;

@@ -224,20 +224,4 @@ export class OrderQueryModule {
             return false;
         }
     }
-
-    async getOrderIdsForBusiness(orderIds: string[], businessId: string): Promise<Set<string>> {
-        if (orderIds.length === 0) return new Set();
-        try {
-            const db = this.deps.db;
-            const rows = await db
-                .selectDistinct({ orderId: orderItemsTable.orderId })
-                .from(orderItemsTable)
-                .innerJoin(productsTable, eq(orderItemsTable.productId, productsTable.id))
-                .where(and(inArray(orderItemsTable.orderId, orderIds), eq(productsTable.businessId, businessId)));
-            return new Set(rows.map((r) => r.orderId));
-        } catch (error) {
-            log.error({ err: error, businessId }, 'order:getOrderIdsForBusiness:error');
-            return new Set();
-        }
-    }
 }
