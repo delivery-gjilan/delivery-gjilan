@@ -673,25 +673,26 @@ export default function MapScreen() {
                         </Pressable>
                     );
                 })()}
-                {/* Lock camera button */}
-                <Pressable
-                    style={[styles.mapBtn, followDriver && styles.mapBtnActive]}
-                    onPress={toggleFollowDriver}
-                >
-                    <Ionicons
-                        name={followDriver ? 'lock-closed' : 'lock-open-outline'}
-                        size={20}
-                        color={followDriver ? '#4285F4' : '#6B7280'}
-                    />
-                </Pressable>
-
-                {/* Recenter button */}
-                <Pressable
-                    style={styles.mapBtn}
-                    onPress={recenterOnDriver}
-                >
-                    <Ionicons name="locate" size={22} color="#4285F4" />
-                </Pressable>
+                {/* Lock camera + Recenter (compact pill) */}
+                <View style={styles.mapControlPill}>
+                    <Pressable
+                        style={[styles.mapControlBtn, followDriver && styles.mapControlBtnActive]}
+                        onPress={toggleFollowDriver}
+                    >
+                        <Ionicons
+                            name={followDriver ? 'lock-closed' : 'lock-open-outline'}
+                            size={17}
+                            color={followDriver ? '#4285F4' : '#6B7280'}
+                        />
+                    </Pressable>
+                    <View style={styles.mapControlDivider} />
+                    <Pressable
+                        style={styles.mapControlBtn}
+                        onPress={recenterOnDriver}
+                    >
+                        <Ionicons name="locate" size={18} color="#4285F4" />
+                    </Pressable>
+                </View>
             </View>
 
             {/* ═══ Connection status pill ═══ */}
@@ -1007,6 +1008,32 @@ const styles = StyleSheet.create({
     },
     mapBtnArrived: {
         backgroundColor: '#16a34a',
+    },
+    mapControlPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+        borderRadius: 22,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.18,
+        shadowRadius: 6,
+        elevation: 5,
+        overflow: 'hidden',
+    },
+    mapControlBtn: {
+        width: 42,
+        height: 42,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    mapControlBtnActive: {
+        backgroundColor: '#EFF6FF',
+    },
+    mapControlDivider: {
+        width: 1,
+        height: 22,
+        backgroundColor: '#E5E7EB',
     },
     poolBadge: {
         position: 'absolute',

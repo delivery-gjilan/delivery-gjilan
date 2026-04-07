@@ -25,7 +25,14 @@ export const UPDATE_ORDER_STATUS = graphql(`
                 business {
                     id
                     name
+                    phoneNumber
                     businessType
+                    commissionPercentage
+                    location {
+                        latitude
+                        longitude
+                        address
+                    }
                 }
                 items {
                     productId
@@ -140,7 +147,14 @@ export const CREATE_TEST_ORDER = graphql(`
                 business {
                     id
                     name
+                    phoneNumber
                     businessType
+                    commissionPercentage
+                    location {
+                        latitude
+                        longitude
+                        address
+                    }
                 }
                 items {
                     productId

@@ -9,6 +9,8 @@ import Topbar from "@/components/dashboard/topbar";
 import { useAuth } from "@/lib/auth-context";
 import { ReactNode } from "react";
 import { canAccessAdminPanelPath } from "@/lib/route-access";
+import { AdminPttProvider } from "@/lib/hooks/useAdminPtt";
+import GlobalPttOverlay from "@/components/dashboard/GlobalPttOverlay";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -61,15 +63,18 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen w-full bg-[#09090b]">
-      <Sidebar />
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <Topbar />
-        <main className="flex-1 overflow-y-auto p-5 bg-[#09090b]">
-          {children}
-        </main>
+    <AdminPttProvider>
+      <div className="flex h-screen w-full bg-[#09090b]">
+        <Sidebar />
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <Topbar />
+          <main className="flex-1 overflow-y-auto p-5 bg-[#09090b]">
+            {children}
+          </main>
+        </div>
+        <GlobalPttOverlay />
       </div>
-    </div>
+    </AdminPttProvider>
   );
 }
 

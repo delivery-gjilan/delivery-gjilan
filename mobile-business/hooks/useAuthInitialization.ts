@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/store/authStore';
 import { getValidAccessToken } from '@/lib/authSession';
 
@@ -8,7 +7,6 @@ import { getValidAccessToken } from '@/lib/authSession';
  * Restores auth from SecureStore and validates business user access
  */
 export function useAuthInitialization() {
-    const router = useRouter();
     const hasInitialized = useRef(false);
     const { setToken, logout, hasHydrated, user, setAuthInitComplete } = useAuthStore();
 
@@ -30,21 +28,19 @@ export function useAuthInitialization() {
                 // Load token from SecureStore (single source of truth for tokens)
                 const token = await getValidAccessToken();
 
-                // No token - redirect to login
+                // No token - clear state, navigation guard will redirect to login
                 if (!token) {
                     console.log('[AuthInit] No token found, redirecting to login');
                     await logout();
-                    setTimeout(() => router.replace('/login'), 0);
                     setAuthInitComplete(true);
                     hasInitialized.current = true;
                     return;
                 }
 
-                // Has token but no user data - logout and redirect
+                // Has token but no user data - logout, navigation guard handles redirect
                 if (!user) {
                     console.log('[AuthInit] Token found but no user data, logging out');
                     await logout();
-                    setTimeout(() => router.replace('/login'), 0);
                     setAuthInitComplete(true);
                     hasInitialized.current = true;
                     return;
@@ -54,7 +50,6 @@ export function useAuthInitialization() {
                 if (user.role !== 'BUSINESS_OWNER' && user.role !== 'BUSINESS_EMPLOYEE') {
                     console.log('[AuthInit] Invalid role, logging out');
                     await logout();
-                    setTimeout(() => router.replace('/login'), 0);
                     setAuthInitComplete(true);
                     hasInitialized.current = true;
                     return;
@@ -64,27 +59,24 @@ export function useAuthInitialization() {
                 if (!user.businessId || !user.business) {
                     console.log('[AuthInit] No business association, logging out');
                     await logout();
-                    setTimeout(() => router.replace('/login'), 0);
                     setAuthInitComplete(true);
                     hasInitialized.current = true;
                     return;
                 }
 
-                // All good - load token into memory and navigate to main app
+                // All good - load token into memory, navigation guard will route to tabs
                 console.log('[AuthInit] Auth valid, user:', user.email, 'business:', user.business.name);
                 setToken(token);
-                setTimeout(() => router.replace('/(tabs)'), 0);
                 setAuthInitComplete(true);
                 hasInitialized.current = true;
             } catch (err) {
                 console.error('[AuthInit] Auth initialization error:', err);
                 await logout();
-                setTimeout(() => router.replace('/login'), 0);
                 setAuthInitComplete(true);
                 hasInitialized.current = true;
             }
         };
 
         initializeAuth();
-    }, [hasHydrated, logout, router, setToken, setAuthInitComplete, user]);
+    }, [hasHydrated, logout, setToken, setAuthInitComplete, user]);
 }

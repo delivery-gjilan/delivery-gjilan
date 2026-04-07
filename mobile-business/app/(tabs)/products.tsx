@@ -68,12 +68,10 @@ export default function ProductsScreen() {
     const [formSalePrice, setFormSalePrice] = useState('');
     const [formCategoryId, setFormCategoryId] = useState<string | null>(null);
 
-    const { data, loading, error: _qryError, refetch } = useQuery(GET_BUSINESS_PRODUCTS, {
+    const { data, loading, refetch } = useQuery(GET_BUSINESS_PRODUCTS, {
         variables: { businessId: user?.businessId || '' },
         skip: !user?.businessId,
     });
-    const _debugProducts = `PRD: skip=${!user?.businessId}, biz=${user?.businessId?.slice(0,8)}, cards=${data?.products?.length ?? 'null'}, cats=${data?.productCategories?.length ?? 'null'}, err=${_qryError?.message ?? 'none'}, loading=${loading}`;
-    console.log('[DEBUG-PRODUCTS]', _debugProducts);
 
     const [createProduct] = useMutation(CREATE_PRODUCT, { refetchQueries: ['GetBusinessProducts'] });
     const [updateProduct] = useMutation(UPDATE_PRODUCT, { refetchQueries: ['GetBusinessProducts'] });
@@ -340,11 +338,6 @@ export default function ProductsScreen() {
 
     return (
         <SafeAreaView className="flex-1 bg-background">
-            {/* ── DEBUG BANNER — REMOVE ME ── */}
-            <View style={{ backgroundColor: '#1a1a2e', padding: 8, borderBottomWidth: 1, borderBottomColor: '#333' }}>
-                <Text style={{ color: '#0f0', fontSize: 10, fontFamily: 'monospace' }}>{_debugProducts}</Text>
-                <Text style={{ color: '#ff0', fontSize: 10, fontFamily: 'monospace' }}>filtered={filteredProducts.length} raw={products.length} selCat={selectedCategory ?? 'all'}</Text>
-            </View>
             <View className="px-4 py-3">
                 <View className="flex-row items-center gap-3">
                     <View className="flex-1">

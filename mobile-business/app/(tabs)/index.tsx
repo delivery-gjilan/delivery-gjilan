@@ -197,6 +197,8 @@ export default function OrdersScreen() {
     const [addTimeModalOrder, setAddTimeModalOrder] = useState<Order | null>(null);
     const [addTimeAmount, setAddTimeAmount] = useState(10);
     const [customAddTime, setCustomAddTime] = useState('');
+    const [showCompleted, setShowCompleted] = useState(false);
+    const [completedPage, setCompletedPage] = useState(0);
     const { width } = useWindowDimensions();
     const isTablet = width >= 768;
     const businessId = user?.businessId ?? '';
@@ -278,15 +280,10 @@ export default function OrdersScreen() {
         });
     }, [refetch]);
 
-    const [_debugSub, _setDebugSub] = useState('');
     useSubscription(ORDERS_SUBSCRIPTION, {
         onData: ({ data: subscriptionData }) => {
             const incomingOrders = subscriptionData.data?.allOrdersUpdated as any[] | undefined;
             if (incomingOrders && incomingOrders.length > 0) {
-                const statuses = incomingOrders.map((o: any) => `${o.displayId}:${o.status}`).join(', ');
-                const bizCheck = incomingOrders.map((o: any) => o.businesses?.length ?? 0);
-                _setDebugSub(`SUB: ${incomingOrders.length} orders [${statuses}] biz-arrays:${JSON.stringify(bizCheck)}`);
-                console.log('[DEBUG-SUB]', statuses, 'businessId:', user?.businessId, 'businesses:', JSON.stringify(incomingOrders.map((o: any) => o.businesses?.map((b: any) => b?.business?.id))));
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 apolloClient.cache.updateQuery({ query: GET_BUSINESS_ORDERS }, (existing: any) => {
                     const currentOrders = Array.isArray(existing?.orders?.orders) ? existing.orders.orders : [];
@@ -335,8 +332,6 @@ export default function OrdersScreen() {
         const isUpcoming = UPCOMING_ORDER_STATUSES.includes(order.status as OrderStatus);
         return belongsToBusiness && isUpcoming;
     });
-    const _debugQuery = `QRY: ${_allOrders.length} total, ${businessOrders.length} filtered, biz:${user?.businessId?.slice(0,8)}`;    console.log('[DEBUG-ORDERS]', _debugQuery, 'statuses:', _allOrders.map(o => o.status));
-
     // Sort: PENDING first, then PREPARING, then by date desc
     const STATUS_PRIORITY: Record<OrderStatus, number> = {
         PENDING: 0,
@@ -354,6 +349,16 @@ export default function OrdersScreen() {
     });
 
     const hasPendingOrders = sortedOrders.some((order) => order.status === 'PENDING');
+
+    const COMPLETED_PAGE_SIZE = 10;
+    const completedOrders = _allOrders
+        .filter((order: any) => {
+            const belongsToBusiness = order.businesses?.some((b: any) => b.business.id === user?.businessId);
+            return belongsToBusiness && (order.status === 'DELIVERED' || order.status === 'CANCELLED');
+        })
+        .sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
+    const visibleCompletedOrders = completedOrders.slice(0, (completedPage + 1) * COMPLETED_PAGE_SIZE);
+    const hasMoreCompleted = visibleCompletedOrders.length < completedOrders.length;
 
     useEffect(() => {
         const pendingIds = new Set(sortedOrders.filter((order) => order.status === 'PENDING').map((order) => order.id));
@@ -982,12 +987,6 @@ export default function OrdersScreen() {
                 </View>
             </View>
 
-            {/* ── DEBUG BANNER — REMOVE ME ── */}
-            <View style={{ backgroundColor: '#1a1a2e', padding: 8, borderBottomWidth: 1, borderBottomColor: '#333' }}>
-                <Text style={{ color: '#0f0', fontSize: 10, fontFamily: 'monospace' }}>{_debugQuery}</Text>
-                <Text style={{ color: '#ff0', fontSize: 10, fontFamily: 'monospace' }}>{_debugSub || 'SUB: waiting...'}</Text>
-            </View>
-
             {/* ── Orders List ── */}
             {loading && !data ? (
                 <View className="flex-1 items-center justify-center">
@@ -1023,8 +1022,116 @@ export default function OrdersScreen() {
                             </Text>
                         </View>
                     }
+                    ListFooterComponent={
+                        completedOrders.length > 0 ? (
+                            <View style={{ paddingHorizontal: 4, paddingTop: 16 }}>
+                                <TouchableOpacity
+                                    style={{
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        paddingVertical: 14,
+                                        borderRadius: 16,
+                                        backgroundColor: showCompleted ? '#374151' : '#1E293B',
+                                        borderWidth: 1,
+                                        borderColor: showCompleted ? '#6b7280' : '#475569',
+                                    }}
+                                    onPress={() => {
+                                        setShowCompleted((prev) => !prev);
+                                        if (!showCompleted) setCompletedPage(0);
+                                    }}
+                                >
+                                    <Ionicons
+                                        name={showCompleted ? 'chevron-up' : 'checkbox-outline'}
+                                        size={18}
+                                        color="#9ca3af"
+                                    />
+                                    <Text style={{ color: '#9ca3af', fontWeight: '700', fontSize: 14, marginLeft: 8 }}>
+                                        {showCompleted
+                                            ? t('orders.hide_completed', 'Hide Completed')
+                                            : t('orders.show_completed', 'Show Completed') + ` (${completedOrders.length})`}
+                                    </Text>
+                                </TouchableOpacity>
+
+                                {showCompleted && (
+                                    <View style={{ marginTop: 12 }}>
+                                        {visibleCompletedOrders.map((order) => {
+                                            const businessOrder = order.businesses.find((b) => b.business.id === user?.businessId);
+                                            if (!businessOrder) return null;
+                                            const businessSubtotal = businessOrder.items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
+                                            const isCancelled = order.status === 'CANCELLED';
+                                            return (
+                                                <View
+                                                    key={order.id}
+                                                    style={{
+                                                        backgroundColor: '#1E293B',
+                                                        borderRadius: 16,
+                                                        padding: 14,
+                                                        marginBottom: 10,
+                                                        borderWidth: 1,
+                                                        borderColor: isCancelled ? '#ef444440' : '#22c55e40',
+                                                        opacity: 0.85,
+                                                    }}
+                                                >
+                                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                            <View style={{
+                                                                paddingHorizontal: 8,
+                                                                paddingVertical: 3,
+                                                                borderRadius: 8,
+                                                                backgroundColor: isCancelled ? '#ef444420' : '#22c55e20',
+                                                            }}>
+                                                                <Text style={{
+                                                                    color: isCancelled ? '#ef4444' : '#22c55e',
+                                                                    fontSize: 11,
+                                                                    fontWeight: '700',
+                                                                }}>
+                                                                    {isCancelled ? t('orders.cancelled', 'Cancelled') : t('orders.delivered', 'Delivered')}
+                                                                </Text>
+                                                            </View>
+                                                            <Text style={{ color: '#94a3b8', fontSize: 13, fontWeight: '600', marginLeft: 8 }}>
+                                                                #{order.displayId}
+                                                            </Text>
+                                                        </View>
+                                                        <Text style={{ color: '#64748b', fontSize: 12 }}>
+                                                            {timeAgo(order.orderDate)}
+                                                        </Text>
+                                                    </View>
+                                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                        <Text style={{ color: '#cbd5e1', fontSize: 13 }} numberOfLines={1}>
+                                                            {businessOrder.items.map((i) => `${i.quantity}× ${i.name}`).join(', ')}
+                                                        </Text>
+                                                        <Text style={{ color: '#94a3b8', fontSize: 13, fontWeight: '700', marginLeft: 8 }}>
+                                                            {businessSubtotal.toFixed(2)}€
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                            );
+                                        })}
+
+                                        {hasMoreCompleted && (
+                                            <TouchableOpacity
+                                                style={{
+                                                    alignItems: 'center',
+                                                    paddingVertical: 12,
+                                                    borderRadius: 12,
+                                                    backgroundColor: '#374151',
+                                                    marginTop: 4,
+                                                }}
+                                                onPress={() => setCompletedPage((p) => p + 1)}
+                                            >
+                                                <Text style={{ color: '#9ca3af', fontWeight: '600', fontSize: 13 }}>
+                                                    {t('orders.load_more', 'Load More')}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
+                                )}
+                            </View>
+                        ) : null
+                    }
                     contentContainerStyle={
-                        sortedOrders.length === 0
+                        sortedOrders.length === 0 && completedOrders.length === 0
                             ? { flexGrow: 1, justifyContent: 'center', paddingBottom: 20 }
                             : { paddingTop: 6, paddingBottom: 20 }
                     }

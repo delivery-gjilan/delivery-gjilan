@@ -17,6 +17,7 @@ import { useStoreStatus } from '@/hooks/useStoreStatus';
 import DriverMessageBanner from '@/components/DriverMessageBanner';
 import type { AlertType } from '@/components/DriverMessageBanner';
 import { DRIVER_MESSAGE_RECEIVED_SUB } from '@/graphql/operations/driverMessages';
+import { useTranslations } from '@/hooks/useTranslations';
 import * as Haptics from 'expo-haptics';
 
 /* â”€â”€â”€ Screen constants â”€â”€â”€ */

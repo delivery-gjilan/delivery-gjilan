@@ -102,11 +102,23 @@ export const ORDERS_SUBSCRIPTION = graphql(`
             status
             preparationMinutes
             estimatedReadyAt
+            preparingAt
+            readyAt
             user {
                 id
                 firstName
                 lastName
                 phoneNumber
+            }
+            driver {
+                id
+                firstName
+                lastName
+            }
+            dropOffLocation {
+                address
+                latitude
+                longitude
             }
             businesses {
                 business {
@@ -116,6 +128,7 @@ export const ORDERS_SUBSCRIPTION = graphql(`
                 items {
                     productId
                     name
+                    imageUrl
                     quantity
                     unitPrice
                     notes

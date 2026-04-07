@@ -157,8 +157,8 @@ function AppContent() {
             {isAuthenticated && isOnline && (
                 <View style={{
                     position: 'absolute',
-                    bottom: showPoolFab ? 170 : 100,
-                    right: 16,
+                    bottom: showPoolFab ? 230 : 160,
+                    left: 16,
                     zIndex: 60,
                     alignItems: 'center',
                     gap: 4,

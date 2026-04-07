@@ -178,11 +178,17 @@ export function useOrders(options: UseOrdersOptions = {}): UseOrdersResult {
                     byId.set(String(order?.id), existingOrder ? { ...existingOrder, ...order } : order);
                 });
 
+                // Filter out orders that don't match the query's expected statuses
+                const expectedStatuses = statuses ?? ['AWAITING_APPROVAL', 'PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'];
+                const filtered = Array.from(byId.values()).filter(
+                    (order: any) => order?.status && expectedStatuses.includes(order.status),
+                );
+
                 return {
                     ...(existing ?? {}),
                     orders: {
                         ...(currentConnection ?? {}),
-                        orders: Array.from(byId.values()),
+                        orders: filtered,
                     },
                 };
             });

@@ -451,6 +451,7 @@ export default function OrdersPage() {
 
     const activeOrders = useMemo(() =>
         filteredOrders
+            .filter(order => order.status !== 'DELIVERED' && order.status !== 'CANCELLED')
             .sort((a, b) => {
                 if (a.status === 'AWAITING_APPROVAL' && b.status !== 'AWAITING_APPROVAL') return -1;
                 if (a.status !== 'AWAITING_APPROVAL' && b.status === 'AWAITING_APPROVAL') return 1;

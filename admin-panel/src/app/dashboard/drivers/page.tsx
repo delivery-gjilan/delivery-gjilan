@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, FormEvent, useEffect, useRef, useCallback } from "react";
-import { useQuery, useMutation, useSubscription, useLazyQuery } from "@apollo/client/react";
+import { useState, FormEvent, useEffect } from "react";
+import { useQuery, useMutation, useSubscription } from "@apollo/client/react";
 import { DRIVERS_QUERY } from "@/graphql/operations/users/queries";
 import { DRIVERS_UPDATED_SUBSCRIPTION } from "@/graphql/operations/users/subscriptions";
-import { ADMIN_SEND_PTT_SIGNAL, GET_AGORA_RTC_CREDENTIALS, ADMIN_PTT_SIGNAL_SUBSCRIPTION } from "@/graphql/operations/users/ptt";
 import {
     CREATE_USER_MUTATION,
     DELETE_USER_MUTATION,
@@ -17,8 +16,8 @@ import { Table, Th, Td } from "@/components/ui/Table";
 import Modal from "@/components/ui/Modal";
 import { UserRole } from "@/gql/graphql";
 import { useAuth } from "@/lib/auth-context";
-import { Trash2, Plus, Signal, Settings2, Mic, MicOff, Radio } from "lucide-react";
-import AgoraRTC, { IAgoraRTCClient, IMicrophoneAudioTrack } from 'agora-rtc-sdk-ng';
+import { useAdminPtt } from "@/lib/hooks/useAdminPtt";
+import { Trash2, Plus, Signal, Settings2, Mic, MicOff } from "lucide-react";
 
 interface DriverItem {
     id: string;
@@ -94,8 +93,6 @@ export default function DriversPage() {
         onCompleted: () => { refetch(); setShowSettingsModal(false); setSettingsTarget(null); },
     });
     const [updateUser] = useMutation(UPDATE_USER_MUTATION);
-    const [sendPttSignal] = useMutation(ADMIN_SEND_PTT_SIGNAL);
-    const [getAgoraCredentials] = useLazyQuery(GET_AGORA_RTC_CREDENTIALS, { fetchPolicy: 'no-cache' });
 
     // Create modal state
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -114,18 +111,7 @@ export default function DriversPage() {
     const [formError, setFormError] = useState("");
     const [formSuccess, setFormSuccess] = useState("");
     const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([]);
-    const [isTalking, setIsTalking] = useState(false);
-    const [isMuted, setIsMuted] = useState(false);
-    const [pttChannelName, setPttChannelName] = useState<string | null>(null);
-    const [pttError, setPttError] = useState<string>("");
-    const [activePttDriverIds, setActivePttDriverIds] = useState<string[]>([]);
-
-    const rtcClientRef = useRef<IAgoraRTCClient | null>(null);
-    const micTrackRef = useRef<IMicrophoneAudioTrack | null>(null);
-
-    // Driver PTT receive state
-    const [driverTalkingId, setDriverTalkingId] = useState<string | null>(null);
-    const driverRtcClientRef = useRef<IAgoraRTCClient | null>(null);
+    const { isTalking, isMuted, pttError, startTalking, stopTalking, toggleMute } = useAdminPtt();
 
     const selectedDrivers = drivers.filter((d) => selectedDriverIds.includes(d.id));
     const selectedConnectedDriverIds = selectedDrivers
@@ -133,193 +119,9 @@ export default function DriversPage() {
         .map((d) => d.id);
     const selectedOfflineCount = selectedDrivers.length - selectedConnectedDriverIds.length;
 
-    const ensureRtcClient = async () => {
-        if (rtcClientRef.current) {
-            return rtcClientRef.current;
-        }
-
-        const client = AgoraRTC.createClient({ mode: 'live', codec: 'vp8' });
-        await client.setClientRole('host');
-        rtcClientRef.current = client;
-        return client;
-    };
-
-    const stopTalking = async () => {
-        const targetDriverIds = activePttDriverIds.length > 0 ? activePttDriverIds : selectedConnectedDriverIds;
-
-        if (pttChannelName && targetDriverIds.length > 0) {
-            try {
-                await sendPttSignal({
-                    variables: {
-                        driverIds: targetDriverIds,
-                        channelName: pttChannelName,
-                        action: 'STOPPED',
-                        muted: false,
-                    },
-                });
-            } catch {
-                // Ignore signaling errors during teardown.
-            }
-        }
-
-        try {
-            if (rtcClientRef.current && micTrackRef.current) {
-                await rtcClientRef.current.unpublish([micTrackRef.current]);
-            }
-            micTrackRef.current?.stop();
-            micTrackRef.current?.close();
-            micTrackRef.current = null;
-            if (rtcClientRef.current) {
-                await rtcClientRef.current.leave();
-            }
-        } catch {
-            // no-op
-        }
-
-        setIsTalking(false);
-        setPttChannelName(null);
-        setActivePttDriverIds([]);
-    };
-
-    const startTalking = async () => {
-        if (isTalking) {
-            return;
-        }
-        setPttError('');
-        if (selectedConnectedDriverIds.length === 0) {
-            setPttError('Select at least one connected driver to start PTT.');
-            return;
-        }
-
-        const channelName = `ptt-${Date.now()}-${admin?.id || 'admin'}`;
-        const targetDriverIds = [...selectedConnectedDriverIds];
-
-        try {
-            const credsResult = await getAgoraCredentials({
-                variables: {
-                    channelName,
-                    role: 'PUBLISHER',
-                },
-            });
-
-            const creds = credsResult.data?.getAgoraRtcCredentials;
-            if (!creds) {
-                throw new Error('Failed to get Agora credentials');
-            }
-
-            const client = await ensureRtcClient();
-            let micTrack: IMicrophoneAudioTrack;
-            try {
-              micTrack = await AgoraRTC.createMicrophoneAudioTrack();
-            } catch (micErr: any) {
-              throw new Error(micErr?.code === 'DEVICE_NOT_FOUND'
-                ? 'No microphone found. Please connect a microphone and try again.'
-                : `Microphone error: ${micErr?.message || 'unknown'}`);
-            }
-            await client.join(creds.appId, creds.channelName, creds.token, creds.uid);
-            await client.publish([micTrack]);
-
-            micTrackRef.current = micTrack;
-
-            await sendPttSignal({
-                variables: {
-                    driverIds: targetDriverIds,
-                    channelName,
-                    action: 'STARTED',
-                    muted: isMuted,
-                },
-            });
-
-            setPttChannelName(channelName);
-            setActivePttDriverIds(targetDriverIds);
-            setIsTalking(true);
-        } catch (err) {
-            const msg = err instanceof Error ? err.message : 'Failed to start PTT session';
-            setPttError(msg);
-            await stopTalking();
-        }
-    };
-
-    const handleToggleMute = async () => {
-        const nextMuted = !isMuted;
-        setIsMuted(nextMuted);
-
-        if (micTrackRef.current) {
-            await micTrackRef.current.setEnabled(!nextMuted);
-        }
-
-        const targetDriverIds = activePttDriverIds.length > 0 ? activePttDriverIds : selectedConnectedDriverIds;
-
-        if (pttChannelName && targetDriverIds.length > 0) {
-            await sendPttSignal({
-                variables: {
-                    driverIds: targetDriverIds,
-                    channelName: pttChannelName,
-                    action: nextMuted ? 'MUTE' : 'UNMUTE',
-                    muted: nextMuted,
-                },
-            });
-        }
-    };
-
-    // ═══════════════ DRIVER → ADMIN PTT RECEIVE ═══════════════
-
-    const joinDriverPttChannel = useCallback(async (channelName: string) => {
-        try {
-            if (driverRtcClientRef.current) {
-                try { await driverRtcClientRef.current.leave(); } catch { /* no-op */ }
-                driverRtcClientRef.current = null;
-            }
-
-            const res = await getAgoraCredentials({ variables: { channelName, role: 'SUBSCRIBER' } });
-            const creds = res.data?.getAgoraRtcCredentials;
-            if (!creds) return;
-
-            const client = AgoraRTC.createClient({ mode: 'live', codec: 'vp8' });
-            await client.setClientRole('audience');
-            client.on('user-published', async (user, mediaType) => {
-                await client.subscribe(user, mediaType);
-                if (mediaType === 'audio') {
-                    user.audioTrack?.play();
-                }
-            });
-            await client.join(creds.appId, creds.channelName, creds.token, creds.uid);
-            driverRtcClientRef.current = client;
-        } catch (err) {
-            console.warn('[PTT-Recv] Failed to join driver channel', err);
-            driverRtcClientRef.current = null;
-        }
-    }, [getAgoraCredentials]);
-
-    const leaveDriverPttChannel = useCallback(async () => {
-        if (!driverRtcClientRef.current) return;
-        try { await driverRtcClientRef.current.leave(); } catch { /* no-op */ }
-        driverRtcClientRef.current = null;
-    }, []);
-
-    useSubscription(ADMIN_PTT_SIGNAL_SUBSCRIPTION, {
-        onData: async ({ data: subData }) => {
-            const signal = subData.data?.adminPttSignal;
-            if (!signal) return;
-
-            if (signal.action === 'STARTED') {
-                setDriverTalkingId(signal.driverId);
-                await joinDriverPttChannel(signal.channelName);
-            } else if (signal.action === 'STOPPED') {
-                setDriverTalkingId(null);
-                await leaveDriverPttChannel();
-            }
-        },
-    });
-
-    useEffect(() => {
-        return () => {
-            if (driverRtcClientRef.current) {
-                driverRtcClientRef.current.leave().catch(() => {});
-                driverRtcClientRef.current = null;
-            }
-        };
-    }, []);
+    const handleStartTalking = () => startTalking(selectedConnectedDriverIds);
+    const handleStopTalking = () => stopTalking();
+    const handleToggleMute = () => toggleMute(selectedConnectedDriverIds);
 
     const handleCloseCreateModal = () => {
         setShowCreateModal(false);
@@ -420,12 +222,6 @@ export default function DriversPage() {
         }
     };
 
-    useEffect(() => {
-        return () => {
-            stopTalking();
-        };
-    }, []);
-
     return (
         <div className="text-white">
             <div className="mb-6 flex items-center justify-between">
@@ -474,11 +270,11 @@ export default function DriversPage() {
                             </Button>
                             <Button
                                 className={`${isTalking ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'} text-white`}
-                                onMouseDown={startTalking}
-                                onMouseUp={stopTalking}
-                                onMouseLeave={stopTalking}
-                                onTouchStart={startTalking}
-                                onTouchEnd={stopTalking}
+                                onMouseDown={handleStartTalking}
+                                onMouseUp={handleStopTalking}
+                                onMouseLeave={handleStopTalking}
+                                onTouchStart={handleStartTalking}
+                                onTouchEnd={handleStopTalking}
                             >
                                 <Mic size={16} className="mr-2" />
                                 {isTalking ? 'Release To Stop' : 'Hold To Talk'}
@@ -487,14 +283,6 @@ export default function DriversPage() {
                     </div>
                     {pttError && (
                         <p className="text-red-300 text-sm mt-2">{pttError}</p>
-                    )}
-                    {driverTalkingId && (
-                        <div className="mt-2 flex items-center gap-2 px-2 py-1.5 rounded-lg bg-cyan-950/50 border border-cyan-500/30 animate-pulse">
-                            <Radio size={14} className="text-cyan-400" />
-                            <span className="text-sm text-cyan-200 font-semibold">
-                                🔊 {(() => { const d = drivers.find((d) => d.id === driverTalkingId); return d ? `${d.firstName} ${d.lastName}` : 'Driver'; })()} is talking
-                            </span>
-                        </div>
                     )}
                 </div>
                 {loading ? (

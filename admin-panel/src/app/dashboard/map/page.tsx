@@ -14,7 +14,6 @@ import {
 import { ASSIGN_DRIVER_TO_ORDER, UPDATE_ORDER_STATUS, ADMIN_CANCEL_ORDER, SET_ORDER_ADMIN_NOTE, APPROVE_ORDER, START_PREPARING } from "@/graphql/operations/orders";
 import { ADMIN_UPDATE_DRIVER_LOCATION, ADMIN_SET_SHIFT_DRIVERS, UPDATE_USER_NOTE_MUTATION } from "@/graphql/operations/users/mutations";
 import { getDirectionsTelemetry } from "@/lib/utils/mapbox";
-import { ADMIN_SEND_PTT_SIGNAL, GET_AGORA_RTC_CREDENTIALS, ADMIN_PTT_SIGNAL_SUBSCRIPTION } from "@/graphql/operations/users/ptt";
 import { USERS_QUERY } from "@/graphql/operations/users/queries";
 import { SEND_DRIVER_MESSAGE, MARK_DRIVER_MESSAGES_READ } from "@/graphql/operations/driverMessages/mutations";
 import { GET_DRIVER_MESSAGES } from "@/graphql/operations/driverMessages/queries";
@@ -23,8 +22,8 @@ import { SEND_BUSINESS_MESSAGE, MARK_BUSINESS_MESSAGES_READ } from "@/graphql/op
 import { GET_BUSINESS_MESSAGES } from "@/graphql/operations/businessMessages/queries";
 import { ADMIN_BUSINESS_MESSAGE_RECEIVED } from "@/graphql/operations/businessMessages/subscriptions";
 import { GET_BUSINESS_DEVICE_HEALTH } from "@/graphql/operations/notifications";
-import AgoraRTC, { IAgoraRTCClient, IMicrophoneAudioTrack } from 'agora-rtc-sdk-ng';
 import { getInitials, getAvatarColor } from "@/lib/avatarUtils";
+import { useAdminPtt } from "@/lib/hooks/useAdminPtt";
 
 import { useMapRealtimeData } from "@/lib/hooks/useMapRealtimeData";
 import { useOrderRouteDistances } from "@/lib/hooks/useOrderRouteDistances";
@@ -453,7 +452,6 @@ export default function MapPage() {
   const [assignDriver] = useMutation(ASSIGN_DRIVER_TO_ORDER);
   const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS, { fetchPolicy: "no-cache" });
   const [startPreparingOrder, { loading: startPreparingLoading }] = useMutation(START_PREPARING, { fetchPolicy: "no-cache" });
-  const [sendPttSignal] = useMutation(ADMIN_SEND_PTT_SIGNAL);
   const [sendDriverMessage] = useMutation(SEND_DRIVER_MESSAGE);
   const [setShiftDrivers] = useMutation(ADMIN_SET_SHIFT_DRIVERS);
   const [sendBusinessMessage] = useMutation(SEND_BUSINESS_MESSAGE);
@@ -487,7 +485,6 @@ export default function MapPage() {
       setTimeout(() => chatBizBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
     },
   });
-  const [getAgoraCredentials] = useLazyQuery(GET_AGORA_RTC_CREDENTIALS, { fetchPolicy: 'no-cache' });
   const { data: usersData } = useQuery(USERS_QUERY, {
     variables: { limit: 2000, offset: 0 },
     fetchPolicy: 'cache-first',
@@ -684,18 +681,9 @@ export default function MapPage() {
   const [driverHeadingDeg, setDriverHeadingDeg] = useState<Record<string, number>>({});
   const [incidentNotes, setIncidentNotes] = useState<Record<string, IncidentNote>>({});
 
-  // == PTT STATE ==
+  // == PTT (global) ==
   const [pttSelectedDriverIds, setPttSelectedDriverIds] = useState<string[]>([]);
-  const [pttIsTalking, setPttIsTalking] = useState(false);
-  const [pttChannelName, setPttChannelName] = useState<string | null>(null);
-  const [pttError, setPttError] = useState<string>('');
-  const [pttActiveDriverIds, setPttActiveDriverIds] = useState<string[]>([]);
-  const rtcClientRef = useRef<IAgoraRTCClient | null>(null);
-  const micTrackRef = useRef<IMicrophoneAudioTrack | null>(null);
-
-  // == DRIVER PTT RECEIVE STATE ==
-  const [driverTalkingId, setDriverTalkingId] = useState<string | null>(null);
-  const driverRtcClientRef = useRef<IAgoraRTCClient | null>(null);
+  const { isTalking: pttIsTalking, pttError, driverTalkingId, startTalking, stopTalking } = useAdminPtt();
 
   // == FILTERED ==
   const filteredOrders = useMemo(() => {
@@ -886,136 +874,18 @@ export default function MapPage() {
     [pttSelectedDriverIds, drivers],
   );
 
-  const ensureRtcClient = useCallback(async () => {
-    if (rtcClientRef.current) return rtcClientRef.current;
-    const client = AgoraRTC.createClient({ mode: 'live', codec: 'vp8' });
-    await client.setClientRole('host');
-    rtcClientRef.current = client;
-    return client;
-  }, []);
+  const handleStartTalking = useCallback(() => {
+    startTalking(pttConnectedSelectedIds);
+  }, [startTalking, pttConnectedSelectedIds]);
 
-  const stopTalking = useCallback(async () => {
-    const targets = pttActiveDriverIds.length > 0 ? pttActiveDriverIds : pttConnectedSelectedIds;
-    if (pttChannelName && targets.length > 0) {
-      try {
-        await sendPttSignal({ variables: { driverIds: targets, channelName: pttChannelName, action: 'STOPPED', muted: false } });
-      } catch { /* ignore */ }
-    }
-    try {
-      if (rtcClientRef.current && micTrackRef.current) {
-        await rtcClientRef.current.unpublish([micTrackRef.current]);
-      }
-      micTrackRef.current?.stop();
-      micTrackRef.current?.close();
-      micTrackRef.current = null;
-      if (rtcClientRef.current) await rtcClientRef.current.leave();
-        rtcClientRef.current = null;
-    } catch { /* no-op */ }
-    setPttIsTalking(false);
-    setPttChannelName(null);
-    setPttActiveDriverIds([]);
-  }, [pttChannelName, pttActiveDriverIds, pttConnectedSelectedIds, sendPttSignal]);
-
-  const startTalking = useCallback(async () => {
-    if (pttIsTalking) return;
-    setPttError('');
-    if (pttConnectedSelectedIds.length === 0) {
-      setPttError('Select connected drivers first.');
-      return;
-    }
-    const channelName = `ptt-map-${Date.now()}`;
-    const targets = [...pttConnectedSelectedIds];
-    try {
-      const res = await getAgoraCredentials({ variables: { channelName, role: 'PUBLISHER' } });
-      const creds = res.data?.getAgoraRtcCredentials;
-      if (!creds) throw new Error('Failed to get Agora credentials');
-      const client = await ensureRtcClient();
-      let micTrack: IMicrophoneAudioTrack;
-      try {
-        micTrack = await AgoraRTC.createMicrophoneAudioTrack();
-      } catch (micErr: any) {
-        throw new Error(micErr?.code === 'DEVICE_NOT_FOUND'
-          ? 'No microphone found. Please connect a microphone and try again.'
-          : `Microphone error: ${micErr?.message || 'unknown'}`);
-      }
-      await client.join(creds.appId, creds.channelName, creds.token, creds.uid);
-      await client.publish([micTrack]);
-      micTrackRef.current = micTrack;
-      await sendPttSignal({ variables: { driverIds: targets, channelName, action: 'STARTED', muted: false } });
-      setPttChannelName(channelName);
-      setPttActiveDriverIds(targets);
-      setPttIsTalking(true);
-    } catch (err) {
-      setPttError(err instanceof Error ? err.message : 'Failed to start PTT');
-      await stopTalking();
-    }
-  }, [pttIsTalking, pttConnectedSelectedIds, getAgoraCredentials, ensureRtcClient, sendPttSignal, stopTalking]);
+  const handleStopTalking = useCallback(() => {
+    stopTalking();
+  }, [stopTalking]);
 
   const togglePttDriver = useCallback((driverId: string) => {
     setPttSelectedDriverIds((prev) =>
       prev.includes(driverId) ? prev.filter((id) => id !== driverId) : [...prev, driverId],
     );
-  }, []);
-
-  // ═══════════════ DRIVER → ADMIN PTT RECEIVE ═══════════════
-
-  const joinDriverPttChannel = useCallback(async (channelName: string) => {
-    try {
-      // Leave any existing driver-listen channel
-      if (driverRtcClientRef.current) {
-        try { await driverRtcClientRef.current.leave(); } catch { /* no-op */ }
-        driverRtcClientRef.current = null;
-      }
-
-      const res = await getAgoraCredentials({ variables: { channelName, role: 'SUBSCRIBER' } });
-      const creds = res.data?.getAgoraRtcCredentials;
-      if (!creds) return;
-
-      const client = AgoraRTC.createClient({ mode: 'live', codec: 'vp8' });
-      await client.setClientRole('audience');
-      client.on('user-published', async (user, mediaType) => {
-        await client.subscribe(user, mediaType);
-        if (mediaType === 'audio') {
-          user.audioTrack?.play();
-        }
-      });
-      await client.join(creds.appId, creds.channelName, creds.token, creds.uid);
-      driverRtcClientRef.current = client;
-    } catch (err) {
-      console.warn('[PTT-Recv] Failed to join driver channel', err);
-      driverRtcClientRef.current = null;
-    }
-  }, [getAgoraCredentials]);
-
-  const leaveDriverPttChannel = useCallback(async () => {
-    if (!driverRtcClientRef.current) return;
-    try { await driverRtcClientRef.current.leave(); } catch { /* no-op */ }
-    driverRtcClientRef.current = null;
-  }, []);
-
-  useSubscription(ADMIN_PTT_SIGNAL_SUBSCRIPTION, {
-    onData: async ({ data: subData }) => {
-      const signal = subData.data?.adminPttSignal;
-      if (!signal) return;
-
-      if (signal.action === 'STARTED') {
-        setDriverTalkingId(signal.driverId);
-        await joinDriverPttChannel(signal.channelName);
-      } else if (signal.action === 'STOPPED') {
-        setDriverTalkingId(null);
-        await leaveDriverPttChannel();
-      }
-    },
-  });
-
-  // Clean up driver-listen client on unmount
-  useEffect(() => {
-    return () => {
-      if (driverRtcClientRef.current) {
-        driverRtcClientRef.current.leave().catch(() => {});
-        driverRtcClientRef.current = null;
-      }
-    };
   }, []);
 
   // ╔══════════════════════════════════════════════════════════╗
@@ -2467,11 +2337,11 @@ export default function MapPage() {
                   <span className="text-zinc-500">/{pttSelectedDriverIds.length} ready</span>
                 </div>
                 <button
-                  onMouseDown={startTalking}
-                  onMouseUp={stopTalking}
-                  onMouseLeave={stopTalking}
-                  onTouchStart={startTalking}
-                  onTouchEnd={stopTalking}
+                  onMouseDown={handleStartTalking}
+                  onMouseUp={handleStopTalking}
+                  onMouseLeave={handleStopTalking}
+                  onTouchStart={handleStartTalking}
+                  onTouchEnd={handleStopTalking}
                   disabled={pttConnectedSelectedIds.length === 0}
                   className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all shadow-lg flex-shrink-0 ${
                     pttIsTalking
@@ -2493,16 +2363,6 @@ export default function MapPage() {
                   className="text-[9px] text-zinc-600 hover:text-zinc-400 transition disabled:opacity-30 flex-shrink-0">
                   Clear
                 </button>
-              </div>
-            )}
-
-            {/* Driver talking indicator */}
-            {driverTalkingId && (
-              <div className="flex-shrink-0 border-t border-cyan-500/30 bg-cyan-950/40 px-3 py-2 flex items-center gap-3 animate-pulse">
-                <Radio size={14} className="text-cyan-400 flex-shrink-0" />
-                <div className="text-[11px] text-cyan-200 font-semibold truncate">
-                  🔊 {(() => { const d = drivers.find((d: any) => d.id === driverTalkingId); return d ? d.name : 'Driver'; })()} is talking
-                </div>
               </div>
             )}
 
