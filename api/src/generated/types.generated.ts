@@ -80,6 +80,15 @@ export type AddUserAddressInput = {
   priority?: InputMaybe<Scalars['Int']['input']>;
 };
 
+/** Signal sent from a driver to all listening admins */
+export type AdminPttSignal = {
+  __typename?: 'AdminPttSignal';
+  action: DriverPttSignalAction;
+  channelName: Scalars['String']['output'];
+  driverId: Scalars['ID']['output'];
+  timestamp: Scalars['DateTime']['output'];
+};
+
 export type AgoraRtcCredentials = {
   __typename?: 'AgoraRtcCredentials';
   appId: Scalars['String']['output'];
@@ -1018,6 +1027,8 @@ export type Mutation = {
   driverNotifyCustomer: Scalars['Boolean']['output'];
   /** Driver self-registration — creates user (role=DRIVER) + driver profile row */
   driverRegister: DriverAuthResult;
+  /** Driver sends push-to-talk signal to all listening admins */
+  driverSendPttSignal: Scalars['Boolean']['output'];
   /** Driver battery telemetry update (recommended every 5-10 minutes) */
   driverUpdateBatteryStatus: DriverConnection;
   generateReferralCode: Scalars['String']['output'];
@@ -1387,6 +1398,12 @@ export type MutationdriverNotifyCustomerArgs = {
 
 export type MutationdriverRegisterArgs = {
   input: DriverRegisterInput;
+};
+
+
+export type MutationdriverSendPttSignalArgs = {
+  action: DriverPttSignalAction;
+  channelName: Scalars['String']['input'];
 };
 
 
@@ -2966,6 +2983,8 @@ export type Subscription = {
   adminBusinessMessageReceived: BusinessMessage;
   /** Admin receives replies from a specific driver in real-time */
   adminMessageReceived: DriverMessage;
+  /** Admin listens for push-to-talk signals from any driver */
+  adminPttSignal: AdminPttSignal;
   allOrdersUpdated: Array<Order>;
   auditLogCreated: AuditLog;
   /** Business user receives messages from admin in real-time */
@@ -3407,12 +3426,13 @@ export type ResolversTypes = {
   String: ResolverTypeWrapper<Scalars['String']['output']>;
   Float: ResolverTypeWrapper<Scalars['Float']['output']>;
   Int: ResolverTypeWrapper<Scalars['Int']['output']>;
+  AdminPttSignal: ResolverTypeWrapper<Omit<AdminPttSignal, 'action'> & { action: ResolversTypes['DriverPttSignalAction'] }>;
+  ID: ResolverTypeWrapper<Scalars['ID']['output']>;
   AgoraRtcCredentials: ResolverTypeWrapper<AgoraRtcCredentials>;
   AgoraRtcRole: ResolverTypeWrapper<'PUBLISHER' | 'SUBSCRIBER'>;
   AppLanguage: ResolverTypeWrapper<'EN' | 'AL'>;
   ApplicablePromotion: ResolverTypeWrapper<Omit<ApplicablePromotion, 'target' | 'type'> & { target: ResolversTypes['PromotionTarget'], type: ResolversTypes['PromotionType'] }>;
   Boolean: ResolverTypeWrapper<Scalars['Boolean']['output']>;
-  ID: ResolverTypeWrapper<Scalars['ID']['output']>;
   ApprovalReason: ResolverTypeWrapper<'FIRST_ORDER' | 'HIGH_VALUE' | 'OUT_OF_ZONE'>;
   AssignPromotionToUserInput: AssignPromotionToUserInput;
   AudiencePreview: ResolverTypeWrapper<Omit<AudiencePreview, 'sampleUsers'> & { sampleUsers: Array<ResolversTypes['User']> }>;
@@ -3611,10 +3631,11 @@ export type ResolversParentTypes = {
   String: Scalars['String']['output'];
   Float: Scalars['Float']['output'];
   Int: Scalars['Int']['output'];
+  AdminPttSignal: AdminPttSignal;
+  ID: Scalars['ID']['output'];
   AgoraRtcCredentials: AgoraRtcCredentials;
   ApplicablePromotion: ApplicablePromotion;
   Boolean: Scalars['Boolean']['output'];
-  ID: Scalars['ID']['output'];
   AssignPromotionToUserInput: AssignPromotionToUserInput;
   AudiencePreview: Omit<AudiencePreview, 'sampleUsers'> & { sampleUsers: Array<ResolversParentTypes['User']> };
   AuditLog: Omit<AuditLog, 'actor'> & { actor?: Maybe<ResolversParentTypes['User']> };
@@ -3778,6 +3799,14 @@ export type skipAuthDirectiveResolver<Result, Parent, ContextType = GraphQLConte
 export type ActionTypeResolvers = EnumResolverSignature<{ BUSINESS_APPROVED?: any, BUSINESS_CREATED?: any, BUSINESS_DELETED?: any, BUSINESS_REJECTED?: any, BUSINESS_UPDATED?: any, CATEGORY_CREATED?: any, CATEGORY_DELETED?: any, CATEGORY_UPDATED?: any, DRIVER_APPROVED?: any, DRIVER_CREATED?: any, DRIVER_REJECTED?: any, DRIVER_STATUS_CHANGED?: any, DRIVER_UPDATED?: any, ORDER_ASSIGNED?: any, ORDER_CANCELLED?: any, ORDER_CREATED?: any, ORDER_DELIVERED?: any, ORDER_STATUS_CHANGED?: any, ORDER_UPDATED?: any, PASSWORD_CHANGED?: any, PASSWORD_RESET?: any, PRODUCT_AVAILABILITY_CHANGED?: any, PRODUCT_CREATED?: any, PRODUCT_DELETED?: any, PRODUCT_PRICE_CHANGED?: any, PRODUCT_PUBLISHED?: any, PRODUCT_UNPUBLISHED?: any, PRODUCT_UPDATED?: any, SETTLEMENT_CREATED?: any, SETTLEMENT_PAID?: any, SETTLEMENT_PARTIAL_PAID?: any, SETTLEMENT_UNSETTLED?: any, SUBCATEGORY_CREATED?: any, SUBCATEGORY_DELETED?: any, SUBCATEGORY_UPDATED?: any, USER_CREATED?: any, USER_DELETED?: any, USER_LOGIN?: any, USER_LOGOUT?: any, USER_ROLE_CHANGED?: any, USER_UPDATED?: any }, ResolversTypes['ActionType']>;
 
 export type ActorTypeResolvers = EnumResolverSignature<{ ADMIN?: any, BUSINESS?: any, CUSTOMER?: any, DRIVER?: any, SYSTEM?: any }, ResolversTypes['ActorType']>;
+
+export type AdminPttSignalResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['AdminPttSignal'] = ResolversParentTypes['AdminPttSignal']> = {
+  action?: Resolver<ResolversTypes['DriverPttSignalAction'], ParentType, ContextType>;
+  channelName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  driverId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  timestamp?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
 
 export type AgoraRtcCredentialsResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['AgoraRtcCredentials'] = ResolversParentTypes['AgoraRtcCredentials']> = {
   appId?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
@@ -4306,6 +4335,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   driverLogin?: Resolver<ResolversTypes['DriverAuthResult'], ParentType, ContextType, RequireFields<MutationdriverLoginArgs, 'input'>>;
   driverNotifyCustomer?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdriverNotifyCustomerArgs, 'kind' | 'orderId'>>;
   driverRegister?: Resolver<ResolversTypes['DriverAuthResult'], ParentType, ContextType, RequireFields<MutationdriverRegisterArgs, 'input'>>;
+  driverSendPttSignal?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdriverSendPttSignalArgs, 'action' | 'channelName'>>;
   driverUpdateBatteryStatus?: Resolver<ResolversTypes['DriverConnection'], ParentType, ContextType, RequireFields<MutationdriverUpdateBatteryStatusArgs, 'level' | 'optIn'>>;
   generateReferralCode?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   grantFreeDelivery?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationgrantFreeDeliveryArgs, 'orderId' | 'userId'>>;
@@ -5060,6 +5090,7 @@ export type StoreStatusResolvers<ContextType = GraphQLContext, ParentType extend
 export type SubscriptionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Subscription'] = ResolversParentTypes['Subscription']> = {
   adminBusinessMessageReceived?: SubscriptionResolver<ResolversTypes['BusinessMessage'], "adminBusinessMessageReceived", ParentType, ContextType, RequireFields<SubscriptionadminBusinessMessageReceivedArgs, 'businessUserId'>>;
   adminMessageReceived?: SubscriptionResolver<ResolversTypes['DriverMessage'], "adminMessageReceived", ParentType, ContextType, RequireFields<SubscriptionadminMessageReceivedArgs, 'driverId'>>;
+  adminPttSignal?: SubscriptionResolver<ResolversTypes['AdminPttSignal'], "adminPttSignal", ParentType, ContextType>;
   allOrdersUpdated?: SubscriptionResolver<Array<ResolversTypes['Order']>, "allOrdersUpdated", ParentType, ContextType>;
   auditLogCreated?: SubscriptionResolver<ResolversTypes['AuditLog'], "auditLogCreated", ParentType, ContextType, Partial<SubscriptionauditLogCreatedArgs>>;
   businessMessageReceived?: SubscriptionResolver<ResolversTypes['BusinessMessage'], "businessMessageReceived", ParentType, ContextType>;
@@ -5183,6 +5214,7 @@ export type WorkingHoursResolvers<ContextType = GraphQLContext, ParentType exten
 export type Resolvers<ContextType = GraphQLContext> = {
   ActionType?: ActionTypeResolvers;
   ActorType?: ActorTypeResolvers;
+  AdminPttSignal?: AdminPttSignalResolvers<ContextType>;
   AgoraRtcCredentials?: AgoraRtcCredentialsResolvers<ContextType>;
   AgoraRtcRole?: AgoraRtcRoleResolvers;
   AppLanguage?: AppLanguageResolvers;

@@ -60,6 +60,14 @@ input AddUserAddressInput {
   priority: Int
 }
 
+"""Signal sent from a driver to all listening admins"""
+type AdminPttSignal {
+  action: DriverPttSignalAction!
+  channelName: String!
+  driverId: ID!
+  timestamp: DateTime!
+}
+
 type AgoraRtcCredentials {
   appId: String!
   channelName: String!
@@ -1048,6 +1056,9 @@ type Mutation {
   """
   driverRegister(input: DriverRegisterInput!): DriverAuthResult!
 
+  """Driver sends push-to-talk signal to all listening admins"""
+  driverSendPttSignal(action: DriverPttSignalAction!, channelName: String!): Boolean!
+
   """Driver battery telemetry update (recommended every 5-10 minutes)"""
   driverUpdateBatteryStatus(isCharging: Boolean, level: Int!, optIn: Boolean!): DriverConnection!
   generateReferralCode: String!
@@ -1958,6 +1969,9 @@ type Subscription {
 
   """Admin receives replies from a specific driver in real-time"""
   adminMessageReceived(driverId: ID!): DriverMessage!
+
+  """Admin listens for push-to-talk signals from any driver"""
+  adminPttSignal: AdminPttSignal!
   allOrdersUpdated: [Order!]!
   auditLogCreated(action: ActionType, actorType: ActorType, entityType: EntityType): AuditLog!
 

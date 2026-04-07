@@ -33,7 +33,6 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Component, type ReactNode, type ErrorInfo } from 'react';
 import { useLiveActivity } from '@/hooks/useLiveActivity';
-import { useActiveOrdersStore } from '@/modules/orders/store/activeOrdersStore';
 import { fetchRoute } from '@/utils/route';
 
 // Lazy-load MapLibreGL to prevent crash if native module has issues
@@ -604,7 +603,6 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     const [showSummary, setShowSummary] = useState(false);
     const [showDriverInfo, setShowDriverInfo] = useState(false);
     const [mapZoomLevel, setMapZoomLevel] = useState(15.5);
-    const patchDriverConnection = useActiveOrdersStore((s) => s.patchDriverConnection);
     const [interpolatedDriverLocation, setInterpolatedDriverLocation] = useState<{
         latitude: number;
         longitude: number;
@@ -668,16 +666,8 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
             const payload = data.data?.orderDriverLiveTracking;
             if (!payload) return;
             setLiveDriverTracking(payload);
-            // Propagate live ETA into the Zustand store so useBackgroundLiveActivity
-            // can update the Live Activity without waiting for the next full order push.
-            if (order?.id) {
-                patchDriverConnection(order.id, {
-                    activeOrderId: payload.orderId,
-                    navigationPhase: payload.navigationPhase ?? null,
-                    remainingEtaSeconds: payload.remainingEtaSeconds ?? null,
-                    etaUpdatedAt: payload.etaUpdatedAt,
-                });
-            }
+            // patchDriverConnection is handled by useGlobalDriverTracking at the
+            // app root level — no need to duplicate it here.
         },
         onError: (error) => {
             console.warn('[OrderDetails] live tracking subscription error:', error);

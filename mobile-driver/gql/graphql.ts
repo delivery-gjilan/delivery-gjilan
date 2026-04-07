@@ -78,6 +78,15 @@ export type AddUserAddressInput = {
   priority?: InputMaybe<Scalars['Int']['input']>;
 };
 
+/** Signal sent from a driver to all listening admins */
+export type AdminPttSignal = {
+  __typename?: 'AdminPttSignal';
+  action: DriverPttSignalAction;
+  channelName: Scalars['String']['output'];
+  driverId: Scalars['ID']['output'];
+  timestamp: Scalars['DateTime']['output'];
+};
+
 export type AgoraRtcCredentials = {
   __typename?: 'AgoraRtcCredentials';
   appId: Scalars['String']['output'];
@@ -333,6 +342,17 @@ export type BusinessMessageUser = {
   lastName: Scalars['String']['output'];
 };
 
+export type BusinessPerformanceStat = {
+  __typename?: 'BusinessPerformanceStat';
+  avgOrderValue: Scalars['Float']['output'];
+  businessId: Scalars['ID']['output'];
+  businessName: Scalars['String']['output'];
+  imageUrl?: Maybe<Scalars['String']['output']>;
+  isFeatured: Scalars['Boolean']['output'];
+  totalOrders: Scalars['Int']['output'];
+  totalRevenue: Scalars['Float']['output'];
+};
+
 export type BusinessPromotion = {
   __typename?: 'BusinessPromotion';
   description?: Maybe<Scalars['String']['output']>;
@@ -459,6 +479,7 @@ export type CreateOptionGroupInput = {
 export type CreateOptionInput = {
   displayOrder?: InputMaybe<Scalars['Int']['input']>;
   extraPrice?: InputMaybe<Scalars['Float']['input']>;
+  imageUrl?: InputMaybe<Scalars['String']['input']>;
   linkedProductId?: InputMaybe<Scalars['ID']['input']>;
   name: Scalars['String']['input'];
 };
@@ -537,6 +558,7 @@ export type CreatePromotionInput = {
   eligibleBusinessIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   endsAt?: InputMaybe<Scalars['String']['input']>;
   isActive: Scalars['Boolean']['input'];
+  isRecovery?: InputMaybe<Scalars['Boolean']['input']>;
   isStackable: Scalars['Boolean']['input'];
   maxDiscountCap?: InputMaybe<Scalars['Float']['input']>;
   maxGlobalUsage?: InputMaybe<Scalars['Int']['input']>;
@@ -907,6 +929,15 @@ export type InitiateSignupInput = {
   referralCode?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type IssueRecoveryPromotionInput = {
+  discountValue?: InputMaybe<Scalars['Float']['input']>;
+  expiresAt?: InputMaybe<Scalars['String']['input']>;
+  orderId?: InputMaybe<Scalars['ID']['input']>;
+  reason: Scalars['String']['input'];
+  type: PromotionType;
+  userIds: Array<Scalars['ID']['input']>;
+};
+
 export type Location = {
   __typename?: 'Location';
   address: Scalars['String']['output'];
@@ -1010,11 +1041,14 @@ export type Mutation = {
   driverNotifyCustomer: Scalars['Boolean']['output'];
   /** Driver self-registration — creates user (role=DRIVER) + driver profile row */
   driverRegister: DriverAuthResult;
+  /** Driver sends push-to-talk signal to all listening admins */
+  driverSendPttSignal: Scalars['Boolean']['output'];
   /** Driver battery telemetry update (recommended every 5-10 minutes) */
   driverUpdateBatteryStatus: DriverConnection;
   generateReferralCode: Scalars['String']['output'];
   grantFreeDelivery: Scalars['Boolean']['output'];
   initiateSignup: AuthResponse;
+  issueRecoveryPromotion: Array<UserPromotion>;
   login: AuthResponse;
   logoutAllSessions: Scalars['Boolean']['output'];
   logoutCurrentSession: Scalars['Boolean']['output'];
@@ -1048,6 +1082,7 @@ export type Mutation = {
   setBusinessSchedule: Array<BusinessDayHours>;
   setDefaultAddress: Scalars['Boolean']['output'];
   setDeliveryPricingTiers: Array<DeliveryPricingTier>;
+  setMyEmailOptOut: User;
   setMyPreferredLanguage: User;
   setOrderAdminNote: Order;
   setUserPermissions: User;
@@ -1380,6 +1415,12 @@ export type MutationDriverRegisterArgs = {
 };
 
 
+export type MutationDriverSendPttSignalArgs = {
+  action: DriverPttSignalAction;
+  channelName: Scalars['String']['input'];
+};
+
+
 export type MutationDriverUpdateBatteryStatusArgs = {
   isCharging?: InputMaybe<Scalars['Boolean']['input']>;
   level: Scalars['Int']['input'];
@@ -1395,6 +1436,11 @@ export type MutationGrantFreeDeliveryArgs = {
 
 export type MutationInitiateSignupArgs = {
   input: InitiateSignupInput;
+};
+
+
+export type MutationIssueRecoveryPromotionArgs = {
+  input: IssueRecoveryPromotionInput;
 };
 
 
@@ -1499,6 +1545,7 @@ export type MutationSendBusinessMessageArgs = {
 
 export type MutationSendCampaignArgs = {
   id: Scalars['ID']['input'];
+  promotionId?: InputMaybe<Scalars['ID']['input']>;
 };
 
 
@@ -1534,6 +1581,11 @@ export type MutationSetDefaultAddressArgs = {
 
 export type MutationSetDeliveryPricingTiersArgs = {
   input: SetDeliveryPricingTiersInput;
+};
+
+
+export type MutationSetMyEmailOptOutArgs = {
+  optOut: Scalars['Boolean']['input'];
 };
 
 
@@ -1803,6 +1855,7 @@ export type Option = {
   displayOrder: Scalars['Int']['output'];
   extraPrice: Scalars['Float']['output'];
   id: Scalars['ID']['output'];
+  imageUrl?: Maybe<Scalars['String']['output']>;
   linkedProduct?: Maybe<Product>;
   linkedProductId?: Maybe<Scalars['ID']['output']>;
   name: Scalars['String']['output'];
@@ -2059,12 +2112,14 @@ export type Promotion = {
   endsAt?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
   isActive: Scalars['Boolean']['output'];
+  isRecovery: Scalars['Boolean']['output'];
   isStackable: Scalars['Boolean']['output'];
   maxDiscountCap?: Maybe<Scalars['Float']['output']>;
   maxGlobalUsage?: Maybe<Scalars['Int']['output']>;
   maxUsagePerUser?: Maybe<Scalars['Int']['output']>;
   minOrderAmount?: Maybe<Scalars['Float']['output']>;
   name: Scalars['String']['output'];
+  orderId?: Maybe<Scalars['ID']['output']>;
   priority: Scalars['Int']['output'];
   spendThreshold?: Maybe<Scalars['Float']['output']>;
   startsAt?: Maybe<Scalars['String']['output']>;
@@ -2196,6 +2251,7 @@ export type Query = {
   businessMessageThreads: Array<BusinessMessageThread>;
   /** Admin: full conversation with a specific business user */
   businessMessages: Array<BusinessMessage>;
+  businessPerformanceStats: Array<BusinessPerformanceStat>;
   businesses: Array<Business>;
   calculateDeliveryPrice: DeliveryPriceResult;
   cancelledOrders: Array<Order>;
@@ -2226,6 +2282,7 @@ export type Query = {
   getPromotionAnalytics: PromotionAnalyticsResult;
   getPromotionThresholds: Array<PromotionThreshold>;
   getPromotionUsage: Array<PromotionUsage>;
+  getRecoveryPromotions: Array<Promotion>;
   getStoreStatus: StoreStatus;
   getUserPromoMetadata?: Maybe<UserPromoMetadata>;
   getUserPromotions: Array<UserPromotion>;
@@ -2323,6 +2380,11 @@ export type QueryBusinessMessagesArgs = {
 };
 
 
+export type QueryBusinessPerformanceStatsArgs = {
+  days?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
 export type QueryCalculateDeliveryPriceArgs = {
   businessId: Scalars['ID']['input'];
   dropoffLat: Scalars['Float']['input'];
@@ -2383,6 +2445,7 @@ export type QueryGetAgoraRtcCredentialsArgs = {
 
 
 export type QueryGetAllPromotionsArgs = {
+  includeRecovery?: InputMaybe<Scalars['Boolean']['input']>;
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
@@ -2954,6 +3017,8 @@ export type Subscription = {
   adminBusinessMessageReceived: BusinessMessage;
   /** Admin receives replies from a specific driver in real-time */
   adminMessageReceived: DriverMessage;
+  /** Admin listens for push-to-talk signals from any driver */
+  adminPttSignal: AdminPttSignal;
   allOrdersUpdated: Array<Order>;
   auditLogCreated: AuditLog;
   /** Business user receives messages from admin in real-time */
@@ -3122,6 +3187,7 @@ export type UpdateOptionGroupInput = {
 export type UpdateOptionInput = {
   displayOrder?: InputMaybe<Scalars['Int']['input']>;
   extraPrice?: InputMaybe<Scalars['Float']['input']>;
+  imageUrl?: InputMaybe<Scalars['String']['input']>;
   linkedProductId?: InputMaybe<Scalars['ID']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
 };
@@ -3209,6 +3275,7 @@ export type User = {
   driverLocation?: Maybe<Location>;
   driverLocationUpdatedAt?: Maybe<Scalars['Date']['output']>;
   email: Scalars['String']['output'];
+  emailOptOut: Scalars['Boolean']['output'];
   emailVerified: Scalars['Boolean']['output'];
   firstName: Scalars['String']['output'];
   flagColor?: Maybe<Scalars['String']['output']>;

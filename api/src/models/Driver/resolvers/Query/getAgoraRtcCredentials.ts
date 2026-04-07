@@ -19,8 +19,8 @@ export const getAgoraRtcCredentials: NonNullable<QueryResolvers['getAgoraRtcCred
                 throw new GraphQLError('Forbidden', { extensions: { code: 'FORBIDDEN' } });
         }
 
-        if (role === 'PUBLISHER' && !isAdmin) {
-                throw new GraphQLError('Only admins can request publisher credentials', {
+        if (role === 'PUBLISHER' && !isAdmin && !isDriver) {
+                throw new GraphQLError('Only admins and drivers can request publisher credentials', {
                         extensions: { code: 'FORBIDDEN' },
                 });
         }

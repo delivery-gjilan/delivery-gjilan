@@ -14,7 +14,7 @@ import {
 import { ASSIGN_DRIVER_TO_ORDER, UPDATE_ORDER_STATUS, ADMIN_CANCEL_ORDER, SET_ORDER_ADMIN_NOTE, APPROVE_ORDER, START_PREPARING } from "@/graphql/operations/orders";
 import { ADMIN_UPDATE_DRIVER_LOCATION, ADMIN_SET_SHIFT_DRIVERS, UPDATE_USER_NOTE_MUTATION } from "@/graphql/operations/users/mutations";
 import { getDirectionsTelemetry } from "@/lib/utils/mapbox";
-import { ADMIN_SEND_PTT_SIGNAL, GET_AGORA_RTC_CREDENTIALS } from "@/graphql/operations/users/ptt";
+import { ADMIN_SEND_PTT_SIGNAL, GET_AGORA_RTC_CREDENTIALS, ADMIN_PTT_SIGNAL_SUBSCRIPTION } from "@/graphql/operations/users/ptt";
 import { USERS_QUERY } from "@/graphql/operations/users/queries";
 import { SEND_DRIVER_MESSAGE, MARK_DRIVER_MESSAGES_READ } from "@/graphql/operations/driverMessages/mutations";
 import { GET_DRIVER_MESSAGES } from "@/graphql/operations/driverMessages/queries";
@@ -693,6 +693,10 @@ export default function MapPage() {
   const rtcClientRef = useRef<IAgoraRTCClient | null>(null);
   const micTrackRef = useRef<IMicrophoneAudioTrack | null>(null);
 
+  // == DRIVER PTT RECEIVE STATE ==
+  const [driverTalkingId, setDriverTalkingId] = useState<string | null>(null);
+  const driverRtcClientRef = useRef<IAgoraRTCClient | null>(null);
+
   // == FILTERED ==
   const filteredOrders = useMemo(() => {
     return activeOrders.filter((order: any) => {
@@ -926,7 +930,14 @@ export default function MapPage() {
       const creds = res.data?.getAgoraRtcCredentials;
       if (!creds) throw new Error('Failed to get Agora credentials');
       const client = await ensureRtcClient();
-      const micTrack = await AgoraRTC.createMicrophoneAudioTrack();
+      let micTrack: IMicrophoneAudioTrack;
+      try {
+        micTrack = await AgoraRTC.createMicrophoneAudioTrack();
+      } catch (micErr: any) {
+        throw new Error(micErr?.code === 'DEVICE_NOT_FOUND'
+          ? 'No microphone found. Please connect a microphone and try again.'
+          : `Microphone error: ${micErr?.message || 'unknown'}`);
+      }
       await client.join(creds.appId, creds.channelName, creds.token, creds.uid);
       await client.publish([micTrack]);
       micTrackRef.current = micTrack;
@@ -944,6 +955,67 @@ export default function MapPage() {
     setPttSelectedDriverIds((prev) =>
       prev.includes(driverId) ? prev.filter((id) => id !== driverId) : [...prev, driverId],
     );
+  }, []);
+
+  // ═══════════════ DRIVER → ADMIN PTT RECEIVE ═══════════════
+
+  const joinDriverPttChannel = useCallback(async (channelName: string) => {
+    try {
+      // Leave any existing driver-listen channel
+      if (driverRtcClientRef.current) {
+        try { await driverRtcClientRef.current.leave(); } catch { /* no-op */ }
+        driverRtcClientRef.current = null;
+      }
+
+      const res = await getAgoraCredentials({ variables: { channelName, role: 'SUBSCRIBER' } });
+      const creds = res.data?.getAgoraRtcCredentials;
+      if (!creds) return;
+
+      const client = AgoraRTC.createClient({ mode: 'live', codec: 'vp8' });
+      await client.setClientRole('audience');
+      client.on('user-published', async (user, mediaType) => {
+        await client.subscribe(user, mediaType);
+        if (mediaType === 'audio') {
+          user.audioTrack?.play();
+        }
+      });
+      await client.join(creds.appId, creds.channelName, creds.token, creds.uid);
+      driverRtcClientRef.current = client;
+    } catch (err) {
+      console.warn('[PTT-Recv] Failed to join driver channel', err);
+      driverRtcClientRef.current = null;
+    }
+  }, [getAgoraCredentials]);
+
+  const leaveDriverPttChannel = useCallback(async () => {
+    if (!driverRtcClientRef.current) return;
+    try { await driverRtcClientRef.current.leave(); } catch { /* no-op */ }
+    driverRtcClientRef.current = null;
+  }, []);
+
+  useSubscription(ADMIN_PTT_SIGNAL_SUBSCRIPTION, {
+    onData: async ({ data: subData }) => {
+      const signal = subData.data?.adminPttSignal;
+      if (!signal) return;
+
+      if (signal.action === 'STARTED') {
+        setDriverTalkingId(signal.driverId);
+        await joinDriverPttChannel(signal.channelName);
+      } else if (signal.action === 'STOPPED') {
+        setDriverTalkingId(null);
+        await leaveDriverPttChannel();
+      }
+    },
+  });
+
+  // Clean up driver-listen client on unmount
+  useEffect(() => {
+    return () => {
+      if (driverRtcClientRef.current) {
+        driverRtcClientRef.current.leave().catch(() => {});
+        driverRtcClientRef.current = null;
+      }
+    };
   }, []);
 
   // ╔══════════════════════════════════════════════════════════╗
@@ -2421,6 +2493,16 @@ export default function MapPage() {
                   className="text-[9px] text-zinc-600 hover:text-zinc-400 transition disabled:opacity-30 flex-shrink-0">
                   Clear
                 </button>
+              </div>
+            )}
+
+            {/* Driver talking indicator */}
+            {driverTalkingId && (
+              <div className="flex-shrink-0 border-t border-cyan-500/30 bg-cyan-950/40 px-3 py-2 flex items-center gap-3 animate-pulse">
+                <Radio size={14} className="text-cyan-400 flex-shrink-0" />
+                <div className="text-[11px] text-cyan-200 font-semibold truncate">
+                  🔊 {(() => { const d = drivers.find((d: any) => d.id === driverTalkingId); return d ? d.name : 'Driver'; })()} is talking
+                </div>
               </div>
             )}
 

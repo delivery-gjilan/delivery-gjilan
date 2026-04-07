@@ -444,6 +444,8 @@ CREATE TABLE "promotions" (
 	"total_usage_count" integer DEFAULT 0 NOT NULL,
 	"creator_type" "promotion_creator_type" DEFAULT 'PLATFORM' NOT NULL,
 	"creator_id" uuid,
+	"is_recovery" boolean DEFAULT false NOT NULL,
+	"order_id" uuid,
 	"is_deleted" boolean DEFAULT false NOT NULL,
 	"created_by" uuid,
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -718,6 +720,7 @@ ALTER TABLE "promotion_usage" ADD CONSTRAINT "promotion_usage_user_id_users_id_f
 ALTER TABLE "promotion_usage" ADD CONSTRAINT "promotion_usage_order_id_orders_id_fk" FOREIGN KEY ("order_id") REFERENCES "public"."orders"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "promotion_usage" ADD CONSTRAINT "promotion_usage_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "promotions" ADD CONSTRAINT "promotions_creator_id_businesses_id_fk" FOREIGN KEY ("creator_id") REFERENCES "public"."businesses"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "promotions" ADD CONSTRAINT "promotions_order_id_orders_id_fk" FOREIGN KEY ("order_id") REFERENCES "public"."orders"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "promotions" ADD CONSTRAINT "promotions_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_promo_metadata" ADD CONSTRAINT "user_promo_metadata_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_promotions" ADD CONSTRAINT "user_promotions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

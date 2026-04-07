@@ -480,9 +480,16 @@ export class OrderLifecycleModule {
                     } catch { /* fall through */ }
                 }
                 if (estimatedMinutes === 0) {
+                    // No live ETA available — set flag so the first driver heartbeat
+                    // fires the Live Activity push immediately with real GPS data
+                    // instead of sending "15 min" now and correcting later.
                     await cache.set(`cache:la-ofd-pending:${id}`, true, 300);
                 }
             }
+
+            // Skip the Live Activity push for OFD when we have no real ETA —
+            // the first driver heartbeat will fire it with accurate data.
+            const skipOfdPushNoEta = status === 'OUT_FOR_DELIVERY' && estimatedMinutes === 0;
 
             const phaseInitialMinutes =
                 status === 'PENDING'
@@ -502,8 +509,9 @@ export class OrderLifecycleModule {
                             ? (parseDbTimestamp(dbOrder.outForDeliveryAt)?.getTime() ?? Date.now())
                             : Date.now();
 
-            const safeEstimatedMinutes = (status === 'OUT_FOR_DELIVERY' && estimatedMinutes === 0) ? 15 : estimatedMinutes;
-            updateLiveActivity(notificationService, id, liveActivityStatus, driverName, safeEstimatedMinutes, phaseInitialMinutes, phaseStartedAt);
+            if (!skipOfdPushNoEta) {
+                updateLiveActivity(notificationService, id, liveActivityStatus, driverName, estimatedMinutes, phaseInitialMinutes, phaseStartedAt);
+            }
 
             if (status === 'DELIVERED' || status === 'CANCELLED') {
                 endLiveActivity(notificationService, id, status === 'CANCELLED' ? 'cancelled' : 'delivered');

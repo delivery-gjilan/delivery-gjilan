@@ -36,6 +36,13 @@ export type DriverPttSignalPayload = {
     timestamp: Date;
 };
 
+export type AdminPttSignalPayload = {
+    driverId: string;
+    channelName: string;
+    action: 'STARTED' | 'STOPPED' | 'MUTE' | 'UNMUTE';
+    timestamp: Date;
+};
+
 export type StoreStatusPayload = {
     isStoreClosed: boolean;
     closedMessage?: string | null;
@@ -73,6 +80,7 @@ type PubSubPayloadMap = {
     'drivers.all.changed': DriversUpdatedPayload;
     'order.driver.live.changed': OrderDriverLiveTrackingPayload;
     'driver.ptt.signal': DriverPttSignalPayload;
+    'admin.ptt.signal': AdminPttSignalPayload;
     'store.status.changed': StoreStatusPayload;
     'driver.message': DriverMessagePayload;
     'admin.message': DriverMessagePayload;
@@ -82,9 +90,9 @@ type PubSubPayloadMap = {
 
 type TopicKey<K extends keyof PubSubPayloadMap> = `${K}.${string}` | `${K}`;
 
-type AnyTopicKey = TopicKey<'order.byId.updated' | 'orders.byUser.changed' | 'orders.all.changed' | 'drivers.all.changed' | 'order.driver.live.changed' | 'driver.ptt.signal' | 'store.status.changed' | 'driver.message' | 'admin.message' | 'business.message' | 'admin.business.message'>;
+type AnyTopicKey = TopicKey<'order.byId.updated' | 'orders.byUser.changed' | 'orders.all.changed' | 'drivers.all.changed' | 'order.driver.live.changed' | 'driver.ptt.signal' | 'admin.ptt.signal' | 'store.status.changed' | 'driver.message' | 'admin.message' | 'business.message' | 'admin.business.message'>;
 
-type AnyPayload = Order | UserOrdersPayload | AllOrdersPayload | DriversUpdatedPayload | OrderDriverLiveTrackingPayload | DriverPttSignalPayload | StoreStatusPayload | DriverMessagePayload | BusinessMessagePayload;
+type AnyPayload = Order | UserOrdersPayload | AllOrdersPayload | DriversUpdatedPayload | OrderDriverLiveTrackingPayload | DriverPttSignalPayload | AdminPttSignalPayload | StoreStatusPayload | DriverMessagePayload | BusinessMessagePayload;
 
 type PubSubChannels = {
     [K in keyof PubSubPayloadMap as TopicKey<K>]: [payload: PubSubPayloadMap[K]];
@@ -232,6 +240,9 @@ export const topics = {
 
     driverPttSignal: (driverId: string): TopicKey<'driver.ptt.signal'> => `driver.ptt.signal.${driverId}`,
 
+    /** Broadcast topic for driver→admin PTT signals (all admins subscribe to this single topic) */
+    adminPttSignal: (): TopicKey<'admin.ptt.signal'> => 'admin.ptt.signal',
+
     storeStatusChanged: (): TopicKey<'store.status.changed'> => 'store.status.changed',
 
     /** Message sent to a specific driver (driver subscribes to this) */
@@ -254,6 +265,7 @@ export function publish(p: PubSub, topic: TopicKey<'orders.all.changed'>, payloa
 export function publish(p: PubSub, topic: TopicKey<'drivers.all.changed'>, payload: DriversUpdatedPayload): void;
 export function publish(p: PubSub, topic: TopicKey<'order.driver.live.changed'>, payload: OrderDriverLiveTrackingPayload): void;
 export function publish(p: PubSub, topic: TopicKey<'driver.ptt.signal'>, payload: DriverPttSignalPayload): void;
+export function publish(p: PubSub, topic: TopicKey<'admin.ptt.signal'>, payload: AdminPttSignalPayload): void;
 export function publish(p: PubSub, topic: TopicKey<'store.status.changed'>, payload: StoreStatusPayload): void;
 export function publish(p: PubSub, topic: TopicKey<'driver.message'>, payload: DriverMessagePayload): void;
 export function publish(p: PubSub, topic: TopicKey<'admin.message'>, payload: DriverMessagePayload): void;
@@ -261,12 +273,12 @@ export function publish(p: PubSub, topic: TopicKey<'business.message'>, payload:
 export function publish(p: PubSub, topic: TopicKey<'admin.business.message'>, payload: BusinessMessagePayload): void;
 export function publish(
     p: PubSub,
-    topic: TopicKey<'order.byId.updated' | 'orders.byUser.changed' | 'orders.all.changed' | 'drivers.all.changed' | 'order.driver.live.changed' | 'driver.ptt.signal' | 'store.status.changed' | 'driver.message' | 'admin.message' | 'business.message' | 'admin.business.message'>,
+    topic: TopicKey<'order.byId.updated' | 'orders.byUser.changed' | 'orders.all.changed' | 'drivers.all.changed' | 'order.driver.live.changed' | 'driver.ptt.signal' | 'admin.ptt.signal' | 'store.status.changed' | 'driver.message' | 'admin.message' | 'business.message' | 'admin.business.message'>,
     payload: AnyPayload,
 ): void;
 export function publish(
     p: PubSub,
-    topic: TopicKey<'order.byId.updated' | 'orders.byUser.changed' | 'orders.all.changed' | 'drivers.all.changed' | 'order.driver.live.changed' | 'driver.ptt.signal' | 'store.status.changed' | 'driver.message' | 'admin.message' | 'business.message' | 'admin.business.message'>,
+    topic: TopicKey<'order.byId.updated' | 'orders.byUser.changed' | 'orders.all.changed' | 'drivers.all.changed' | 'order.driver.live.changed' | 'driver.ptt.signal' | 'admin.ptt.signal' | 'store.status.changed' | 'driver.message' | 'admin.message' | 'business.message' | 'admin.business.message'>,
     payload: AnyPayload,
 ) {
     // @ts-expect-error can fix it but with unnecessary complexity
@@ -284,12 +296,13 @@ export function subscribe(p: PubSub, topic: TopicKey<'orders.all.changed'>): Ret
 export function subscribe(p: PubSub, topic: TopicKey<'drivers.all.changed'>): ReturnType<PubSub['subscribe']>;
 export function subscribe(p: PubSub, topic: TopicKey<'order.driver.live.changed'>): ReturnType<PubSub['subscribe']>;
 export function subscribe(p: PubSub, topic: TopicKey<'driver.ptt.signal'>): ReturnType<PubSub['subscribe']>;
+export function subscribe(p: PubSub, topic: TopicKey<'admin.ptt.signal'>): ReturnType<PubSub['subscribe']>;
 export function subscribe(p: PubSub, topic: TopicKey<'store.status.changed'>): ReturnType<PubSub['subscribe']>;
 export function subscribe(p: PubSub, topic: TopicKey<'driver.message'>): ReturnType<PubSub['subscribe']>;
 export function subscribe(p: PubSub, topic: TopicKey<'admin.message'>): ReturnType<PubSub['subscribe']>;
 export function subscribe(p: PubSub, topic: TopicKey<'business.message'>): ReturnType<PubSub['subscribe']>;
 export function subscribe(p: PubSub, topic: TopicKey<'admin.business.message'>): ReturnType<PubSub['subscribe']>;
 
-export function subscribe(p: PubSub, topic: TopicKey<'order.byId.updated' | 'orders.byUser.changed' | 'orders.all.changed' | 'drivers.all.changed' | 'order.driver.live.changed' | 'driver.ptt.signal' | 'store.status.changed' | 'driver.message' | 'admin.message' | 'business.message' | 'admin.business.message'>) {
+export function subscribe(p: PubSub, topic: TopicKey<'order.byId.updated' | 'orders.byUser.changed' | 'orders.all.changed' | 'drivers.all.changed' | 'order.driver.live.changed' | 'driver.ptt.signal' | 'admin.ptt.signal' | 'store.status.changed' | 'driver.message' | 'admin.message' | 'business.message' | 'admin.business.message'>) {
     return p.subscribe(topic);
 }

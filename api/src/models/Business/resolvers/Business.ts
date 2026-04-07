@@ -1,6 +1,6 @@
 import type { BusinessResolvers } from './../../../generated/types.generated';
 import { getDB } from '@/database';
-import { promotions } from '@/database/schema/promotions';
+import { promotions, userPromotions } from '@/database/schema/promotions';
 import { eq, and, isNull, lte, gte, or, sql } from 'drizzle-orm';
 
 /**
@@ -53,13 +53,15 @@ export const Business: BusinessResolvers = {
         return currentMinutes >= opensAt && currentMinutes < closesAt;
     },
 
-    activePromotion: async (parent) => {
+    activePromotion: async (parent, _args, ctx) => {
         const db = await getDB();
         const now = new Date().toISOString();
+        const userId = (ctx as any)?.userData?.userId as string | undefined;
 
         // Find active promotions for this business.
         // A promotion applies if it is explicitly linked to this business
         // OR has no business eligibility entries (applies to all businesses).
+        // SPECIFIC_USERS promos are excluded here — they only show if assigned to and unused by this user.
         const activePromotions = await db
             .select({
                 id: promotions.id,
@@ -69,6 +71,8 @@ export const Business: BusinessResolvers = {
                 discountValue: promotions.discountValue,
                 spendThreshold: promotions.spendThreshold,
                 priority: promotions.priority,
+                target: promotions.target,
+                maxUsagePerUser: promotions.maxUsagePerUser,
             })
             .from(promotions)
             .where(
@@ -91,14 +95,37 @@ export const Business: BusinessResolvers = {
                     )
                 )
             )
-            .orderBy(sql`${promotions.priority} DESC`)
-            .limit(1);
+            .orderBy(sql`${promotions.priority} DESC`);
 
         if (activePromotions.length === 0) {
             return null;
         }
 
-        const promo = activePromotions[0];
+        // Filter out SPECIFIC_USERS promos that aren't assigned to or have been fully used by this user
+        const eligible = await Promise.all(
+            activePromotions.map(async (promo) => {
+                if (promo.target !== 'SPECIFIC_USERS') return promo;
+                // No user context → don't show user-specific promos
+                if (!userId) return null;
+                // Check assignment and usage
+                const [assignment] = await db
+                    .select({ usageCount: userPromotions.usageCount })
+                    .from(userPromotions)
+                    .where(
+                        and(
+                            eq(userPromotions.promotionId, promo.id),
+                            eq(userPromotions.userId, userId)
+                        )
+                    )
+                    .limit(1);
+                if (!assignment) return null;
+                if (promo.maxUsagePerUser && assignment.usageCount >= promo.maxUsagePerUser) return null;
+                return promo;
+            })
+        );
+
+        const promo = eligible.find(Boolean);
+        if (!promo) return null;
         return {
             id: promo.id,
             name: promo.name,

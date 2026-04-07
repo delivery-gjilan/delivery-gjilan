@@ -1,5 +1,5 @@
 {
-  "id": "a40316de-316e-4096-bbac-cad6d6a3bcf7",
+  "id": "5a9d57dd-bd62-4672-95b8-36b7d5bf1e96",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -3879,6 +3879,19 @@
           "primaryKey": false,
           "notNull": false
         },
+        "is_recovery": {
+          "name": "is_recovery",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "order_id": {
+          "name": "order_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "is_deleted": {
           "name": "is_deleted",
           "type": "boolean",
@@ -3967,6 +3980,19 @@
           "tableTo": "businesses",
           "columnsFrom": [
             "creator_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "promotions_order_id_orders_id_fk": {
+          "name": "promotions_order_id_orders_id_fk",
+          "tableFrom": "promotions",
+          "tableTo": "orders",
+          "columnsFrom": [
+            "order_id"
           ],
           "columnsTo": [
             "id"

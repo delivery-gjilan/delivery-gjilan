@@ -35,3 +35,9 @@ export const GET_AGORA_RTC_CREDENTIALS = gql`
     }
   }
 `;
+
+export const DRIVER_SEND_PTT_SIGNAL = gql`
+  mutation DriverSendPttSignal($channelName: String!, $action: DriverPttSignalAction!) {
+    driverSendPttSignal(channelName: $channelName, action: $action)
+  }
+`;

@@ -27,3 +27,14 @@ export const ADMIN_SEND_PTT_SIGNAL = gql`
     )
   }
 `;
+
+export const ADMIN_PTT_SIGNAL_SUBSCRIPTION = gql`
+  subscription AdminPttSignal {
+    adminPttSignal {
+      driverId
+      channelName
+      action
+      timestamp
+    }
+  }
+`;

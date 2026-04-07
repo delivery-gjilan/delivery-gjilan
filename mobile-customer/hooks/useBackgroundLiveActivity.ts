@@ -137,17 +137,14 @@ export function useBackgroundLiveActivity() {
         };
     }, [candidateOrder, mappedStatus]);
 
-    const syncLiveActivityRef = useRef(syncLiveActivity);
-    useEffect(() => {
-        syncLiveActivityRef.current = syncLiveActivity;
-    }, [syncLiveActivity]);
-
     const appStateRef = useRef<AppStateStatus>(AppState.currentState);
     const clearedWhenNoActiveOrderRef = useRef(false);
     const lastSyncedSignatureRef = useRef<string | null>(null);
     /** Timestamp when we first saw OFD without a live ETA — used to delay fallback. */
     const ofdFallbackWaitingSinceRef = useRef<number | null>(null);
     const ofdFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    /** True once setActiveOrders has been called at least once (query returned). */
+    const storeHasLoadedRef = useRef(false);
 
     const syncLiveActivity = useCallback(
         (force = false) => {
@@ -226,6 +223,11 @@ export function useBackgroundLiveActivity() {
         [buildState, candidateOrder, mappedStatus, startLiveActivity],
     );
 
+    const syncLiveActivityRef = useRef(syncLiveActivity);
+    useEffect(() => {
+        syncLiveActivityRef.current = syncLiveActivity;
+    }, [syncLiveActivity]);
+
     useEffect(() => {
         const subscription = AppState.addEventListener('change', (nextState) => {
             const previous = appStateRef.current;
@@ -270,6 +272,14 @@ export function useBackgroundLiveActivity() {
         };
     }, []);
 
+    // Track when the store gets its first real data load so we don't
+    // accidentally kill Live Activities before the orders query returns.
+    useEffect(() => {
+        if (activeOrders.length > 0) {
+            storeHasLoadedRef.current = true;
+        }
+    }, [activeOrders]);
+
     useEffect(() => {
         if (Platform.OS !== 'ios') {
             return;
@@ -277,6 +287,12 @@ export function useBackgroundLiveActivity() {
 
         if (candidateOrder?.id) {
             clearedWhenNoActiveOrderRef.current = false;
+            return;
+        }
+
+        // Don't end activities until the store has loaded at least once —
+        // on cold start the store is empty before the orders query resolves.
+        if (!storeHasLoadedRef.current) {
             return;
         }
 

@@ -29,7 +29,7 @@ function AppContent() {
     useNotifications();
     useNetworkStatus();
     const isNetworkConnected = useAuthStore((s) => s.isNetworkConnected);
-    const { isAdminTalking } = useDriverPttReceiver();
+    const { isAdminTalking, isTalking, pttError, startTalking, stopTalking } = useDriverPttReceiver();
     const { pendingOrder, autoCountdown, accepting, acceptError, takenByOther, availableOrders, poolOrders, handleAcceptOrder, handleSkipOrder, handleAcceptAndNavigate } =
         useGlobalOrderAccept();
 
@@ -153,6 +153,60 @@ function AppContent() {
                     }}
                 />
             </Stack>
+            {/* Driver PTT (talk to dispatch) floating button */}
+            {isAuthenticated && isOnline && (
+                <View style={{
+                    position: 'absolute',
+                    bottom: showPoolFab ? 170 : 100,
+                    right: 16,
+                    zIndex: 60,
+                    alignItems: 'center',
+                    gap: 4,
+                }}>
+                    {isTalking && (
+                        <View style={{
+                            backgroundColor: 'rgba(239,68,68,0.9)',
+                            borderRadius: 8,
+                            paddingHorizontal: 8,
+                            paddingVertical: 3,
+                        }}>
+                            <Text style={{ color: 'white', fontSize: 10, fontWeight: '700' }}>🔴 Live</Text>
+                        </View>
+                    )}
+                    {!!pttError && !isTalking && (
+                        <View style={{
+                            backgroundColor: 'rgba(127,29,29,0.9)',
+                            borderRadius: 8,
+                            paddingHorizontal: 8,
+                            paddingVertical: 3,
+                            maxWidth: 140,
+                        }}>
+                            <Text style={{ color: '#fca5a5', fontSize: 9, fontWeight: '600' }} numberOfLines={2}>{pttError}</Text>
+                        </View>
+                    )}
+                    <Pressable
+                        onPressIn={startTalking}
+                        onPressOut={stopTalking}
+                        style={{
+                            backgroundColor: isTalking ? '#dc2626' : '#0b1120',
+                            borderRadius: 18,
+                            width: 58,
+                            height: 58,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderWidth: 1,
+                            borderColor: isTalking ? 'rgba(248,113,113,0.5)' : 'rgba(139,92,246,0.25)',
+                            shadowColor: isTalking ? '#ef4444' : '#8b5cf6',
+                            shadowOffset: { width: 0, height: 0 },
+                            shadowOpacity: 0.25,
+                            shadowRadius: 12,
+                            elevation: 12,
+                        }}
+                    >
+                        <Ionicons name="mic" size={24} color={isTalking ? 'white' : '#a78bfa'} />
+                    </Pressable>
+                </View>
+            )}
             {showPoolFab && (
                 <Pressable
                     onPress={() => setPoolOpen(true)}

@@ -600,6 +600,12 @@ export class NotificationService {
                             updates.phaseStartedAt ?? Date.now(),
                         ),
                         lastUpdated: String(Date.now()),
+                        // ETA fields for the JS background handler to bridge into Zustand
+                        ...(updates.status === 'out_for_delivery' ? {
+                            navigationPhase: 'to_dropoff',
+                            remainingEtaSeconds: String(updates.estimatedMinutes * 60),
+                            etaUpdatedAt: new Date().toISOString(),
+                        } : {}),
                     },
                     apns: {
                         headers: {

@@ -19,7 +19,9 @@ function toAgoraUid(userId: string): number {
     hash = (hash * 31 + userId.charCodeAt(i)) >>> 0;
   }
 
-  // Agora RTC expects a positive uint32 uid.
+  // Mask to 31 bits so the value stays within GraphQL Int (signed 32-bit) range
+  // while remaining a valid positive Agora RTC uid.
+  hash = hash & 0x7fffffff;
   return hash === 0 ? 1 : hash;
 }
 

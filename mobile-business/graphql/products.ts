@@ -25,6 +25,10 @@ export const GET_BUSINESS_PRODUCTS = graphql(`
                 createdAt
                 updatedAt
             }
+            variants {
+                id
+                categoryId
+            }
         }
         productCategories(businessId: $businessId) {
             id

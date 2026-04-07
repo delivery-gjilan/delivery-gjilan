@@ -278,10 +278,15 @@ export default function OrdersScreen() {
         });
     }, [refetch]);
 
+    const [_debugSub, _setDebugSub] = useState('');
     useSubscription(ORDERS_SUBSCRIPTION, {
         onData: ({ data: subscriptionData }) => {
             const incomingOrders = subscriptionData.data?.allOrdersUpdated as any[] | undefined;
             if (incomingOrders && incomingOrders.length > 0) {
+                const statuses = incomingOrders.map((o: any) => `${o.displayId}:${o.status}`).join(', ');
+                const bizCheck = incomingOrders.map((o: any) => o.businesses?.length ?? 0);
+                _setDebugSub(`SUB: ${incomingOrders.length} orders [${statuses}] biz-arrays:${JSON.stringify(bizCheck)}`);
+                console.log('[DEBUG-SUB]', statuses, 'businessId:', user?.businessId, 'businesses:', JSON.stringify(incomingOrders.map((o: any) => o.businesses?.map((b: any) => b?.business?.id))));
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 apolloClient.cache.updateQuery({ query: GET_BUSINESS_ORDERS }, (existing: any) => {
                     const currentOrders = Array.isArray(existing?.orders?.orders) ? existing.orders.orders : [];
@@ -324,11 +329,13 @@ export default function OrdersScreen() {
     const avgPrepTime = businessOps?.avgPrepTimeMinutes ?? 20;
 
     // Show only upcoming orders for this business.
-    const businessOrders = ((data?.orders?.orders as unknown as Order[]) || []).filter((order: any) => {
-        const belongsToBusiness = order.businesses.some((b: any) => b.business.id === user?.businessId);
+    const _allOrders = (data?.orders?.orders as unknown as Order[]) || [];
+    const businessOrders = _allOrders.filter((order: any) => {
+        const belongsToBusiness = order.businesses?.some((b: any) => b.business.id === user?.businessId);
         const isUpcoming = UPCOMING_ORDER_STATUSES.includes(order.status as OrderStatus);
         return belongsToBusiness && isUpcoming;
     });
+    const _debugQuery = `QRY: ${_allOrders.length} total, ${businessOrders.length} filtered, biz:${user?.businessId?.slice(0,8)}`;    console.log('[DEBUG-ORDERS]', _debugQuery, 'statuses:', _allOrders.map(o => o.status));
 
     // Sort: PENDING first, then PREPARING, then by date desc
     const STATUS_PRIORITY: Record<OrderStatus, number> = {
@@ -973,6 +980,12 @@ export default function OrdersScreen() {
                         </View>
                     </TouchableOpacity>
                 </View>
+            </View>
+
+            {/* ── DEBUG BANNER — REMOVE ME ── */}
+            <View style={{ backgroundColor: '#1a1a2e', padding: 8, borderBottomWidth: 1, borderBottomColor: '#333' }}>
+                <Text style={{ color: '#0f0', fontSize: 10, fontFamily: 'monospace' }}>{_debugQuery}</Text>
+                <Text style={{ color: '#ff0', fontSize: 10, fontFamily: 'monospace' }}>{_debugSub || 'SUB: waiting...'}</Text>
             </View>
 
             {/* ── Orders List ── */}

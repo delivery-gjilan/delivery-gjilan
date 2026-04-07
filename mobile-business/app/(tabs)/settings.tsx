@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useMutation, useQuery } from '@apollo/client/react';
+import { useMutation, useQuery, useApolloClient } from '@apollo/client/react';
 import { useAuthStore } from '@/store/authStore';
 import { hasBusinessPermission } from '@/lib/rbac';
 import { UserPermission } from '@/gql/graphql';
@@ -43,6 +43,7 @@ export default function SettingsScreen() {
     const { t } = useTranslation();
     const router = useRouter();
     const { user, logout } = useAuthStore();
+    const apolloClient = useApolloClient();
     const { languageChoice, setLanguageChoice } = useLocaleStore();
     const { pushEnabled, setPushEnabled } = useNotificationSettingsStore();
     const canManageSettings = hasBusinessPermission(user, UserPermission.ManageSettings);
@@ -145,6 +146,7 @@ export default function SettingsScreen() {
                 style: 'destructive',
                 onPress: async () => {
                     await logout();
+                    await apolloClient.clearStore().catch(() => {});
                     router.replace('/login');
                 },
             },

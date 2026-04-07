@@ -113,6 +113,14 @@ type DriverPttSignal {
     timestamp: DateTime!
 }
 
+"""Signal sent from a driver to all listening admins"""
+type AdminPttSignal {
+    driverId: ID!
+    channelName: String!
+    action: DriverPttSignalAction!
+    timestamp: DateTime!
+}
+
 enum AgoraRtcRole {
     PUBLISHER
     SUBSCRIBER
@@ -219,6 +227,12 @@ extend type Mutation {
         muted: Boolean
     ): Boolean!
 
+    """Driver sends push-to-talk signal to all listening admins"""
+    driverSendPttSignal(
+        channelName: String!
+        action: DriverPttSignalAction!
+    ): Boolean!
+
     """
     Admin mutation to set which drivers are on the current shift.
     Only on-shift drivers will receive new-order dispatch notifications.
@@ -249,4 +263,7 @@ extend type Subscription {
 
     """Per-driver push-to-talk signal stream (start/stop/mute/unmute)"""
     driverPttSignal(driverId: ID!): DriverPttSignal! @skipAuth
+
+    """Admin listens for push-to-talk signals from any driver"""
+    adminPttSignal: AdminPttSignal! @skipAuth
 }
