@@ -40,6 +40,7 @@ export const GET_MY_SETTLEMENTS = gql`
                 }
                 businesses {
                     business {
+                        id
                         name
                     }
                 }
