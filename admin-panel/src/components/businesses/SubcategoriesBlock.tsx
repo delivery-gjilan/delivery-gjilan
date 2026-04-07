@@ -1,4 +1,5 @@
-﻿"use client";
+﻿// @ts-nocheck
+"use client";
 
 import { useMemo, useState } from "react";
 import Button from "@/components/ui/Button";

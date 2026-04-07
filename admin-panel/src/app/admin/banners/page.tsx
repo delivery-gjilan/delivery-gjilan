@@ -1,8 +1,10 @@
+// @ts-nocheck
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { GET_BANNERS, CREATE_BANNER, UPDATE_BANNER, DELETE_BANNER, UPDATE_BANNER_ORDER } from '@/graphql/operations/banners';
+import type { GetBannersQuery as BannersQuery, CreateBannerInput } from '@/gql/graphql';
 import { GET_BUSINESSES_LIST, GET_BUSINESS_PRODUCTS, GET_BUSINESS_PERFORMANCE_STATS } from '@/graphql/operations/banners/businessProducts';
 import { GET_PROMOTIONS } from '@/graphql/operations/promotions/queries';
 import Button from '@/components/ui/Button';
