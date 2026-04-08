@@ -17,6 +17,7 @@ WORKDIR /app
 
 COPY package*.json ./
 RUN npm install --omit=dev --ignore-scripts
+RUN npm install -g pm2
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/database/migrations ./database/migrations
@@ -26,4 +27,4 @@ RUN mkdir -p /app/logs
 
 EXPOSE 4000
 
-CMD ["node", "dist/index.js"]
+CMD ["pm2-runtime", "dist/index.js", "-i", "max"]
