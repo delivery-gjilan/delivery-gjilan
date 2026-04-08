@@ -16,7 +16,7 @@ export const settleWithDriver: NonNullable<MutationResolvers['settleWithDriver']
     // The input driverId may be a user ID (from the admin panel's drivers query).
     // Look up the actual driver record ID.
     let resolvedDriverId = driverId;
-    const driverRecord = await db.query.drivers.findFirst({
+    const driverRecord = await db.query.drivers.findFirst({ // foup
         where: eq(driversTable.userId, driverId),
     });
     if (driverRecord) {
