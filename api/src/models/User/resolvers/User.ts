@@ -93,17 +93,6 @@ export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'busines
     isTrustedCustomer: (parent) => {
         return isTrustedCustomer((parent as any).adminNote, (parent as any).flagColor);
     },
-    commissionPercentage: async (parent, _args, { loaders }) => {
-        if (parent.role !== 'DRIVER') return null;
-        try {
-            const driver = await loaders.driverByUserIdLoader.load(String(parent.id));
-            if (!driver?.commissionPercentage) return null;
-            return parseFloat(driver.commissionPercentage);
-        } catch (error) {
-            logger.error({ err: error }, 'user:commissionPercentage resolve failed');
-            return null;
-        }
-    },
     driverConnection: async (parent, _args, { loaders }) => {
         if (parent.role !== 'DRIVER') return null;
         try {
