@@ -42,6 +42,7 @@ function makeMutationDb(rows: any[]) {
     const chain: any = {
         insert: vi.fn().mockReturnThis(),
         update: vi.fn().mockReturnThis(),
+        delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([]) }),
         values: vi.fn().mockReturnThis(),
         set: vi.fn().mockReturnThis(),
         where: vi.fn().mockReturnThis(),

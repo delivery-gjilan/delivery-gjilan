@@ -7,6 +7,7 @@ export default defineConfig({
         globals: true,
         include: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
         exclude: ['src/**/*.integration.test.ts', 'node_modules'],
+        setupFiles: ['src/__tests__/setup.ts'],
     },
     resolve: {
         alias: {
