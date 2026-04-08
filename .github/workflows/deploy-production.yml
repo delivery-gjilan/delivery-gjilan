@@ -76,14 +76,6 @@ jobs:
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "Deploying image tag: $TAG"
 
-      - name: Debug SSH key
-        run: |
-          echo "Key length: ${#KEY}"
-          echo "Key first 30 chars: ${KEY:0:30}"
-          echo "Key last 30 chars: ${KEY: -30}"
-        env:
-          KEY: ${{ secrets.PROD_SSH_KEY }}
-
       - name: Copy compose & Caddy config to server
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -105,7 +97,7 @@ jobs:
             cd /opt/zippgo/api
 
             # Log in to GHCR
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
             # Pull new image
             IMAGE_TAG=${{ steps.tag.outputs.tag }}
