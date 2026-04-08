@@ -3,6 +3,12 @@ import logger from '@/lib/logger';
 
 const log = logger.child({ module: 'EmailService' });
 
+export type PasswordResetParams = {
+    toEmail: string;
+    toName: string;
+    token: string;
+};
+
 export type OrderReceiptParams = {
     toEmail: string;
     toName: string;
@@ -118,6 +124,49 @@ export class EmailService {
             this.client = new Resend(apiKey);
         }
         this.from = process.env.RESEND_FROM_ADDRESS ?? 'noreply@deliverygjilan.com';
+    }
+
+    async sendPasswordResetEmail(params: PasswordResetParams): Promise<void> {
+        if (!this.client) {
+            log.warn({ email: params.toEmail }, 'email:passwordReset:skipped (no API key)');
+            return;
+        }
+
+        const resetUrl = `${process.env.APP_DEEP_LINK_BASE ?? 'zipp://'}reset-password?token=${params.token}`;
+
+        const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Reset your password</title></head>
+<body style="margin:0;padding:0;background:#F5F3FF;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding:32px 16px" align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(124,58,237,.10)">
+  <tr><td style="background:linear-gradient(135deg,#7C3AED,#6D28D9);padding:36px 40px 32px">
+    <p style="margin:0;font-size:22px;font-weight:700;color:#fff">Zipp Go</p>
+  </td></tr>
+  <tr><td style="padding:36px 40px">
+    <p style="margin:0 0 8px;font-size:22px;font-weight:700;color:#111827">Reset your password</p>
+    <p style="margin:0 0 24px;font-size:15px;color:#6b7280">Hi ${esc(params.toName)}, we received a request to reset your password.</p>
+    <a href="${resetUrl}" style="display:inline-block;background:#7C3AED;color:#fff;text-decoration:none;font-weight:700;font-size:16px;padding:14px 28px;border-radius:12px">Reset Password</a>
+    <p style="margin:24px 0 0;font-size:13px;color:#9ca3af">This link expires in 1 hour. If you didn't request a password reset, you can safely ignore this email.</p>
+    <p style="margin:12px 0 0;font-size:12px;color:#d1d5db;word-break:break-all">Or paste this link: ${resetUrl}</p>
+  </td></tr>
+  <tr><td style="padding:20px 40px;border-top:1px solid #f3f4f6">
+    <p style="margin:0;font-size:12px;color:#9ca3af">This is an automated email from Zipp Go. Please do not reply.</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+
+        try {
+            await this.client.emails.send({
+                from: this.from,
+                to: params.toEmail,
+                subject: 'Reset your Zipp Go password',
+                html,
+            });
+            log.info({ to: params.toEmail }, 'email:passwordReset:sent');
+        } catch (err) {
+            log.error({ err, to: params.toEmail }, 'email:passwordReset:send_failed');
+        }
     }
 
     async sendOrderReceipt(params: OrderReceiptParams): Promise<void> {

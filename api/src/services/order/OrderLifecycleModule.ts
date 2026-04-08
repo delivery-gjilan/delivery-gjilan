@@ -131,17 +131,14 @@ export class OrderLifecycleModule {
             throw AppError.unauthorized();
         }
 
-        const currentOrder = await this.query.getOrderById(id);
-        if (!currentOrder) {
-            throw AppError.notFound('Order');
-        }
-
+        // Fetch the raw DB record once — use it for all permission checks and side-effects.
+        // The mapped Order is returned by updateOrderStatus / updateOrderStatusWithDriver below.
         const dbOrder = await this.deps.orderRepository.findById(id);
         if (!dbOrder) {
             throw AppError.notFound('Order');
         }
 
-        const currentStatus = currentOrder.status;
+        const currentStatus = dbOrder.status as OrderStatus;
         const isSuperAdmin = role === 'SUPER_ADMIN';
         const isDriver = role === 'DRIVER';
         const isBusinessAdmin = role === 'BUSINESS_OWNER' || role === 'BUSINESS_EMPLOYEE';
@@ -150,7 +147,7 @@ export class OrderLifecycleModule {
         let order: Order;
 
         if (isCustomer) {
-            if (currentOrder.userId !== userData.userId) {
+            if (dbOrder.userId !== userData.userId) {
                 throw AppError.forbidden('Not authorized to update this order');
             }
             if (status !== 'DELIVERED') {
@@ -376,12 +373,10 @@ export class OrderLifecycleModule {
             throw AppError.badInput('Preparation time must be between 1 and 180 minutes');
         }
 
-        const currentOrder = await this.query.getOrderById(id);
-        if (!currentOrder) {
-            throw AppError.notFound('Order');
-        }
-
+        // startPreparing will throw AppError.notFound if the order doesn't exist or is not PENDING.
         const order = await this.startPreparing(id, preparationMinutes);
+        // Re-fetch the updated DB record after startPreparing to get the new timestamps
+        // (preparingAt, estimatedReadyAt). currentOrder is stale at this point.
         const dbOrder = await this.deps.orderRepository.findById(id);
 
         if (dbOrder) {
@@ -530,41 +525,42 @@ export class OrderLifecycleModule {
     ): Promise<void> {
         const { db } = this.deps;
 
-        // Fetch user email
-        const [user] = await db
-            .select({ email: usersTable.email, firstName: usersTable.firstName, lastName: usersTable.lastName, preferredLanguage: usersTable.preferredLanguage, emailOptOut: usersTable.emailOptOut })
-            .from(usersTable)
-            .where(eq(usersTable.id, dbOrder.userId));
+        const productIds = [...new Set(items.map((i) => i.productId))];
+
+        // Fetch all required data in parallel to avoid sequential round-trips.
+        const [userRows, businessRows, productRows, promos] = await Promise.all([
+            db
+                .select({ email: usersTable.email, firstName: usersTable.firstName, lastName: usersTable.lastName, preferredLanguage: usersTable.preferredLanguage, emailOptOut: usersTable.emailOptOut })
+                .from(usersTable)
+                .where(eq(usersTable.id, dbOrder.userId)),
+            db
+                .select({ name: businessesTable.name })
+                .from(businessesTable)
+                .where(eq(businessesTable.id, dbOrder.businessId)),
+            productIds.length
+                ? db
+                      .select({ id: productsTable.id, name: productsTable.name })
+                      .from(productsTable)
+                      .where(inArray(productsTable.id, productIds))
+                : Promise.resolve([]),
+            db
+                .select({
+                    discountAmount: orderPromotionsTable.discountAmount,
+                    appliesTo: orderPromotionsTable.appliesTo,
+                    name: promotionsTable.name,
+                    code: promotionsTable.code,
+                })
+                .from(orderPromotionsTable)
+                .innerJoin(promotionsTable, eq(orderPromotionsTable.promotionId, promotionsTable.id))
+                .where(eq(orderPromotionsTable.orderId, orderId)),
+        ]);
+
+        const [user] = userRows;
+        const [business] = businessRows;
 
         if (!user?.email || user.emailOptOut) return;
 
-        // Fetch business name (historical lookup — may be deleted)
-        const [business] = await db
-            .select({ name: businessesTable.name })
-            .from(businessesTable)
-            .where(eq(businessesTable.id, dbOrder.businessId));
-
-        // Fetch product names for each item (historical lookup)
-        const productIds = [...new Set(items.map((i) => i.productId))];
-        const productRows = productIds.length
-            ? await db
-                  .select({ id: productsTable.id, name: productsTable.name })
-                  .from(productsTable)
-                  .where(inArray(productsTable.id, productIds))
-            : [];
         const productNameMap = new Map(productRows.map((p) => [p.id, p.name]));
-
-        // Fetch promotions applied to this order (with promo name/code)
-        const promos = await db
-            .select({
-                discountAmount: orderPromotionsTable.discountAmount,
-                appliesTo: orderPromotionsTable.appliesTo,
-                name: promotionsTable.name,
-                code: promotionsTable.code,
-            })
-            .from(orderPromotionsTable)
-            .innerJoin(promotionsTable, eq(orderPromotionsTable.promotionId, promotionsTable.id))
-            .where(eq(orderPromotionsTable.orderId, orderId));
         const discountTotal = promos.reduce((sum, p) => sum + Number(p.discountAmount), 0);
 
         // Only include top-level items (not option/child items)

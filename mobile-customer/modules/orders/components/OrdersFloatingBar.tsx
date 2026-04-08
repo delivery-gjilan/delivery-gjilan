@@ -1,5 +1,5 @@
 import { View, Text, TouchableOpacity } from 'react-native';
-import { usePathname, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
@@ -18,19 +18,14 @@ const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 export const OrdersFloatingBar = () => {
     const router = useRouter();
-    const pathname = usePathname();
     const theme = useTheme();
     const { t } = useTranslations();
 
     const { hasActiveOrders, activeOrders } = useActiveOrdersStore();
     const openModal = useAwaitingApprovalModalStore((state) => state.openModal);
-    const isModalVisible = useAwaitingApprovalModalStore((state) => state.visible);
 
     // Auto-open is now handled centrally in AwaitingApprovalModalContainer.
 
-    const activeOrderCount = activeOrders.length;
-    // For multiple active orders, we highlight the first one for status coloring
-    // and route users to the active-orders list.
     const activeOrder = activeOrders[0] as any;
     const activeOrderId = activeOrder?.id === null || activeOrder?.id === undefined ? null : String(activeOrder.id);
     const customerVisibleStatus = activeOrder?.status === 'READY' ? 'PREPARING' : activeOrder?.status;
@@ -175,12 +170,9 @@ export const OrdersFloatingBar = () => {
     };
 
     const statusInfo = getStatusInfo(customerVisibleStatus);
-    const activeOrderTitle =
-        activeOrderCount > 1 ? `${activeOrderCount} ${t.orders.active_orders}` : t.orders.active_bar;
-    const activeOrderSubtitle =
-        activeOrderCount > 1 ? t.orders.multiple_active_cta : displayBusinessName;
-    const activeOrderHint =
-        activeOrderCount > 1 ? t.orders.multiple_active_subtitle : statusInfo.message;
+    const activeOrderTitle = t.orders.active_bar;
+    const activeOrderSubtitle = displayBusinessName;
+    const activeOrderHint = statusInfo.message;
 
     // Auto-open is handled in AwaitingApprovalModalContainer — not here.
 
@@ -206,35 +198,24 @@ export const OrdersFloatingBar = () => {
         transform: [{ translateY: translateY.value }],
     }));
 
+    const pressInFlightRef = useRef(false);
+
     if (!hasActiveOrders || activeOrders.length === 0 || !activeOrder) {
         return null;
     }
 
     const handlePress = async () => {
+        if (pressInFlightRef.current) return;
+        pressInFlightRef.current = true;
+        setTimeout(() => { pressInFlightRef.current = false; }, 800);
+
         if (!activeOrderId) {
-            console.warn('[OrdersFloatingBar] Press ignored: missing activeOrderId', {
-                pathname,
-                hasActiveOrders,
-                activeOrdersCount: activeOrders.length,
-            });
             toast.warning(t.common.error, t.orders.banner_unavailable);
             return;
         }
 
-        console.log('[OrdersFloatingBar] Press -> navigate', {
-            pathname,
-            activeOrderId,
-            status: activeOrder?.status,
-            activeOrderCount,
-        });
-
-        if (activeOrderCount === 1 && isAwaitingApproval) {
+        if (isAwaitingApproval) {
             openModal(activeOrderId);
-            return;
-        }
-
-        if (activeOrderCount > 1) {
-            router.push('/orders/active');
             return;
         }
 

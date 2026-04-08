@@ -1,6 +1,6 @@
-import { graphql } from '@/gql';
+import { gql } from '@apollo/client';
 
-export const GET_FEATURED_BUSINESSES = graphql(`
+export const GET_FEATURED_BUSINESSES = gql`
     query FeaturedBusinessesHome {
         featuredBusinesses {
             id
@@ -24,4 +24,4 @@ export const GET_FEATURED_BUSINESSES = graphql(`
             }
         }
     }
-`);
+`;

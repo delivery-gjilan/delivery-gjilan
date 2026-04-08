@@ -56,7 +56,32 @@
             "no_account": "Don't have an account? ",
             "sign_up_link": "Sign up",
             "fill_all_fields": "Please fill in all fields",
-            "login_failed": "Login failed"
+            "login_failed": "Login failed",
+            "forgot_password": "Forgot password?"
+        },
+        "forgot_password": {
+            "title": "Forgot Password?",
+            "subtitle": "Enter your email address and we'll send you a link to reset your password.",
+            "email_placeholder": "Enter your email",
+            "send_button": "Send Reset Link",
+            "success_title": "Check your email",
+            "success_message": "If an account exists for that email, we've sent a reset link. It expires in 1 hour.",
+            "back_to_login": "Back to Sign In",
+            "fill_email": "Please enter your email address",
+            "failed": "Failed to send reset link. Please try again."
+        },
+        "reset_password": {
+            "title": "Set New Password",
+            "subtitle": "Choose a strong password for your account.",
+            "new_password_placeholder": "New password (min 8 characters)",
+            "confirm_password_placeholder": "Confirm new password",
+            "reset_button": "Update Password",
+            "success_title": "Password Updated",
+            "success_message": "Your password has been reset. You can now sign in with your new password.",
+            "passwords_no_match": "Passwords do not match",
+            "password_min_length": "Password must be at least 8 characters",
+            "failed": "Failed to reset password. Please try again.",
+            "invalid_link": "This reset link is invalid or has expired."
         },
         "signup": {
             "steps": {

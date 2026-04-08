@@ -221,6 +221,18 @@ export default function LoginScreen() {
                         </TouchableOpacity>
                     </Animated.View>
 
+                    {/* Forgot Password */}
+                    <Animated.View entering={FadeInDown.delay(350).duration(500)}>
+                        <TouchableOpacity
+                            style={{ paddingVertical: 12, marginTop: 4, alignItems: 'center' }}
+                            onPress={() => router.push('/forgot-password')}
+                        >
+                            <Text style={{ color: theme.colors.primary, fontSize: 14, fontWeight: '500' }}>
+                                {t.auth.login.forgot_password}
+                            </Text>
+                        </TouchableOpacity>
+                    </Animated.View>
+
                     {/* Sign Up Link */}
                     <Animated.View entering={FadeInDown.delay(400).duration(500)}>
                         <TouchableOpacity

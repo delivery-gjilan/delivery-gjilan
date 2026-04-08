@@ -15,7 +15,7 @@
         "ITSAppUsesNonExemptEncryption": false,
         "NSSupportsLiveActivities": true,
         "NSSupportsLiveActivitiesFrequentUpdates": true,
-        "UIBackgroundModes": []
+        "UIBackgroundModes": ["remote-notification"]
       },
       "appleTeamId": "87K8YXG5V8",
       "bundleIdentifier": "com.artshabani.mobilecustomer",

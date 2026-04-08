@@ -8,7 +8,7 @@ export const settlementRulesCount: NonNullable<QueryResolvers['settlementRulesCo
   { filter },
   { db, userData },
 ) => {
-  if (!userData?.userId) {
+  if (!userData?.userId || !['ADMIN', 'SUPER_ADMIN'].includes(userData.role!)) {
     throw new GraphQLError('Authentication required', {
       extensions: { code: 'UNAUTHORIZED' },
     });

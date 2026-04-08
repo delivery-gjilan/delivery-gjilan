@@ -1,6 +1,6 @@
-import { graphql } from '@/gql';
+import { gql } from '@apollo/client';
 
-export const CREATE_ORDER = graphql(`
+export const CREATE_ORDER = gql`
     mutation CreateOrder($input: CreateOrderInput!) {
         createOrder(input: $input) {
             id
@@ -64,9 +64,9 @@ export const CREATE_ORDER = graphql(`
             }
         }
     }
-`);
+`;
 
-export const UPDATE_ORDER_STATUS = graphql(`
+export const UPDATE_ORDER_STATUS = gql`
     mutation UpdateOrderStatus($id: ID!, $status: OrderStatus!) {
         updateOrderStatus(id: $id, status: $status) {
             id
@@ -134,9 +134,9 @@ export const UPDATE_ORDER_STATUS = graphql(`
             }
         }
     }
-`);
+`;
 
-export const CANCEL_ORDER = graphql(`
+export const CANCEL_ORDER = gql`
     mutation CancelOrder($id: ID!) {
         cancelOrder(id: $id) {
             id
@@ -204,4 +204,4 @@ export const CANCEL_ORDER = graphql(`
             }
         }
     }
-`);
+`;

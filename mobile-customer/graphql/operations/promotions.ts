@@ -1,6 +1,6 @@
-import { graphql } from '@/gql';
+import { gql } from '@apollo/client';
 
-export const VALIDATE_PROMOTIONS = graphql(`
+export const VALIDATE_PROMOTIONS = gql`
     query ValidatePromotions($cart: CartContextInput!, $manualCode: String) {
         validatePromotions(cart: $cart, manualCode: $manualCode) {
             totalDiscount
@@ -20,9 +20,9 @@ export const VALIDATE_PROMOTIONS = graphql(`
             }
         }
     }
-`);
+`;
 
-export const GET_APPLICABLE_PROMOTIONS = graphql(`
+export const GET_APPLICABLE_PROMOTIONS = gql`
     query GetApplicablePromotions($cart: CartContextInput!, $manualCode: String) {
         getApplicablePromotions(cart: $cart, manualCode: $manualCode) {
             id
@@ -35,9 +35,9 @@ export const GET_APPLICABLE_PROMOTIONS = graphql(`
             priority
         }
     }
-`);
+`;
 
-export const GET_PROMOTION_THRESHOLDS = graphql(`
+export const GET_PROMOTION_THRESHOLDS = gql`
     query GetPromotionThresholds($cart: CartContextInput!) {
         getPromotionThresholds(cart: $cart) {
             id
@@ -49,9 +49,9 @@ export const GET_PROMOTION_THRESHOLDS = graphql(`
             isActive
         }
     }
-`);
+`;
 
-export const GET_ACTIVE_GLOBAL_PROMOTIONS = graphql(`
+export const GET_ACTIVE_GLOBAL_PROMOTIONS = gql`
     query GetActiveGlobalPromotions {
         getActiveGlobalPromotions {
             id
@@ -64,4 +64,4 @@ export const GET_ACTIVE_GLOBAL_PROMOTIONS = graphql(`
             isActive
         }
     }
-`);
+`;

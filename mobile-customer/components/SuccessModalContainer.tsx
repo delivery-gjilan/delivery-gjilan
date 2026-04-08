@@ -5,32 +5,54 @@ import OrderSuccessScreen from './OrderSuccessScreen';
 import { useSuccessModalStore } from '@/store/useSuccessModalStore';
 
 const AUTO_DISMISS_MS = 4000;
+// Approximate duration of the RN Modal 'fade' animation — used to delay
+// post-dismiss navigation so it fires after the modal has fully disappeared.
+const MODAL_FADE_MS = 320;
 
 export default function SuccessModalContainer() {
     const router = useRouter();
     const { visible, orderId, type, phase, hideSuccess } = useSuccessModalStore();
-    const hasNavigatedRef = useRef(false);
+    const hasScheduledDismissRef = useRef(false);
     const autoDismissRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Holds the orderId to navigate to after the modal has finished fading out.
+    const pendingTrackOrderIdRef = useRef<string | null>(null);
+    // Tracks whether the modal was ever opened so the !visible branch only
+    // runs on genuine dismiss events, not on the initial render.
+    const wasVisibleRef = useRef(false);
 
-    // Navigate to home immediately when success phase starts so the screen
-    // renders behind the modal. After AUTO_DISMISS_MS the modal fades out
-    // and home is already fully loaded — no black flash.
-    // The (tabs) screen has animation: 'none' so the transition is instant.
     useEffect(() => {
-        if (visible && phase === 'success' && !hasNavigatedRef.current) {
-            hasNavigatedRef.current = true;
-            router.replace('/(tabs)/home');
+        if (visible) {
+            wasVisibleRef.current = true;
 
-            autoDismissRef.current = setTimeout(() => {
-                hideSuccess();
-            }, AUTO_DISMISS_MS);
-        }
+            if (phase === 'success' && !hasScheduledDismissRef.current) {
+                hasScheduledDismissRef.current = true;
+                // Schedule auto-dismiss. Navigation to the correct destination has
+                // already been handled by whoever triggered the modal:
+                //   • order_created → CartScreen calls router.replace('/(tabs)/home')
+                //     before showSuccess() so home is under the modal while it plays.
+                //   • order_delivered → user is already on some screen; no nav needed.
+                autoDismissRef.current = setTimeout(() => {
+                    hideSuccess();
+                }, AUTO_DISMISS_MS);
+            }
+        } else if (wasVisibleRef.current) {
+            // Modal just dismissed (visible flipped false after being true).
+            wasVisibleRef.current = false;
+            hasScheduledDismissRef.current = false;
 
-        if (!visible) {
-            hasNavigatedRef.current = false;
             if (autoDismissRef.current) {
                 clearTimeout(autoDismissRef.current);
                 autoDismissRef.current = null;
+            }
+
+            // If the user tapped "Track Order", navigate after the fade finishes
+            // so there is no underlying-screen flash during the dismissal animation.
+            if (pendingTrackOrderIdRef.current) {
+                const targetOrderId = pendingTrackOrderIdRef.current;
+                pendingTrackOrderIdRef.current = null;
+                setTimeout(() => {
+                    router.push(`/orders/${targetOrderId}` as any);
+                }, MODAL_FADE_MS);
             }
         }
     }, [visible, phase, router, hideSuccess]);
@@ -45,14 +67,16 @@ export default function SuccessModalContainer() {
     const handleTrackOrder = useCallback(() => {
         cancelAutoDismiss();
         if (orderId) {
-            router.replace(`/orders/${orderId}` as any);
+            // Store the id, then dismiss. Navigation fires after the fade in the
+            // !visible branch above — prevents screen flashes during the animation.
+            pendingTrackOrderIdRef.current = orderId;
             hideSuccess();
         }
-    }, [orderId, router, hideSuccess, cancelAutoDismiss]);
+    }, [orderId, hideSuccess, cancelAutoDismiss]);
 
     const handleGoHome = useCallback(() => {
         cancelAutoDismiss();
-        // Home is already loaded behind the modal, just dismiss.
+        // The correct screen is already rendered behind the modal — just dismiss.
         hideSuccess();
     }, [hideSuccess, cancelAutoDismiss]);
 

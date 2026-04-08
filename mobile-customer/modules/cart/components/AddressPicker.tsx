@@ -387,11 +387,20 @@ export default function AddressPicker({
                         setPinLocation({ latitude, longitude });
                         setMapCenter([longitude, latitude]);
 
-                        cameraRef.current?.setCamera({
-                            centerCoordinate: [longitude, latitude],
-                            zoomLevel: 16,
-                            animationDuration: 600,
-                        });
+                        // Camera may not be mounted yet if GPS resolves quickly (permission already granted).
+                        // Retry until the ref is available (up to ~1 s).
+                        const flyToGps = (attemptsLeft: number) => {
+                            if (cameraRef.current) {
+                                cameraRef.current.setCamera({
+                                    centerCoordinate: [longitude, latitude],
+                                    zoomLevel: 16,
+                                    animationDuration: 600,
+                                });
+                            } else if (attemptsLeft > 0) {
+                                setTimeout(() => flyToGps(attemptsLeft - 1), 100);
+                            }
+                        };
+                        flyToGps(10);
 
                         const address = await reverseGeocode(latitude, longitude);
                         setPinAddress(address);

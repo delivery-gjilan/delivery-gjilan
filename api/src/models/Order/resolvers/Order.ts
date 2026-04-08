@@ -45,11 +45,12 @@ export const Order: OrderResolvers = {
         try {
             const orderId = String(parent.id);
 
-            // Fetch the raw DbOrder and its items
-            const [dbOrder] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId));
+            // Fetch the raw DbOrder and its items in parallel
+            const [[dbOrder], items] = await Promise.all([
+                db.select().from(ordersTable).where(eq(ordersTable.id, orderId)),
+                db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, orderId)),
+            ]);
             if (!dbOrder) return null;
-
-            const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, orderId));
 
             const engine = new SettlementCalculationEngine(db);
             const calculations = await engine.calculateOrderSettlements(dbOrder, items, dbOrder.driverId);

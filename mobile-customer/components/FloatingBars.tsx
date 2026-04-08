@@ -11,7 +11,11 @@ export const FloatingBars = () => {
     const insets = useSafeAreaInsets();
 
     // Routes where floating bars should not appear
-    const hiddenRoutes = ['/product/', '/cart', '/orders', '/login', '/signup', '/auth-selection', '/profile', '/addresses', '/business/'];
+    const hiddenRoutes = [
+        '/product/', '/cart', '/orders', '/business/',
+        '/login', '/signup', '/auth-selection', '/forgot-password', '/reset-password', '/brand-splash',
+        '/profile', '/addresses',
+    ];
     const shouldHide = hiddenRoutes.some((route) => pathname.startsWith(route)) || pathname === '/';
 
     // Check if we're on a tab route

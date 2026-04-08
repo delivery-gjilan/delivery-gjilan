@@ -3,7 +3,6 @@ import { CREATE_ORDER } from '@/graphql/operations/orders';
 import { useCart } from './useCart';
 import { useActiveOrdersStore } from '@/modules/orders/store/activeOrdersStore';
 import { useTranslations } from '@/hooks/useTranslations';
-import { toast } from '@/store/toastStore';
 
 export function useCreateOrder() {
     const { items } = useCart();
@@ -22,9 +21,9 @@ export function useCreateOrder() {
         userContextLocation?: { latitude: number; longitude: number; address: string } | null,
         priorityRequested?: boolean,
     ) => {
-        // Keep this as UX guidance only; backend remains source of truth.
+        // Hard block — UI layers should catch this before reaching here.
         if (hasActiveOrders) {
-            toast.warning(t.cart.active_order_exists_title, t.cart.active_order_exists_message);
+            throw new Error(t.cart.active_order_exists_message);
         }
 
         if (items.length === 0) {

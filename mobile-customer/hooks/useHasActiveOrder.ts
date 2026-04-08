@@ -13,7 +13,7 @@ export function useHasActiveOrder(): { hasActiveOrder: boolean; isLoading: boole
         fetchPolicy: 'cache-and-network',
     });
 
-    const orders: Array<{ status: string }> = (data as any)?.orders ?? [];
+    const orders: Array<{ status: string }> = (data as any)?.orders?.orders ?? [];
     return {
         hasActiveOrder: orders.some((o) => ACTIVE_STATUSES.has(o.status)),
         // Keep loading true during cache-and-network refresh so callers can avoid

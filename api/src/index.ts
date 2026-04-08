@@ -1,3 +1,17 @@
+import * as Sentry from '@sentry/node';
+
+// Initialise Sentry/GlitchTip before any other imports so it can instrument automatically.
+// Set SENTRY_DSN in your .env to the DSN from your GlitchTip project.
+// Leave it unset in development to disable reporting.
+if (process.env.SENTRY_DSN) {
+    Sentry.init({
+        dsn: process.env.SENTRY_DSN,
+        environment: process.env.NODE_ENV ?? 'development',
+        // Capture 100% of errors; tune tracesSampleRate down (e.g. 0.1) if you want perf tracing
+        tracesSampleRate: 0,
+    });
+}
+
 import { randomUUID } from 'crypto';
 import { GraphQLError } from 'graphql';
 import { WebSocketServer } from 'ws';
@@ -348,9 +362,11 @@ process.on('SIGTERM', async () => {
 
 process.on('unhandledRejection', (error) => {
     logger.error({ err: error }, 'Unhandled promise rejection');
+    if (process.env.SENTRY_DSN) Sentry.captureException(error);
 });
 
 process.on('uncaughtException', (error) => {
     logger.fatal({ err: error }, 'Uncaught exception — exiting');
+    if (process.env.SENTRY_DSN) Sentry.captureException(error);
     process.exit(1);
 });

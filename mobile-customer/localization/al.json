@@ -56,7 +56,32 @@
             "no_account": "Nuk keni llogari? ",
             "sign_up_link": "Regjistrohu",
             "fill_all_fields": "Ju lutem plotësoni të gjitha fushat",
-            "login_failed": "Hyrja dështoi"
+            "login_failed": "Hyrja dështoi",
+            "forgot_password": "Keni harruar fjalëkalimin?"
+        },
+        "forgot_password": {
+            "title": "Keni harruar fjalëkalimin?",
+            "subtitle": "Shkruani email-in tuaj dhe ne do t'ju dërgojmë një lidhje për të rivendosur fjalëkalimin.",
+            "email_placeholder": "Shkruani email-in tuaj",
+            "send_button": "Dërgo Lidhjen",
+            "success_title": "Kontrolloni email-in tuaj",
+            "success_message": "Nëse ekziston një llogari me atë email, kemi dërguar një lidhje rivendosjeje. Skadон pas 1 ore.",
+            "back_to_login": "Kthehu tek Hyrja",
+            "fill_email": "Ju lutem shkruani adresën tuaj email",
+            "failed": "Dështoi dërgimi i lidhjes. Ju lutem provoni përsëri."
+        },
+        "reset_password": {
+            "title": "Vendos Fjalëkalimin e Ri",
+            "subtitle": "Zgjidhni një fjalëkalim të fortë për llogarinë tuaj.",
+            "new_password_placeholder": "Fjalëkalim i ri (min 8 karaktere)",
+            "confirm_password_placeholder": "Konfirmo fjalëkalimin e ri",
+            "reset_button": "Përditëso Fjalëkalimin",
+            "success_title": "Fjalëkalimi u Përditësua",
+            "success_message": "Fjalëkalimi juaj u rivendos. Tani mund të hyni me fjalëkalimin tuaj të ri.",
+            "passwords_no_match": "Fjalëkalimet nuk përputhen",
+            "password_min_length": "Fjalëkalimi duhet të ketë së paku 8 karaktere",
+            "failed": "Dështoi rivendosja e fjalëkalimit. Ju lutem provoni përsëri.",
+            "invalid_link": "Kjo lidhje rivendosjeje është e pavlefshme ose ka skaduar."
         },
         "signup": {
             "steps": {

@@ -4,10 +4,14 @@
         import logger from '@/lib/logger';
         import { orderItems as orderItemsTable } from '@/database/schema';
         import { eq } from 'drizzle-orm';
+        import { AppError } from '@/lib/errors';
 
         export const backfillSettlementsForDeliveredOrders: NonNullable<
                 MutationResolvers['backfillSettlementsForDeliveredOrders']
-        > = async (_parent, _arg, { db, orderService }) => {
+        > = async (_parent, _arg, { db, userData, orderService }) => {
+                if (!userData?.userId || userData.role !== 'SUPER_ADMIN') {
+                    throw AppError.forbidden();
+                }
                 if (!orderService) {
                         logger.error('settlement:backfillSettlements orderService missing from context');
                         return 0;

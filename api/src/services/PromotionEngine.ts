@@ -105,7 +105,54 @@ export class PromotionEngine {
 
         log.debug({ count: allPromos.length, manualPromoCode, cartSubtotal: cart.subtotal }, 'promo:found');
 
-        // 3. Filter by target type and eligibility
+        // 3. Batch-prefetch all per-promo lookup data before the loop
+        const allPromoIds = allPromos.map((p) => p.id);
+        const promoIdsWithPerUserLimit = allPromos.filter((p) => p.maxUsagePerUser).map((p) => p.id);
+
+        const [usageRows, userAssignmentRows, businessEligibilityRows] = await Promise.all([
+            // Per-user usage counts for promos that have a per-user limit
+            promoIdsWithPerUserLimit.length > 0
+                ? this.db
+                      .select({ promotionId: promotionUsage.promotionId, count: sql<number>`count(*)` })
+                      .from(promotionUsage)
+                      .where(and(inArray(promotionUsage.promotionId, promoIdsWithPerUserLimit), eq(promotionUsage.userId, userId)))
+                      .groupBy(promotionUsage.promotionId)
+                : Promise.resolve([]),
+            // SPECIFIC_USERS assignments for this user
+            allPromoIds.length > 0
+                ? this.db
+                      .select({ promotionId: userPromotions.promotionId })
+                      .from(userPromotions)
+                      .where(
+                          and(
+                              inArray(userPromotions.promotionId, allPromoIds),
+                              eq(userPromotions.userId, userId),
+                              eq(userPromotions.isActive, true),
+                              or(isNull(userPromotions.expiresAt), gte(userPromotions.expiresAt, now))
+                          )
+                      )
+                : Promise.resolve([]),
+            // Business eligibility rows for all promos
+            allPromoIds.length > 0
+                ? this.db
+                      .select({ promotionId: promotionBusinessEligibility.promotionId, businessId: promotionBusinessEligibility.businessId })
+                      .from(promotionBusinessEligibility)
+                      .where(inArray(promotionBusinessEligibility.promotionId, allPromoIds))
+                : Promise.resolve([]),
+        ]);
+
+        // Build lookup maps
+        const usageCountByPromoId = new Map<string, number>(usageRows.map((r) => [r.promotionId, Number(r.count)]));
+        const assignedPromoIds = new Set<string>(userAssignmentRows.map((r) => r.promotionId));
+        const eligibleBusinessIdsByPromoId = new Map<string, Set<string>>();
+        for (const row of businessEligibilityRows) {
+            if (!eligibleBusinessIdsByPromoId.has(row.promotionId)) {
+                eligibleBusinessIdsByPromoId.set(row.promotionId, new Set());
+            }
+            eligibleBusinessIdsByPromoId.get(row.promotionId)!.add(row.businessId);
+        }
+
+        // 4. Filter by target type and eligibility — zero DB calls inside this loop
         for (const promo of allPromos) {
             log.debug({ id: promo.id, name: promo.name, code: promo.code, target: promo.target, spendThreshold: promo.spendThreshold }, 'promo:checking');
             
@@ -115,33 +162,35 @@ export class PromotionEngine {
                 continue;
             }
 
+            // Per-user usage check (shared by checkCodeEligibility and checkUsageLimits)
+            const userUsageCount = usageCountByPromoId.get(promo.id) ?? 0;
+            const withinPerUserLimit = !promo.maxUsagePerUser || userUsageCount < promo.maxUsagePerUser;
+
             // Check target eligibility
             let isEligible = false;
 
             switch (promo.target) {
                 case 'ALL_USERS':
-                    // Check basic code eligibility (usage limits)
-                    isEligible = await this.checkCodeEligibility(promo, userId);
+                    isEligible = withinPerUserLimit;
                     log.debug({ isEligible }, 'promo:allUsers:codeEligibility');
-                    // If promo has a spend threshold, also check if it's met
                     if (isEligible && promo.spendThreshold) {
-                        isEligible = await this.checkConditionalEligibility(promo, cart);
+                        isEligible = cart.subtotal >= Number(promo.spendThreshold);
                         log.debug({ isEligible, spendThreshold: promo.spendThreshold, cartSubtotal: cart.subtotal }, 'promo:allUsers:thresholdCheck');
                     }
                     break;
 
                 case 'FIRST_ORDER':
-                    isEligible = isFirstOrder && await this.checkCodeEligibility(promo, userId);
+                    isEligible = isFirstOrder && withinPerUserLimit;
                     log.debug({ isEligible, isFirstOrder }, 'promo:firstOrder');
                     break;
 
                 case 'SPECIFIC_USERS':
-                    isEligible = await this.checkUserAssignment(promo.id, userId);
+                    isEligible = assignedPromoIds.has(promo.id);
                     log.debug({ isEligible }, 'promo:specificUsers');
                     break;
 
                 case 'CONDITIONAL':
-                    isEligible = await this.checkConditionalEligibility(promo, cart);
+                    isEligible = !promo.spendThreshold || cart.subtotal >= Number(promo.spendThreshold);
                     log.debug({ isEligible, spendThreshold: promo.spendThreshold, cartSubtotal: cart.subtotal }, 'promo:conditional');
                     break;
             }
@@ -151,13 +200,18 @@ export class PromotionEngine {
                 continue;
             }
 
-            // Check business eligibility
-            const businessEligible = await this.checkBusinessEligibility(promo.id, cart.businessIds);
+            // Check business eligibility (in-memory using prefetched data)
+            const restrictedBusinessIds = eligibleBusinessIdsByPromoId.get(promo.id);
+            const businessEligible =
+                !restrictedBusinessIds || // no restrictions = eligible everywhere
+                cart.businessIds.some((id) => restrictedBusinessIds.has(id));
             log.debug({ businessEligible, cartBusinessIds: cart.businessIds }, 'promo:businessEligibility');
             if (!businessEligible) continue;
 
-            // Check usage limits
-            const usageLimitOk = await this.checkUsageLimits(promo, userId);
+            // Check usage limits (global check; per-user already checked above)
+            const usageLimitOk =
+                (!promo.maxGlobalUsage || promo.currentGlobalUsage < promo.maxGlobalUsage) &&
+                withinPerUserLimit;
             log.debug({ usageLimitOk }, 'promo:usageLimits');
             if (!usageLimitOk) continue;
 

@@ -37,6 +37,8 @@ export const users = pgTable('users', {
     isDemoAccount: boolean('is_demo_account').default(false).notNull(),
     imageUrl: text('image_url'),
     referralCode: text('referral_code').unique(),
+    passwordResetToken: text('password_reset_token'),
+    passwordResetExpiresAt: timestamp('password_reset_expires_at', { withTimezone: true, mode: 'string' }),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
         .default(sql`CURRENT_TIMESTAMP`)
         .notNull(),

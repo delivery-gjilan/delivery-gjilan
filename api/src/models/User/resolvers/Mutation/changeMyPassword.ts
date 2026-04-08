@@ -13,8 +13,8 @@ export const changeMyPassword: NonNullable<MutationResolvers['changeMyPassword']
         });
     }
 
-    if (!newPassword || newPassword.length < 8) {
-        throw new GraphQLError('New password must be at least 8 characters long', {
+    if (!newPassword || newPassword.length < 8 || !/[A-Z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+        throw new GraphQLError('New password must be at least 8 characters, include an uppercase letter and a number', {
             extensions: { code: 'BAD_REQUEST' },
         });
     }

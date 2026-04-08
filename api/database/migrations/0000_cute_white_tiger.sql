@@ -308,6 +308,8 @@ CREATE TABLE "users" (
 	"is_demo_account" boolean DEFAULT false NOT NULL,
 	"image_url" text,
 	"referral_code" text,
+	"password_reset_token" text,
+	"password_reset_expires_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	"deleted_at" timestamp with time zone,

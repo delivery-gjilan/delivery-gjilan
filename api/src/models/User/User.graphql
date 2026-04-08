@@ -201,6 +201,8 @@ type Mutation {
     setMyEmailOptOut(optOut: Boolean!): User!
     changeMyPassword(currentPassword: String!, newPassword: String!): Boolean!
     updateMyProfile(input: UpdateMyProfileInput!): User!
+    requestPasswordReset(email: String!): Boolean! @skipAuth
+    resetPassword(token: String!, newPassword: String!): Boolean! @skipAuth
 }
 
 type Subscription {

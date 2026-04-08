@@ -2,12 +2,16 @@ import type { MutationResolvers } from './../../../../generated/types.generated'
 import { AppContext } from '@/index';
 import { SettlementRepository } from '@/repositories/SettlementRepository';
 import { createAuditLogger } from '@/services/AuditLogger';
+import { AppError } from '@/lib/errors';
 
 export const markSettlementsAsPaid: NonNullable<MutationResolvers['markSettlementsAsPaid']> = async (
     _parent,
     { ids },
     context
 ): Promise<any> => {
+    if (!context.userData?.userId || !['ADMIN', 'SUPER_ADMIN'].includes(context.userData.role!)) {
+        throw AppError.forbidden();
+    }
     const { db } = context;
     const repo = new SettlementRepository(db);
     const result = await repo.markMultipleAsPaid(ids);

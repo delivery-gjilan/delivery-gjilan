@@ -1085,7 +1085,9 @@ type Mutation {
 
   """Driver replies to admin"""
   replyToDriverMessage(adminId: ID!, body: String!): DriverMessage!
+  requestPasswordReset(email: String!): Boolean!
   resendEmailVerification: SignupStepResponse!
+  resetPassword(newPassword: String!, token: String!): Boolean!
 
   """Business/driver accepts or rejects a pending settlement request."""
   respondToSettlementRequest(action: SettlementRequestAction!, reason: String, requestId: ID!): SettlementRequest!

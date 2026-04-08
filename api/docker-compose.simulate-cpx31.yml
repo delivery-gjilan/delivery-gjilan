@@ -1,0 +1,103 @@
+# CPX31 all-in-one simulation
+# Matches: Hetzner CPX31 — 4 vCPU AMD (shared), 8 GB RAM
+# Real-world usable: ~4 vCPU, ~7 GB RAM after OS overhead
+#
+# Simulates production scenario: API + Postgres + Redis all on one box.
+# Total resource budget split across services to reflect real coexistence.
+#
+# Usage:
+#   1. Ensure your local Postgres and Redis are stopped (or use different ports)
+#   2. docker compose -f docker-compose.simulate-cpx31.yml up --build
+#   3. Wait for db healthcheck to pass (watch logs)
+#   4. In another terminal: cd api && npx tsx database/migrate.ts (once, to seed schema)
+#      OR if you have a dump: docker exec -i simulate-db psql -U postgres delivery_gjilan < dump.sql
+#   5. Run: k6 run tests/k6/order-flow.js
+#      (fixtures.json apiUrl should point to localhost:4002)
+#
+# Update fixtures.json apiUrl to: http://localhost:4002
+#
+# Thresholds to watch:
+#   - create_order_duration p95 < 200ms  (your baseline was ~76ms on 1 vCPU)
+#   - error_rate < 2%
+#   - http_req_duration p99 < 1000ms
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    container_name: simulate-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: delivery-gjilan-sim
+    volumes:
+      - sim_dbdata:/var/lib/postgresql/data
+    ports:
+      - "8091:5432"
+    # Postgres gets the lion's share of memory on a DB+API box
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 3000M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    container_name: simulate-redis
+    ports:
+      - "6380:6379"
+    # Redis is lightweight — memory is the main concern
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    container_name: simulate-api
+    ports:
+      - "4002:4000"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/delivery-gjilan-sim
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: production
+      REDIS_REQUIRED: "false"
+    env_file:
+      - .env.docker
+    depends_on:
+      db:
+        condition: service_healthy
+    # API gets remaining CPU budget; 2 GB is generous for Node.js
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2048M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  sim_dbdata:
+    driver: local

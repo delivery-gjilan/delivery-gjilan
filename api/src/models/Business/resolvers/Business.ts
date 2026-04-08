@@ -1,7 +1,7 @@
 import type { BusinessResolvers } from './../../../generated/types.generated';
 import { getDB } from '@/database';
 import { promotions, userPromotions } from '@/database/schema/promotions';
-import { eq, and, isNull, lte, gte, or, sql } from 'drizzle-orm';
+import { eq, and, isNull, lte, gte, or, sql, inArray } from 'drizzle-orm';
 
 /**
  * Parse a working hours time string like "08:00" into total minutes from midnight.
@@ -101,30 +101,32 @@ export const Business: BusinessResolvers = {
             return null;
         }
 
-        // Filter out SPECIFIC_USERS promos that aren't assigned to or have been fully used by this user
-        const eligible = await Promise.all(
-            activePromotions.map(async (promo) => {
-                if (promo.target !== 'SPECIFIC_USERS') return promo;
-                // No user context → don't show user-specific promos
-                if (!userId) return null;
-                // Check assignment and usage
-                const [assignment] = await db
-                    .select({ usageCount: userPromotions.usageCount })
-                    .from(userPromotions)
-                    .where(
-                        and(
-                            eq(userPromotions.promotionId, promo.id),
-                            eq(userPromotions.userId, userId)
-                        )
-                    )
-                    .limit(1);
-                if (!assignment) return null;
-                if (promo.maxUsagePerUser && assignment.usageCount >= promo.maxUsagePerUser) return null;
-                return promo;
-            })
-        );
+        // Filter out SPECIFIC_USERS promos that aren't assigned to or have been fully used by this user.
+        const specificUserPromos = activePromotions.filter((p) => p.target === 'SPECIFIC_USERS');
+        let userAssignmentsByPromoId = new Map<string, { usageCount: number }>();
 
-        const promo = eligible.find(Boolean);
+        if (specificUserPromos.length > 0 && userId) {
+            // Single batch query instead of one per promo.
+            const assignmentRows = await db
+                .select({ promotionId: userPromotions.promotionId, usageCount: userPromotions.usageCount })
+                .from(userPromotions)
+                .where(
+                    and(
+                        inArray(userPromotions.promotionId, specificUserPromos.map((p) => p.id)),
+                        eq(userPromotions.userId, userId),
+                    ),
+                );
+            userAssignmentsByPromoId = new Map(assignmentRows.map((r) => [r.promotionId, { usageCount: r.usageCount }]));
+        }
+
+        const promo = activePromotions.find((p) => {
+            if (p.target !== 'SPECIFIC_USERS') return true;
+            if (!userId) return false;
+            const assignment = userAssignmentsByPromoId.get(p.id);
+            if (!assignment) return false;
+            if (p.maxUsagePerUser && assignment.usageCount >= p.maxUsagePerUser) return false;
+            return true;
+        });
         if (!promo) return null;
         return {
             id: promo.id,

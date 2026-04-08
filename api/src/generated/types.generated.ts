@@ -1052,7 +1052,9 @@ export type Mutation = {
   replyToBusinessMessage: BusinessMessage;
   /** Driver replies to admin */
   replyToDriverMessage: DriverMessage;
+  requestPasswordReset: Scalars['Boolean']['output'];
   resendEmailVerification: SignupStepResponse;
+  resetPassword: Scalars['Boolean']['output'];
   /** Business/driver accepts or rejects a pending settlement request. */
   respondToSettlementRequest: SettlementRequest;
   runSettlementScenarioHarness: SettlementScenarioHarnessResult;
@@ -1498,6 +1500,17 @@ export type MutationreplyToBusinessMessageArgs = {
 export type MutationreplyToDriverMessageArgs = {
   adminId: Scalars['ID']['input'];
   body: Scalars['String']['input'];
+};
+
+
+export type MutationrequestPasswordResetArgs = {
+  email: Scalars['String']['input'];
+};
+
+
+export type MutationresetPasswordArgs = {
+  newPassword: Scalars['String']['input'];
+  token: Scalars['String']['input'];
 };
 
 
@@ -4340,7 +4353,9 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   removeUserFromPromotion?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationremoveUserFromPromotionArgs, 'promotionId' | 'userId'>>;
   replyToBusinessMessage?: Resolver<ResolversTypes['BusinessMessage'], ParentType, ContextType, RequireFields<MutationreplyToBusinessMessageArgs, 'adminId' | 'body'>>;
   replyToDriverMessage?: Resolver<ResolversTypes['DriverMessage'], ParentType, ContextType, RequireFields<MutationreplyToDriverMessageArgs, 'adminId' | 'body'>>;
+  requestPasswordReset?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationrequestPasswordResetArgs, 'email'>>;
   resendEmailVerification?: Resolver<ResolversTypes['SignupStepResponse'], ParentType, ContextType>;
+  resetPassword?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationresetPasswordArgs, 'newPassword' | 'token'>>;
   respondToSettlementRequest?: Resolver<ResolversTypes['SettlementRequest'], ParentType, ContextType, RequireFields<MutationrespondToSettlementRequestArgs, 'action' | 'requestId'>>;
   runSettlementScenarioHarness?: Resolver<ResolversTypes['SettlementScenarioHarnessResult'], ParentType, ContextType, Partial<MutationrunSettlementScenarioHarnessArgs>>;
   sendBusinessMessage?: Resolver<ResolversTypes['BusinessMessage'], ParentType, ContextType, RequireFields<MutationsendBusinessMessageArgs, 'alertType' | 'body' | 'businessUserId'>>;

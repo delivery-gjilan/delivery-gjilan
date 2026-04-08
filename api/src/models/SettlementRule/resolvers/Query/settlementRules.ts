@@ -7,7 +7,7 @@ export const settlementRules: NonNullable<QueryResolvers['settlementRules']> = a
   { filter, limit, offset },
   { db, userData },
 ): Promise<any> => {
-  if (!userData?.userId) {
+  if (!userData?.userId || !['ADMIN', 'SUPER_ADMIN'].includes(userData.role!)) {
     throw new GraphQLError('Authentication required', {
       extensions: { code: 'UNAUTHORIZED' },
     });

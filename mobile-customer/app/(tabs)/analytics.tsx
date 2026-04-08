@@ -16,7 +16,7 @@ export default function Profile() {
     const user = useAuthStore((state) => state.user);
     // Read from Apollo cache only — the root subscription already keeps it fresh
     const { data: ordersData } = useQuery(GET_ORDERS, { fetchPolicy: 'cache-only' });
-    const orders: any[] = (ordersData as any)?.orders ?? [];
+    const orders: any[] = (ordersData as any)?.orders?.orders ?? [];
 
     // Get user initials
     const getInitials = () => {

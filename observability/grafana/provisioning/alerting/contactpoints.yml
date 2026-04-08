@@ -5,27 +5,12 @@ contactPoints:
   - orgId: 1
     name: delivery-alerts
     receivers:
-      # Uncomment and configure when ready:
-      #
-      # - uid: slack-alerts
-      #   type: slack
-      #   settings:
-      #     url: ${SLACK_WEBHOOK_URL}
-      #     recipient: "#delivery-alerts"
-      #     title: |
-      #       {{ template "slack.default.title" . }}
-      #     text: |
-      #       {{ template "slack.default.text" . }}
-      #
-      # - uid: email-alerts
-      #   type: email
-      #   settings:
-      #     addresses: ops@delivery-gjilan.com
-      #     singleEmail: true
-      - uid: default-log
-        type: "victorops"
-        disableResolveMessage: true
-        settings: {}
+      # Email alerts — set GF_SMTP_* env vars in docker-compose to activate
+      - uid: email-alerts
+        type: email
+        settings:
+          addresses: ${ALERT_EMAIL:-ops@example.com}
+          singleEmail: true
 
 policies:
   - orgId: 1

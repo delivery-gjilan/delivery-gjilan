@@ -3,7 +3,7 @@ import { SettlementRuleRepository } from '@/repositories/SettlementRuleRepositor
 import { GraphQLError } from 'graphql';
 
 export const settlementRule: NonNullable<QueryResolvers['settlementRule']> = async (_parent, { id }, { db, userData }): Promise<any> => {
-  if (!userData?.userId) {
+  if (!userData?.userId || !['ADMIN', 'SUPER_ADMIN'].includes(userData.role!)) {
     throw new GraphQLError('Authentication required', {
       extensions: { code: 'UNAUTHORIZED' },
     });

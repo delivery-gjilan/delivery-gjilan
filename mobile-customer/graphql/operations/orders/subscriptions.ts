@@ -1,15 +1,15 @@
-import { graphql } from '@/gql';
+import { gql } from '@apollo/client';
 
-export const ORDER_STATUS_UPDATED = graphql(`
+export const ORDER_STATUS_UPDATED = gql`
     subscription OrderStatusUpdated($orderId: ID!) {
         orderStatusUpdated(orderId: $orderId) {
             id
             status
         }
     }
-`);
+`;
 
-export const USER_ORDERS_UPDATED = graphql(`
+export const USER_ORDERS_UPDATED = gql`
     subscription UserOrdersUpdated {
         userOrdersUpdated {
             id
@@ -105,9 +105,9 @@ export const USER_ORDERS_UPDATED = graphql(`
             }
         }
     }
-`);
+`;
 
-export const ORDER_DRIVER_LIVE_TRACKING = graphql(`
+export const ORDER_DRIVER_LIVE_TRACKING = gql`
     subscription OrderDriverLiveTracking($orderId: ID!) {
         orderDriverLiveTracking(orderId: $orderId) {
             orderId
@@ -119,4 +119,4 @@ export const ORDER_DRIVER_LIVE_TRACKING = graphql(`
             etaUpdatedAt
         }
     }
-`);
+`;

@@ -40,7 +40,7 @@ export function useOrdersSubscription() {
             query: GET_ORDERS,
             fetchPolicy: 'network-only',
         });
-        const orders = (data as any)?.orders ?? [];
+        const orders = (data as any)?.orders?.orders ?? [];
         const activeOrders = orders.filter(
             (order: any) =>
                 order.userId === userId &&
@@ -72,7 +72,7 @@ export function useOrdersSubscription() {
         }
 
         client.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
-            const currentOrders = Array.isArray(existing?.orders) ? existing.orders : [];
+            const currentOrders = Array.isArray(existing?.orders?.orders) ? existing.orders.orders : [];
             const existingIndex = currentOrders.findIndex(
                 (order: any) => String(order?.id) === String(nextOrder.id),
             );
@@ -87,7 +87,10 @@ export function useOrdersSubscription() {
 
             return {
                 ...(existing ?? {}),
-                orders: updatedOrders,
+                orders: {
+                    ...(existing?.orders ?? {}),
+                    orders: updatedOrders,
+                },
             };
         });
 
@@ -112,14 +115,17 @@ export function useOrdersSubscription() {
         }
 
         client.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
-            const currentOrders = Array.isArray(existing?.orders) ? existing.orders : [];
+            const currentOrders = Array.isArray(existing?.orders?.orders) ? existing.orders.orders : [];
             const byId = new Map(currentOrders.map((o: any) => [String(o?.id), o]));
             nextOrders.forEach((o: any) => {
                 if (o?.id) byId.set(String(o.id), o);
             });
             return {
                 ...(existing ?? {}),
-                orders: Array.from(byId.values()),
+                orders: {
+                    ...(existing?.orders ?? {}),
+                    orders: Array.from(byId.values()),
+                },
             };
         });
 

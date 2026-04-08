@@ -1,6 +1,6 @@
-import { graphql } from '@/gql';
+import { gql } from '@apollo/client';
 
-export const ME_QUERY = graphql(`
+export const ME_QUERY = gql`
     query Me {
         me {
             id
@@ -17,4 +17,4 @@ export const ME_QUERY = graphql(`
             emailOptOut
         }
     }
-`);
+`;

@@ -1,5 +1,5 @@
 {
-  "id": "1cf014c7-1282-46a8-a0f7-cbbaad596b1c",
+  "id": "32301d98-eb07-40ff-a342-6e8016f3b27b",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -2424,6 +2424,18 @@
         "referral_code": {
           "name": "referral_code",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "password_reset_token": {
+          "name": "password_reset_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "password_reset_expires_at": {
+          "name": "password_reset_expires_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },

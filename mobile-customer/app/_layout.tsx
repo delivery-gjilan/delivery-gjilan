@@ -2,12 +2,16 @@ import { useTheme } from '@/hooks/useTheme';
 import { ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import '../global.css';
+import { loadDevMessages, loadErrorMessages } from '@apollo/client/dev';
 import { useAppSetup } from '@/hooks/useAppSetup';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ApolloProvider } from '@apollo/client/react';
 import client from '@/lib/graphql/apolloClient';
 import LoadingScreen from '@/components/LoadingScreen';
+
+loadDevMessages();
+loadErrorMessages();
 import { FloatingBars } from '@/components/FloatingBars';
 import { useActiveOrdersTracking } from '@/hooks/useActiveOrdersTracking';
 import { useStoreStatusInit, useStoreStatus } from '@/hooks/useStoreStatus';

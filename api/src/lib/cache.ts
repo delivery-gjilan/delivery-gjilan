@@ -23,6 +23,7 @@ async function getClient(): Promise<RedisClientType | null> {
     const url = process.env.REDIS_URL || 'redis://localhost:6379';
 
     try {
+        const isTLS = url.startsWith('rediss://');
         client = createClient({
             url,
             socket: {
@@ -35,8 +36,8 @@ async function getClient(): Promise<RedisClientType | null> {
                     return Math.min(retries * 200, 5_000);
                 },
                 connectTimeout: 5_000,
-                tls: url.startsWith('rediss://'),
-            },
+                ...(isTLS ? { tls: true } : {}),
+            } as any,
         }) as RedisClientType;
 
         // Swallow ongoing errors so the process doesn't crash

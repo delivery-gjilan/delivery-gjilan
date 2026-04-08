@@ -12,14 +12,12 @@ export const createTestOrder: NonNullable<MutationResolvers['createTestOrder']> 
     _args,
     context,
 ) => {
-    const { orderService, userData } = context;
+    const { orderService, userData, db } = context;
 
     // Only super admins can create test orders
     if (!userData?.userId || userData.role !== 'SUPER_ADMIN') {
         throw AppError.forbidden('Only super admins can create test orders');
     }
-
-    const db = await getDB();
 
     // 1. Find businesses that have products and are not deleted.
     const availableBusinesses = await db

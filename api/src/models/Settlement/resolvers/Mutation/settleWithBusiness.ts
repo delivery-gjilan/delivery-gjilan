@@ -7,7 +7,7 @@ export const settleWithBusiness: NonNullable<MutationResolvers['settleWithBusine
     { businessId, amount, paymentMethod, paymentReference, note },
     { db, userData }
 ): Promise<any> => {
-    if (!userData?.userId) {
+    if (!userData?.userId || !['ADMIN', 'SUPER_ADMIN'].includes(userData.role!)) {
         throw new GraphQLError('Unauthorized', { extensions: { code: 'UNAUTHORIZED' } });
     }
 

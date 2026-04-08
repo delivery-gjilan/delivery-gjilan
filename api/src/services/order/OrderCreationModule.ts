@@ -944,16 +944,36 @@ export class OrderCreationModule {
             log.error({ err: error, userId, orderId: order.id }, 'createOrder:publish:failed');
         }
 
-        try {
-            const adminRows = await this.deps.db
+        // Fetch admin user IDs and (if applicable) business user IDs in parallel to avoid
+        // sequential network round-trips to the remote DB.
+        const orderBusinessIds = Array.from(
+            new Set(
+                (order.businesses ?? [])
+                    .map((entry: any) => entry?.business?.id)
+                    .filter((id: string | undefined): id is string => Boolean(id)),
+            ),
+        );
+
+        const [adminRows, businessUserRows] = await Promise.all([
+            this.deps.db
                 .select({ id: usersTable.id })
                 .from(usersTable)
-                .where(
-                    and(
-                        inArray(usersTable.role, ['SUPER_ADMIN', 'ADMIN']),
-                        isNull(usersTable.deletedAt),
-                    ),
-                );
+                .where(and(inArray(usersTable.role, ['SUPER_ADMIN', 'ADMIN']), isNull(usersTable.deletedAt))),
+            orderBusinessIds.length > 0
+                ? this.deps.db
+                      .select({ id: usersTable.id })
+                      .from(usersTable)
+                      .where(
+                          and(
+                              inArray(usersTable.businessId, orderBusinessIds),
+                              inArray(usersTable.role, ['BUSINESS_OWNER', 'BUSINESS_EMPLOYEE']),
+                              isNull(usersTable.deletedAt),
+                          ),
+                      )
+                : Promise.resolve([]),
+        ]);
+
+        try {
             const adminUserIds = adminRows.map((row: any) => row.id);
             notifyAdminsNewOrder(context.notificationService, adminUserIds, String(order.id));
             if (order.needsApproval) {
@@ -966,26 +986,7 @@ export class OrderCreationModule {
 
         if (!order.needsApproval) {
             try {
-                const orderBusinessIds = Array.from(
-                    new Set(
-                        (order.businesses ?? [])
-                            .map((entry: any) => entry?.business?.id)
-                            .filter((id: string | undefined): id is string => Boolean(id)),
-                    ),
-                );
-
                 if (orderBusinessIds.length > 0) {
-                    const businessUserRows = await this.deps.db
-                        .select({ id: usersTable.id })
-                        .from(usersTable)
-                        .where(
-                            and(
-                                inArray(usersTable.businessId, orderBusinessIds),
-                                inArray(usersTable.role, ['BUSINESS_OWNER', 'BUSINESS_EMPLOYEE']),
-                                isNull(usersTable.deletedAt),
-                            ),
-                        );
-
                     notifyBusinessNewOrder(
                         context.notificationService,
                         businessUserRows.map((row: any) => row.id),

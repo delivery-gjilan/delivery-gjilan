@@ -421,6 +421,31 @@ async function seed() {
 
     console.log('👥 3 test customer users ready');
 
+    // Create demo customer accounts for Apple App Review (auto-progression enabled)
+    const demoCustomerPassword = await hashPassword('Review2026!');
+    const demoCustomers = [
+        { firstName: 'John', lastName: 'Doe', email: 'john.doe@zipp-go.com' },
+        { firstName: 'Emma', lastName: 'Smith', email: 'emma.smith@zipp-go.com' },
+        { firstName: 'Luca', lastName: 'Rossi', email: 'luca.rossi@zipp-go.com' },
+    ];
+    for (const dc of demoCustomers) {
+        const demoCustomer = await upsertUser({
+            id: faker.string.uuid(),
+            firstName: dc.firstName,
+            lastName: dc.lastName,
+            email: dc.email,
+            password: demoCustomerPassword,
+            role: 'CUSTOMER',
+            isDemoAccount: true,
+            emailVerified: true,
+            phoneVerified: true,
+            signupStep: 'COMPLETED',
+        });
+        customerUsers.push(demoCustomer.id);
+    }
+
+    console.log('🍎 3 demo customers ready (john.doe / emma.smith / luca.rossi @zipp-go.com / Review2026!)');
+
     // Create driver users and linked driver profiles
     const seededDrivers = [
         { firstName: 'Liridon', lastName: 'Berisha', email: 'driver1@demo.com' },
@@ -462,6 +487,38 @@ async function seed() {
     }
 
     console.log('🚗 3 test drivers ready (driver1@demo.com, driver2@demo.com, driver3@demo.com)');
+
+    // Create demo driver account for Apple App Review
+    const demoDriverPassword = await hashPassword('Review2026!');
+    const demoDriverUser = await upsertUser({
+        id: faker.string.uuid(),
+        firstName: 'Alex',
+        lastName: 'Driver',
+        email: 'demo.driver@zipp-go.com',
+        password: demoDriverPassword,
+        role: 'DRIVER',
+        isDemoAccount: true,
+        emailVerified: true,
+        phoneVerified: true,
+        signupStep: 'COMPLETED',
+    });
+
+    const existingDemoDriver = await db.select().from(drivers).where(eq(drivers.userId, demoDriverUser.id)).limit(1);
+    if (existingDemoDriver.length === 0) {
+        await db.insert(drivers).values({
+            userId: demoDriverUser.id,
+            driverLat: 42.4604,
+            driverLng: 21.4694,
+            onlinePreference: true,
+            connectionStatus: 'CONNECTED',
+            commissionPercentage: '20',
+            maxActiveOrders: '5',
+            lastHeartbeatAt: new Date().toISOString(),
+            lastLocationUpdate: new Date().toISOString(),
+        });
+    }
+
+    console.log('🍎 Demo driver ready (demo.driver@zipp-go.com / Review2026!)');
 
     // Store created businesses and their products
     const createdBusinesses: Array<{
@@ -921,7 +978,11 @@ async function seed() {
     console.log('  Admin: admin@admin.com / asdasdasd');
     console.log('  Cima Business Admin: cima@gmail.com / asdasdasd');
     console.log('  Customer: artshabani2002@gmail.com / asdasdasd');
-    console.log('  Drivers: driver1@demo.com, driver2@demo.com, driver3@demo.com / asdasdasd\n');
+    console.log('  Drivers: driver1@demo.com, driver2@demo.com, driver3@demo.com / asdasdasd');
+  console.log('\n🍎 App Review Demo Accounts:');
+  console.log('  Demo Customers: john.doe@zipp-go.com, emma.smith@zipp-go.com, luca.rossi@zipp-go.com / Review2026! (isDemoAccount=true)');
+  console.log('  Demo Driver:   demo.driver@zipp-go.com / Review2026! (isDemoAccount=true)');
+  console.log('  → Set DEMO_DRIVER_ID env var to the demo driver\'s user ID after seeding\n');
 }
 
 seed()

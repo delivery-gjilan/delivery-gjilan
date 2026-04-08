@@ -107,7 +107,7 @@ export default function Profile() {
     const { logout } = useAuth();
     const user = useAuthStore((state) => state.user);
     const { data: ordersData } = useQuery(GET_ORDERS, { fetchPolicy: 'cache-only' });
-    const orders: any[] = (ordersData as any)?.orders ?? [];
+    const orders: any[] = (ordersData as any)?.orders?.orders ?? [];
     const deliveredOrders = orders.filter((o: any) => o.status === 'DELIVERED');
 
     const firstName = user?.firstName ?? '';
@@ -257,8 +257,8 @@ export default function Profile() {
                     <ProfileRow title="Edit Profile" icon="person-outline" onPress={openEditProfile} />
                     <ProfileRow title={t.profile.my_addresses} icon="location-outline" onPress={() => router.push('/addresses')} />
                     <ProfileRow title={t.profile.contact_support} icon="chatbubble-outline" onPress={() => Linking.openURL('mailto:support@zippdelivery.com')} />
-                    <ProfileRow title="Privacy Policy" icon="shield-checkmark-outline" onPress={() => Linking.openURL('https://zippdelivery.com/privacy')} />
-                    <ProfileRow title="Terms of Service" icon="document-text-outline" onPress={() => Linking.openURL('https://zippdelivery.com/terms')} showDivider={false} />
+                    <ProfileRow title="Privacy Policy" icon="shield-checkmark-outline" onPress={() => Linking.openURL('https://delivery-gjilan.vercel.app/privacy')} />
+                    <ProfileRow title="Terms of Service" icon="document-text-outline" onPress={() => Linking.openURL('https://delivery-gjilan.vercel.app/terms')} showDivider={false} />
                 </View>
 
                 {/* ── Language ─────────────────────────────────────────── */}

@@ -29,22 +29,23 @@ export class SettlementCalculationEngine {
         driverId: string | null,
     ): Promise<SettlementCalculation[]> {
         try {
-            // ── Step 1: Collect business IDs from this order's products ──
+            // ── Step 1: Collect business IDs and promotion IDs in parallel ──
             const productIds = [...new Set(orderItems.map((i) => i.productId))];
-            const productRows =
+            const [productRows, promoRows] = await Promise.all([
                 productIds.length > 0
-                    ? await this.db
+                    ? this.db
                           .select({ id: products.id, businessId: products.businessId })
                           .from(products)
                           .where(inArray(products.id, productIds))
-                    : [];
+                    : Promise.resolve([]),
+                this.db
+                    .select({ promotionId: orderPromotions.promotionId })
+                    .from(orderPromotions)
+                    .where(eq(orderPromotions.orderId, order.id)),
+            ]);
             const orderBusinessIds = [...new Set(productRows.map((p) => p.businessId).filter(Boolean))] as string[];
 
             // ── Step 2: Collect promotion IDs applied to this order ──
-            const promoRows = await this.db
-                .select({ promotionId: orderPromotions.promotionId })
-                .from(orderPromotions)
-                .where(eq(orderPromotions.orderId, order.id));
             const orderPromotionIds = promoRows.map((r) => r.promotionId);
 
             // ── Step 3: Fetch all active, applicable settlement rules ──
@@ -89,11 +90,7 @@ export class SettlementCalculationEngine {
             const promotionRules     = allRules.filter((r) => !r.businessId &&  r.promotionId);
             const businessPromoRules = allRules.filter((r) =>  r.businessId &&  r.promotionId);
 
-            console.log("potential rules:")
-            console.log("global rules:", globalRules);
-            console.log("business rules:", businessRules);
-            console.log("promotion rules:", promotionRules);
-            console.log("business + promotion rules:", businessPromoRules);
+            log.debug({ orderId: order.id }, 'settlement:engine:potential_rules');
 
             const results: SettlementCalculation[] = [];
 
@@ -120,12 +117,10 @@ export class SettlementCalculationEngine {
             }
 
             if (selectedDeliveryRules.length > 0) {
-                console.log("selected delivery rules:", selectedDeliveryRules);
                 for (const rule of selectedDeliveryRules) {
                     this.applyRule(rule, order, orderBusinessIds, driverId, results);
                 }
             } else {
-                console.log("no delivery price rules found, applying driver commission fallback");
                 // Fallback: use the driver's individual commission rate applied to
                 // the actual delivery price (excluding priority surcharge).
                 await this.addDriverCommissionFallback(order, driverId, results);
@@ -143,9 +138,7 @@ export class SettlementCalculationEngine {
                 selectedOrderRules.push(...promotionRules.filter((r) => r.type === 'ORDER_PRICE'));
             }
 
-            console.log("selected order price rules:", selectedOrderRules);
             for (const rule of selectedOrderRules) {
-                
                 this.applyRule(rule, order, orderBusinessIds, driverId, results);
             }
 

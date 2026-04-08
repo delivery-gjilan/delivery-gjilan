@@ -1,66 +1,53 @@
-import { graphql } from '@/gql';
+import { gql } from '@apollo/client';
 
-export const GET_ORDERS = graphql(`
+export const GET_ORDERS = gql`
     query GetOrders($limit: Int, $offset: Int) {
         orders(limit: $limit, offset: $offset) {
-            id
-            displayId
-            userId
-            orderPrice
-            deliveryPrice
-            totalPrice
-            orderDate
-            updatedAt
-            status
-            approvalReasons
-            preparationMinutes
-            estimatedReadyAt
-            preparingAt
-            dropOffLocation {
-                latitude
-                longitude
-                address
-            }
-            businesses {
-                business {
-                    id
-                    name
-                    imageUrl
-                    businessType
-                    isActive
-                    location {
-                        latitude
-                        longitude
-                        address
-                    }
-                    workingHours {
-                        opensAt
-                        closesAt
-                    }
+            totalCount
+            orders {
+                id
+                displayId
+                userId
+                orderPrice
+                deliveryPrice
+                totalPrice
+                orderDate
+                updatedAt
+                status
+                approvalReasons
+                preparationMinutes
+                estimatedReadyAt
+                preparingAt
+                dropOffLocation {
+                    latitude
+                    longitude
+                    address
                 }
-                items {
-                    id
-                    productId
-                    name
-                    imageUrl
-                    quantity
-                    unitPrice
-                    parentOrderItemId
-                    selectedOptions {
+                businesses {
+                    business {
                         id
-                        optionGroupId
-                        optionGroupName
-                        optionId
-                        optionName
-                        priceAtOrder
+                        name
+                        imageUrl
+                        businessType
+                        isActive
+                        location {
+                            latitude
+                            longitude
+                            address
+                        }
+                        workingHours {
+                            opensAt
+                            closesAt
+                        }
                     }
-                    childItems {
+                    items {
                         id
                         productId
                         name
                         imageUrl
                         quantity
                         unitPrice
+                        parentOrderItemId
                         selectedOptions {
                             id
                             optionGroupId
@@ -69,14 +56,30 @@ export const GET_ORDERS = graphql(`
                             optionName
                             priceAtOrder
                         }
+                        childItems {
+                            id
+                            productId
+                            name
+                            imageUrl
+                            quantity
+                            unitPrice
+                            selectedOptions {
+                                id
+                                optionGroupId
+                                optionGroupName
+                                optionId
+                                optionName
+                                priceAtOrder
+                            }
+                        }
                     }
                 }
             }
         }
     }
-`);
+`;
 
-export const GET_ORDER = graphql(`
+export const GET_ORDER = gql`
     query GetOrder($id: ID!) {
         order(id: $id) {
             id
@@ -190,9 +193,9 @@ export const GET_ORDER = graphql(`
             }
         }
     }
-`);
+`;
 
-export const GET_ORDERS_BY_STATUS = graphql(`
+export const GET_ORDERS_BY_STATUS = gql`
     query GetOrdersByStatus($status: OrderStatus!) {
         ordersByStatus(status: $status) {
             id
@@ -264,9 +267,9 @@ export const GET_ORDERS_BY_STATUS = graphql(`
             }
         }
     }
-`);
+`;
 
-export const GET_ORDER_DRIVER = graphql(`
+export const GET_ORDER_DRIVER = gql`
     query GetOrderDriver($id: ID!) {
         order(id: $id) {
             id
@@ -292,9 +295,9 @@ export const GET_ORDER_DRIVER = graphql(`
             }
         }
     }
-`);
+`;
 
-export const UNCOMPLETED_ORDERS = graphql(`
+export const UNCOMPLETED_ORDERS = gql`
     query UncompletedOrders {
         uncompletedOrders {
             id
@@ -370,10 +373,10 @@ export const UNCOMPLETED_ORDERS = graphql(`
             }
         }
     }
-`);
+`;
 
-export const GET_PRIORITY_SURCHARGE_AMOUNT = graphql(`
+export const GET_PRIORITY_SURCHARGE_AMOUNT = gql`
     query GetPrioritySurchargeAmount {
         prioritySurchargeAmount
     }
-`);
+`;

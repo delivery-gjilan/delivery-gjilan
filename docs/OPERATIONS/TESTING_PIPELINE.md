@@ -1,32 +1,83 @@
 # Testing Pipeline
 
-<!-- MDS:O8 | Domain: Operations | Updated: 2026-03-26 -->
+<!-- MDS:O8 | Domain: Operations | Updated: 2026-04-08 -->
 <!-- Depends-On: O7, B2, BL1 -->
 <!-- Depended-By: O9 -->
 <!-- Nav: Preflight changes → update B2 (Order Creation), BL1 (Settlements). CI layers → review O7 (Environments). Load testing → review O9 (Docker). -->
 
 ## Current State In This Repo
 
-The repo now has a practical API preflight test gate, but still lacks full CI and broader automated suites.
+The repo has a Vitest unit + integration test suite, an API preflight gate, and lint/typecheck scripts.
 
-What exists:
+### Unit Tests (Vitest — no DB)
 
-- lint scripts across API, admin, and mobile apps
-- typecheck scripts across API, admin, and mobile apps
-- GraphQL codegen scripts across packages
-- API preflight suite:
-	- `npm run test:api:preflight` for deterministic settlement scenarios and order-creation checks
-	- `npm run dev` starts API directly for fast local iteration
-	- `npm run dev:preflight` runs preflight first, then starts API
-- detailed pass/fail console report with scenario/check IDs and debugging pointers
+Run: `cd api && npx vitest run`  
+Config: `api/vitest.config.ts` (includes `src/**/*.test.ts`)
 
-What is still missing:
+Covered modules:
+- `generateDisplayId` format/uniqueness
+- Delivery pricing tier matching logic
+- Order approval flagging (`locationFlagged`, `deriveApprovalReasons`)
+- PromotionEngine — all discount types and stacking rules
+- PricingService — markup, night price, sale discount
+- SettlementCalculationEngine — every scenario
+- SettlingService
+- S3Service, NotificationService, DriverWatchdogService, orderNotifications
+- haversine, isPointInPolygon, pubsub, cache, dateTime, errors, driverEtaCache
 
-- no dedicated unit-test framework (vitest/jest) wired for API yet
-- no frontend browser E2E suite checked in
-- no mobile E2E or device-smoke automation
-- no CI workflow in `.github/workflows`
-- strict API preflight (`npm run test:api:strict`) currently fails because of existing unrelated type errors
+### Integration Tests (Vitest + live PostgreSQL)
+
+Run: `cd api && npx vitest run --config vitest.integration.config.ts`  
+Config: `api/vitest.integration.config.ts` (includes `src/**/*.integration.test.ts`)  
+Requires: `.env` with a valid `DB_URL` pointing at the dev database.
+
+Covered test files:
+- `order-pricing.integration.test.ts` — full `createOrder` pricing pipeline: basic, markup, discount, options, priority, platform FREE_DELIVERY, platform FIXED_AMOUNT, business-created order discount, business-created FREE_DELIVERY.
+- `order-settlements.integration.test.ts` — FinancialService settlement rows for every scenario.
+- `order-creation.integration.test.ts` — validation, approval, zone routing, payment defaults, min order:
+  - User rejects: missing user, incomplete signup
+  - Product rejects: not found, unavailable, multi-business
+  - Business closed check
+  - Item price mismatch
+  - Delivery fee too high / correct / one-directional lower
+  - Total price too high / too low / correct
+  - Option validation: missing required group, wrong group, missing paid-option price, option price mismatch, valid free option, valid paid option
+  - Invalid promotionId
+  - Approval routing: FIRST_ORDER → AWAITING_APPROVAL, HIGH_VALUE >€20 → AWAITING_APPROVAL, locationFlagged (outside service zone) → AWAITING_APPROVAL, repeat low-value → PENDING
+  - Delivery zone vs tier: zone polygon matches → zone fee, wrong delivery price for zone
+  - Payment collection defaults (CASH_TO_DRIVER) and explicit variants
+  - Minimum order amount rejection and acceptance
+  - Priority surcharge mismatch and spurious surcharge
+  - Happy path: core DB row fields and order item snapshot
+
+### API Preflight Suite
+
+Run: `npm run test:api:preflight` (from repo root or `api/`)  
+Script: `api/scripts/run-settlement-harness.ts`  
+
+Covers:
+1. Settlement scenario harness checks (deterministic expected vs actual)
+2. Order-creation checks:
+   - defaults payment collection to `CASH_TO_DRIVER`
+   - honors explicit `PREPAID_TO_PLATFORM`
+   - rejects mismatched delivery fee
+   - rejects mismatched total
+   - rejects invalid promo code
+
+Detailed pass/fail console report with `✓`/`✗` lines and "look here" file pointers.
+
+### Other Scripts
+
+- `npm run lint` — ESLint across all packages
+- `npm run typecheck` — `tsc --noEmit` across all packages
+- `npm run codegen` — GraphQL codegen across all packages (API + mobile apps)
+
+### What Is Still Missing
+
+- No CI workflow in `.github/workflows`
+- No frontend browser E2E suite
+- No mobile E2E or device-smoke automation
+- `npm run test:api:strict` currently fails because of unrelated existing type errors outside order creation/settlements
 
 ## Recommended Test Strategy
 

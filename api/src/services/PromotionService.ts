@@ -378,12 +378,12 @@ export class PromotionService {
 
         // Store the orderId reference on this recovery promotion
         if (input.orderId) {
-            await this.repository.update(promo.id, { orderId: input.orderId } as any);
+            await this.repository.update(String(promo.id), { orderId: input.orderId } as any);
         }
 
-        await this.repository.assignToUsers(promo.id, input.userIds, expiresAt);
+        await this.repository.assignToUsers(String(promo.id), input.userIds, expiresAt);
 
-        const assignments = await this.repository.getUserAssignmentsForPromotion(promo.id);
+        const assignments = await this.repository.getUserAssignmentsForPromotion(String(promo.id));
         return assignments;
     }
 

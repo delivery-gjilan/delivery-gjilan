@@ -235,16 +235,13 @@ export class OrderRepository {
         preparationMinutes: number,
     ): Promise<DbOrder | null> {
         const db = await getDB();
-        const order = await this.findById(id);
-        if (!order || order.status !== 'PREPARING') return null;
-
-        const preparingAt = order.preparingAt ? new Date(order.preparingAt) : new Date();
-        const estimatedReadyAt = new Date(preparingAt.getTime() + preparationMinutes * 60_000);
+        // Single UPDATE: compute estimatedReadyAt from preparingAt in SQL, avoiding
+        // the previous findById + update round-trip.
         const result = await db
             .update(ordersTable)
             .set({
                 preparationMinutes,
-                estimatedReadyAt: estimatedReadyAt.toISOString(),
+                estimatedReadyAt: sql`COALESCE(preparing_at, NOW()) + (${preparationMinutes} || ' minutes')::interval`,
             })
             .where(and(eq(ordersTable.id, id), eq(ordersTable.status, 'PREPARING' as OrderStatus)))
             .returning();

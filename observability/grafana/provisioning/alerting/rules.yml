@@ -533,3 +533,174 @@ groups:
         annotations:
           summary: "Push sends have no accepted deliveries"
           description: "Push sends are happening but none are being accepted by the provider in the last 5 minutes. Check provider auth keys and outbound networking."
+
+  # ── Server infrastructure alerts (node_exporter / Prometheus) ──
+  - orgId: 1
+    name: server-infra-alerts
+    folder: Delivery Alerts
+    interval: 1m
+    rules:
+      # ────────────────────────────────────────────
+      # Disk >80% full
+      # ────────────────────────────────────────────
+      - uid: disk-almost-full
+        title: "Disk Almost Full (>80%)"
+        condition: disk_check
+        data:
+          - refId: disk_used
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: >
+                (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|fuse.lxcfs",mountpoint="/"} / node_filesystem_size_bytes{fstype!~"tmpfs|fuse.lxcfs",mountpoint="/"}) * 100
+              instant: true
+              refId: disk_used
+          - refId: disk_check
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              expression: "$disk_used"
+              conditions:
+                - evaluator: { type: gt, params: [80] }
+                  operator: { type: and }
+                  reducer: { type: last }
+        for: 5m
+        labels:
+          severity: warning
+          service: server
+        annotations:
+          summary: "Server disk usage above 80%"
+          description: "Root filesystem is more than 80% full. Clean up logs or expand storage before it hits 100% and Postgres stops writing."
+
+      # ────────────────────────────────────────────
+      # Disk >95% full — critical
+      # ────────────────────────────────────────────
+      - uid: disk-critical
+        title: "Disk Critical (>95%)"
+        condition: disk_crit_check
+        data:
+          - refId: disk_used
+            relativeTimeRange: { from: 60, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: >
+                (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|fuse.lxcfs",mountpoint="/"} / node_filesystem_size_bytes{fstype!~"tmpfs|fuse.lxcfs",mountpoint="/"}) * 100
+              instant: true
+              refId: disk_used
+          - refId: disk_crit_check
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              expression: "$disk_used"
+              conditions:
+                - evaluator: { type: gt, params: [95] }
+                  operator: { type: and }
+                  reducer: { type: last }
+        for: 0m
+        labels:
+          severity: critical
+          service: server
+        annotations:
+          summary: "Disk critically full (>95%)"
+          description: "Disk is above 95%. Postgres WILL stop writing soon. Immediate action required."
+
+      # ────────────────────────────────────────────
+      # RAM >90% used
+      # ────────────────────────────────────────────
+      - uid: high-memory
+        title: "High Memory Usage (>90%)"
+        condition: mem_check
+        data:
+          - refId: mem_used
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: >
+                (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100
+              instant: true
+              refId: mem_used
+          - refId: mem_check
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              expression: "$mem_used"
+              conditions:
+                - evaluator: { type: gt, params: [90] }
+                  operator: { type: and }
+                  reducer: { type: last }
+        for: 5m
+        labels:
+          severity: warning
+          service: server
+        annotations:
+          summary: "Server memory above 90%"
+          description: "Available RAM is below 10%. OOM killer may start terminating processes. Consider restarting non-essential services or scaling up."
+
+      # ────────────────────────────────────────────
+      # CPU >90% sustained for 5 min
+      # ────────────────────────────────────────────
+      - uid: high-cpu
+        title: "High CPU Usage (>90% for 5m)"
+        condition: cpu_check
+        data:
+          - refId: cpu_used
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: >
+                100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100)
+              instant: true
+              refId: cpu_used
+          - refId: cpu_check
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              expression: "$cpu_used"
+              conditions:
+                - evaluator: { type: gt, params: [90] }
+                  operator: { type: and }
+                  reducer: { type: last }
+        for: 5m
+        labels:
+          severity: warning
+          service: server
+        annotations:
+          summary: "CPU sustained above 90% for 5 minutes"
+          description: "Server CPU has been above 90% for 5 minutes. API latency will degrade. Check for runaway processes."
+
+      # ────────────────────────────────────────────
+      # API /ready endpoint returning non-200
+      # ────────────────────────────────────────────
+      - uid: api-not-ready
+        title: "API /ready Failing (DB or Redis down)"
+        condition: ready_check
+        data:
+          - refId: ready
+            relativeTimeRange: { from: 120, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: >
+                probe_success{job="delivery-api-ready"}
+              instant: true
+              refId: ready
+          - refId: ready_check
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              expression: "$ready"
+              conditions:
+                - evaluator: { type: lt, params: [1] }
+                  operator: { type: and }
+                  reducer: { type: last }
+        for: 2m
+        labels:
+          severity: critical
+          service: server
+        annotations:
+          summary: "API /ready is failing"
+          description: "/ready returned non-200 for 2 minutes — Postgres or Redis is likely down."

@@ -4,7 +4,7 @@ import {
     products as productsTable,
     settlements as settlementsTable,
 } from '@/database/schema';
-import { and, eq, inArray, ne } from 'drizzle-orm';
+import { and, eq, inArray, ne, exists, sql } from 'drizzle-orm';
 import type { Order, OrderStatus, OrderPaymentCollection } from '@/generated/types.generated';
 import logger from '@/lib/logger';
 import type { OrderServiceDeps } from './types';
@@ -160,19 +160,28 @@ export class OrderQueryModule {
     async getOrdersByBusinessId(businessId: string): Promise<Order[]> {
         try {
             const db = this.deps.db;
-            const orderIds = await db
-                .selectDistinct({ orderId: orderItemsTable.orderId })
-                .from(orderItemsTable)
-                .innerJoin(productsTable, eq(orderItemsTable.productId, productsTable.id))
-                .where(eq(productsTable.businessId, businessId))
-                .then((rows) => rows.map((r) => r.orderId));
-
-            if (orderIds.length === 0) return [];
-
-            const dbOrders = await db.query.orders.findMany({
-                where: and(inArray(ordersTable.id, orderIds), ne(ordersTable.status, 'AWAITING_APPROVAL')),
-                orderBy: (tbl, { desc }) => [desc(tbl.createdAt)],
-            });
+            // Single query: EXISTS subquery replaces the 2-step orderIds fetch + order fetch.
+            const dbOrders = await db
+                .select()
+                .from(ordersTable)
+                .where(
+                    and(
+                        ne(ordersTable.status, 'AWAITING_APPROVAL'),
+                        exists(
+                            db
+                                .select({ _: sql`1` })
+                                .from(orderItemsTable)
+                                .innerJoin(productsTable, eq(orderItemsTable.productId, productsTable.id))
+                                .where(
+                                    and(
+                                        eq(orderItemsTable.orderId, ordersTable.id),
+                                        eq(productsTable.businessId, businessId),
+                                    ),
+                                ),
+                        ),
+                    ),
+                )
+                .orderBy(ordersTable.createdAt);
 
             return this.mapping.mapOrders(dbOrders);
         } catch (error) {
@@ -188,19 +197,27 @@ export class OrderQueryModule {
             }
 
             const db = this.deps.db;
-            const orderIds = await db
-                .selectDistinct({ orderId: orderItemsTable.orderId })
-                .from(orderItemsTable)
-                .innerJoin(productsTable, eq(orderItemsTable.productId, productsTable.id))
-                .where(eq(productsTable.businessId, businessId))
-                .then((rows) => rows.map((r) => r.orderId));
-
-            if (orderIds.length === 0) return [];
-
-            const dbOrders = await db.query.orders.findMany({
-                where: (tbl, { and: andOp, eq: eqOp }) => andOp(inArray(tbl.id, orderIds), eqOp(tbl.status, status)),
-                orderBy: (tbl, { desc }) => [desc(tbl.createdAt)],
-            });
+            const dbOrders = await db
+                .select()
+                .from(ordersTable)
+                .where(
+                    and(
+                        eq(ordersTable.status, status),
+                        exists(
+                            db
+                                .select({ _: sql`1` })
+                                .from(orderItemsTable)
+                                .innerJoin(productsTable, eq(orderItemsTable.productId, productsTable.id))
+                                .where(
+                                    and(
+                                        eq(orderItemsTable.orderId, ordersTable.id),
+                                        eq(productsTable.businessId, businessId),
+                                    ),
+                                ),
+                        ),
+                    ),
+                )
+                .orderBy(ordersTable.createdAt);
 
             return this.mapping.mapOrders(dbOrders);
         } catch (error) {

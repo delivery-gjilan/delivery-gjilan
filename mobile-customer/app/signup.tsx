@@ -81,10 +81,12 @@ function InputRow({
     icon,
     children,
     theme,
+    borderColor,
 }: {
     icon: string;
     children: React.ReactNode;
     theme: any;
+    borderColor?: string;
 }) {
     return (
         <View
@@ -92,8 +94,8 @@ function InputRow({
                 flexDirection: 'row',
                 alignItems: 'center',
                 backgroundColor: theme.colors.card,
-                borderWidth: 1,
-                borderColor: theme.colors.border,
+                borderWidth: 1.5,
+                borderColor: borderColor ?? theme.colors.border,
                 borderRadius: 16,
                 paddingHorizontal: 16,
                 marginBottom: 12,
@@ -127,6 +129,15 @@ export default function SignupScreen() {
     const [lastName, setLastName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+
+    const [focusedField, setFocusedField] = useState<string | null>(null);
+
+    const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+    const fieldBorderColor = (field: string, isValid: boolean) => {
+        if (focusedField === field) return theme.colors.primary;
+        if (isValid) return '#22c55e';
+        return undefined;
+    };
 
     const [showPassword, setShowPassword] = useState(false);
 
@@ -455,7 +466,7 @@ export default function SignupScreen() {
                         {currentStep === 'INITIAL' && (
                             <Animated.View entering={FadeInDown.delay(100).duration(400)}>
                                 <LanguagePicker />
-                                <InputRow icon="person-outline" theme={theme}>
+                                <InputRow icon="person-outline" theme={theme} borderColor={fieldBorderColor('firstName', firstName.trim().length > 0)}>
                                     <TextInput
                                         style={inputStyle}
                                         placeholder={t.auth.signup.first_name_placeholder}
@@ -466,10 +477,12 @@ export default function SignupScreen() {
                                         autoCapitalize="words"
                                         autoComplete="off"
                                         textContentType="givenName"
+                                        onFocus={() => setFocusedField('firstName')}
+                                        onBlur={() => setFocusedField(null)}
                                     />
                                 </InputRow>
 
-                                <InputRow icon="person-outline" theme={theme}>
+                                <InputRow icon="person-outline" theme={theme} borderColor={fieldBorderColor('lastName', lastName.trim().length > 0)}>
                                     <TextInput
                                         style={inputStyle}
                                         placeholder={t.auth.signup.last_name_placeholder}
@@ -480,10 +493,12 @@ export default function SignupScreen() {
                                         autoCapitalize="words"
                                         autoComplete="off"
                                         textContentType="familyName"
+                                        onFocus={() => setFocusedField('lastName')}
+                                        onBlur={() => setFocusedField(null)}
                                     />
                                 </InputRow>
 
-                                <InputRow icon="mail-outline" theme={theme}>
+                                <InputRow icon="mail-outline" theme={theme} borderColor={fieldBorderColor('email', isValidEmail(email))}>
                                     <TextInput
                                         style={inputStyle}
                                         placeholder={t.auth.signup.email_placeholder}
@@ -495,10 +510,12 @@ export default function SignupScreen() {
                                         autoCapitalize="none"
                                         autoComplete="email"
                                         textContentType="emailAddress"
+                                        onFocus={() => setFocusedField('email')}
+                                        onBlur={() => setFocusedField(null)}
                                     />
                                 </InputRow>
 
-                                <InputRow icon="lock-closed-outline" theme={theme}>
+                                <InputRow icon="lock-closed-outline" theme={theme} borderColor={fieldBorderColor('password', password.length >= 6)}>
                                     <TextInput
                                         style={inputStyle}
                                         placeholder={t.auth.signup.password_placeholder}
@@ -509,6 +526,8 @@ export default function SignupScreen() {
                                         secureTextEntry={!showPassword}
                                         autoComplete="off"
                                         textContentType="oneTimeCode"
+                                        onFocus={() => setFocusedField('password')}
+                                        onBlur={() => setFocusedField(null)}
                                     />
                                     <TouchableOpacity
                                         onPress={() => setShowPassword(!showPassword)}
@@ -554,7 +573,7 @@ export default function SignupScreen() {
                                     </Text>
                                 </View>
 
-                                <InputRow icon="call-outline" theme={theme}>
+                                <InputRow icon="call-outline" theme={theme} borderColor={fieldBorderColor('phone', phoneNumber.trim().length >= 6)}>
                                     <TextInput
                                         style={inputStyle}
                                         placeholder={t.auth.signup.phone_placeholder}
@@ -565,6 +584,8 @@ export default function SignupScreen() {
                                         keyboardType="phone-pad"
                                         autoComplete="off"
                                         textContentType="telephoneNumber"
+                                        onFocus={() => setFocusedField('phone')}
+                                        onBlur={() => setFocusedField(null)}
                                     />
                                 </InputRow>
 

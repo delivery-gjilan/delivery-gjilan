@@ -1,6 +1,6 @@
-import { graphql } from '@/gql';
+import { gql } from '@apollo/client';
 
-export const RESEND_EMAIL_VERIFICATION_MUTATION = graphql(`
+export const RESEND_EMAIL_VERIFICATION_MUTATION = gql`
     mutation ResendEmailVerification {
         resendEmailVerification {
             userId
@@ -8,4 +8,4 @@ export const RESEND_EMAIL_VERIFICATION_MUTATION = graphql(`
             message
         }
     }
-`);
+`;

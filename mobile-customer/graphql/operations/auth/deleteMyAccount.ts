@@ -1,7 +1,7 @@
-import { graphql } from '@/gql';
+import { gql } from '@apollo/client';
 
-export const DELETE_MY_ACCOUNT_MUTATION = graphql(`
+export const DELETE_MY_ACCOUNT_MUTATION = gql`
     mutation DeleteMyAccount {
         deleteMyAccount
     }
-`);
+`;

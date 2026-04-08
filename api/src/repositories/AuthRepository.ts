@@ -139,6 +139,28 @@ export class AuthRepository {
         return user;
     }
 
+    async setPasswordResetToken(userId: string, token: string, expiresAt: string): Promise<void> {
+        await this.db
+            .update(users)
+            .set({ passwordResetToken: token, passwordResetExpiresAt: expiresAt })
+            .where(eq(users.id, userId));
+    }
+
+    async findByPasswordResetToken(token: string): Promise<DbUser | undefined> {
+        const [user] = await this.db
+            .select()
+            .from(users)
+            .where(and(eq(users.passwordResetToken, token), isNull(users.deletedAt), gt(users.passwordResetExpiresAt, sql`CURRENT_TIMESTAMP`)));
+        return user;
+    }
+
+    async clearPasswordResetToken(userId: string): Promise<void> {
+        await this.db
+            .update(users)
+            .set({ passwordResetToken: null, passwordResetExpiresAt: null })
+            .where(eq(users.id, userId));
+    }
+
     async createUserWithRole(
         firstName: string,
         lastName: string,

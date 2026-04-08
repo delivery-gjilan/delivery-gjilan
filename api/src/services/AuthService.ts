@@ -31,7 +31,7 @@ export class AuthService {
     }
 
     private getRefreshSecret(): string {
-        const secret = process.env.REFRESH_TOKEN_SECRET || process.env.JWT_SECRET;
+        const secret = process.env.REFRESH_TOKEN_SECRET;
         if (!secret) {
             throw new Error('REFRESH_TOKEN_SECRET is not defined in environment variables');
         }
@@ -205,7 +205,7 @@ export class AuthService {
             throw AppError.badInput('Invalid email or password');
         }
 
-        log.info({ userId: user.id, email: user.email, role: user.role }, 'auth:login:userFound');
+        log.debug({ userId: user.id }, 'auth:login:userFound');
 
         // Allow login at any signup stage - user will be redirected based on signupStep
 
@@ -413,6 +413,50 @@ export class AuthService {
      */
     async updateUser(userId: string, data: Partial<Omit<DbUser, 'id' | 'createdAt'>>): Promise<DbUser | undefined> {
         return this.authRepository.updateUser(userId, data);
+    }
+
+    /**
+     * Request a password reset — generates a token and sends an email.
+     * Always returns true to avoid leaking whether an email exists.
+     */
+    async requestPasswordReset(email: string, emailService: import('@/services/EmailService').EmailService): Promise<true> {
+        email = email.trim().toLowerCase();
+        const user = await this.authRepository.findByEmail(email);
+
+        if (user) {
+            const token = randomUUID();
+            const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
+            await this.authRepository.setPasswordResetToken(user.id, token, expiresAt);
+            await emailService.sendPasswordResetEmail({
+                toEmail: user.email,
+                toName: user.firstName,
+                token,
+            });
+            log.info({ userId: user.id }, 'auth:passwordReset:requested');
+        }
+
+        return true;
+    }
+
+    /**
+     * Reset the user's password using a valid reset token.
+     */
+    async resetPassword(token: string, newPassword: string): Promise<true> {
+        if (!newPassword || newPassword.length < 8) {
+            throw AppError.badInput('Password must be at least 8 characters long');
+        }
+
+        const user = await this.authRepository.findByPasswordResetToken(token);
+        if (!user) {
+            throw AppError.badInput('Invalid or expired reset link');
+        }
+
+        const hashed = await hashPassword(newPassword);
+        await this.authRepository.updatePassword(user.id, hashed);
+        await this.authRepository.clearPasswordResetToken(user.id);
+
+        log.info({ userId: user.id }, 'auth:passwordReset:completed');
+        return true;
     }
 
 }

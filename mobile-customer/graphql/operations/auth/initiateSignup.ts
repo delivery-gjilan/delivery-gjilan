@@ -1,6 +1,6 @@
-import { graphql } from '@/gql';
+import { gql } from '@apollo/client';
 
-export const INITIATE_SIGNUP_MUTATION = graphql(`
+export const INITIATE_SIGNUP_MUTATION = gql`
     mutation InitiateSignup($input: InitiateSignupInput!) {
         initiateSignup(input: $input) {
             token
@@ -18,4 +18,4 @@ export const INITIATE_SIGNUP_MUTATION = graphql(`
             message
         }
     }
-`);
+`;

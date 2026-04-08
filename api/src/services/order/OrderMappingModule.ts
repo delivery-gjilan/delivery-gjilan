@@ -1,14 +1,7 @@
 import {
-    orderItems as orderItemsTable,
     orders as ordersTable,
-    products as productsTable,
-    businesses as businessesTable,
-    orderPromotions as orderPromotionsTable,
-    orderItemOptions as orderItemOptionsTable,
-    optionGroups as optionGroupsTable,
-    options as optionsDbTable,
 } from '@/database/schema';
-import { asc, inArray, ne, and } from 'drizzle-orm';
+import { asc, inArray, and } from 'drizzle-orm';
 import type { Order, OrderBusiness, OrderItem, OrderStatus, OrderPaymentCollection } from '@/generated/types.generated';
 import type { DbOrder } from '@/database/schema/orders';
 import { parseDbTimestamp } from '@/lib/dateTime';
@@ -27,39 +20,43 @@ export class OrderMappingModule {
 
         const db = this.deps.db;
         const orderIds = dbOrders.map((order) => order.id);
-
-        const allItems = await db.select().from(orderItemsTable).where(inArray(orderItemsTable.orderId, orderIds));
-
-        const itemsByOrderId = new Map<string, typeof allItems>();
-        for (const item of allItems) {
-            const rows = itemsByOrderId.get(item.orderId) ?? [];
-            rows.push(item);
-            itemsByOrderId.set(item.orderId, rows);
-        }
-
-        const allItemIds = allItems.map((i) => i.id);
-        const productIds = [...new Set(allItems.map((i) => i.productId))];
         const userIds = [...new Set(dbOrders.map((order) => order.userId))];
-        const driverIds = [...new Set(dbOrders.map((order) => order.driverId).filter((driverId): driverId is string => Boolean(driverId)))];
+        const driverIds = [...new Set(dbOrders.map((order) => order.driverId).filter((id): id is string => Boolean(id)))];
 
-        const [allItemOptionRows, productsRows, dbPromotions, driverUsers, firstOrderRows] = await Promise.all([
-            allItemIds.length > 0
-                ? db
-                      .select()
-                      .from(orderItemOptionsTable)
-                      .where(inArray(orderItemOptionsTable.orderItemId, allItemIds))
-                : Promise.resolve([]),
-            productIds.length > 0
-                ? db.select().from(productsTable).where(inArray(productsTable.id, productIds))
-                : Promise.resolve([]),
-            db
-                .select()
-                .from(orderPromotionsTable)
-                .where(inArray(orderPromotionsTable.orderId, orderIds))
-                .catch((err) => {
-                    log.error({ err, orderIds }, 'order:promotions:fetch_failed');
-                    return [];
-                }),
+        // Single relational query fetches items + options + option-group/option names + products + businesses + promotions
+        // in one DB round-trip (Drizzle issues sub-selects, not N+1).
+        // driverUsers and firstOrderRows are independent and run in parallel.
+        const [ordersWithRelations, driverUsers, firstOrderRows] = await Promise.all([
+            db.query.orders.findMany({
+                where: inArray(ordersTable.id, orderIds),
+                with: {
+                    orderItems: {
+                        with: {
+                            orderItemOptions: {
+                                with: {
+                                    optionGroup: true,
+                                    option: true,
+                                },
+                            },
+                            product: {
+                                with: { business: true },
+                            },
+                            childOrderItems: {
+                                with: {
+                                    orderItemOptions: {
+                                        with: {
+                                            optionGroup: true,
+                                            option: true,
+                                        },
+                                    },
+                                    product: true,
+                                },
+                            },
+                        },
+                    },
+                    orderPromotions: true,
+                },
+            }),
             driverIds.length > 0 ? this.deps.authRepository.findDriversByIds(driverIds) : Promise.resolve([]),
             userIds.length > 0
                 ? db
@@ -73,70 +70,33 @@ export class OrderMappingModule {
                 : Promise.resolve([]),
         ]);
 
-        // Batch-fetch option groups and options for names
-        const ogIds = [...new Set(allItemOptionRows.map((r) => r.optionGroupId))];
-        const optIds = [...new Set(allItemOptionRows.map((r) => r.optionId))];
-        const [ogRows, optRows] = await Promise.all([
-            ogIds.length > 0
-                ? db.select().from(optionGroupsTable).where(inArray(optionGroupsTable.id, ogIds))
-                : Promise.resolve([]),
-            optIds.length > 0
-                ? db.select().from(optionsDbTable).where(inArray(optionsDbTable.id, optIds))
-                : Promise.resolve([]),
-        ]);
-        const ogNameById = new Map(ogRows.map((og) => [og.id, og.name]));
-        const optNameById = new Map(optRows.map((o) => [o.id, o.name]));
-
-        const promotionsByOrderId = new Map<string, typeof dbPromotions>();
-        for (const promotion of dbPromotions) {
-            const rows = promotionsByOrderId.get(promotion.orderId) ?? [];
-            rows.push(promotion);
-            promotionsByOrderId.set(promotion.orderId, rows);
-        }
-
-        const itemOptionsMap = new Map<string, typeof allItemOptionRows>();
-        for (const row of allItemOptionRows) {
-            const arr = itemOptionsMap.get(row.orderItemId) ?? [];
-            arr.push(row);
-            itemOptionsMap.set(row.orderItemId, arr);
-        }
-
-        const productById = new Map(productsRows.map((p) => [p.id, p]));
-
-        const driverUserById = new Map(driverUsers.map((driverUser) => [driverUser.id, driverUser]));
+        const driverUserById = new Map(driverUsers.map((u) => [u.id, u]));
         const firstOrderIdByUserId = new Map(firstOrderRows.map((row) => [row.userId, row.id]));
+        // Index the rich relational results by orderId to preserve original order
+        const richOrderById = new Map(ordersWithRelations.map((o) => [o.id, o]));
 
-        const childItemsMap = new Map<string, typeof allItems>();
-        for (const item of allItems) {
-            if (item.parentOrderItemId) {
-                const arr = childItemsMap.get(item.parentOrderItemId) ?? [];
-                arr.push(item);
-                childItemsMap.set(item.parentOrderItemId, arr);
-            }
-        }
-        
-        // Helper to build an OrderItem from a DB row
-        const buildOrderItem = (item: (typeof allItems)[0]): OrderItem => {
-            const product = productById.get(item.productId);
+        // Type alias for the relational order item shape coming back from Drizzle
+        type RichOrderItem = NonNullable<(typeof ordersWithRelations)[0]['orderItems'][0]>;
 
-            const selectedOptions = (itemOptionsMap.get(item.id) ?? []).map((oio) => ({
+        const buildOrderItem = (item: RichOrderItem): OrderItem => {
+            const selectedOptions = (item.orderItemOptions ?? []).map((oio) => ({
                 id: oio.id,
                 optionGroupId: oio.optionGroupId,
-                optionGroupName: ogNameById.get(oio.optionGroupId) ?? '',
+                optionGroupName: oio.optionGroup?.name ?? '',
                 optionId: oio.optionId,
-                optionName: optNameById.get(oio.optionId) ?? '',
+                optionName: oio.option?.name ?? '',
                 priceAtOrder: oio.priceAtOrder,
             }));
 
-            const children = (childItemsMap.get(item.id) ?? []).map(buildOrderItem);
+            const children = (item.childOrderItems ?? []).map((child) => buildOrderItem(child as RichOrderItem));
 
             return {
                 id: item.id,
                 productId: item.productId,
-                name: product?.name ?? '',
-                imageUrl: product?.imageUrl || undefined,
+                name: item.product?.name ?? '',
+                imageUrl: item.product?.imageUrl || undefined,
                 quantity: item.quantity,
-                unitPrice: Number(item.finalAppliedPrice), // DB: finalAppliedPrice → GraphQL: unitPrice
+                unitPrice: Number(item.finalAppliedPrice),
                 notes: item.notes || undefined,
                 selectedOptions,
                 childItems: children,
@@ -144,30 +104,25 @@ export class OrderMappingModule {
             };
         };
 
-        const businessIds = [...new Set(productsRows.map((product) => product.businessId))];
-        const businessRows = await (businessIds.length > 0
-            ? db.select().from(businessesTable).where(inArray(businessesTable.id, businessIds))
-            : Promise.resolve([]));
-        const businessById = new Map(businessRows.map((b) => [b.id, b]));
-
         return dbOrders.map((dbOrder) => {
-            const orderItems = itemsByOrderId.get(dbOrder.id) ?? [];
-            const topLevelItems = orderItems.filter((item) => !item.parentOrderItemId);
+            const richOrder = richOrderById.get(dbOrder.id);
+            const allItems = richOrder?.orderItems ?? [];
+            const topLevelItems = allItems.filter((item) => !item.parentOrderItemId);
             const businessMap = new Map<string, OrderItem[]>();
 
             for (const item of topLevelItems) {
-                const product = productById.get(item.productId);
-                if (!product) continue;
-
-                const rows = businessMap.get(product.businessId) ?? [];
+                const businessId = item.product?.businessId;
+                if (!businessId) continue;
+                const rows = businessMap.get(businessId) ?? [];
                 rows.push(buildOrderItem(item));
-                businessMap.set(product.businessId, rows);
+                businessMap.set(businessId, rows);
             }
 
             const businessOrderList: OrderBusiness[] = [];
 
             for (const [businessId, businessItems] of businessMap) {
-                const business = businessById.get(businessId);
+                // Derive business from any item's product.business (all items share the same business)
+                const business = topLevelItems.find((i) => i.product?.businessId === businessId)?.product?.business;
                 if (business) {
                     businessOrderList.push({
                         business: {
@@ -205,7 +160,7 @@ export class OrderMappingModule {
 
             const isFirstOrder = firstOrderIdByUserId.get(dbOrder.userId) === dbOrder.id;
             const driverUser = dbOrder.driverId ? driverUserById.get(dbOrder.driverId) : undefined;
-            const orderPromotions = promotionsByOrderId.get(dbOrder.id) ?? [];
+            const orderPromotions = richOrder?.orderPromotions ?? [];
 
             return {
                 id: dbOrder.id,

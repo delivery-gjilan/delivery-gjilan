@@ -24,12 +24,12 @@ export function useOrders() {
         nextFetchPolicy: 'cache-first',
     });
 
-    const orders: any[] = (data as any)?.orders || [];
+    const orders: any[] = (data as any)?.orders?.orders || [];
 
     // Update store when query data changes (subscription updates are handled by useOrdersSubscription)
     useEffect(() => {
-        if (data?.orders && userId) {
-            const activeOrders = (data.orders as any[]).filter(
+        if (data?.orders?.orders && userId) {
+            const activeOrders = ((data.orders as any).orders as any[]).filter(
                 (order) => 
                     order.userId === userId && 
                     order.status !== 'DELIVERED' && 
@@ -43,10 +43,13 @@ export function useOrders() {
         await fetchMore({
             variables: { limit: ORDERS_PAGE_SIZE, offset: orders.length },
             updateQuery: (prev: any, { fetchMoreResult }: any) => {
-                if (!fetchMoreResult?.orders?.length) return prev;
+                if (!fetchMoreResult?.orders?.orders?.length) return prev;
                 return {
                     ...prev,
-                    orders: [...prev.orders, ...fetchMoreResult.orders],
+                    orders: {
+                        ...fetchMoreResult.orders,
+                        orders: [...(prev.orders?.orders ?? []), ...fetchMoreResult.orders.orders],
+                    },
                 };
             },
         });

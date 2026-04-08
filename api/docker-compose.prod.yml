@@ -1,0 +1,83 @@
+# Production docker-compose — runs on Hetzner CCX13
+# All services on one box: API + Postgres + Redis + Caddy + Observability
+#
+# Usage:
+#   IMAGE_TAG=<git-sha> docker compose -f docker-compose.prod.yml up -d
+#
+# On first deploy, run migrations after containers are up:
+#   docker compose -f docker-compose.prod.yml exec api node dist/migrate.js
+
+services:
+  # ── PostgreSQL ─────────────────────────────────────────────
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: zippgo-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-zippgo}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      POSTGRES_DB: ${DB_NAME:-zippgo}
+      PGUSER: ${DB_USER:-zippgo}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-zippgo}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ──────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: zippgo-redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+
+  # ── API ────────────────────────────────────────────────────
+  api:
+    image: ghcr.io/${GITHUB_REPO:-delivery-gjilan/delivery-gjilan}/api:${IMAGE_TAG:-latest}
+    container_name: zippgo-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    env_file: .env.prod
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${DB_USER:-zippgo}:${DB_PASSWORD}@db:5432/${DB_NAME:-zippgo}
+      REDIS_URL: redis://redis:6379
+      REDIS_REQUIRED: "true"
+    volumes:
+      - api_logs:/app/logs
+    ports:
+      - "127.0.0.1:4000:4000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Caddy: reverse proxy + automatic TLS ──────────────────
+  caddy:
+    image: caddy:2-alpine
+    container_name: zippgo-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  db_data:
+  redis_data:
+  api_logs:
+  caddy_data:
+  caddy_config:

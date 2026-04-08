@@ -58,6 +58,8 @@ export const CartScreen = () => {
     const { showLoading, showSuccess, hideSuccess } = useSuccessModalStore();
     const updateActiveOrder = useActiveOrdersStore((state) => state.updateOrder);
     const setActiveOrders = useActiveOrdersStore((state) => state.setActiveOrders);
+    const hasActiveOrders = useActiveOrdersStore((state) => state.hasActiveOrders);
+    const activeOrderForNav = useActiveOrdersStore((state) => state.activeOrders[0] as any);
 
     const [isProcessing, setIsProcessing] = useState(false);
     const [deliveryPrice, setDeliveryPrice] = useState(2.0); // Default; updated from API
@@ -789,6 +791,26 @@ export const CartScreen = () => {
     );
 
     const handleCheckout = async () => {
+        if (hasActiveOrders) {
+            const activeOrderId = activeOrderForNav?.id ? String(activeOrderForNav.id) : null;
+            Alert.alert(
+                t.cart.active_order_exists_title,
+                t.cart.active_order_exists_message,
+                [
+                    {
+                        text: t.orders.details.view_order,
+                        onPress: () => {
+                            if (activeOrderId) {
+                                router.push({ pathname: '/orders/[orderId]', params: { orderId: activeOrderId } } as never);
+                            }
+                        },
+                    },
+                    { text: t.common.ok, style: 'cancel' },
+                ],
+            );
+            return;
+        }
+
         if (!selectedLocation) {
             Alert.alert(t.cart.select_address, t.cart.select_address_alert);
             return;
@@ -851,9 +873,16 @@ export const CartScreen = () => {
             setShowSaveAddressPrompt(false);
             setStep(1);
             
-            // Keep current route and show success directly to avoid visible route flashes.
+            // Navigate to home while the loading modal still covers the screen so the
+            // cart→home transition is invisible to the user.  The (tabs) screen is
+            // configured with animation:'none' so this is instantaneous.  Once the
+            // modal switches to its success phase the home screen is already rendered
+            // behind it; when the modal finally dismisses (auto or user action) there
+            // is no underlying-screen flash.
             if (orderId) {
                 updateActiveOrder(order as any);
+
+                router.replace('/(tabs)/home');
 
                 console.log('[CartScreen] Showing success modal');
                 showSuccess(orderId, 'order_created');

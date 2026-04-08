@@ -4,7 +4,7 @@ import { DbOrder, DbOrderItem } from '@/database/schema';
 import logger from '@/lib/logger';
 import { drivers } from '@/database/schema/drivers';
 import { settlements } from '@/database/schema/settlements';
-import { eq, sql } from 'drizzle-orm';
+import { eq, or, sql } from 'drizzle-orm';
 import { DbType } from '@/database/index';
 
 const log = logger.child({ service: 'FinancialService' });
@@ -57,22 +57,21 @@ export class FinancialService {
                     normalizedDriverId,
                 );
 
-                console.log("calculated settlements:", calculated);
-                for (const settlement of calculated) {
+                if (calculated.length > 0) {
                     await tx
                         .insert(settlements)
-                        .values({
-                            type: settlement.type,
-                            direction: settlement.direction,
-                            driverId: settlement.driverId,
-                            businessId: settlement.businessId,
-                            orderId: settlement.orderId,
-                            amount: settlement.amount,
-                            status: 'PENDING',
-                            ruleId: settlement.ruleId,
-                        })
-                        // Defensive idempotency: if another path already inserted the same
-                        // pending settlement fingerprint, keep this operation as a no-op.
+                        .values(
+                            calculated.map((s) => ({
+                                type: s.type,
+                                direction: s.direction,
+                                driverId: s.driverId,
+                                businessId: s.businessId,
+                                orderId: s.orderId,
+                                amount: s.amount,
+                                status: 'PENDING' as const,
+                                ruleId: s.ruleId,
+                            })),
+                        )
                         .onConflictDoNothing()
                         .execute();
                 }
@@ -135,24 +134,14 @@ export class FinancialService {
     private async normalizeDriverId(driverId: string | null): Promise<string | null> {
         if (!driverId) return null;
 
-        // If already a driver profile id, keep as-is.
-        const byDriverId = await this.db
-            .select({ id: drivers.id })
+        // Single query: match by drivers.id (driver profile PK) OR drivers.userId (user FK).
+        // This replaces the two sequential lookups with one round-trip.
+        const [row] = await this.db
+            .select({ id: drivers.id, userId: drivers.userId })
             .from(drivers)
-            .where(eq(drivers.id, driverId))
+            .where(or(eq(drivers.id, driverId), eq(drivers.userId, driverId)))
             .limit(1);
 
-        if (byDriverId[0]?.id) {
-            return byDriverId[0].id;
-        }
-
-        // Backward compatibility: caller may pass users.id from orders.driverId.
-        const byUserId = await this.db
-            .select({ id: drivers.id })
-            .from(drivers)
-            .where(eq(drivers.userId, driverId))
-            .limit(1);
-
-        return byUserId[0]?.id ?? null;
+        return row?.id ?? null;
     }
 }

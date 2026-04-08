@@ -9,3 +9,4 @@ export { DELETE_MY_ACCOUNT_MUTATION } from './deleteMyAccount';
 export { SET_MY_PREFERRED_LANGUAGE_MUTATION } from './setMyPreferredLanguage';
 export { SET_MY_EMAIL_OPT_OUT_MUTATION } from './setMyEmailOptOut';
 export { UPDATE_MY_PROFILE_MUTATION } from './updateMyProfile';
+export { REQUEST_PASSWORD_RESET_MUTATION, RESET_PASSWORD_MUTATION } from './passwordReset';
