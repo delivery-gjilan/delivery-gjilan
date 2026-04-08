@@ -76,12 +76,17 @@ jobs:
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "Deploying image tag: $TAG"
 
+      - name: Setup SSH key
+        run: |
+          printf '%s' "${{ secrets.PROD_SSH_KEY }}" | tr -d '\r' > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+
       - name: Copy compose & Caddy config to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.PROD_SSH_HOST }}
           username: ${{ secrets.PROD_SSH_USER }}
-          key: ${{ secrets.PROD_SSH_KEY }}
+          key_path: /tmp/deploy_key
           source: "api/docker-compose.prod.yml,api/Caddyfile"
           target: "/opt/zippgo/api/"
           strip_components: 1
@@ -91,7 +96,7 @@ jobs:
         with:
           host: ${{ secrets.PROD_SSH_HOST }}
           username: ${{ secrets.PROD_SSH_USER }}
-          key: ${{ secrets.PROD_SSH_KEY }}
+          key_path: /tmp/deploy_key
           script: |
             set -e
             cd /opt/zippgo/api
