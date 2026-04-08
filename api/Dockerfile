@@ -8,7 +8,7 @@ RUN npm install --ignore-scripts
 COPY . .
 RUN npm run build
 RUN npx esbuild database/migrate.ts --bundle --platform=node --outfile=dist/migrate.js --packages=external
-RUN npx esbuild database/seed.ts --bundle --platform=node --outfile=dist/seed.js --external:bcrypt --external:pg-native --external:thread-stream --external:pino-pretty
+RUN npx esbuild database/seed.ts --bundle --platform=node --outfile=dist/seed.js --external:bcrypt --external:pg-native
 
 # ── Production image ──────────────────────────────────────────
 FROM node:22-alpine
