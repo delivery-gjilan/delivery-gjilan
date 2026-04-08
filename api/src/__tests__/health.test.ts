@@ -12,6 +12,17 @@ process.env.JWT_SECRET = 'test-secret-12345';
 
 // ── Mock modules that would open real connections ──────────────────────────
 
+// Mock the redis package itself so makeStore() in app.ts never opens a real socket
+vi.mock('redis', () => ({
+    createClient: vi.fn(() => ({
+        on: vi.fn().mockReturnThis(),
+        connect: vi.fn().mockResolvedValue(undefined),
+        disconnect: vi.fn().mockResolvedValue(undefined),
+        quit: vi.fn().mockResolvedValue(undefined),
+        sendCommand: vi.fn().mockResolvedValue(null),
+    })),
+}));
+
 vi.mock('@/lib/cache', () => ({
     cache: {
         ping: vi.fn().mockResolvedValue({ ok: false, disabled: true }),
