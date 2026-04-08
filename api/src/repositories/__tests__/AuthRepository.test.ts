@@ -67,6 +67,7 @@ function makeSelectDb(rows: any[]) {
         values: vi.fn().mockReturnThis(),
         set: vi.fn().mockReturnThis(),
         returning: vi.fn().mockResolvedValue(rows),
+        delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([]) }),
     };
 }
 
