@@ -96,6 +96,9 @@ jobs:
             set -e
             cd /opt/zippgo/api
 
+            # Ensure env file is in place
+            cp .env.prod .env
+
             # Log in to GHCR
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
