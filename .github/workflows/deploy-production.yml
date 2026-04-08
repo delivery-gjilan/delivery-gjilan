@@ -107,6 +107,15 @@ jobs:
             export IMAGE_TAG
             docker compose -f docker-compose.prod.yml pull api
 
+            # Start db and redis first (no-op if already running)
+            docker compose -f docker-compose.prod.yml up -d db redis
+
+            # Wait for postgres to be ready
+            sleep 5
+
+            # Run DB migrations
+            docker compose -f docker-compose.prod.yml run --rm api node dist/migrate.js
+
             # Rolling restart: bring up new api container, leave db/redis/caddy running
             docker compose -f docker-compose.prod.yml up -d --no-deps api
 
@@ -121,8 +130,8 @@ jobs:
               echo "  Attempt $i — status $STATUS, retrying in 5s..."
               sleep 5
               if [ "$i" = "12" ]; then
-                echo "Health check failed after 60s — rolling back"
-                docker compose -f docker-compose.prod.yml up -d --no-deps --rollback api || true
+                echo "Health check failed after 60s — container logs:"
+                docker compose -f docker-compose.prod.yml logs --tail=50 api
                 exit 1
               fi
             done
