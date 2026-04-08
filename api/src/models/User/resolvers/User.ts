@@ -1,7 +1,6 @@
 import type { UserResolvers } from './../../../generated/types.generated';
 import logger from '@/lib/logger';
 import { getUserPermissions } from '@/lib/utils/permissions';
-import { getLiveDriverEta } from '@/lib/driverEtaCache';
 
 const TRUSTED_CUSTOMER_MARKER = '[TRUSTED_CUSTOMER]';
 
@@ -92,31 +91,5 @@ export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'busines
     },
     isTrustedCustomer: (parent) => {
         return isTrustedCustomer((parent as any).adminNote, (parent as any).flagColor);
-    },
-    driverConnection: async (parent, _args, { loaders }) => {
-        if (parent.role !== 'DRIVER') return null;
-        try {
-            const driver = await loaders.driverByUserIdLoader.load(String(parent.id));
-            if (!driver) return null;
-            const liveEta = await getLiveDriverEta(String(parent.id));
-            return {
-                onlinePreference: driver.onlinePreference ?? false,
-                connectionStatus: driver.connectionStatus ?? 'DISCONNECTED',
-                lastHeartbeatAt: driver.lastHeartbeatAt,
-                lastLocationUpdate: driver.lastLocationUpdate,
-                disconnectedAt: driver.disconnectedAt,
-                batteryLevel: driver.batteryLevel ?? null,
-                batteryOptIn: driver.batteryOptIn ?? false,
-                batteryUpdatedAt: driver.batteryUpdatedAt ?? null,
-                isCharging: driver.isCharging ?? null,
-                activeOrderId: liveEta?.activeOrderId ?? null,
-                navigationPhase: liveEta?.navigationPhase ?? null,
-                remainingEtaSeconds: liveEta?.remainingEtaSeconds ?? null,
-                etaUpdatedAt: liveEta?.etaUpdatedAt ?? null,
-            };
-        } catch (error) {
-            logger.error({ err: error }, 'user:driverConnection resolve failed');
-            return null;
-        }
     },
 };
