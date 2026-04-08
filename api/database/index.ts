@@ -55,9 +55,15 @@ export async function getDB(): Promise<AnyDb> {
         const { Pool } = await import('pg');
         const { drizzle } = await import('drizzle-orm/node-postgres');
 
+        // PM2 cluster mode runs one pool per worker process.
+        // Keep max low enough that total connections across all workers
+        // stay well under Postgres max_connections (100 by default).
+        // With 2 workers: 2 × 20 = 40 connections used, leaving headroom.
+        const poolMax = parseInt(process.env.DB_POOL_MAX ?? '20', 10);
+
         pool = new Pool({
             connectionString,
-            max: 50,
+            max: poolMax,
             min: 2,
             idleTimeoutMillis: 30_000,
             connectionTimeoutMillis: 5_000,
