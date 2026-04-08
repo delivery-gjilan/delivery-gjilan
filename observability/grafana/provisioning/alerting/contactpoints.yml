@@ -9,7 +9,7 @@ contactPoints:
       - uid: email-alerts
         type: email
         settings:
-          addresses: ${ALERT_EMAIL:-ops@example.com}
+          addresses: ops@example.com
           singleEmail: true
 
 policies:

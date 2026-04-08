@@ -7,17 +7,17 @@ scrape_configs:
     metrics_path: /metrics
     static_configs:
       - targets:
-          - host.docker.internal:4000
+          - 178.104.94.20:4000
 
   - job_name: prometheus
     static_configs:
       - targets:
           - localhost:9090
 
-  - job_name: node
+  - job_name: node-exporter
     static_configs:
       - targets:
-          - node-exporter:9100
+          - 178.104.94.20:9100
 
   - job_name: delivery-api-ready
     metrics_path: /probe
@@ -25,7 +25,7 @@ scrape_configs:
       module: [http_2xx]
     static_configs:
       - targets:
-          - http://host.docker.internal:4000/ready
+          - http://178.104.94.20:4000/ready
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target

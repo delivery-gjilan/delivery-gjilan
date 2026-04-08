@@ -1,5 +1,5 @@
 {
-  "apiUrl": "http://localhost:4000",
+  "apiUrl": "http://178.104.94.20:4000",
   "password": "StressTest123!",
   "stressSecret": "local-stress-bypass-secret",
   "customers": [
