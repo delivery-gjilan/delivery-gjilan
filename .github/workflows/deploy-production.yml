@@ -78,7 +78,7 @@ jobs:
 
       - name: Setup SSH key
         run: |
-          echo "${{ secrets.PROD_SSH_KEY }}" | base64 -d > /tmp/deploy_key
+          echo "${{ secrets.PROD_SSH_KEY }}" | base64 --decode --ignore-garbage > /tmp/deploy_key
           chmod 600 /tmp/deploy_key
 
       - name: Copy compose & Caddy config to server
