@@ -36,6 +36,7 @@ export function useGlobalOrderAccept() {
     const acceptError = useOrderAcceptStore((s) => s.acceptError);
     const skippedAt = useOrderAcceptStore((s) => s.skippedAt);
     const lastOrdersRefreshAt = useRef(0);
+    const [bootstrapExpired, setBootstrapExpired] = useState(false);
 
     // ── Orders query (keeps cache warm when driver is off the map) ──
     const { data, refetch, networkStatus } = useQuery(GET_ORDERS, {
@@ -56,6 +57,17 @@ export function useGlobalOrderAccept() {
             setNetworkReady(true);
         }
     }, [networkStatus, networkReady, data]);
+
+    useEffect(() => {
+        setBootstrapExpired(false);
+        if (!currentDriverId) {
+            return;
+        }
+        // Avoid an endless full-screen loader if the initial network request
+        // hangs during cold start.
+        const timer = setTimeout(() => setBootstrapExpired(true), 12000);
+        return () => clearTimeout(timer);
+    }, [currentDriverId]);
 
     const refreshOrders = useCallback(async () => {
         const now = Date.now();
@@ -91,6 +103,10 @@ export function useGlobalOrderAccept() {
 
     const [assignDriver] = useMutation(ASSIGN_DRIVER_TO_ORDER);
 
+    // Track the latest subscription payload directly so that orders are
+    // available even while the initial network-only query is still in-flight.
+    const [subscriptionOrders, setSubscriptionOrders] = useState<any[] | null>(null);
+
     // ── Single global subscription — updates cache; drive.tsx reads from cache ──
     useSubscription(ALL_ORDERS_UPDATED, {
         skip: !currentDriverId,
@@ -105,6 +121,14 @@ export function useGlobalOrderAccept() {
             apolloClient.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
                 return { ...(existing ?? {}), orders: incomingOrders };
             });
+            // Store subscription data directly — while the initial query is
+            // still in network-only mode, cache writes don't propagate to
+            // useQuery's `data`.  This fallback ensures orders are available
+            // immediately and unblocks card rendering on cold start.
+            setSubscriptionOrders(incomingOrders);
+            // Subscription data is fresh from the server — safe to allow
+            // auto-present and card display.
+            setNetworkReady(true);
         },
     });
 
@@ -121,9 +145,23 @@ export function useGlobalOrderAccept() {
         };
     }, [currentDriverId, refreshOrders]);
 
+    const cachedOrders = useMemo(() => {
+        try {
+            return ((apolloClient.readQuery({ query: GET_ORDERS }) as any)?.orders ?? []) as any[];
+        } catch {
+            return [];
+        }
+    }, [apolloClient, data, subscriptionOrders]);
+
     const orders = useMemo(() => {
-        return (data as any)?.orders ?? [];
-    }, [data]);
+        return (data as any)?.orders ?? subscriptionOrders ?? cachedOrders;
+    }, [data, subscriptionOrders, cachedOrders]);
+
+    const isOrdersBootstrapping =
+        !!currentDriverId &&
+        !networkReady &&
+        networkStatus === NetworkStatus.loading &&
+        !bootstrapExpired;
 
     // ── Precise per-order timers: fire exactly when each PREPARING order crosses
     //    the 5-min threshold instead of polling every 30s.
@@ -189,9 +227,8 @@ export function useGlobalOrderAccept() {
     // shows up-to-date fields (estimatedReadyAt, status, items) without a separate query.
     const liveOrder = useMemo(() => {
         if (!pendingOrder) return null;
-        const orders = (data as any)?.orders ?? [];
         return orders.find((o: any) => o.id === pendingOrder.id) ?? pendingOrder;
-    }, [pendingOrder, data]);
+    }, [pendingOrder, orders]);
 
     // ── Dismiss stale modal: clear pendingOrder if it's no longer in availableOrders ──
     // Skip when takenByOther is active — the 3-second overlay timer owns the dismissal.
@@ -205,15 +242,14 @@ export function useGlobalOrderAccept() {
         if (!stillAvailable) {
             // Check why it disappeared: still in the order list but now has a different driver
             // means someone else took it — show the overlay instead of silently dismissing.
-            const allOrders = (data as any)?.orders ?? [];
-            const currentOrder = allOrders.find((o: any) => o.id === store.pendingOrder.id);
+            const currentOrder = orders.find((o: any) => o.id === store.pendingOrder.id);
             if (currentOrder?.driver?.id && currentOrder.driver.id !== currentDriverId) {
                 store.setTakenByOther(true);
             } else {
                 store.setPendingOrder(null);
             }
         }
-    }, [availableOrders, data, currentDriverId]);
+    }, [availableOrders, orders, currentDriverId]);
 
     // ── Auto-present (capacity-aware) ──
     // Depends on pendingOrder so after skip/dismiss the next order surfaces immediately.
@@ -370,6 +406,7 @@ export function useGlobalOrderAccept() {
         acceptError,
         takenByOther,
         networkReady,
+        isOrdersBootstrapping,
         assignedOrders,
         availableOrders,
         poolOrders,

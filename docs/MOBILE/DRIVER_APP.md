@@ -116,8 +116,10 @@ index.tsx
 - `useGlobalOrderAccept` and `drive.tsx` defer their initial `GET_ORDERS` work until auth hydration completes
 - On each app init, `useGlobalOrderAccept` and `drive.tsx` run their first `GET_ORDERS` request as `network-only`; once that baseline succeeds, the same query instances fall back to `cache-first`
 - `drive.tsx` no longer owns a second independent orders query; it consumes the shared order state exposed by `useGlobalOrderAccept`, so startup card visibility, pool state, and map annotations all derive from the same Apollo result
-- The startup assigned-order redirect in `_layout.tsx` waits for the first successful orders-network baseline before routing into drive, so persisted Apollo cache alone does not resurrect stale assigned-order UI after backend unassignments or temporary cold-start fetch failures
-- If the first cold-start orders fetch fails, both `_layout.tsx` and `drive.tsx` keep assigned-order UI gated off and retry until a fresh baseline succeeds instead of trusting persisted cache
+- `useGlobalOrderAccept` resolves orders from three sources in priority order: active query result, latest subscription payload, then Apollo cache snapshot. This keeps map/order state available during cold-start network races.
+- `networkReady` gates auto-present behavior (order accept sheet and startup assigned-order redirect) so stale cache cannot auto-surface actionable prompts before a fresh network baseline.
+- `drive.tsx` renders assigned-order cards from shared `assignedOrders` immediately and does not gate card visibility behind `networkReady`; map cards can rehydrate from cache/subscription while network baseline is still in-flight.
+- The drive loading overlay uses a bounded bootstrap state (`isOrdersBootstrapping`) tied to initial query loading and a 12s timeout guard, so the map never stays behind an infinite spinner when startup requests hang.
 - `orderAcceptStore` persists recently assigned order ids for a short TTL, so an order that was previously assigned to this driver does not immediately resurface as a fresh available-order prompt after an admin unassigns it while the app is closed
 
 ### Token Refresh (`lib/graphql/authSession.ts`)

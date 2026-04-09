@@ -76,7 +76,7 @@ export default function MapScreen() {
     const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS);
     const pendingOrder = useOrderAcceptStore((s) => s.pendingOrder);
     const pendingAutoCountdown = useOrderAcceptStore((s) => s.autoCountdown);
-    const { orders, assignedOrders, availableOrders, networkReady } = useSharedOrderAccept();
+    const { orders, assignedOrders, availableOrders, isOrdersBootstrapping } = useSharedOrderAccept();
 
     // ── Route state ──
     const [routeCoords, setRouteCoords] = useState<Array<[number, number]> | null>(null);
@@ -85,8 +85,8 @@ export default function MapScreen() {
     const [previewRouteInfo, setPreviewRouteInfo] = useState<{ distanceKm: number; durationMin: number } | null>(null);
 
     const visibleAssignedOrders = useMemo(() => {
-        return networkReady ? assignedOrders : [];
-    }, [assignedOrders, networkReady]);
+        return assignedOrders;
+    }, [assignedOrders]);
 
     // ── Adaptive GPS interval based on activity ──
     const hasActiveNavigation = useMemo(() => {
@@ -134,7 +134,7 @@ export default function MapScreen() {
         [visibleAssignedOrders, availableOrders],
     );
 
-    const isInitialOrdersLoading = hasHydrated && !!currentDriverId && !networkReady;
+    const isInitialOrdersLoading = hasHydrated && !!currentDriverId && isOrdersBootstrapping;
 
     // ── Focused order object ──
     const focusedOrder = useMemo(
