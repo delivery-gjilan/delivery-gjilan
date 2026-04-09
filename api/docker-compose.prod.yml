@@ -54,7 +54,7 @@ services:
     volumes:
       - api_logs:/app/logs
     ports:
-      - "4000:4000"
+      - "80:4000"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
       interval: 10s
