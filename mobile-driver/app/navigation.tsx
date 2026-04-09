@@ -41,6 +41,9 @@ export default function NavigationScreen() {
     const successCardHoverY  = useRef(new Animated.Value(0)).current;    // hover loop only
     const successCardYTotal  = useRef(Animated.add(successCardY, successCardHoverY)).current;
     const successCardScale   = useRef(new Animated.Value(0.72)).current;
+    const successCardStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const confettiTimerRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
+    const successAnimationActiveRef = useRef(false);
     const confettiData = useRef(
         Array.from({ length: 60 }, (_, i) => ({
             anim:     new Animated.Value(0),
@@ -88,6 +91,28 @@ export default function NavigationScreen() {
     const apolloClient = useApolloClient();
     const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS);
     const [driverNotifyCustomer] = useMutation(DRIVER_NOTIFY_CUSTOMER);
+
+    const resetSuccessAnimation = useCallback(() => {
+        successAnimationActiveRef.current = false;
+        if (successCardStartTimerRef.current) {
+            clearTimeout(successCardStartTimerRef.current);
+            successCardStartTimerRef.current = null;
+        }
+        confettiTimerRefs.current.forEach(clearTimeout);
+        confettiTimerRefs.current = [];
+        mapDimOpacity.stopAnimation();
+        successCardOpacity.stopAnimation();
+        successCardY.stopAnimation();
+        successCardHoverY.stopAnimation();
+        successCardScale.stopAnimation();
+        confettiData.forEach((particle) => particle.anim.stopAnimation());
+        setShowSuccessCard(false);
+        mapDimOpacity.setValue(0);
+        successCardOpacity.setValue(0);
+        successCardY.setValue(320);
+        successCardHoverY.setValue(0);
+        successCardScale.setValue(0.72);
+    }, [confettiData, mapDimOpacity, successCardOpacity, successCardScale, successCardHoverY, successCardY]);
 
     /* â”€â”€ Store â”€â”€ */
     const {
@@ -143,6 +168,7 @@ export default function NavigationScreen() {
             const wasReassigned = updatedOrder.driver?.id && updatedOrder.driver.id !== currentDriverId;
             const isClosed = updatedOrder.status === 'DELIVERED' || updatedOrder.status === 'CANCELLED';
             if (isClosed || wasReassigned) {
+                resetSuccessAnimation();
                 setShowDeliveryPanel(false);
                 setShowPickupPanel(false);
                 clearNavigationLocation();
@@ -168,10 +194,11 @@ export default function NavigationScreen() {
         if (!order) return;
         const liveOrder = orders.find((o: any) => o.id === order.id);
         if (!liveOrder || liveOrder.status === 'DELIVERED' || liveOrder.status === 'CANCELLED') {
+            resetSuccessAnimation();
             stopNavigation();
             router.replace('/(tabs)/drive' as any);
         }
-    }, [data, order?.id, stopNavigation, router]);
+    }, [data, order?.id, resetSuccessAnimation, stopNavigation, router]);
 
     /* â”€â”€ Build coordinates for MapboxNavigationView â”€â”€ */
     // Use the stored origin only â€” the Navigation SDK tracks GPS internally.
@@ -194,8 +221,9 @@ export default function NavigationScreen() {
         return () => {
             clearNavigationLocation();
             if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+            resetSuccessAnimation();
         };
-    }, [clearNavigationLocation]);
+    }, [clearNavigationLocation, resetSuccessAnimation]);
 
     /* â”€â”€ Detect newly assigned orders and show toast â”€â”€ */
     useEffect(() => {
@@ -252,6 +280,7 @@ export default function NavigationScreen() {
                 t.navigation.order_reassigned,
                 t.navigation.order_reassigned_msg,
                 [{ text: t.common.ok, onPress: () => {
+                    resetSuccessAnimation();
                     setShowDeliveryPanel(false);
                     setShowPickupPanel(false);
                     clearNavigationLocation();
@@ -261,7 +290,7 @@ export default function NavigationScreen() {
                 { cancelable: false },
             );
         }
-    }, [data, order?.id, isNavigating, currentDriverId, clearNavigationLocation, stopNavigation, router]);
+    }, [data, order?.id, isNavigating, currentDriverId, clearNavigationLocation, resetSuccessAnimation, stopNavigation, router]);
 
     /* â”€â”€ Auto-notify customer when driver is < 3 min away (to_dropoff only) â”€â”€ */
     useEffect(() => {        if (
@@ -301,10 +330,11 @@ export default function NavigationScreen() {
     );
 
     const handleCancelNavigation = useCallback(() => {
+        resetSuccessAnimation();
         clearNavigationLocation(); // Stop providing location to heartbeat
         stopNavigation();
         router.replace('/(tabs)/drive' as any);
-    }, [clearNavigationLocation, stopNavigation, router]);
+    }, [clearNavigationLocation, resetSuccessAnimation, stopNavigation, router]);
 
     const handleWaypointArrival = useCallback(
         (_event: any) => {
@@ -409,6 +439,7 @@ export default function NavigationScreen() {
             <Pressable
                 style={[styles.backBtn, { top: insets.top + 8 }]}
                 onPress={() => {
+                    resetSuccessAnimation();
                     minimizeNavigation();
                     router.replace('/(tabs)/drive' as any);
                 }}
@@ -763,13 +794,7 @@ export default function NavigationScreen() {
                                 return { ...existing, orders: prev.filter((o: any) => o.id !== deliveredId) };
                             });
                         }
-                        // Clean up success animation state before switching
-                        setShowSuccessCard(false);
-                        mapDimOpacity.setValue(0);
-                        successCardOpacity.setValue(0);
-                        successCardY.setValue(320);
-                        successCardHoverY.setValue(0);
-                        successCardScale.setValue(0.72);
+                        resetSuccessAnimation();
                         setShowDeliveryPanel(false);
                         clearNavigationLocation();
                         stopNavigation();
@@ -782,13 +807,16 @@ export default function NavigationScreen() {
                         }
                     }}
                     onSuccessAnimStart={() => {
+                        resetSuccessAnimation();
+                        successAnimationActiveRef.current = true;
                         // Dim the map behind everything
                         Animated.timing(mapDimOpacity, { toValue: 1, duration: 350, useNativeDriver: true }).start();
 
                         // Spring the success card up from the panel area to screen centre
                         const fo2 = assignedOrders.find((o: any) => o.id === order?.id);
                         setSuccessCardPrice(fo2?.deliveryPrice ?? 0);
-                        setTimeout(() => {
+                        successCardStartTimerRef.current = setTimeout(() => {
+                            if (!successAnimationActiveRef.current) return;
                             successCardY.setValue(320);
                             successCardHoverY.setValue(0);
                             successCardScale.setValue(0.72);
@@ -810,10 +838,13 @@ export default function NavigationScreen() {
                             // Confetti burst (staggered, JS driver)
                             confettiData.forEach((p, i) => {
                                 p.anim.setValue(0);
-                                setTimeout(() => {
+                                const confettiTimer = setTimeout(() => {
+                                    if (!successAnimationActiveRef.current) return;
                                     Animated.timing(p.anim, { toValue: 1, duration: 1200 + i * 10, useNativeDriver: false }).start();
                                 }, i * 18);
+                                confettiTimerRefs.current.push(confettiTimer);
                             });
+                            successCardStartTimerRef.current = null;
                         }, 280);
                     }}
                     onCancel={async (reason) => {
@@ -822,13 +853,7 @@ export default function NavigationScreen() {
                         } catch {
                             Alert.alert(t.common.error, t.navigation.status_update_failed);
                         }
-                        // Clean up success animation state
-                        setShowSuccessCard(false);
-                        mapDimOpacity.setValue(0);
-                        successCardOpacity.setValue(0);
-                        successCardY.setValue(320);
-                        successCardHoverY.setValue(0);
-                        successCardScale.setValue(0.72);
+                        resetSuccessAnimation();
                         setShowDeliveryPanel(false);
                         clearNavigationLocation();
                         stopNavigation();

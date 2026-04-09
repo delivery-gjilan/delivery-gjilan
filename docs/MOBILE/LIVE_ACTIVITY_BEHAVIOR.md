@@ -144,6 +144,8 @@ If these are absent, the backend keeps the previous Firebase-based fallback path
 - `LIVE_ACTIVITY_APNS_BUNDLE_ID`: the customer app bundle ID. In this repo it is `com.artshabani.mobilecustomer` from `mobile-customer/app.json`.
 - `LIVE_ACTIVITY_APNS_ENV`: use `sandbox` for local/dev testing against development-signed iOS builds, and `production` for TestFlight/App Store or production-signed builds.
 
+Apple now supports environment-scoped APNs auth keys. If the key details page shows `Sandbox`, that key cannot be used for TestFlight or App Store Live Activity pushes. TestFlight/App Store traffic must use a production-capable APNs key with `LIVE_ACTIVITY_APNS_ENV=production`.
+
 ### Production Wiring
 
 - Docker production already loads API secrets from `api/.env.prod` via `api/docker-compose.prod.yml`.

@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Mapbox from '@rnmapbox/maps';
 
+import { NetworkStatus } from '@apollo/client';
 import { useApolloClient, useMutation, useQuery } from '@apollo/client/react';
 import { GET_ORDERS, UPDATE_ORDER_STATUS } from '@/graphql/operations/orders';
 import { useDriverLocation } from '@/hooks/useDriverLocation';
@@ -55,6 +56,7 @@ export default function MapScreen() {
         ? 'mapbox://styles/mapbox/dark-v11'
         : 'mapbox://styles/mapbox/light-v11';
     const currentDriverId = useAuthStore((state) => state.user?.id);
+    const hasHydrated = useAuthStore((state) => state.hasHydrated);
     const startNavigation = useNavigationStore((s) => s.startNavigation);
     const cameraRef = useRef<Mapbox.Camera>(null);
 
@@ -86,10 +88,34 @@ export default function MapScreen() {
     // (removed — preview route now uses a simple static style)
 
     // ── Orders query + real-time subscription ──
-    const { data, loading, refetch } = useQuery(GET_ORDERS, {
+    const { data, loading, refetch, networkStatus } = useQuery(GET_ORDERS, {
         fetchPolicy: 'cache-and-network',
         nextFetchPolicy: 'cache-first',
+        notifyOnNetworkStatusChange: true,
+        skip: !hasHydrated,
     });
+
+    const [networkReady, setNetworkReady] = useState(false);
+    const seenLoadingRef = useRef(false);
+    useEffect(() => {
+        if (networkStatus === NetworkStatus.loading || networkStatus === NetworkStatus.refetch) {
+            seenLoadingRef.current = true;
+        }
+        if (!networkReady) {
+            if (seenLoadingRef.current && networkStatus === NetworkStatus.ready) {
+                setNetworkReady(true);
+            } else if (networkStatus === NetworkStatus.error) {
+                setNetworkReady(true);
+            }
+        }
+    }, [networkReady, networkStatus]);
+
+    useEffect(() => {
+        if (!hasHydrated || !currentDriverId) return;
+        void refetch().catch(() => {
+            // Keep stale cache visible if the cold-start refresh fails.
+        });
+    }, [hasHydrated, currentDriverId, refetch]);
 
     // ── Precise per-order timers: fire exactly when each PREPARING order crosses
     //    the 5-min threshold for map pin/pool button visibility.
@@ -116,12 +142,16 @@ export default function MapScreen() {
         });
     }, [data, currentDriverId]);
 
+    const visibleAssignedOrders = useMemo(() => {
+        return networkReady ? assignedOrders : [];
+    }, [assignedOrders, networkReady]);
+
     // ── Adaptive GPS interval based on activity ──
     const hasActiveNavigation = useMemo(() => {
-        return assignedOrders.some((order: any) =>
+        return visibleAssignedOrders.some((order: any) =>
             order.status === 'READY' || order.status === 'OUT_FOR_DELIVERY'
         );
-    }, [assignedOrders]);
+    }, [visibleAssignedOrders]);
 
     const gpsInterval = hasActiveNavigation ? 1000 : 5000;
 
@@ -173,8 +203,8 @@ export default function MapScreen() {
     }, [data, dispatchModeEnabled, now]);
 
     const allMapOrders = useMemo(
-        () => [...assignedOrders, ...availableOrders],
-        [assignedOrders, availableOrders],
+        () => [...visibleAssignedOrders, ...availableOrders],
+        [visibleAssignedOrders, availableOrders],
     );
 
     // ── Focused order object ──
@@ -404,29 +434,29 @@ export default function MapScreen() {
     // ── Clamp card index when orders are removed ──
     useEffect(() => {
         assignedOrdersLenRef.current = assignedOrders.length;
-        if (assignedOrders.length === 0) {
+        if (visibleAssignedOrders.length === 0) {
             setCurrentCardIndex(0);
             setFocusedOrderId(null);
             return;
         }
-        setCurrentCardIndex(prev => Math.min(prev, assignedOrders.length - 1));
-    }, [assignedOrders.length]);
+        setCurrentCardIndex(prev => Math.min(prev, visibleAssignedOrders.length - 1));
+    }, [assignedOrders.length, visibleAssignedOrders.length]);
 
     // ── Focus camera on the current card's order ──
     useEffect(() => {
-        if (assignedOrders.length === 0) return;
-        const idx = Math.min(currentCardIndex, assignedOrders.length - 1);
-        const order = assignedOrders[idx];
+        if (visibleAssignedOrders.length === 0) return;
+        const idx = Math.min(currentCardIndex, visibleAssignedOrders.length - 1);
+        const order = visibleAssignedOrders[idx];
         if (order) focusOrder(order);
     // focusOrder dep intentionally omitted — it changes on every render due to location
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentCardIndex, assignedOrders.length]);
+    }, [currentCardIndex, visibleAssignedOrders.length]);
 
     // ── Pulse animation for READY orders ──
     useEffect(() => {
-        if (assignedOrders.length === 0) return;
-        const idx = Math.min(currentCardIndex, assignedOrders.length - 1);
-        const order = assignedOrders[idx];
+        if (visibleAssignedOrders.length === 0) return;
+        const idx = Math.min(currentCardIndex, visibleAssignedOrders.length - 1);
+        const order = visibleAssignedOrders[idx];
         if (order?.status === 'READY') {
             const loop = Animated.loop(
                 Animated.sequence([
@@ -440,7 +470,7 @@ export default function MapScreen() {
             readyPulse.setValue(1);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentCardIndex, assignedOrders.length]);
+    }, [currentCardIndex, visibleAssignedOrders.length]);
 
     // ── Launch Mapbox Navigation SDK ──
     const handleStartNavigation = useCallback((targetOrder?: any) => {
@@ -481,7 +511,7 @@ export default function MapScreen() {
                     minZoomLevel={12}
                     padding={{
                         paddingTop: 0,
-                        paddingBottom: assignedOrders.length > 0 ? BOTTOM_BAR_HEIGHT : 0,
+                        paddingBottom: visibleAssignedOrders.length > 0 ? BOTTOM_BAR_HEIGHT : 0,
                         paddingLeft: 0,
                         paddingRight: 0,
                     }}
@@ -653,12 +683,12 @@ export default function MapScreen() {
             </Mapbox.MapView>
 
             {/* ═══ Right-side buttons ═══ */}
-            <View style={[styles.rightButtons, { bottom: (assignedOrders.length > 0 ? BOTTOM_BAR_HEIGHT + 12 : 20 + insets.bottom) }]}>
+            <View style={[styles.rightButtons, { bottom: (visibleAssignedOrders.length > 0 ? BOTTOM_BAR_HEIGHT + 12 : 20 + insets.bottom) }]}>
                 {/* Arrived at pickup shortcut */}
                 {(() => {
-                    const t = assignedOrders.length === 1
-                        ? assignedOrders[0]
-                        : assignedOrders.find((o: any) => o.id === focusedOrderId) ?? null;
+                    const t = visibleAssignedOrders.length === 1
+                        ? visibleAssignedOrders[0]
+                        : visibleAssignedOrders.find((o: any) => o.id === focusedOrderId) ?? null;
                     if (t?.status !== 'READY') return null;
                     return (
                         <Pressable
@@ -722,9 +752,9 @@ export default function MapScreen() {
             )}
 
             {/* ═══ Single swipeable active order card ═══ */}
-            {assignedOrders.length > 0 && (() => {
-                const idx = Math.min(currentCardIndex, assignedOrders.length - 1);
-                const order = assignedOrders[idx];
+            {visibleAssignedOrders.length > 0 && (() => {
+                const idx = Math.min(currentCardIndex, visibleAssignedOrders.length - 1);
+                const order = visibleAssignedOrders[idx];
                 const statusColor = STATUS_COLORS[order.status] ?? '#6B7280';
                 const bizName = order.businesses?.[0]?.business?.name ?? '?';
                 const initial = bizName.charAt(0).toUpperCase();
@@ -738,7 +768,7 @@ export default function MapScreen() {
                 const prepMinsLeft = isPreparing && order.estimatedReadyAt
                     ? Math.max(0, Math.ceil((new Date(order.estimatedReadyAt).getTime() - nowTs) / 60000))
                     : null;
-                const total = assignedOrders.length;
+                const total = visibleAssignedOrders.length;
 
                 return (
                     <View style={[styles.singleCardWrap, { bottom: 12 + insets.bottom }]}>

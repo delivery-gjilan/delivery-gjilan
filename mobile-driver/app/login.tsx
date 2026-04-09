@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
     View,
     Text,
@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslations } from '@/hooks/useTranslations';
+import { useAuthStore } from '@/store/authStore';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -22,11 +23,19 @@ export default function LoginScreen() {
     const router = useRouter();
     const { login, loading } = useAuth();
     const { t } = useTranslations();
+    const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+    const hasHydrated = useAuthStore((state) => state.hasHydrated);
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (hasHydrated && isAuthenticated) {
+            router.replace('/(tabs)/drive');
+        }
+    }, [hasHydrated, isAuthenticated, router]);
 
     const handleLogin = async () => {
         if (!email.trim() || !password.trim()) {

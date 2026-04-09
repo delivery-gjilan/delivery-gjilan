@@ -1,6 +1,6 @@
 # Mobile Driver App
 
-<!-- MDS:M8 | Domain: Mobile | Updated: 2026-04-06 -->
+<!-- MDS:M8 | Domain: Mobile | Updated: 2026-04-09 -->
 <!-- Depends-On: A1, B1, B4, B5, B7, BL1 -->
 <!-- Depended-By: M1, O4 -->
 <!-- Nav: Heartbeat changes → also update B4 (Watchdog). Auth changes → also update B5. Subscription shape changes → verify map.tsx and navigation.tsx cache update logic. -->
@@ -77,6 +77,7 @@ index.tsx
        ├── useAppSetup()
        │    ├── useSyncTheme()      → reads useThemeStore, applies system theme
        │    └── useInitializeTranslation() → loads locale from useLocaleStore
+  ├── waits for `authStore.hasHydrated === true` before rendering the app shell
        ├── Mapbox.setAccessToken(MAPBOX_TOKEN)   [EXPO_PUBLIC_MAPBOX_TOKEN]
        └── <Providers>
             ├── apollo3-cache-persist restores InMemoryCache from AsyncStorage
@@ -107,6 +108,13 @@ index.tsx
 4. Tokens saved: `saveToken()` → `expo-secure-store` (native) / `AsyncStorage` (web)
 5. `authStore.login(token, user)` updates Zustand state; `isOnline` is seeded from `user.driverConnection.onlinePreference`
 6. Router replaces to `/(tabs)/home`
+
+### Persisted Session Resume
+
+- `RootLayout` waits for `authStore.hasHydrated` before rendering `AppContent`, so startup hooks do not race against an unhydrated driver session
+- `login.tsx` redirects straight to `/(tabs)/drive` when a persisted authenticated driver session is restored
+- `useGlobalOrderAccept` and `drive.tsx` defer their initial `GET_ORDERS` work until auth hydration completes
+- `drive.tsx` performs an explicit cold-start `refetch()` once the hydrated driver id is available so admin-side assignments or READY transitions made while the app was closed appear immediately on first open
 
 ### Token Refresh (`lib/graphql/authSession.ts`)
 
@@ -271,7 +279,7 @@ Renamed from `map.tsx`.
 The map is the primary operational view. It shows all active/available orders and the driver's live location.
 
 **Data layer:**
-- `GET_ORDERS` query (`cache-and-network` → `cache-first`)
+- `GET_ORDERS` query (`cache-and-network` → `cache-first`) and an explicit one-shot `refetch()` after auth hydration on cold start
 - `ALL_ORDERS_UPDATED` subscription runs once globally in `useGlobalOrderAccept` (mounted in `AppContent`), merging payloads into the Apollo cache so all active `GET_ORDERS` queries auto-update
 - If subscription payload is empty, the global hook falls back to `refetch()`
 
@@ -369,7 +377,7 @@ The `navigationStore.advanceToDropoff()` action transitions the phase. `stopNavi
 
 | Layer | zIndex | Description |
 |-------|--------|-------------|
-| Back button | 150 | Top-left 44×44 circle, `rgba(0,0,0,0.55)` bg, white chevron icon — ensures visibility over dark map tiles |
+| Back button | 150 | Top-left 44×44 circle, `rgba(0,0,0,0.55)` bg, white chevron icon — minimizes navigation back to the drive tab without stopping the active nav session |
 | Floating bottom bar | 100 | Status colour, phase label, distance, ETA, exit button |
 | Earnings pill | 100 | Green badge showing delivery fee + tip total (€ symbol) |
 | Recenter button | 50 | Right side — calls `mapViewRef.current?.recenterMap()` |
@@ -377,6 +385,11 @@ The `navigationStore.advanceToDropoff()` action transitions the phase. `stopNavi
 | Avatar sidebar | 50 | Discord-style order switcher — only visible when `assignedOrders.length > 1` |
 | `<PickupSlider>` | 200 | Slides from bottom on `onWaypointArrival` — extracted component (`components/PickupSlider.tsx`). Props: `businessName`, `etaMins`, `prepMinsLeft`, `insetBottom`, `onConfirm`, `onCancel` |
 | `<DeliverySlider>` | 200 | Slides from bottom on `onFinalDestinationArrival` — extracted component (`components/DeliverySlider.tsx`). Full delivery panel: confirm delivery CTA, cancel reason selector (sends enum key like `NOT_RESPONDING`, not translated label), ping/cancel unlock timers |
+
+**Realtime exit rules:**
+- `useGlobalOrderAccept` keeps the shared `GET_ORDERS` cache updated from `allOrdersUpdated`
+- `navigation.tsx` also subscribes to `orderStatusUpdated(orderId)` for the active order so admin-side `DELIVERED`, `CANCELLED`, or reassignment events immediately close the navigation session and return the driver to the drive tab
+- `navigationStore` has a runtime-only minimize flag so the driver can leave full-screen navigation and later resume it without the tab layout auto-pushing them straight back into the nav screen
 
 ### New Order Toast
 
@@ -555,6 +568,7 @@ When `dispatchModeEnabled` is `true` and the driver is online, an amber pill is 
 | Subscription | File | Where Used |
 |--------------|------|-----------|
 | `allOrdersUpdated` | `orders.ts` | `useGlobalOrderAccept` only (single global instance in `AppContent`); includes `estimatedReadyAt` for cache parity with `GET_ORDERS` |
+| `orderStatusUpdated(orderId)` | `orders.ts` | `navigation.tsx` for active-order close/reassign events; backend publishes exact order updates on the per-order topic |
 | `storeStatusUpdated` | `store.ts` | `useStoreStatus` (real-time dispatch mode + banner updates) |
 | `driverPttSignal(driverId)` | `driverTelemetry.ts` | `useDriverPttReceiver` |
 

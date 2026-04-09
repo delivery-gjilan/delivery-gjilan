@@ -1,7 +1,7 @@
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import '../global.css';
 import { useAppSetup } from '@/hooks/useAppSetup';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import Providers from '@/lib/graphql/providers';
 import { useDriverTracking } from '@/hooks/useDriverTracking';
@@ -22,21 +22,25 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Mapbox from '@rnmapbox/maps';
 import { MAPBOX_TOKEN } from '@/utils/mapbox';
+import { useNavigationStore } from '@/store/navigationStore';
 
 function AppContent() {
+    const router = useRouter();
     // Start heartbeat as soon as auth is established
     useDriverTracking();
     useNotifications();
     useNetworkStatus();
     const isNetworkConnected = useAuthStore((s) => s.isNetworkConnected);
     const { isAdminTalking, isTalking, pttError, startTalking, stopTalking } = useDriverPttReceiver();
-    const { pendingOrder, autoCountdown, accepting, acceptError, takenByOther, availableOrders, poolOrders, handleAcceptOrder, handleSkipOrder, handleAcceptAndNavigate } =
+    const { pendingOrder, autoCountdown, accepting, acceptError, takenByOther, networkReady, assignedOrders, availableOrders, poolOrders, handleAcceptOrder, handleSkipOrder, handleAcceptAndNavigate } =
         useGlobalOrderAccept();
 
     const isOnline = useAuthStore((s) => s.isOnline);
     const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+    const isNavigationActive = useNavigationStore((s) => s.isNavigating);
     const { dispatchModeEnabled } = useStoreStatus();
     const [poolOpen, setPoolOpen] = useState(false);
+    const didStartupAssignedRedirectRef = useRef(false);
 
     const showPoolFab = isAuthenticated && !dispatchModeEnabled && isOnline && poolOrders.length > 0;
 
@@ -79,6 +83,15 @@ function AppContent() {
             setIncomingMessage(msg);
         },
     });
+
+    useEffect(() => {
+        if (!isAuthenticated || isNavigationActive || !networkReady) return;
+        if (didStartupAssignedRedirectRef.current) return;
+        if (assignedOrders.length === 0) return;
+
+        didStartupAssignedRedirectRef.current = true;
+        router.replace('/(tabs)/drive' as any);
+    }, [assignedOrders.length, isAuthenticated, isNavigationActive, networkReady, router]);
 
     return (
         <>
@@ -273,6 +286,7 @@ function AppContent() {
 
 export default function RootLayout() {
     const { ready } = useAppSetup();
+    const hasHydrated = useAuthStore((s) => s.hasHydrated);
 
     useEffect(() => {
         if (MAPBOX_TOKEN) {
@@ -280,7 +294,7 @@ export default function RootLayout() {
         }
     }, []);
 
-    if (!ready) {
+    if (!ready || !hasHydrated) {
         return (
             <View className="flex-1 justify-center items-center bg-white">
                 <ActivityIndicator size="large" className="text-blue-600" />

@@ -23,6 +23,7 @@ import type { NavigationPhase } from '@/store/navigationStore';
  */
 export function useGlobalOrderAccept() {
     const apolloClient = useApolloClient();
+    const hasHydrated = useAuthStore((s) => s.hasHydrated);
     const currentDriverId = useAuthStore((s) => s.user?.id);
     const isOnline = useAuthStore((s) => s.isOnline);
     const { dispatchModeEnabled } = useStoreStatus();
@@ -41,7 +42,7 @@ export function useGlobalOrderAccept() {
         fetchPolicy: 'cache-and-network',
         nextFetchPolicy: 'cache-first',
         notifyOnNetworkStatusChange: true,
-        skip: !currentDriverId,
+        skip: !hasHydrated || !currentDriverId,
     });
 
     // True once the first real network response arrives — prevents auto-present
@@ -366,6 +367,8 @@ export function useGlobalOrderAccept() {
         accepting,
         acceptError,
         takenByOther,
+        networkReady,
+        assignedOrders,
         availableOrders,
         poolOrders,
         handleAcceptOrder,
