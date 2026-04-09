@@ -1,5 +1,4 @@
 # Caddyfile — production reverse proxy
-# Replace api.zippgo.com with your actual domain
 # Caddy automatically obtains and renews TLS certificates
 
 # API — public, proxied through Cloudflare
@@ -12,22 +11,4 @@ api.zippgo.uk {
         header Upgrade websocket
     }
     reverse_proxy @websocket api:4000
-}
-
-# Grafana — restricted to your IP only
-grafana.zippgo.com {
-    @allowed remote_ip 0.0.0.0/0
-    handle @allowed {
-        reverse_proxy localhost:3100
-    }
-    respond 403
-}
-
-# GlitchTip error tracking — restricted to your IP only
-errors.zippgo.com {
-    @allowed remote_ip 0.0.0.0/0
-    handle @allowed {
-        reverse_proxy localhost:8000
-    }
-    respond 403
 }
