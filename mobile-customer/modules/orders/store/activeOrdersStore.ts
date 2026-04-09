@@ -8,6 +8,17 @@ interface DriverConnectionPatch {
     etaUpdatedAt?: string | null;
 }
 
+interface OrderLifecyclePatch {
+    status?: string;
+    updatedAt?: string;
+    preparingAt?: string | null;
+    estimatedReadyAt?: string | null;
+    outForDeliveryAt?: string | null;
+    readyAt?: string | null;
+    deliveredAt?: string | null;
+    preparationMinutes?: number | null;
+}
+
 interface ActiveOrdersState {
     activeOrders: Order[];
     hasActiveOrders: boolean;
@@ -19,6 +30,8 @@ interface ActiveOrdersState {
     clearActiveOrders: () => void;
     /** Patch driver.driverConnection on an existing order (e.g. from live-tracking subscription). */
     patchDriverConnection: (orderId: string, patch: DriverConnectionPatch) => void;
+    /** Patch a small set of lifecycle fields without replacing the whole order object. */
+    patchOrderLifecycle: (orderId: string, patch: OrderLifecyclePatch) => void;
 }
 
 export const useActiveOrdersStore = create<ActiveOrdersState>()((set) => ({
@@ -88,6 +101,21 @@ export const useActiveOrdersStore = create<ActiveOrdersState>()((set) => ({
                     driverConnection: { ...prev, ...patch },
                 },
             };
+            return { activeOrders: newOrders };
+        }),
+
+    patchOrderLifecycle: (orderId, patch) =>
+        set((state) => {
+            const idx = state.activeOrders.findIndex((o) => o.id === orderId);
+            if (idx < 0) return state;
+
+            const order = state.activeOrders[idx] as any;
+            const newOrders = [...state.activeOrders];
+            newOrders[idx] = {
+                ...order,
+                ...patch,
+            };
+
             return { activeOrders: newOrders };
         }),
 }));

@@ -63,7 +63,6 @@
       <li>Password (stored as a bcrypt hash — never in plain text)</li>
       <li>User role (customer, driver, business owner, business employee, admin)</li>
       <li>Preferred language</li>
-      <li>Referral code (if generated or redeemed)</li>
     </ul>
 
     <p><strong>Address and location information</strong></p>
@@ -77,7 +76,7 @@
     <ul>
       <li>Items ordered, quantities, applied options and variants</li>
       <li>Order total, promotions applied, delivery fee</li>
-      <li>Payment method (cash on delivery or prepaid)</li>
+      <li>Payment method (cash on delivery)</li>
       <li>Delivery address, order timestamps, order status history</li>
       <li>Driver notes (text you add to an order)</li>
     </ul>
@@ -107,7 +106,7 @@
       <thead><tr><th>Purpose</th><th>Data used</th></tr></thead>
       <tbody>
         <tr><td>Create and manage your account</td><td>Name, email, phone, password hash, role</td></tr>
-        <tr><td>Process and fulfill orders</td><td>Order details, delivery address, payment method</td></tr>
+        <tr><td>Process and fulfill orders</td><td>Order details, delivery address, cash-on-delivery payment preference</td></tr>
         <tr><td>Match and dispatch drivers</td><td>Driver location, connection status, ETA</td></tr>
         <tr><td>Send push notifications</td><td>Device tokens, order status</td></tr>
         <tr><td>Display real-time order tracking (Live Activity)</td><td>Live Activity token, order status, driver ETA</td></tr>
@@ -144,7 +143,7 @@
     <h2>4. Data Retention</h2>
     <ul>
       <li>Active account data is retained for as long as your account exists.</li>
-      <li>If you delete your account, your personal information (name, phone number, address, referral code) is immediately anonymized, your push notification tokens are deleted, and your saved addresses are deleted. Your email address is replaced with an irreversible placeholder. Order records are retained in anonymized form for accounting and legal compliance purposes.</li>
+      <li>If you delete your account, your personal information (name, phone number, address) is immediately anonymized, your push notification tokens are deleted, and your saved addresses are deleted. Your email address is replaced with an irreversible placeholder. Order records are retained in anonymized form for accounting and legal compliance purposes.</li>
       <li>Refresh token sessions expire after 30 days and are automatically purged.</li>
       <li>Audit logs are retained for operational and fraud prevention purposes.</li>
     </ul>
@@ -221,7 +220,6 @@
       <li>Fjalëkalimi (ruhet si hash bcrypt — kurrë në tekst të qartë)</li>
       <li>Roli i përdoruesit (klient, shofer, pronar biznesi, punonjës biznesi, administrator)</li>
       <li>Gjuha e preferuar</li>
-      <li>Kodi i referimit (nëse është gjeneruar ose përdorur)</li>
     </ul>
 
     <p><strong>Informacioni i adresës dhe vendndodhjes</strong></p>
@@ -302,7 +300,7 @@
     <h2>4. Ruajtja e të Dhënave</h2>
     <ul>
       <li>Të dhënat e llogarisë aktive ruhen për aq kohë sa ekziston llogaria juaj.</li>
-      <li>Nëse fshini llogarinë tuaj, informacioni juaj personal (emri, numri i telefonit, adresa, kodi i referimit) anonimizоhet menjëherë, tokenat e njoftimeve push fshihen dhe adresat e ruajtura hiqen përgjithmonë. Adresa juaj e emailit zëvendësohet me një zëvendësues të pakthyeshëm. Të dhënat e porosisë ruhen në formë anonime për qëllime kontabiliteti dhe pajtueshmërie ligjore.</li>
+      <li>Nëse fshini llogarinë tuaj, informacioni juaj personal (emri, numri i telefonit, adresa) anonimizоhet menjëherë, tokenat e njoftimeve push fshihen dhe adresat e ruajtura hiqen përgjithmonë. Adresa juaj e emailit zëvendësohet me një zëvendësues të pakthyeshëm. Të dhënat e porosisë ruhen në formë anonime për qëllime kontabiliteti dhe pajtueshmërie ligjore.</li>
       <li>Sesionet e token-ave të rifreskimit skadojnë pas 30 ditësh dhe pastrohen automatikisht.</li>
       <li>Regjistrat e auditimit ruhen për qëllime operative dhe parandalimi të mashtrimit.</li>
     </ul>
@@ -396,7 +394,6 @@
       <li>Password (stored as a bcrypt hash — never in plain text)</li>
       <li>User role (customer, driver, business owner, business employee, admin)</li>
       <li>Preferred language</li>
-      <li>Referral code (if generated or redeemed)</li>
     </ul>
 
     <p><strong>Address and location information</strong></p>
@@ -410,7 +407,7 @@
     <ul>
       <li>Items ordered, quantities, applied options and variants</li>
       <li>Order total, promotions applied, delivery fee</li>
-      <li>Payment method (cash on delivery or prepaid)</li>
+      <li>Payment method (cash on delivery)</li>
       <li>Delivery address, order timestamps, order status history</li>
       <li>Driver notes (text you add to an order)</li>
     </ul>
@@ -443,7 +440,7 @@
       </thead>
       <tbody>
         <tr><td>Create and manage your account</td><td>Name, email, phone, password hash, role</td></tr>
-        <tr><td>Process and fulfill orders</td><td>Order details, delivery address, payment method</td></tr>
+        <tr><td>Process and fulfill orders</td><td>Order details, delivery address, cash-on-delivery payment preference</td></tr>
         <tr><td>Match and dispatch drivers</td><td>Driver location, connection status, ETA</td></tr>
         <tr><td>Send push notifications</td><td>Device tokens, order status</td></tr>
         <tr><td>Display real-time order tracking (Live Activity)</td><td>Live Activity token, order status, driver ETA</td></tr>
@@ -485,7 +482,7 @@
     <h2>4. Data Retention</h2>
     <ul>
       <li>Active account data is retained for as long as your account exists.</li>
-      <li>If you delete your account, your personal information (name, phone number, address, referral code) is immediately anonymized, your push notification tokens are deleted, and your saved addresses are deleted. Your email address is replaced with an irreversible placeholder. Order records are retained in anonymized form for accounting and legal compliance purposes.</li>
+      <li>If you delete your account, your personal information (name, phone number, address) is immediately anonymized, your push notification tokens are deleted, and your saved addresses are deleted. Your email address is replaced with an irreversible placeholder. Order records are retained in anonymized form for accounting and legal compliance purposes.</li>
       <li>Refresh token sessions expire after 30 days and are automatically purged.</li>
       <li>Audit logs are retained for operational and fraud prevention purposes.</li>
     </ul>

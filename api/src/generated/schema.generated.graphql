@@ -912,7 +912,6 @@ input InitiateSignupInput {
   firstName: String!
   lastName: String!
   password: String!
-  referralCode: String
 }
 
 input IssueRecoveryPromotionInput {
@@ -1058,7 +1057,6 @@ type Mutation {
 
   """Driver battery telemetry update (recommended every 5-10 minutes)"""
   driverUpdateBatteryStatus(isCharging: Boolean, level: Int!, optIn: Boolean!): DriverConnection!
-  generateReferralCode: String!
   grantFreeDelivery(orderId: ID!, userId: ID!): Boolean!
   initiateSignup(input: InitiateSignupInput!): AuthResponse!
   issueRecoveryPromotion(input: IssueRecoveryPromotionInput!): [UserPromotion!]!
@@ -1633,7 +1631,6 @@ type Query {
 
   """Get live metrics for the authenticated driver"""
   myDriverMetrics: DriverDailyMetrics!
-  myReferralStats: ReferralStats!
   notificationCampaign(id: ID!): NotificationCampaign
   notificationCampaigns: [NotificationCampaign!]!
   offers(businessId: ID!): [Product!]!
@@ -1669,34 +1666,6 @@ type Query {
   userBehavior(userId: ID!): UserBehavior
   users(limit: Int, offset: Int): [User!]!
   validatePromotions(cart: CartContextInput!, manualCode: String): PromotionResult!
-}
-
-type Referral {
-  completedAt: DateTime
-  createdAt: DateTime!
-  id: ID!
-  referralCode: String!
-  referredUser: User
-  referredUserId: ID
-  referrerUserId: ID!
-  rewardAmount: Float
-  rewardGiven: Boolean!
-  status: ReferralStatus!
-}
-
-type ReferralStats {
-  completedReferrals: Int!
-  pendingReferrals: Int!
-  referralCode: String!
-  referrals: [Referral!]!
-  totalReferrals: Int!
-  totalRewardsEarned: Float!
-}
-
-enum ReferralStatus {
-  COMPLETED
-  EXPIRED
-  PENDING
 }
 
 input RegisterDeviceTokenInput {
@@ -2184,7 +2153,6 @@ type User {
   phoneNumber: String
   phoneVerified: Boolean!
   preferredLanguage: AppLanguage!
-  referralCode: String
   role: UserRole!
   signupStep: SignupStep!
   totalOrders: Int!

@@ -913,7 +913,6 @@ export type InitiateSignupInput = {
   firstName: Scalars['String']['input'];
   lastName: Scalars['String']['input'];
   password: Scalars['String']['input'];
-  referralCode?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type IssueRecoveryPromotionInput = {
@@ -1029,7 +1028,6 @@ export type Mutation = {
   driverSendPttSignal: Scalars['Boolean']['output'];
   /** Driver battery telemetry update (recommended every 5-10 minutes) */
   driverUpdateBatteryStatus: DriverConnection;
-  generateReferralCode: Scalars['String']['output'];
   grantFreeDelivery: Scalars['Boolean']['output'];
   initiateSignup: AuthResponse;
   issueRecoveryPromotion: Array<UserPromotion>;
@@ -2277,7 +2275,6 @@ export type Query = {
   myDriverMessages: Array<DriverMessage>;
   /** Get live metrics for the authenticated driver */
   myDriverMetrics: DriverDailyMetrics;
-  myReferralStats: ReferralStats;
   notificationCampaign?: Maybe<NotificationCampaign>;
   notificationCampaigns: Array<NotificationCampaign>;
   offers: Array<Product>;
@@ -2692,35 +2689,6 @@ export type QueryvalidatePromotionsArgs = {
   cart: CartContextInput;
   manualCode?: InputMaybe<Scalars['String']['input']>;
 };
-
-export type Referral = {
-  __typename?: 'Referral';
-  completedAt?: Maybe<Scalars['DateTime']['output']>;
-  createdAt: Scalars['DateTime']['output'];
-  id: Scalars['ID']['output'];
-  referralCode: Scalars['String']['output'];
-  referredUser?: Maybe<User>;
-  referredUserId?: Maybe<Scalars['ID']['output']>;
-  referrerUserId: Scalars['ID']['output'];
-  rewardAmount?: Maybe<Scalars['Float']['output']>;
-  rewardGiven: Scalars['Boolean']['output'];
-  status: ReferralStatus;
-};
-
-export type ReferralStats = {
-  __typename?: 'ReferralStats';
-  completedReferrals: Scalars['Int']['output'];
-  pendingReferrals: Scalars['Int']['output'];
-  referralCode: Scalars['String']['output'];
-  referrals: Array<Referral>;
-  totalReferrals: Scalars['Int']['output'];
-  totalRewardsEarned: Scalars['Float']['output'];
-};
-
-export type ReferralStatus =
-  | 'COMPLETED'
-  | 'EXPIRED'
-  | 'PENDING';
 
 export type RegisterDeviceTokenInput = {
   appType: DeviceAppType;
@@ -3255,7 +3223,6 @@ export type User = {
   phoneNumber?: Maybe<Scalars['String']['output']>;
   phoneVerified: Scalars['Boolean']['output'];
   preferredLanguage: AppLanguage;
-  referralCode?: Maybe<Scalars['String']['output']>;
   role: UserRole;
   signupStep: SignupStep;
   totalOrders: Scalars['Int']['output'];
@@ -3558,9 +3525,6 @@ export type ResolversTypes = {
   PushTelemetryEventType: ResolverTypeWrapper<'RECEIVED' | 'OPENED' | 'ACTION_TAPPED' | 'TOKEN_REGISTERED' | 'TOKEN_REFRESHED' | 'TOKEN_UNREGISTERED'>;
   PushTelemetrySummary: ResolverTypeWrapper<PushTelemetrySummary>;
   Query: ResolverTypeWrapper<{}>;
-  Referral: ResolverTypeWrapper<Omit<Referral, 'referredUser' | 'status'> & { referredUser?: Maybe<ResolversTypes['User']>, status: ResolversTypes['ReferralStatus'] }>;
-  ReferralStats: ResolverTypeWrapper<Omit<ReferralStats, 'referrals'> & { referrals: Array<ResolversTypes['Referral']> }>;
-  ReferralStatus: ResolverTypeWrapper<'PENDING' | 'COMPLETED' | 'EXPIRED'>;
   RegisterDeviceTokenInput: RegisterDeviceTokenInput;
   SendNotificationResult: ResolverTypeWrapper<SendNotificationResult>;
   SendPushNotificationInput: SendPushNotificationInput;
@@ -3739,8 +3703,6 @@ export type ResolversParentTypes = {
   PushTelemetryEvent: PushTelemetryEvent;
   PushTelemetrySummary: PushTelemetrySummary;
   Query: {};
-  Referral: Omit<Referral, 'referredUser'> & { referredUser?: Maybe<ResolversParentTypes['User']> };
-  ReferralStats: Omit<ReferralStats, 'referrals'> & { referrals: Array<ResolversParentTypes['Referral']> };
   RegisterDeviceTokenInput: RegisterDeviceTokenInput;
   SendNotificationResult: SendNotificationResult;
   SendPushNotificationInput: SendPushNotificationInput;
@@ -4334,7 +4296,6 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   driverRegister?: Resolver<ResolversTypes['DriverAuthResult'], ParentType, ContextType, RequireFields<MutationdriverRegisterArgs, 'input'>>;
   driverSendPttSignal?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdriverSendPttSignalArgs, 'action' | 'channelName'>>;
   driverUpdateBatteryStatus?: Resolver<ResolversTypes['DriverConnection'], ParentType, ContextType, RequireFields<MutationdriverUpdateBatteryStatusArgs, 'level' | 'optIn'>>;
-  generateReferralCode?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   grantFreeDelivery?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationgrantFreeDeliveryArgs, 'orderId' | 'userId'>>;
   initiateSignup?: Resolver<ResolversTypes['AuthResponse'], ParentType, ContextType, RequireFields<MutationinitiateSignupArgs, 'input'>>;
   issueRecoveryPromotion?: Resolver<Array<ResolversTypes['UserPromotion']>, ParentType, ContextType, RequireFields<MutationissueRecoveryPromotionArgs, 'input'>>;
@@ -4841,7 +4802,6 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   myBusinessMessages?: Resolver<Array<ResolversTypes['BusinessMessage']>, ParentType, ContextType, Partial<QuerymyBusinessMessagesArgs>>;
   myDriverMessages?: Resolver<Array<ResolversTypes['DriverMessage']>, ParentType, ContextType, Partial<QuerymyDriverMessagesArgs>>;
   myDriverMetrics?: Resolver<ResolversTypes['DriverDailyMetrics'], ParentType, ContextType>;
-  myReferralStats?: Resolver<ResolversTypes['ReferralStats'], ParentType, ContextType>;
   notificationCampaign?: Resolver<Maybe<ResolversTypes['NotificationCampaign']>, ParentType, ContextType, RequireFields<QuerynotificationCampaignArgs, 'id'>>;
   notificationCampaigns?: Resolver<Array<ResolversTypes['NotificationCampaign']>, ParentType, ContextType>;
   offers?: Resolver<Array<ResolversTypes['Product']>, ParentType, ContextType, RequireFields<QueryoffersArgs, 'businessId'>>;
@@ -4876,32 +4836,6 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   users?: Resolver<Array<ResolversTypes['User']>, ParentType, ContextType, Partial<QueryusersArgs>>;
   validatePromotions?: Resolver<ResolversTypes['PromotionResult'], ParentType, ContextType, RequireFields<QueryvalidatePromotionsArgs, 'cart'>>;
 };
-
-export type ReferralResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Referral'] = ResolversParentTypes['Referral']> = {
-  completedAt?: Resolver<Maybe<ResolversTypes['DateTime']>, ParentType, ContextType>;
-  createdAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
-  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
-  referralCode?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
-  referredUser?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType>;
-  referredUserId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
-  referrerUserId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
-  rewardAmount?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
-  rewardGiven?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
-  status?: Resolver<ResolversTypes['ReferralStatus'], ParentType, ContextType>;
-  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
-};
-
-export type ReferralStatsResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['ReferralStats'] = ResolversParentTypes['ReferralStats']> = {
-  completedReferrals?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
-  pendingReferrals?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
-  referralCode?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
-  referrals?: Resolver<Array<ResolversTypes['Referral']>, ParentType, ContextType>;
-  totalReferrals?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
-  totalRewardsEarned?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
-  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
-};
-
-export type ReferralStatusResolvers = EnumResolverSignature<{ COMPLETED?: any, EXPIRED?: any, PENDING?: any }, ResolversTypes['ReferralStatus']>;
 
 export type SendNotificationResultResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['SendNotificationResult'] = ResolversParentTypes['SendNotificationResult']> = {
   failureCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
@@ -5139,7 +5073,6 @@ export type UserResolvers<ContextType = GraphQLContext, ParentType extends Resol
   phoneNumber?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   phoneVerified?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   preferredLanguage?: Resolver<ResolversTypes['AppLanguage'], ParentType, ContextType>;
-  referralCode?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   role?: Resolver<ResolversTypes['UserRole'], ParentType, ContextType>;
   signupStep?: Resolver<ResolversTypes['SignupStep'], ParentType, ContextType>;
   totalOrders?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
@@ -5306,9 +5239,6 @@ export type Resolvers<ContextType = GraphQLContext> = {
   PushTelemetryEventType?: PushTelemetryEventTypeResolvers;
   PushTelemetrySummary?: PushTelemetrySummaryResolvers<ContextType>;
   Query?: QueryResolvers<ContextType>;
-  Referral?: ReferralResolvers<ContextType>;
-  ReferralStats?: ReferralStatsResolvers<ContextType>;
-  ReferralStatus?: ReferralStatusResolvers;
   SendNotificationResult?: SendNotificationResultResolvers<ContextType>;
   SettleResult?: SettleResultResolvers<ContextType>;
   Settlement?: SettlementResolvers<ContextType>;

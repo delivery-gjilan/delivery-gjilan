@@ -8,6 +8,11 @@ import type { Message, MulticastMessage } from 'firebase-admin/messaging';
 import { LiveActivityTokenRepository } from '@/repositories/LiveActivityTokenRepository';
 import { cache } from '@/lib/cache';
 import {
+    getLiveActivityApnsConfig,
+    getLiveActivityApnsTopic,
+    sendLiveActivityApnsPush,
+} from '@/lib/liveActivityApns';
+import {
     pushNotificationsActionedTotal,
     pushNotificationsOpenedTotal,
     pushNotificationsProviderAcceptedTotal,
@@ -82,6 +87,11 @@ export interface BusinessDeviceHeartbeatPayload {
 
 export class NotificationService {
     constructor(public readonly repo: NotificationRepository) {}
+
+    private isStaleLiveActivityReason(reason?: string, status?: number): boolean {
+        if (status === 410) return true;
+        return reason === 'BadDeviceToken' || reason === 'Unregistered';
+    }
 
     private normalizePushReason(code?: string): string {
         if (!code) return 'unknown';
@@ -569,10 +579,6 @@ export class NotificationService {
             return;
         }
 
-        const liveActivityTopic =
-            process.env.LIVE_ACTIVITY_APNS_TOPIC ||
-            process.env.IOS_EXTENSION_BUNDLE_ID ||
-            'com.artshabani.mobilecustomer.DeliveryLiveActivityExtension';
         const liveActivityRepo = new LiveActivityTokenRepository();
         const tokens = await liveActivityRepo.getTokensByOrderId(orderId);
 
@@ -581,58 +587,100 @@ export class NotificationService {
             return;
         }
 
+        const liveActivityApnsConfig = getLiveActivityApnsConfig();
         const messaging = getMessaging();
+        const liveActivityTopic = getLiveActivityApnsTopic();
 
         // Send update to each Live Activity
         for (const tokenRecord of tokens) {
             try {
-                const message: Message = {
-                    token: tokenRecord.pushToken,
-                    data: {
-                        driverName: updates.driverName,
-                        estimatedMinutes: String(updates.estimatedMinutes),
-                        status: updates.status,
-                        orderId: orderId,
-                        phaseInitialMinutes: String(
-                            updates.phaseInitialMinutes ?? updates.estimatedMinutes,
-                        ),
-                        phaseStartedAt: String(
-                            updates.phaseStartedAt ?? Date.now(),
-                        ),
-                        lastUpdated: String(Date.now()),
-                        // ETA fields for the JS background handler to bridge into Zustand
-                        ...(updates.status === 'out_for_delivery' ? {
-                            navigationPhase: 'to_dropoff',
-                            remainingEtaSeconds: String(updates.estimatedMinutes * 60),
-                            etaUpdatedAt: new Date().toISOString(),
-                        } : {}),
-                    },
-                    apns: {
-                        headers: {
-                            'apns-push-type': 'liveactivity', // Required for Live Activity updates
-                            'apns-priority': '10',
-                            'apns-topic': liveActivityTopic,
+                if (liveActivityApnsConfig) {
+                    const result = await sendLiveActivityApnsPush(tokenRecord.pushToken, {
+                        timestamp: Math.floor(Date.now() / 1000),
+                        event: 'update',
+                        'content-state': {
+                            driverName: updates.driverName,
+                            estimatedMinutes: updates.estimatedMinutes,
+                            status: updates.status,
+                            orderId,
+                            phaseInitialMinutes: updates.phaseInitialMinutes ?? updates.estimatedMinutes,
+                            phaseStartedAt: updates.phaseStartedAt ?? Date.now(),
+                            lastUpdated: Date.now(),
                         },
-                        payload: {
-                            aps: {
-                                timestamp: Math.floor(Date.now() / 1000),
-                                event: 'update',
-                                'content-state': {
-                                    driverName: updates.driverName,
-                                    estimatedMinutes: updates.estimatedMinutes,
-                                    status: updates.status,
-                                    orderId: orderId,
-                                    phaseInitialMinutes:
-                                        updates.phaseInitialMinutes ?? updates.estimatedMinutes,
-                                    phaseStartedAt: updates.phaseStartedAt ?? Date.now(),
-                                    lastUpdated: Date.now(),
+                    });
+
+                    if (!result.ok) {
+                        if (this.isStaleLiveActivityReason(result.reason, result.status)) {
+                            logger.info(
+                                { activityId: tokenRecord.activityId, status: result.status, reason: result.reason },
+                                'Removing stale Live Activity token after APNs rejection',
+                            );
+                            await liveActivityRepo.removeToken(tokenRecord.activityId);
+                            continue;
+                        }
+
+                        logger.error(
+                            {
+                                orderId,
+                                activityId: tokenRecord.activityId,
+                                status: result.status,
+                                reason: result.reason,
+                                responseBody: result.responseBody,
+                                topic: liveActivityTopic,
+                            },
+                            'Failed to send Live Activity update via APNs',
+                        );
+                        continue;
+                    }
+                } else {
+                    const message: Message = {
+                        token: tokenRecord.pushToken,
+                        data: {
+                            driverName: updates.driverName,
+                            estimatedMinutes: String(updates.estimatedMinutes),
+                            status: updates.status,
+                            orderId: orderId,
+                            phaseInitialMinutes: String(
+                                updates.phaseInitialMinutes ?? updates.estimatedMinutes,
+                            ),
+                            phaseStartedAt: String(
+                                updates.phaseStartedAt ?? Date.now(),
+                            ),
+                            lastUpdated: String(Date.now()),
+                            ...(updates.status === 'out_for_delivery' ? {
+                                navigationPhase: 'to_dropoff',
+                                remainingEtaSeconds: String(updates.estimatedMinutes * 60),
+                                etaUpdatedAt: new Date().toISOString(),
+                            } : {}),
+                        },
+                        apns: {
+                            headers: {
+                                'apns-push-type': 'liveactivity',
+                                'apns-priority': '10',
+                                'apns-topic': liveActivityTopic,
+                            },
+                            payload: {
+                                aps: {
+                                    timestamp: Math.floor(Date.now() / 1000),
+                                    event: 'update',
+                                    'content-state': {
+                                        driverName: updates.driverName,
+                                        estimatedMinutes: updates.estimatedMinutes,
+                                        status: updates.status,
+                                        orderId: orderId,
+                                        phaseInitialMinutes:
+                                            updates.phaseInitialMinutes ?? updates.estimatedMinutes,
+                                        phaseStartedAt: updates.phaseStartedAt ?? Date.now(),
+                                        lastUpdated: Date.now(),
+                                    },
                                 },
                             },
                         },
-                    },
-                };
+                    };
 
-                await messaging.send(message);
+                    await messaging.send(message);
+                }
+
                 logger.info(
                     { orderId, activityId: tokenRecord.activityId, estimatedMinutes: updates.estimatedMinutes },
                     'Sent Live Activity update',
@@ -670,10 +718,6 @@ export class NotificationService {
         orderId: string,
         finalStatus: 'delivered' | 'cancelled' = 'delivered',
     ): Promise<void> {
-        const liveActivityTopic =
-            process.env.LIVE_ACTIVITY_APNS_TOPIC ||
-            process.env.IOS_EXTENSION_BUNDLE_ID ||
-            'com.artshabani.mobilecustomer.DeliveryLiveActivityExtension';
         const liveActivityRepo = new LiveActivityTokenRepository();
         const tokens = await liveActivityRepo.getTokensByOrderId(orderId);
 
@@ -681,7 +725,9 @@ export class NotificationService {
             return;
         }
 
+        const liveActivityApnsConfig = getLiveActivityApnsConfig();
         const messaging = getMessaging();
+        const liveActivityTopic = getLiveActivityApnsTopic();
 
         // Send end event to each Live Activity
         for (const tokenRecord of tokens) {
@@ -694,33 +740,58 @@ export class NotificationService {
                     lastUpdated: Date.now(),
                 };
 
-                const message: Message = {
-                    token: tokenRecord.pushToken,
-                    data: {
-                        driverName: finalState.driverName,
-                        estimatedMinutes: String(finalState.estimatedMinutes),
-                        status: finalState.status,
-                        orderId,
-                        lastUpdated: String(finalState.lastUpdated),
-                    },
-                    apns: {
-                        headers: {
-                            'apns-push-type': 'liveactivity',
-                            'apns-priority': '10',
-                            'apns-topic': liveActivityTopic,
+                if (liveActivityApnsConfig) {
+                    const result = await sendLiveActivityApnsPush(tokenRecord.pushToken, {
+                        timestamp: Math.floor(Date.now() / 1000),
+                        event: 'end',
+                        'content-state': finalState,
+                        'dismissal-date': Math.floor(Date.now() / 1000) + 10,
+                    });
+
+                    if (!result.ok) {
+                        logger.error(
+                            {
+                                orderId,
+                                activityId: tokenRecord.activityId,
+                                status: result.status,
+                                reason: result.reason,
+                                responseBody: result.responseBody,
+                                topic: liveActivityTopic,
+                            },
+                            'Failed to end Live Activity via APNs',
+                        );
+                        continue;
+                    }
+                } else {
+                    const message: Message = {
+                        token: tokenRecord.pushToken,
+                        data: {
+                            driverName: finalState.driverName,
+                            estimatedMinutes: String(finalState.estimatedMinutes),
+                            status: finalState.status,
+                            orderId,
+                            lastUpdated: String(finalState.lastUpdated),
                         },
-                        payload: {
-                            aps: {
-                                timestamp: Math.floor(Date.now() / 1000),
-                                event: 'end',
-                                'content-state': finalState,
-                                'dismissal-date': Math.floor(Date.now() / 1000) + 10, // Dismiss after 10 seconds
+                        apns: {
+                            headers: {
+                                'apns-push-type': 'liveactivity',
+                                'apns-priority': '10',
+                                'apns-topic': liveActivityTopic,
+                            },
+                            payload: {
+                                aps: {
+                                    timestamp: Math.floor(Date.now() / 1000),
+                                    event: 'end',
+                                    'content-state': finalState,
+                                    'dismissal-date': Math.floor(Date.now() / 1000) + 10,
+                                },
                             },
                         },
-                    },
-                };
+                    };
 
-                await messaging.send(message);
+                    await messaging.send(message);
+                }
+
                 logger.info({ orderId, activityId: tokenRecord.activityId }, 'Ended Live Activity');
             } catch (error: any) {
                 logger.error({ error, orderId, activityId: tokenRecord.activityId }, 'Failed to end Live Activity');

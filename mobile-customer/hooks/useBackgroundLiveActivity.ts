@@ -26,116 +26,127 @@ function toMs(dateLike?: string | null): number | null {
     return parsed;
 }
 
+function getCandidateOrder(activeOrders: any[]) {
+    const eligible = activeOrders.filter(
+        (order) =>
+            order &&
+            order.id &&
+            typeof order.status === 'string' &&
+            LIVE_ACTIVITY_ELIGIBLE_STATUSES.has(order.status),
+    );
+
+    if (eligible.length === 0) return null;
+
+    return [...eligible].sort((a, b) => {
+        const aTime = Date.parse(a.updatedAt || a.orderDate || '') || 0;
+        const bTime = Date.parse(b.updatedAt || b.orderDate || '') || 0;
+        return bTime - aTime;
+    })[0];
+}
+
+function mapLiveStatus(orderStatus?: string | null): LiveStatus | null {
+    if (!orderStatus) return null;
+    if (orderStatus === 'OUT_FOR_DELIVERY') return 'out_for_delivery';
+    if (orderStatus === 'PENDING') return 'pending';
+    if (orderStatus === 'PREPARING' || orderStatus === 'READY') return 'preparing';
+    return null;
+}
+
+function getBusinessName(order: any): string {
+    return (
+        order?.businesses?.[0]?.business?.name ||
+        order?.businesses?.find((entry: any) => entry?.business?.name)?.business?.name ||
+        'Your order'
+    );
+}
+
+function buildStateForOrder(candidateOrder: any, mappedStatus: LiveStatus | null) {
+    if (!candidateOrder || !mappedStatus) return null;
+
+    const nowMs = Date.now();
+
+    const prepTotal = Math.max(1, Number(candidateOrder.preparationMinutes || 15));
+    const estimatedReadyAtMs = toMs(candidateOrder.estimatedReadyAt);
+
+    const preparingStartedAtMs = toMs(candidateOrder.preparingAt);
+    const pendingStartedAtMs = toMs(candidateOrder.orderDate);
+    const outForDeliveryStartedAtMs =
+        toMs(candidateOrder.outForDeliveryAt) ?? toMs(candidateOrder.updatedAt);
+
+    const liveConnection = candidateOrder.driver?.driverConnection;
+    const liveEtaSecondsRaw = Number(liveConnection?.remainingEtaSeconds);
+    const hasLiveDropoffEta =
+        Number.isFinite(liveEtaSecondsRaw) &&
+        liveEtaSecondsRaw > 0 &&
+        liveConnection?.navigationPhase === 'to_dropoff' &&
+        String(liveConnection?.activeOrderId ?? '') === String(candidateOrder.id);
+
+    const inferredPrepRemaining = estimatedReadyAtMs
+        ? Math.max(0, Math.ceil((estimatedReadyAtMs - nowMs) / 60000))
+        : prepTotal;
+
+    if (mappedStatus === 'pending') {
+        return {
+            driverName: 'Your driver',
+            estimatedMinutes: inferredPrepRemaining,
+            phaseInitialMinutes: prepTotal,
+            phaseStartedAt: pendingStartedAtMs ?? nowMs,
+            status: mappedStatus,
+        };
+    }
+
+    if (mappedStatus === 'preparing') {
+        return {
+            driverName: 'Your driver',
+            estimatedMinutes: inferredPrepRemaining,
+            phaseInitialMinutes: prepTotal,
+            phaseStartedAt: preparingStartedAtMs ?? nowMs,
+            status: mappedStatus,
+        };
+    }
+
+    const deliveryPhaseStartedAt = outForDeliveryStartedAtMs ?? nowMs;
+
+    if (hasLiveDropoffEta) {
+        const liveEtaMinutes = Math.max(1, Math.ceil(liveEtaSecondsRaw / 60));
+        const elapsedMinutes = Math.max(0, Math.floor((nowMs - deliveryPhaseStartedAt) / 60000));
+        return {
+            driverName: 'Your driver',
+            estimatedMinutes: liveEtaMinutes,
+            phaseInitialMinutes: Math.max(1, liveEtaMinutes + elapsedMinutes),
+            phaseStartedAt: deliveryPhaseStartedAt,
+            status: mappedStatus,
+        };
+    }
+
+    const elapsedMinutesFallback = Math.max(0, Math.floor((nowMs - deliveryPhaseStartedAt) / 60000));
+    const fallbackInitialMinutes = 15;
+    return {
+        driverName: 'Your driver',
+        estimatedMinutes: Math.max(1, fallbackInitialMinutes - elapsedMinutesFallback),
+        phaseInitialMinutes: fallbackInitialMinutes,
+        phaseStartedAt: deliveryPhaseStartedAt,
+        status: mappedStatus,
+    };
+}
+
 export function useBackgroundLiveActivity() {
     const activeOrders = useActiveOrdersStore((state) => state.activeOrders as any[]);
 
     const candidateOrder = useMemo(() => {
-        const eligible = activeOrders.filter(
-            (order) =>
-                order &&
-                order.id &&
-                typeof order.status === 'string' &&
-                LIVE_ACTIVITY_ELIGIBLE_STATUSES.has(order.status),
-        );
-
-        if (eligible.length === 0) return null;
-
-        return [...eligible].sort((a, b) => {
-            const aTime = Date.parse(a.updatedAt || a.orderDate || '') || 0;
-            const bTime = Date.parse(b.updatedAt || b.orderDate || '') || 0;
-            return bTime - aTime;
-        })[0];
+        return getCandidateOrder(activeOrders);
     }, [activeOrders]);
 
     const mappedStatus: LiveStatus | null = useMemo(() => {
-        if (!candidateOrder?.status) return null;
-        if (candidateOrder.status === 'OUT_FOR_DELIVERY') return 'out_for_delivery';
-        if (candidateOrder.status === 'PENDING') return 'pending';
-        if (candidateOrder.status === 'PREPARING' || candidateOrder.status === 'READY') return 'preparing';
-        return null;
+        return mapLiveStatus(candidateOrder?.status);
     }, [candidateOrder?.status]);
 
-    const businessName =
-        candidateOrder?.businesses?.[0]?.business?.name ||
-        candidateOrder?.businesses?.find((entry: any) => entry?.business?.name)?.business?.name ||
-        'Your order';
-
     const { startLiveActivity } = useLiveActivity({
-        orderId: candidateOrder?.id || '',
-        orderDisplayId: candidateOrder?.displayId || '',
-        businessName,
-        enabled: Boolean(candidateOrder?.id && mappedStatus),
+        orderId: '',
+        orderDisplayId: '',
+        businessName: '',
+        enabled: true,
     });
-
-    const buildState = useCallback(() => {
-        if (!candidateOrder || !mappedStatus) return null;
-
-        const nowMs = Date.now();
-
-        const prepTotal = Math.max(1, Number(candidateOrder.preparationMinutes || 15));
-        const estimatedReadyAtMs = toMs(candidateOrder.estimatedReadyAt);
-
-        const preparingStartedAtMs = toMs(candidateOrder.preparingAt);
-        const pendingStartedAtMs = toMs(candidateOrder.orderDate);
-        const outForDeliveryStartedAtMs =
-            toMs(candidateOrder.outForDeliveryAt) ?? toMs(candidateOrder.updatedAt);
-
-        const liveConnection = candidateOrder.driver?.driverConnection;
-        const liveEtaSecondsRaw = Number(liveConnection?.remainingEtaSeconds);
-        const hasLiveDropoffEta =
-            Number.isFinite(liveEtaSecondsRaw) &&
-            liveEtaSecondsRaw > 0 &&
-            liveConnection?.navigationPhase === 'to_dropoff' &&
-            String(liveConnection?.activeOrderId ?? '') === String(candidateOrder.id);
-
-        const inferredPrepRemaining = estimatedReadyAtMs
-            ? Math.max(0, Math.ceil((estimatedReadyAtMs - nowMs) / 60000))
-            : prepTotal;
-
-        if (mappedStatus === 'pending') {
-            return {
-                driverName: 'Your driver',
-                estimatedMinutes: inferredPrepRemaining,
-                phaseInitialMinutes: prepTotal,
-                phaseStartedAt: pendingStartedAtMs ?? nowMs,
-                status: mappedStatus,
-            };
-        }
-
-        if (mappedStatus === 'preparing') {
-            return {
-                driverName: 'Your driver',
-                estimatedMinutes: inferredPrepRemaining,
-                phaseInitialMinutes: prepTotal,
-                phaseStartedAt: preparingStartedAtMs ?? nowMs,
-                status: mappedStatus,
-            };
-        }
-
-        const deliveryPhaseStartedAt = outForDeliveryStartedAtMs ?? nowMs;
-
-        if (hasLiveDropoffEta) {
-            const liveEtaMinutes = Math.max(1, Math.ceil(liveEtaSecondsRaw / 60));
-            const elapsedMinutes = Math.max(0, Math.floor((nowMs - deliveryPhaseStartedAt) / 60000));
-            return {
-                driverName: 'Your driver',
-                estimatedMinutes: liveEtaMinutes,
-                phaseInitialMinutes: Math.max(1, liveEtaMinutes + elapsedMinutes),
-                phaseStartedAt: deliveryPhaseStartedAt,
-                status: mappedStatus,
-            };
-        }
-
-        const elapsedMinutesFallback = Math.max(0, Math.floor((nowMs - deliveryPhaseStartedAt) / 60000));
-        const fallbackInitialMinutes = 15;
-        return {
-            driverName: 'Your driver',
-            estimatedMinutes: Math.max(1, fallbackInitialMinutes - elapsedMinutesFallback),
-            phaseInitialMinutes: fallbackInitialMinutes,
-            phaseStartedAt: deliveryPhaseStartedAt,
-            status: mappedStatus,
-        };
-    }, [candidateOrder, mappedStatus]);
 
     const appStateRef = useRef<AppStateStatus>(AppState.currentState);
     const clearedWhenNoActiveOrderRef = useRef(false);
@@ -148,7 +159,11 @@ export function useBackgroundLiveActivity() {
 
     const syncLiveActivity = useCallback(
         (force = false) => {
-            if (!candidateOrder?.id) {
+            const storeActiveOrders = useActiveOrdersStore.getState().activeOrders as any[];
+            const currentCandidateOrder = getCandidateOrder(storeActiveOrders);
+            const currentMappedStatus = mapLiveStatus(currentCandidateOrder?.status);
+
+            if (!currentCandidateOrder?.id || !currentMappedStatus) {
                 lastSyncedSignatureRef.current = null;
                 ofdFallbackWaitingSinceRef.current = null;
                 if (ofdFallbackTimerRef.current) {
@@ -158,7 +173,7 @@ export function useBackgroundLiveActivity() {
                 return;
             }
 
-            const state = buildState();
+            const state = buildStateForOrder(currentCandidateOrder, currentMappedStatus);
             if (!state) {
                 return;
             }
@@ -168,14 +183,14 @@ export function useBackgroundLiveActivity() {
             // stale (no live navigationPhase/remainingEtaSeconds yet). Starting the
             // LA immediately with "15 min" looks wrong. Instead we wait up to
             // OFD_LIVE_ETA_GRACE_MS for real GPS data before falling back.
-            if (mappedStatus === 'out_for_delivery') {
-                const liveConnection = candidateOrder.driver?.driverConnection;
+            if (currentMappedStatus === 'out_for_delivery') {
+                const liveConnection = currentCandidateOrder.driver?.driverConnection;
                 const liveEtaSecondsRaw = Number(liveConnection?.remainingEtaSeconds);
                 const hasLiveEta =
                     Number.isFinite(liveEtaSecondsRaw) &&
                     liveEtaSecondsRaw > 0 &&
                     liveConnection?.navigationPhase === 'to_dropoff' &&
-                    String(liveConnection?.activeOrderId ?? '') === String(candidateOrder.id);
+                    String(liveConnection?.activeOrderId ?? '') === String(currentCandidateOrder.id);
 
                 if (hasLiveEta) {
                     // Real GPS data is here — clear any pending fallback timer and sync now.
@@ -206,8 +221,8 @@ export function useBackgroundLiveActivity() {
             }
 
             const signature = [
-                candidateOrder.id,
-                mappedStatus ?? '',
+                currentCandidateOrder.id,
+                currentMappedStatus,
                 String(state.estimatedMinutes),
                 String(state.phaseInitialMinutes),
                 String(state.phaseStartedAt),
@@ -218,9 +233,14 @@ export function useBackgroundLiveActivity() {
             }
 
             lastSyncedSignatureRef.current = signature;
-            void startLiveActivity(state);
+            void startLiveActivity(state, {
+                orderId: String(currentCandidateOrder.id),
+                orderDisplayId: String(currentCandidateOrder.displayId ?? ''),
+                businessName: getBusinessName(currentCandidateOrder),
+                enabled: true,
+            });
         },
-        [buildState, candidateOrder, mappedStatus, startLiveActivity],
+        [startLiveActivity],
     );
 
     const syncLiveActivityRef = useRef(syncLiveActivity);

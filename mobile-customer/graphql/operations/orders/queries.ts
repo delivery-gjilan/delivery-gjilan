@@ -18,10 +18,32 @@ export const GET_ORDERS = gql`
                 preparationMinutes
                 estimatedReadyAt
                 preparingAt
+                readyAt
+                outForDeliveryAt
+                deliveredAt
                 dropOffLocation {
                     latitude
                     longitude
                     address
+                }
+                driver {
+                    id
+                    firstName
+                    lastName
+                    phoneNumber
+                    imageUrl
+                    driverLocation {
+                        latitude
+                        longitude
+                        address
+                    }
+                    driverLocationUpdatedAt
+                    driverConnection {
+                        activeOrderId
+                        navigationPhase
+                        remainingEtaSeconds
+                        etaUpdatedAt
+                    }
                 }
                 businesses {
                     business {

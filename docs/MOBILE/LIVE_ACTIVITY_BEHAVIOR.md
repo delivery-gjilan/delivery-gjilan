@@ -118,6 +118,38 @@ Once token registration exists for that activity/order:
 - No foreground app state is required for updates to apply.
 - Out-for-delivery ETA refreshes are sent from driver heartbeat flow.
 
+## Current Reliability Constraints
+
+- The customer app depends on both remote pushes and local app-side reconciliation. The local reconciliation path now needs the active-order store to carry `outForDeliveryAt`, driver connection ETA fields, and background status patches so it can recover when the app resumes from suspension.
+- Background status notifications should patch the active-order store with the new lifecycle state. Without that bridge, the local fallback path can miss transitions while the app is suspended.
+- The backend stores ActivityKit push tokens and uses them as the remote-update address for Live Activities. Apple’s ActivityKit contract requires sending those updates through APNs with the `liveactivity` push type and an `apns-topic` in the form `<app bundle id>.push-type.liveactivity`; this path should be treated as the source of truth for remote Live Activity transport.
+
+### APNs Server Config
+
+The API now supports direct APNs delivery for Live Activity updates and end events. To enable it, configure these environment variables on the API server:
+
+- `LIVE_ACTIVITY_APNS_KEY_ID` or `APNS_KEY_ID`
+- `LIVE_ACTIVITY_APNS_TEAM_ID` or `APNS_TEAM_ID` (falls back to `APPLE_TEAM_ID` / `IOS_TEAM_ID`)
+- `LIVE_ACTIVITY_APNS_PRIVATE_KEY` or `APNS_PRIVATE_KEY`
+- optional: `LIVE_ACTIVITY_APNS_BUNDLE_ID` when the customer app bundle differs from `com.artshabani.mobilecustomer`
+- optional: `LIVE_ACTIVITY_APNS_ENV` with `sandbox` or `production`
+
+If these are absent, the backend keeps the previous Firebase-based fallback path for compatibility, but the direct APNs path should be considered the correct transport for ActivityKit tokens.
+
+### Where To Get Each Value
+
+- `LIVE_ACTIVITY_APNS_KEY_ID`: Apple Developer portal -> Certificates, Identifiers & Profiles -> Keys. Open the APNs key and copy its Key ID.
+- `LIVE_ACTIVITY_APNS_TEAM_ID`: Apple Developer portal -> Membership. Use the Team ID for the account that owns `com.artshabani.mobilecustomer`.
+- `LIVE_ACTIVITY_APNS_PRIVATE_KEY`: the `.p8` file downloaded when the APNs key is created. Store the full file contents in your secret manager or `.env.prod`, preserving newlines.
+- `LIVE_ACTIVITY_APNS_BUNDLE_ID`: the customer app bundle ID. In this repo it is `com.artshabani.mobilecustomer` from `mobile-customer/app.json`.
+- `LIVE_ACTIVITY_APNS_ENV`: use `sandbox` for local/dev testing against development-signed iOS builds, and `production` for TestFlight/App Store or production-signed builds.
+
+### Production Wiring
+
+- Docker production already loads API secrets from `api/.env.prod` via `api/docker-compose.prod.yml`.
+- To enable APNs in production, add the variables above to the server-side `api/.env.prod` file and restart the API container.
+- The likely file on your server is the one you already use for deploy secrets: `/opt/zippgo/api/.env.prod`.
+
 ### Heartbeat Update Throttling
 
 `DriverHeartbeatHandler.processHeartbeat()` pushes periodic Live Activity ETA updates during the `to_dropoff` navigation phase. Two throttle layers prevent excessive pushes:

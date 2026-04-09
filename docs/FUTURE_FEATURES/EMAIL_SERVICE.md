@@ -60,7 +60,6 @@ The `EmailService` is implemented and sends order receipt emails via **Resend** 
 | Password reset code | `AuthService.resetPassword` | High |
 | Order cancelled | Status → `CANCELLED` | Medium |
 | Order confirmation (placed) | Order created (non-approval path) | Medium |
-| Referral reward notification | Referral credited | Low |
 
 When email verification is moved to email-based flow, the current `emailVerificationCode` column and "return code in response" pattern in `AuthService` should be removed.
 

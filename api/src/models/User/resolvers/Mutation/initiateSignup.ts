@@ -10,8 +10,7 @@ export const initiateSignup: NonNullable<MutationResolvers['initiateSignup']> = 
         input.firstName,
         input.lastName,
         input.email,
-        input.password,
-        input.referralCode || undefined
+        input.password
     );
     return {
         token: result.token,

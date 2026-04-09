@@ -77,12 +77,19 @@ export function useAdminOrdersSubscription() {
                 return;
             }
             apolloClient.cache.updateQuery({ query: ADMIN_GET_ORDERS }, (existing: any) => {
-                const currentOrders = Array.isArray(existing?.orders) ? existing.orders : [];
+                const currentOrders = Array.isArray(existing?.orders?.orders) ? existing.orders.orders : [];
                 const byId = new Map(currentOrders.map((o: any) => [String(o?.id), o]));
                 incomingOrders.forEach((o: any) => {
                     byId.set(String(o?.id), { ...(byId.get(String(o?.id)) as any), ...o });
                 });
-                return { ...(existing ?? {}), orders: Array.from(byId.values()) };
+                return {
+                    ...(existing ?? {}),
+                    orders: {
+                        ...(existing?.orders ?? {}),
+                        orders: Array.from(byId.values()),
+                        totalCount: Array.from(byId.values()).length,
+                    },
+                };
             });
         },
     });

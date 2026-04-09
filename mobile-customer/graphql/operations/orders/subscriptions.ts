@@ -25,6 +25,9 @@ export const USER_ORDERS_UPDATED = gql`
             preparationMinutes
             estimatedReadyAt
             preparingAt
+            readyAt
+            outForDeliveryAt
+            deliveredAt
             dropOffLocation {
                 latitude
                 longitude

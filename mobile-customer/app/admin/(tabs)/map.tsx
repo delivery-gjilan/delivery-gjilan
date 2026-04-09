@@ -54,7 +54,7 @@ export default function AdminMapScreen() {
     const { data: ordersData, loading: ordersLoading, refetch: refetchOrders }: any = useQuery(ADMIN_GET_ORDERS);
     const { data: driversData, refetch: refetchDrivers }: any = useQuery(ADMIN_GET_DRIVERS);
 
-    const orders = ordersData?.orders || [];
+    const orders = ordersData?.orders?.orders || [];
     const drivers = driversData?.drivers || [];
 
     const activeOrders = useMemo(

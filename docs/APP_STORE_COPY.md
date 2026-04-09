@@ -32,8 +32,8 @@ Watch your order move in real time with Dynamic Island and Lock Screen Live Acti
 DELIVERY TO YOUR DOOR
 Add multiple delivery addresses, track every order, and get notified at every step — from the moment a business accepts your order to the second it arrives.
 
-PROMOS & REFERRALS
-Use discount codes and referral bonuses to save on every order.
+PROMOS
+Use discount codes and promotions to save on every order.
 
 CONTACT & SUPPORT
 Need help? Contact our support team directly from the app.
@@ -54,8 +54,8 @@ Ndiqni porosinë tuaj në kohë reale me Dynamic Island dhe Live Activities të 
 DORËZIM NË DERËN TUAJ
 Shtoni adresa të shumta dorëzimi, gjurmoni çdo porosi dhe merrni njoftime në çdo hap — nga momenti kur biznesi pranon porosinë tuaj deri në sekondën kur mbërrin.
 
-PROMOVIMET DHE REFERIMI
-Përdorni kode zbritjeje dhe bonuse referimi për të kursyer në çdo porosi.
+PROMOVIMET
+Përdorni kode zbritjeje dhe promovime për të kursyer në çdo porosi.
 
 KONTAKT DHE MBËSHTETJE
 Keni nevojë për ndihmë? Kontaktoni ekipin tonë të mbështetjes direkt nga aplikacioni.
@@ -211,7 +211,7 @@ To test:
 
 Demo account: [your test phone number]
 OTP for demo account: [use real OTP or provide a bypass if available]
-Contact: support@zippdelivery.com
+Contact: artshabani2002@gmail.com
 ```
 
 ### Zipp Driver
@@ -228,7 +228,7 @@ To test:
 4. The order will appear already assigned once it reaches the delivery stage
 
 Demo account: [your test driver phone number]
-Contact: support@zippdelivery.com
+Contact: artshabani2002@gmail.com
 ```
 
 ### Zipp Business
@@ -244,7 +244,7 @@ Recommended review flow:
 3. Place an order using the Zipp Go demo customer account
 4. Observe the incoming order and subsequent status progression
 
-Contact: support@zippdelivery.com
+Contact: artshabani2002@gmail.com
 ```
 
 ---
@@ -253,8 +253,8 @@ Contact: support@zippdelivery.com
 
 | Field | URL |
 |-------|-----|
-| Privacy Policy | `https://zippdelivery.com/privacy` |
-| Terms of Service | `https://zippdelivery.com/terms` |
+| Privacy Policy | `https://delivery-gjilan.vercel.app/privacy` |
+| Terms of Service | `https://delivery-gjilan.vercel.app/terms` |
 
 ---
 

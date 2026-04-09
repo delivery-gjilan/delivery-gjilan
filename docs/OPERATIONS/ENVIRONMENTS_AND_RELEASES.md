@@ -16,6 +16,13 @@ What exists today:
 - EAS `development`, `preview`, and `production` build profiles
 - Expo Update usage in the mobile apps
 
+### Current API Database Wiring
+
+- local API scripts load `api/.env` directly via `tsx --env-file=.env` or `node --env-file=.env`
+- the checked-in local `DB_URL` points at `postgresql://postgres:postgres@localhost:8090/delivery-gjilan-db-local`
+- production Docker wiring injects `DATABASE_URL=postgresql://...@db:5432/...` for the in-cluster Postgres container
+- when debugging database targets, verify whether the running process is reading `DB_URL` or `DATABASE_URL`, because both names appear in repo-level config
+
 What is still a launch blocker:
 
 - the mobile EAS profiles currently point at ngrok URLs in committed config

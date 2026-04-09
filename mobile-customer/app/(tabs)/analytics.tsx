@@ -159,7 +159,7 @@ export default function Profile() {
                     <Text className="text-2xl font-bold text-white mb-4">Quick links</Text>
                     <View>
                         {false && <ProfileRow title="Redeem code" onPress={() => {}} />}
-                        <ProfileRow title="Contact Support" onPress={() => Linking.openURL('mailto:support@zippdelivery.com')} />
+                        <ProfileRow title="Contact Support" onPress={() => Linking.openURL('mailto:artshabani2002@gmail.com')} />
                         <ProfileRow title="Order history" onPress={handleOrderHistoryPress} showDivider={false} />
                     </View>
                 </View>

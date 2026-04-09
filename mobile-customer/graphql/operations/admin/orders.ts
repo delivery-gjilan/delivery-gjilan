@@ -5,54 +5,58 @@ import { gql } from '@apollo/client';
 export const ADMIN_GET_ORDERS = gql`
     query AdminGetOrders {
         orders {
-            id
-            orderPrice
-            deliveryPrice
-            totalPrice
-            orderDate
-            updatedAt
-            status
-            preparationMinutes
-            estimatedReadyAt
-            preparingAt
-            user {
+            hasMore
+            totalCount
+            orders {
                 id
-                firstName
-                lastName
-                email
-                address
-                phoneNumber
-            }
-            driver {
-                id
-                firstName
-                lastName
-                email
-                phoneNumber
-            }
-            dropOffLocation {
-                latitude
-                longitude
-                address
-            }
-            businesses {
-                business {
+                orderPrice
+                deliveryPrice
+                totalPrice
+                orderDate
+                updatedAt
+                status
+                preparationMinutes
+                estimatedReadyAt
+                preparingAt
+                user {
                     id
-                    name
+                    firstName
+                    lastName
+                    email
+                    address
                     phoneNumber
-                    businessType
-                    location {
-                        latitude
-                        longitude
-                        address
-                    }
                 }
-                items {
-                    productId
-                    name
-                    imageUrl
-                    quantity
-                    unitPrice
+                driver {
+                    id
+                    firstName
+                    lastName
+                    email
+                    phoneNumber
+                }
+                dropOffLocation {
+                    latitude
+                    longitude
+                    address
+                }
+                businesses {
+                    business {
+                        id
+                        name
+                        phoneNumber
+                        businessType
+                        location {
+                            latitude
+                            longitude
+                            address
+                        }
+                    }
+                    items {
+                        productId
+                        name
+                        imageUrl
+                        quantity
+                        unitPrice
+                    }
                 }
             }
         }

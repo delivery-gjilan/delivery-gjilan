@@ -1,3 +1,8 @@
+<!-- MDS:O15 | Domain: Operations | Updated: 2026-04-09 -->
+<!-- Depends-On: O7, O10, O19 -->
+<!-- Depended-By: O19 -->
+<!-- Nav: When app submission blockers or mobile release config changes, update this tracker first and keep it aligned with each app's app.json and eas.json. -->
+
 # App Store Deployment Guide — Zipp Platform
 
 > Single source of truth for getting all Zipp mobile apps through Apple App Store and Google Play review.
@@ -13,10 +18,10 @@
 | Phase 2 — Account deletion compliance | ✅ Done | Backend PII anonymization fixed. Delete button added to Driver + Business. |
 | Phase 3 — Debug/dead UI cleanup | ✅ Done | Dead-end buttons hidden, Contact Support → `mailto:`, debug screen removed. |
 | Phase 4 — app.json / eas.json config fixes | ✅ Done | `appleTeamId`, `ITSAppUsesNonExemptEncryption`, `runtimeVersion`, permissions deduped, EAS submit configs populated. |
-| Phase 5 — Production API infrastructure | ⏭️ Skipped | Still on ngrok for now. **Must complete before App Store submission** — replace all ngrok URLs in `eas.json` with the production domain. |
+| Phase 5 — Production API infrastructure | ⏭️ Partial | Customer production build points at Railway. Driver, Business, and Admin production EAS profiles still point at temporary tunnel URLs. |
 | Phase 6 — Live Activities verification | ✅ Done | `NSSupportsLiveActivitiesFrequentUpdates: true` added. Manual checks remain (see Phase 6 section). |
 | Phase 7 — App Store Connect metadata & screenshots | ⏭️ Skipped | Copy written in `docs/APP_STORE_COPY.md`. **Must complete before submission** — enter metadata in ASC, take screenshots, fill Privacy Nutrition Labels. |
-| Phase 8 — Build, test & submit | ❌ Not started | Blocked by Phase 5 and Phase 7. |
+| Phase 8 — Build, test & submit | ❌ Not started | Customer is blocked by Phase 7 plus final production validation. Driver, Business, and Admin are also blocked by Phase 5. |
 
 ---
 
@@ -48,22 +53,30 @@
 | App | Bundle ID (iOS) | Package (Android) | ASC App ID | EAS Project ID | Owner |
 |---|---|---|---|---|---|
 | **Zipp Go** (Customer) | `com.artshabani.mobilecustomer` | `com.artshabani.mobilecustomer` | `6760239090` | `e5c04b16-...` | `artshabani2002` |
-| **Zipp Driver** | `com.zippdelivery.mobiledriver` | `com.zippdelivery.mobiledriver` | `6760439437` | `1c06f250-...` | `edonramadani` |
-| **Zipp Business** | `com.zippdelivery.mobilebusiness` | `com.zippdelivery.mobilebusiness` | `6760672459` | `dc536dcd-...` | ❌ Not set |
+| **Zipp Driver** | `com.zippdelivery.mobiledriver` | `com.zippdelivery.mobiledriver` | `6760439437` | `d813bf35-...` | `artshabani2002` |
+| **Zipp Business** | `com.zippdelivery.mobilebusiness` | `com.zippdelivery.mobilebusiness` | `6760672459` | `dc536dcd-...` | `artshabani2002` |
 | **Zipp Admin** | `com.zippdelivery.mobileadmin` | `com.zippdelivery.mobileadmin` | `6760673685` | `311a1600-...` | `artshabani2002` |
 
 ### Configuration Gap Matrix
 
 | Config Key | Customer | Driver | Business | Admin |
 |---|---|---|---|---|
-| `appleTeamId` | ✅ `87K8YXG5V8` | ❌ Missing | ❌ Missing | ❌ Missing |
+| `appleTeamId` | ✅ `87K8YXG5V8` | ✅ `87K8YXG5V8` | ✅ `87K8YXG5V8` | ⚠️ Verify in config before first store build |
 | `ascAppId` (eas.json submit) | ✅ | ✅ | ✅ | ✅ |
-| `owner` (app.json) | ✅ | ✅ | ❌ Missing | ✅ |
-| `ITSAppUsesNonExemptEncryption` | ✅ | ✅ | ❌ No infoPlist | ⚠️ Not set |
-| `runtimeVersion` | ✅ policy | ✅ policy | ✅ policy | ⚠️ Hardcoded `"1.0.0"` |
-| EAS submit config | ✅ Full | ⚠️ Partial | ❌ Empty `{}` | ❌ No eas.json |
+| `owner` (app.json) | ✅ | ✅ | ✅ | ✅ |
+| `ITSAppUsesNonExemptEncryption` | ✅ | ✅ | ✅ | ✅ |
+| `runtimeVersion` | ✅ policy | ✅ policy | ⚠️ Hardcoded `"1.0.0"` | ✅ policy |
+| EAS submit config | ✅ Full | ✅ App ID + team ID | ✅ App ID + team ID | ✅ Full |
 | `scheme` (deep linking) | ✅ | ✅ | ✅ | ✅ |
 | EAS projectId | ✅ | ✅ | ✅ | ✅ |
+
+### Verified Customer App State
+
+- `mobile-customer/app.json` is App Store-ready on the core config surface: bundle ID, `appleTeamId`, Live Activities flags, `ITSAppUsesNonExemptEncryption`, `owner`, and `runtimeVersion` are set.
+- `mobile-customer/eas.json` production is pointed at `https://api-production-5008.up.railway.app/graphql`, not a tunnel URL.
+- Customer app UI already exposes Privacy Policy, Terms of Service, Contact Support, and Delete Account.
+- Remaining customer work is now mostly App Store Connect operations plus final production validation.
+- Exact App Store Connect field selections for the customer app live in `docs/OPERATIONS/APP_STORE_CONNECT_CUSTOMER.md`.
 
 ---
 
@@ -75,13 +88,13 @@
 |---|---|---|---|---|
 | R1 | **No Privacy Policy URL** | All | No file exists | Host a privacy policy page. Link it in App Store Connect AND inside each app (profile/settings screen). Apple Guidelines 5.1.1(i) |
 | R2 | **No Terms of Service URL** | All | No file exists | Host a ToS page. Link it inside each app. Required for apps with user accounts |
-| R3 | **Account deletion doesn't fully anonymize PII** | All | `api/src/repositories/AuthRepository.ts:272-281` | Backend soft-deletes and anonymizes email only. Does NOT clear: `firstName`, `lastName`, `phoneNumber`, `address`, `referralCode`, device tokens, user addresses. Apple Guidelines 5.1.1(v) |
+| R3 | **Account deletion doesn't fully anonymize PII** | All | `api/src/repositories/AuthRepository.ts:272-281` | Backend must clear all user PII and delete device tokens + saved addresses. Apple Guidelines 5.1.1(v) |
 | R4 | **Account deletion button missing** | Driver, Business | `mobile-driver/app/(tabs)/profile.tsx`, `mobile-business/app/(tabs)/settings.tsx` | Driver profile has NO delete account option. Business settings has NO delete account option. The `deleteMyAccount` mutation exists in the GraphQL schema — just needs a UI button |
 | R5 | **Dead-end buttons (no-op handlers)** | Customer, Admin | See list below | 9 buttons with `onPress={() => {}}` — Apple calls these "incomplete features" and will reject. Either implement or hide |
 | R6 | **Debug screen in production** | Customer | `mobile-customer/app/(tabs)/profile.tsx:198`, `mobile-customer/app/debug-notifications.tsx` | "🐛 Debug Notifications" visible in profile. Remove or gate behind `__DEV__` |
 | R7 | **Production URLs point to ngrok** | All | All `eas.json` files | Temporary tunnel URLs. App won't work after ngrok restarts. Replace with permanent HTTPS domain |
 | R8 | **Missing `ITSAppUsesNonExemptEncryption`** | Business, Admin | `mobile-business/app.json` (no infoPlist), `mobile-admin/app.json` (not set) | Add `"ITSAppUsesNonExemptEncryption": false` to avoid export compliance hold on every build |
-| R9 | **Alcohol category without age-gating** | Customer | `mobile-customer/components/Categories.tsx:48-51` | "Alcohol" category exists (currently a no-op `console.log`). If this leads to actual alcohol products → Apple requires age verification + 17+ rating. **Safest: remove it entirely if not selling alcohol** |
+| R9 | **Age-rating mismatch if regulated goods are introduced later** | Customer | `mobile-customer/components/Categories.tsx` | Current customer categories do not expose alcohol. Keep App Store age rating at **4+** unless regulated goods or adult-only flows are added later. |
 | R10 | **Missing `appleTeamId`** | Driver, Business, Admin | All three `app.json` files | Required for EAS to build and submit to App Store. Add `"appleTeamId": "87K8YXG5V8"` to the `ios` section |
 | R11 | **Missing/broken EAS submit config** | Business, Admin | `mobile-business/eas.json` (empty submit), `mobile-admin/` (no eas.json) | Cannot run `eas submit` without proper config. Create eas.json for admin, add ascAppId to both |
 
@@ -146,7 +159,7 @@
    - Payment and delivery terms
    - Account termination, liability limitations
 
-3. **Host both** at permanent URLs (e.g., `https://zippdelivery.com/privacy`, `https://zippdelivery.com/terms`)
+3. **Host both** at permanent URLs (currently `https://delivery-gjilan.vercel.app/privacy` and `https://delivery-gjilan.vercel.app/terms`)
 
 4. **Add in-app links** to both pages:
    - **Customer:** Add two `ProfileRow` items in `mobile-customer/app/(tabs)/profile.tsx`
@@ -186,7 +199,6 @@ async deleteUser(userId: string): Promise<boolean> {
 - `lastName` → `'User'`
 - `phoneNumber` → `null`
 - `address` → `null`
-- `referralCode` → `null`
 
 **Must also delete related records:**
 - Device tokens (table: `deviceTokens` where `userId = X`)
@@ -210,7 +222,7 @@ async deleteUser(userId: string): Promise<boolean> {
    - Either delete `mobile-customer/app/debug-notifications.tsx` or guard the route
 
 2. **Fix or hide no-op buttons:**
-   - `Contact Support` → **implement**: open `Linking.openURL('mailto:support@zippdelivery.com')` or a support webpage
+   - `Contact Support` → **implement**: open `Linking.openURL('mailto:artshabani2002@gmail.com')` or a support webpage
    - `Credits` / `Redeem Code` / `Buy Gift Card` / `Account` → **hide** (`{false && <ProfileRow .../>}` or remove entirely)
    - Same cleanup in `analytics.tsx`
 
@@ -366,7 +378,7 @@ For **each app** being submitted:
    - Full description (max 4000 chars)
    - Keywords (iOS only, max 100 chars)
    - Category: **Food & Drink** (Customer), **Business** (Driver/Business/Admin)
-   - Age rating: **4+** (if Alcohol category is removed), **17+** (if Alcohol stays)
+   - Age rating: **4+**
 
 3. **Upload screenshots:**
    - iPhone 6.7" (1290 × 2796) — required
@@ -472,7 +484,7 @@ This is a food delivery application operating in Gjilan, Kosovo.
 
 Privacy Policy: https://[your-domain]/privacy
 Terms of Service: https://[your-domain]/terms
-Support: support@zippdelivery.com
+Support: artshabani2002@gmail.com
 ```
 
 ---
@@ -529,20 +541,12 @@ All apps use `appVersionSource: "remote"` in EAS with `autoIncrement: true` for 
 
 ---
 
-## Alcohol Category Decision
+## Age Rating Decision
 
-`mobile-customer/components/Categories.tsx:48-51` has an "Alcohol" category. Currently it's a no-op (`console.log`).
+`mobile-customer/components/Categories.tsx` currently exposes Restaurants, Groceries, Health & Wellbeing, and Beauty & Care only.
 
-**If you DO plan to sell alcohol:**
-- Implement age-gating (DOB verification before accessing Alcohol category)
-- Set age rating to 17+ in App Store Connect
-- Add alcohol-specific disclaimers to Terms of Service
-- Check local Kosovo/regional regulations
-
-**If you do NOT plan to sell alcohol (recommended for v1):**
-- Remove the Alcohol category entirely from the categories array
-- Set age rating to 4+ for broader reach
-- You can always add it back later with proper compliance
+- Set the customer app age rating to **4+** in App Store Connect.
+- Revisit the rating only if you later add regulated goods or adult-only flows.
 
 
 

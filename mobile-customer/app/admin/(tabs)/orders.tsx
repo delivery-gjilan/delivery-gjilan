@@ -18,7 +18,7 @@ export default function AdminOrdersScreen() {
     const [activeTab, setActiveTab] = useState<StatusTab>('ALL');
     const { data, loading, refetch }: any = useQuery(ADMIN_GET_ORDERS);
 
-    const orders = data?.orders || [];
+    const orders = data?.orders?.orders || [];
 
     const filteredOrders = useMemo(
         () => (activeTab === 'ALL' ? orders : orders.filter((o: any) => o.status === activeTab)),

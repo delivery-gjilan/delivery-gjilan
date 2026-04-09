@@ -927,7 +927,6 @@ export type InitiateSignupInput = {
   firstName: Scalars['String']['input'];
   lastName: Scalars['String']['input'];
   password: Scalars['String']['input'];
-  referralCode?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type IssueRecoveryPromotionInput = {
@@ -1044,7 +1043,6 @@ export type Mutation = {
   driverSendPttSignal: Scalars['Boolean']['output'];
   /** Driver battery telemetry update (recommended every 5-10 minutes) */
   driverUpdateBatteryStatus: DriverConnection;
-  generateReferralCode: Scalars['String']['output'];
   grantFreeDelivery: Scalars['Boolean']['output'];
   initiateSignup: AuthResponse;
   issueRecoveryPromotion: Array<UserPromotion>;
@@ -1067,7 +1065,9 @@ export type Mutation = {
   replyToBusinessMessage: BusinessMessage;
   /** Driver replies to admin */
   replyToDriverMessage: DriverMessage;
+  requestPasswordReset: Scalars['Boolean']['output'];
   resendEmailVerification: SignupStepResponse;
+  resetPassword: Scalars['Boolean']['output'];
   /** Business/driver accepts or rejects a pending settlement request. */
   respondToSettlementRequest: SettlementRequest;
   runSettlementScenarioHarness: SettlementScenarioHarnessResult;
@@ -1513,6 +1513,17 @@ export type MutationReplyToBusinessMessageArgs = {
 export type MutationReplyToDriverMessageArgs = {
   adminId: Scalars['ID']['input'];
   body: Scalars['String']['input'];
+};
+
+
+export type MutationRequestPasswordResetArgs = {
+  email: Scalars['String']['input'];
+};
+
+
+export type MutationResetPasswordArgs = {
+  newPassword: Scalars['String']['input'];
+  token: Scalars['String']['input'];
 };
 
 
@@ -2287,7 +2298,6 @@ export type Query = {
   myDriverMessages: Array<DriverMessage>;
   /** Get live metrics for the authenticated driver */
   myDriverMetrics: DriverDailyMetrics;
-  myReferralStats: ReferralStats;
   notificationCampaign?: Maybe<NotificationCampaign>;
   notificationCampaigns: Array<NotificationCampaign>;
   offers: Array<Product>;
@@ -2702,36 +2712,6 @@ export type QueryValidatePromotionsArgs = {
   cart: CartContextInput;
   manualCode?: InputMaybe<Scalars['String']['input']>;
 };
-
-export type Referral = {
-  __typename?: 'Referral';
-  completedAt?: Maybe<Scalars['DateTime']['output']>;
-  createdAt: Scalars['DateTime']['output'];
-  id: Scalars['ID']['output'];
-  referralCode: Scalars['String']['output'];
-  referredUser?: Maybe<User>;
-  referredUserId?: Maybe<Scalars['ID']['output']>;
-  referrerUserId: Scalars['ID']['output'];
-  rewardAmount?: Maybe<Scalars['Float']['output']>;
-  rewardGiven: Scalars['Boolean']['output'];
-  status: ReferralStatus;
-};
-
-export type ReferralStats = {
-  __typename?: 'ReferralStats';
-  completedReferrals: Scalars['Int']['output'];
-  pendingReferrals: Scalars['Int']['output'];
-  referralCode: Scalars['String']['output'];
-  referrals: Array<Referral>;
-  totalReferrals: Scalars['Int']['output'];
-  totalRewardsEarned: Scalars['Float']['output'];
-};
-
-export enum ReferralStatus {
-  Completed = 'COMPLETED',
-  Expired = 'EXPIRED',
-  Pending = 'PENDING'
-}
 
 export type RegisterDeviceTokenInput = {
   appType: DeviceAppType;
@@ -3277,7 +3257,6 @@ export type User = {
   phoneNumber?: Maybe<Scalars['String']['output']>;
   phoneVerified: Scalars['Boolean']['output'];
   preferredLanguage: AppLanguage;
-  referralCode?: Maybe<Scalars['String']['output']>;
   role: UserRole;
   signupStep: SignupStep;
   totalOrders: Scalars['Int']['output'];

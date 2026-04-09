@@ -61,6 +61,5 @@ export const setUserPermissions: NonNullable<MutationResolvers['setUserPermissio
         imageUrl: targetUser.imageUrl ?? null,
         driverLocation: null,
         driverLocationUpdatedAt: null,
-        referralCode: targetUser.referralCode ?? null,
     };
 };

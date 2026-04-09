@@ -66,6 +66,7 @@
 | O15 | [APP_STORE_DEPLOYMENT.md](APP_STORE_DEPLOYMENT.md) | Operations | Workspace-level App Store submission tracker for the four mobile apps, including completed/skipped phases and release blockers |
 | O17 | [OPERATIONS/ANDROID_PLAY_STORE_DEPLOYMENT.md](OPERATIONS/ANDROID_PLAY_STORE_DEPLOYMENT.md) | Operations | Android Play Store deployment plan for Zipp Go, Zipp Driver, and Zipp Business — map bug root cause, config gap matrix, build/submit phases, Data Safety form requirements |
 | O18 | [OPERATIONS/HA_DEPLOYMENT_PLAN.md](OPERATIONS/HA_DEPLOYMENT_PLAN.md) | Operations | High-availability deployment plan: load balancer (Nginx/Caddy), 2–3 API instances (PM2/Docker), shared Redis + Postgres, WebSocket upgrade config, health check endpoint, risk matrix, 2-VPS launch stack |
+| O19 | [OPERATIONS/APP_STORE_CONNECT_CUSTOMER.md](OPERATIONS/APP_STORE_CONNECT_CUSTOMER.md) | Operations | Exact App Store Connect field selections, metadata choices, screenshot guidance, and review-info checklist for the customer iOS app |
 | O16 | [DEMO_MODE_PLAN.md](DEMO_MODE_PLAN.md) | Operations | Apple review demo-account flow, auto-progression behavior, reviewer credentials strategy, and admin-panel demo-account operations |
 | UI1 | [ADMIN_MOBILEBUSINESS_UI_CONTEXT.md](ADMIN_MOBILEBUSINESS_UI_CONTEXT.md) | UI | Product types, variant groups, admin/mobile-business UX |
 | UI2 | [ADMIN_PANEL_BUSINESS_SETTLEMENTS.md](ADMIN_PANEL_BUSINESS_SETTLEMENTS.md) | UI | Business-facing settlements semantics, filters, lazy order details |
@@ -135,6 +136,8 @@ ARCHITECTURE (A1)
     │   └── TESTING_PIPELINE (O8)
     │       └── DOCKER_AND_STRESS_TESTING (O9)
     ├── APP_STORE_RELEASE (O10)
+    │   ├── APP_STORE_DEPLOYMENT (O15)
+    │   └── APP_STORE_CONNECT_CUSTOMER (O19)
     ├── ANALYTICS (O11)
     └── DRIVER_TRACKING_SMOOTHNESS (O12) ← B4, M8
 ```

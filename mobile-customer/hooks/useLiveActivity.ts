@@ -38,6 +38,13 @@ interface UseLiveActivityOptions {
     enabled?: boolean; // Only start Live Activity when enabled
 }
 
+interface LiveActivityRuntimeOptions {
+    orderId?: string;
+    orderDisplayId?: string;
+    businessName?: string;
+    enabled?: boolean;
+}
+
 /**
  * Hook to manage Live Activities (Dynamic Island) for delivery tracking.
  *
@@ -57,6 +64,7 @@ interface UseLiveActivityOptions {
  */
 export function useLiveActivity({ orderId, orderDisplayId, businessName, enabled = false }: UseLiveActivityOptions) {
     const activityIdRef = useRef<string | null>(null);
+    const activityOrderIdRef = useRef<string | null>(null);
     const [registerToken] = useMutation(REGISTER_LIVE_ACTIVITY_TOKEN);
 
     // iOS version check: require 16.2+ for ActivityContent API
@@ -70,46 +78,72 @@ export function useLiveActivity({ orderId, orderDisplayId, businessName, enabled
         iosVersionNumber >= 16.2 &&
         !!DeliveryLiveActivitiesNative;
 
+    const resolveRuntimeOptions = useCallback(
+        (runtime?: LiveActivityRuntimeOptions) => ({
+            orderId: runtime?.orderId ?? orderId,
+            orderDisplayId: runtime?.orderDisplayId ?? orderDisplayId,
+            businessName: runtime?.businessName ?? businessName,
+            enabled: runtime?.enabled ?? enabled,
+        }),
+        [businessName, enabled, orderDisplayId, orderId],
+    );
+
     /**
      * Start a Live Activity for this delivery
      */
-    const startLiveActivity = useCallback(async (initialState: Omit<DeliveryActivityState, 'orderId' | 'lastUpdated'>) => {
-        if (!isSupported || !enabled) {
+    const startLiveActivity = useCallback(async (
+        initialState: Omit<DeliveryActivityState, 'orderId' | 'lastUpdated'>,
+        runtime?: LiveActivityRuntimeOptions,
+    ) => {
+        const resolved = resolveRuntimeOptions(runtime);
+
+        if (!isSupported || !resolved.enabled || !resolved.orderId) {
             console.log('[LiveActivity] Skipping: not supported or not enabled', {
                 isSupported,
-                enabled,
+                enabled: resolved.enabled,
+                orderId: resolved.orderId,
                 hasNativeModule: !!DeliveryLiveActivitiesNative,
             });
             return null;
         }
 
         try {
+            if (activityOrderIdRef.current && activityOrderIdRef.current !== resolved.orderId) {
+                activityIdRef.current = null;
+                activityOrderIdRef.current = null;
+            }
+
             if (!activityIdRef.current && DeliveryLiveActivitiesNative?.findActivityByOrderId) {
-                const existingActivityId = await DeliveryLiveActivitiesNative.findActivityByOrderId(orderId);
+                const existingActivityId = await DeliveryLiveActivitiesNative.findActivityByOrderId(resolved.orderId);
                 if (existingActivityId) {
                     activityIdRef.current = existingActivityId;
+                    activityOrderIdRef.current = resolved.orderId;
                 }
             }
 
             // If activity already exists, just update it
             if (activityIdRef.current) {
                 console.log('[LiveActivity] Activity already exists, updating instead');
-                await updateLiveActivity(initialState);
+                await updateLiveActivity(initialState, runtime);
                 return activityIdRef.current;
             }
 
-            const attributes: DeliveryActivityAttributes = { orderDisplayId, businessName };
+            const attributes: DeliveryActivityAttributes = {
+                orderDisplayId: resolved.orderDisplayId,
+                businessName: resolved.businessName,
+            };
 
             const state: DeliveryActivityState = {
                 ...initialState,
-                orderId,
+                orderId: resolved.orderId,
                 lastUpdated: Date.now(),
             };
 
-            console.log('[LiveActivity] Starting Live Activity', { orderId, attributes, state });
+            console.log('[LiveActivity] Starting Live Activity', { orderId: resolved.orderId, attributes, state });
 
             const activityId = await DeliveryLiveActivitiesNative!.startActivity(attributes, state);
             activityIdRef.current = activityId;
+            activityOrderIdRef.current = resolved.orderId;
 
             console.log('[LiveActivity] Live Activity started', { activityId });
 
@@ -122,7 +156,7 @@ export function useLiveActivity({ orderId, orderDisplayId, businessName, enabled
                         tokenPreview: pushToken.substring(0, 30),
                     });
                     await registerToken({
-                        variables: { token: pushToken, activityId, orderId },
+                        variables: { token: pushToken, activityId, orderId: resolved.orderId },
                     });
                     console.log('[LiveActivity] Push token registered with backend');
                 }
@@ -135,22 +169,28 @@ export function useLiveActivity({ orderId, orderDisplayId, businessName, enabled
             console.error('[LiveActivity] Failed to start Live Activity:', error);
             return null;
         }
-    }, [isSupported, enabled, orderId, orderDisplayId, businessName, registerToken]);
+    }, [isSupported, registerToken, resolveRuntimeOptions]);
 
     /**
      * Update the Live Activity with new data (e.g., updated ETA)
      */
-    const updateLiveActivity = useCallback(async (updates: Omit<DeliveryActivityState, 'orderId' | 'lastUpdated'>) => {
+    const updateLiveActivity = useCallback(async (
+        updates: Omit<DeliveryActivityState, 'orderId' | 'lastUpdated'>,
+        runtime?: LiveActivityRuntimeOptions,
+    ) => {
         if (!isSupported || !activityIdRef.current) {
             return;
         }
 
         try {
+            const resolved = resolveRuntimeOptions(runtime);
             const newState: DeliveryActivityState = {
                 ...updates,
-                orderId,
+                orderId: resolved.orderId,
                 lastUpdated: Date.now(),
             };
+
+            activityOrderIdRef.current = resolved.orderId;
 
             console.log('[LiveActivity] Updating Live Activity', { activityId: activityIdRef.current, newState });
 
@@ -158,7 +198,7 @@ export function useLiveActivity({ orderId, orderDisplayId, businessName, enabled
         } catch (error) {
             console.error('[LiveActivity] Failed to update Live Activity:', error);
         }
-    }, [isSupported, orderId]);
+    }, [isSupported, resolveRuntimeOptions]);
 
     /**
      * End the Live Activity (call when order is delivered or cancelled)
@@ -172,6 +212,7 @@ export function useLiveActivity({ orderId, orderDisplayId, businessName, enabled
             console.log('[LiveActivity] Ending Live Activity', { activityId: activityIdRef.current });
             await DeliveryLiveActivitiesNative!.endActivity(activityIdRef.current);
             activityIdRef.current = null;
+            activityOrderIdRef.current = null;
             console.log('[LiveActivity] Live Activity ended');
         } catch (error) {
             console.error('[LiveActivity] Failed to end Live Activity:', error);

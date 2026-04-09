@@ -13,6 +13,23 @@ if (!bgHandlerGlobal.__customerBgMessageHandlerRegistered) {
         const status = data?.status;
         console.log('[Notifications] Background FCM message', { orderId, type, status });
 
+        if (orderId && status) {
+            try {
+                const nowIso = new Date().toISOString();
+                const nextStatus = String(status);
+                useActiveOrdersStore.getState().patchOrderLifecycle(String(orderId), {
+                    status: nextStatus,
+                    updatedAt: nowIso,
+                    preparingAt: nextStatus === 'PREPARING' ? nowIso : undefined,
+                    outForDeliveryAt: nextStatus === 'OUT_FOR_DELIVERY' ? nowIso : undefined,
+                    readyAt: nextStatus === 'READY' ? nowIso : undefined,
+                    deliveredAt: nextStatus === 'DELIVERED' ? nowIso : undefined,
+                });
+            } catch (e) {
+                console.warn('[Notifications] Failed to patch lifecycle from background message', e);
+            }
+        }
+
         // Bridge Live Activity ETA data into Zustand so useBackgroundLiveActivity
         // has fresh data when the app wakes from suspension.
         if (orderId && data?.remainingEtaSeconds) {

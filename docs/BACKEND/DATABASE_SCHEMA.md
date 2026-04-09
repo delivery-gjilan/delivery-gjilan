@@ -1,6 +1,6 @@
 # Database Schema Reference
 
-<!-- MDS:B7 | Domain: Backend | Updated: 2026-03-18 -->
+<!-- MDS:B7 | Domain: Backend | Updated: 2026-04-09 -->
 <!-- Depends-On: B1 -->
 <!-- Depended-By: B2, B5, B6, BL1, BL2 -->
 <!-- Nav: Any schema change (new table, new column, migration) → update this file and the relevant domain MDS. Settlement tables → BL1. Auth tables → B5. Pricing tables → B6. Order tables → B2. Soft-delete rules → api/SOFT_DELETE_CONVENTION.md. -->
@@ -35,7 +35,6 @@ npm run db:studio     # open Drizzle Studio at https://local.drizzle.studio
 | `users` | `users.ts` | Roles: CUSTOMER, DRIVER, BUSINESS_OWNER, BUSINESS_EMPLOYEE, ADMIN, SUPER_ADMIN. Soft delete via `deleted_at`. |
 | `refresh_token_sessions` | `refreshTokenSessions.ts` | Hashed refresh tokens; one row per active session. Supports multi-device. |
 | `user_permissions` | `userPermissions.ts` | Granular role-based permission rules. |
-| `referrals` | `referrals.ts` | Tracks referrer → referred user relationships. |
 
 **Key `users` fields:**
 
@@ -45,7 +44,6 @@ npm run db:studio     # open Drizzle Studio at https://local.drizzle.studio
 | `role` | CUSTOMER, DRIVER, BUSINESS_OWNER, BUSINESS_EMPLOYEE, ADMIN, SUPER_ADMIN |
 | `business_id` | FK to businesses; required for BUSINESS_* roles |
 | `flag_color` | Admin moderation flag (yellow default) |
-| `referral_code` | Unique, nullable |
 | `deleted_at` | Soft delete timestamp |
 
 ---

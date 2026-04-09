@@ -262,7 +262,7 @@ the demo driver is stationary (not running the Driver app). In production,
 the driver app transmits live GPS and the dot moves in real time.
 
 Demo credentials: [phone number] / OTP: [code or bypass]
-Contact: support@zippdelivery.com
+Contact: artshabani2002@gmail.com
 ```
 
 ### Zipp Business
@@ -274,7 +274,7 @@ An automated test customer order will arrive within ~10 seconds of logging in
 The order management flow (Accept → Preparing → Ready) is fully functional.
 
 Demo credentials: [phone number] / OTP: [code or bypass]
-Contact: support@zippdelivery.com
+Contact: artshabani2002@gmail.com
 ```
 
 ### Zipp Driver
@@ -286,7 +286,7 @@ The demo driver account will automatically receive an assigned delivery order
 within ~30 seconds of going online. No separate customer action is needed.
 
 Demo credentials: [phone number] / OTP: [code or bypass]
-Contact: support@zippdelivery.com
+Contact: artshabani2002@gmail.com
 ```
 
 ---

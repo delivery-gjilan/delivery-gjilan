@@ -256,7 +256,7 @@ export default function Profile() {
                 <View style={{ marginHorizontal: 16, marginBottom: 14, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
                     <ProfileRow title="Edit Profile" icon="person-outline" onPress={openEditProfile} />
                     <ProfileRow title={t.profile.my_addresses} icon="location-outline" onPress={() => router.push('/addresses')} />
-                    <ProfileRow title={t.profile.contact_support} icon="chatbubble-outline" onPress={() => Linking.openURL('mailto:support@zippdelivery.com')} />
+                    <ProfileRow title={t.profile.contact_support} icon="chatbubble-outline" onPress={() => Linking.openURL('mailto:artshabani2002@gmail.com')} />
                     <ProfileRow title="Privacy Policy" icon="shield-checkmark-outline" onPress={() => Linking.openURL('https://delivery-gjilan.vercel.app/privacy')} />
                     <ProfileRow title="Terms of Service" icon="document-text-outline" onPress={() => Linking.openURL('https://delivery-gjilan.vercel.app/terms')} showDivider={false} />
                 </View>

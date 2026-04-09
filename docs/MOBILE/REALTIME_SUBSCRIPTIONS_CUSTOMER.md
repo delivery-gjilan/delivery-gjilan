@@ -1,6 +1,6 @@
 # Real-Time Subscriptions — mobile-customer Audit
 
-<!-- MDS:M10 | Domain: Mobile | Updated: 2026-03-25 -->
+<!-- MDS:M10 | Domain: Mobile | Updated: 2026-04-09 -->
 <!-- Depends-On: A1, B1, B4, M7, BL3 -->
 <!-- Depended-By: M1 -->
 <!-- Nav: Subscription topology, connection count, payload sizing, optimization assessment. Update when subscription definitions, Apollo WS config, or PubSub architecture change. -->
@@ -78,6 +78,8 @@ Comprehensive audit of the real-time subscription system in `mobile-customer`, e
 **Was:** Both `admin/map.tsx` and `admin/orders.tsx` independently subscribed to `ADMIN_ALL_ORDERS_SUBSCRIPTION` with duplicated throttled-refetch infrastructure. `admin/map.tsx` also had its own `driversUpdated` subscription.
 
 **Fix:** Extracted `useAdminOrdersSubscription()` hook (mounted once in `admin/(tabs)/_layout.tsx`). Both tabs now just read from Apollo cache.
+
+**Current shape note:** `ADMIN_GET_ORDERS` reads the GraphQL `OrderConnection` wrapper and admin screens consume `data.orders.orders`. Cache merges in `useAdminOrdersSubscription()` must update the nested `orders` array inside that connection object, not treat `Query.orders` as a flat list.
 
 **Result:** 2 → 1 orders subscription, removed ~100 lines of duplicated throttle logic from both screens.
 

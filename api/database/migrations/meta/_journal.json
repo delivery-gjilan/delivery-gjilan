@@ -8,6 +8,13 @@
       "when": 1775646228059,
       "tag": "0000_cute_white_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1775739669395,
+      "tag": "0001_sturdy_red_hulk",
+      "breakpoints": true
     }
   ]
 }

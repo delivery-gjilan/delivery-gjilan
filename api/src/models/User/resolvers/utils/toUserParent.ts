@@ -21,7 +21,6 @@ export function toUserParent(user: DbUser): ResolversParentTypes['User'] {
         adminNote: user.adminNote || null,
         flagColor: user.flagColor || 'yellow',
         imageUrl: user.imageUrl || null,
-        referralCode: user.referralCode || null,
         preferredLanguage: toAppLanguage(user.preferredLanguage),
         emailOptOut: user.emailOptOut ?? false,
         isDemoAccount: user.isDemoAccount,

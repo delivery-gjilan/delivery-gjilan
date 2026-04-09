@@ -20,7 +20,7 @@ const customerStatusMessages: Record<string, (orderId: string) => NotificationPa
                 body: 'Porosia juaj u pranua dhe po pergatitet.',
             },
         },
-        data: { orderId, screen: 'orders/active', type: 'ORDER_STATUS' },
+        data: { orderId, screen: 'orders/active', type: 'ORDER_STATUS', status: 'PREPARING' },
         timeSensitive: false,
         relevanceScore: 0.6,
     }),
@@ -37,7 +37,7 @@ const customerStatusMessages: Record<string, (orderId: string) => NotificationPa
                 body: 'Porosia juaj eshte ne rruge drejt jush!',
             },
         },
-        data: { orderId, screen: 'orders/active', type: 'ORDER_STATUS' },
+        data: { orderId, screen: 'orders/active', type: 'ORDER_STATUS', status: 'OUT_FOR_DELIVERY' },
         timeSensitive: true, // ← Time-sensitive: bypass Focus modes
         relevanceScore: 0.9,
         category: 'order-on-the-way', // ← Interactive actions
@@ -55,7 +55,7 @@ const customerStatusMessages: Record<string, (orderId: string) => NotificationPa
                 body: 'Porosia juaj u dorezua. Ju befte mire!',
             },
         },
-        data: { orderId, screen: 'orders/active', type: 'ORDER_STATUS' },
+        data: { orderId, screen: 'orders/active', type: 'ORDER_STATUS', status: 'DELIVERED' },
         timeSensitive: true, // ← Time-sensitive: important notification
         relevanceScore: 1.0,
         category: 'order-delivered', // ← Interactive actions: Rate, Tip, Contact Support
@@ -73,7 +73,7 @@ const customerStatusMessages: Record<string, (orderId: string) => NotificationPa
                 body: 'Porosia juaj u anulua.',
             },
         },
-        data: { orderId, screen: 'orders/active', type: 'ORDER_STATUS' },
+        data: { orderId, screen: 'orders/active', type: 'ORDER_STATUS', status: 'CANCELLED' },
         timeSensitive: true, // ← Time-sensitive: user needs to know immediately
         relevanceScore: 0.95,
         category: 'order-cancelled', // ← Interactive action: Contact Support

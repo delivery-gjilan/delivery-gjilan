@@ -1,7 +1,6 @@
 import { DbType } from '@/database';
 import { DbUser, users } from '@/database/schema/users';
 import { refreshTokenSessions } from '@/database/schema/refreshTokenSessions';
-import { userReferrals } from '@/database/schema/referrals';
 import { deviceTokens } from '@/database/schema/deviceTokens';
 import { userAddress } from '@/database/schema/userAddress';
 import { SignupStep } from '@/generated/types.generated';
@@ -332,29 +331,9 @@ export class AuthRepository {
                 lastName: 'User',
                 phoneNumber: null,
                 address: null,
-                referralCode: null,
             })
             .where(and(eq(users.id, userId), isNull(users.deletedAt)))
             .returning();
         return result.length > 0;
-    }
-
-    async findUserByReferralCode(referralCode: string): Promise<string | null> {
-        const [user] = await this.db
-            .select()
-            .from(users)
-            .where(and(eq(users.referralCode, referralCode), isNull(users.deletedAt)))
-            .limit(1);
-        return user ? user.id : null;
-    }
-
-    async createReferral(referrerUserId: string, referredUserId: string, referralCode: string): Promise<void> {
-        await this.db.insert(userReferrals).values({
-            referrerUserId,
-            referredUserId,
-            referralCode,
-            status: 'PENDING',
-            rewardGiven: false,
-        });
     }
 }

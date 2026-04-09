@@ -1,8 +1,8 @@
 # App Store Release
 
-<!-- MDS:O10 | Domain: Operations | Updated: 2026-03-18 -->
+<!-- MDS:O10 | Domain: Operations | Updated: 2026-04-09 -->
 <!-- Depends-On: O7 -->
-<!-- Depended-By: (none) -->
+<!-- Depended-By: O15, O19 -->
 <!-- Nav: Compliance changes → review O5 (Security). Production validation → review O7 (Environments). -->
 
 ## Current Readiness Theme

@@ -49,7 +49,6 @@ type User {
     isOnline: Boolean!
     driverLocation: Location
     driverLocationUpdatedAt: Date
-    referralCode: String
     preferredLanguage: AppLanguage!
     emailOptOut: Boolean!
     totalOrders: Int!
@@ -95,7 +94,6 @@ input InitiateSignupInput {
     lastName: String!
     email: String!
     password: String!
-    referralCode: String
 }
 
 input VerifyEmailInput {
@@ -140,41 +138,12 @@ input UpdateMyProfileInput {
     phoneNumber: String
 }
 
-enum ReferralStatus {
-    PENDING
-    COMPLETED
-    EXPIRED
-}
-
-type Referral {
-    id: ID!
-    referrerUserId: ID!
-    referredUserId: ID
-    referralCode: String!
-    status: ReferralStatus!
-    rewardGiven: Boolean!
-    rewardAmount: Float
-    completedAt: DateTime
-    createdAt: DateTime!
-    referredUser: User
-}
-
-type ReferralStats {
-    totalReferrals: Int!
-    completedReferrals: Int!
-    pendingReferrals: Int!
-    totalRewardsEarned: Float!
-    referralCode: String!
-    referrals: [Referral!]!
-}
-
 type Query {
     me: User
     myBehavior: UserBehavior
     userBehavior(userId: ID!): UserBehavior
     users(limit: Int, offset: Int): [User!]!
     drivers: [User!]!
-    myReferralStats: ReferralStats!
 }
 
 type Mutation {
@@ -196,7 +165,6 @@ type Mutation {
     updateDriverLocation(latitude: Float!, longitude: Float!): User!
     adminUpdateDriverLocation(driverId: ID!, latitude: Float!, longitude: Float!): User!
     updateDriverOnlineStatus(isOnline: Boolean!): User!
-    generateReferralCode: String!
     setMyPreferredLanguage(language: AppLanguage!): User!
     setMyEmailOptOut(optOut: Boolean!): User!
     changeMyPassword(currentPassword: String!, newPassword: String!): Boolean!

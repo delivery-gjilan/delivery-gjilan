@@ -1,6 +1,6 @@
 # Auth & User Management
 
-<!-- MDS:B5 | Domain: Backend | Updated: 2026-03-19 -->
+<!-- MDS:B5 | Domain: Backend | Updated: 2026-04-09 -->
 <!-- Depends-On: B1 -->
 <!-- Depended-By: O5, O6 -->
 <!-- Nav: Token lifetime changes → update O5 (Security). Signup step changes → review M1 (Mobile Overview). Role changes → review BL1 (Settlements), B2 (Order Creation). -->
@@ -159,21 +159,12 @@ The `drivers` table is **required** for driver operation — `driverHeartbeat`, 
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `referralCode` | unique text | Null until generated; used for referral tracking |
 | `flagColor` | text | Admin moderation flag (`yellow` default) |
 | `adminNote` | text | Internal admin annotation |
 | `preferredLanguage` | text | UI localization hint |
 | `deletedAt` | timestamp | **Soft delete** — never hard-deleted |
 | `emailVerificationCode` | text | Cleared after verification |
 | `phoneVerificationCode` | text | Cleared after verification |
-
----
-
-## Referral System
-
-- A user signs up with a referral code → `createReferral(referrerId, newUserId, code)` persists to `referrals` table
-- Referral records tracked but there is no automated reward engine yet
-- Table: `api/database/schema/referrals.ts`
 
 ---
 
