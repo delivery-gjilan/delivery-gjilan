@@ -25,6 +25,8 @@ interface AuthState {
     connectionStatus: DriverConnectionStatus;
     /** OS-level network connectivity (from NetInfo). */
     isNetworkConnected: boolean;
+    /** True only while a live UI app session is mounted (not persisted). */
+    appSessionActive: boolean;
 
     // Actions
     setToken: (token: string | null) => void;
@@ -33,6 +35,7 @@ interface AuthState {
     setOnline: (online: boolean) => void;
     setConnectionStatus: (status: DriverConnectionStatus) => void;
     setNetworkConnected: (connected: boolean) => void;
+    setAppSessionActive: (active: boolean) => void;
     login: (token: string, user: User) => void;
     logout: () => void;
 }
@@ -57,6 +60,7 @@ export const useAuthStore = create<AuthState>()(
             isOnline: false,
             connectionStatus: 'DISCONNECTED' as DriverConnectionStatus,
             isNetworkConnected: true,
+            appSessionActive: false,
 
             setToken: (token) => {
                 set((state) => ({
@@ -82,6 +86,8 @@ export const useAuthStore = create<AuthState>()(
 
             setNetworkConnected: (isNetworkConnected) => set({ isNetworkConnected }),
 
+            setAppSessionActive: (appSessionActive) => set({ appSessionActive }),
+
             login: (token, user) => {
                 const onlinePref = (user as any)?.driverConnection?.onlinePreference;
                 set({
@@ -104,7 +110,10 @@ export const useAuthStore = create<AuthState>()(
                     token: null,
                     user: null,
                     isAuthenticated: false,
-                    isOnline: false,                    connectionStatus: 'DISCONNECTED',                });
+                    isOnline: false,
+                    connectionStatus: 'DISCONNECTED',
+                    appSessionActive: false,
+                });
                 console.log('[AuthStore] Logout successful');
             },
         }),

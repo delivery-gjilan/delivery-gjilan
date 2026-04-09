@@ -111,9 +111,9 @@ if (!TaskManager.isTaskDefined(BACKGROUND_HEARTBEAT_TASK)) {
 
     // If the driver logged out (or app was killed and store rehydrates as
     // unauthenticated), stop the background task so it doesn't keep GPS alive.
-    const { token, user } = useAuthStore.getState();
-    if (!token || !user) {
-      console.log('[Heartbeat][Background] Not authenticated — stopping background task');
+    const { token, user, appSessionActive } = useAuthStore.getState();
+    if (!token || !user || !appSessionActive) {
+      console.log('[Heartbeat][Background] Session inactive/unauthenticated — stopping background task');
       await Location.stopLocationUpdatesAsync(BACKGROUND_HEARTBEAT_TASK).catch(() => {});
       return;
     }
@@ -132,6 +132,7 @@ if (!TaskManager.isTaskDefined(BACKGROUND_HEARTBEAT_TASK)) {
 
 export function useDriverHeartbeat() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const appSessionActive = useAuthStore((state) => state.appSessionActive);
   const navigationOrderStatus = useNavigationStore((state) => state.order?.status);
   const [sendHeartbeat] = useMutation(DRIVER_HEARTBEAT_MUTATION);
   
@@ -544,9 +545,9 @@ export function useDriverHeartbeat() {
   // Main effect - start/stop based on auth only
   // Keep heartbeat active even if the driver toggles offline preference
   useEffect(() => {
-    console.log('[Heartbeat] State changed', { isAuthenticated });
+    console.log('[Heartbeat] State changed', { isAuthenticated, appSessionActive });
 
-    if (isAuthenticated) {
+    if (isAuthenticated && appSessionActive) {
       startHeartbeat();
     } else {
       // Stop foreground + background heartbeat. This also handles the case

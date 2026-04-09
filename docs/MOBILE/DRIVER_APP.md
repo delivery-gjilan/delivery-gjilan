@@ -141,6 +141,7 @@ index.tsx
 | `isAuthenticated` | `boolean` | `!!(token && user && role === DRIVER)` |
 | `isOnline` | `boolean` | Driver's manual preference toggle (≠ backend's `connectionStatus`) |
 | `isNetworkConnected` | `boolean` | OS-level connectivity from `@react-native-community/netinfo` |
+| `appSessionActive` | `boolean` | Runtime-only UI session flag (true while `AppContent` is mounted, not persisted) |
 | `isLoading` | `boolean` | Request in-flight |
 | `hasHydrated` | `boolean` | Zustand persist hydration gate |
 
@@ -208,7 +209,7 @@ useDriverTracking()
   └── useDriverBatteryReporting()
 ```
 
-Both hooks are started unconditionally when `AppContent` mounts and gate themselves on `isAuthenticated`.
+Both hooks are started unconditionally when `AppContent` mounts and gate themselves on `isAuthenticated` plus runtime `appSessionActive`.
 
 ### Heartbeat (`hooks/useDriverHeartbeat.ts`)
 
@@ -251,6 +252,7 @@ mutation DriverHeartbeat(
 - Each callback fires `sendBackgroundHeartbeat()` — a raw `fetch` POST (not Apollo) because Apollo may be suspended in background
 - Requires `backgroundPermission` grant
 - Shows Android foreground service notification: "Driver tracking active"
+- Background task callbacks also enforce a live app-session guard (`authStore.appSessionActive`); if the callback runs in a headless relaunch context, the task self-stops and does not emit GPS heartbeats.
 
 **AppState handling:** The interval is paused when app moves to background (background task takes over) and restored when returning to foreground.
 

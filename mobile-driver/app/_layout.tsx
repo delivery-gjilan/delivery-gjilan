@@ -42,6 +42,13 @@ function AppContent() {
     const [poolOpen, setPoolOpen] = useState(false);
     const didStartupAssignedRedirectRef = useRef(false);
 
+    useEffect(() => {
+        useAuthStore.getState().setAppSessionActive(true);
+        return () => {
+            useAuthStore.getState().setAppSessionActive(false);
+        };
+    }, []);
+
     const showPoolFab = isAuthenticated && !dispatchModeEnabled && isOnline && poolOrders.length > 0;
 
     // Vibrate when a new order pops up for the driver
