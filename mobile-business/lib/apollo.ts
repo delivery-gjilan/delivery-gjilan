@@ -6,6 +6,10 @@ import { setContext } from '@apollo/client/link/context';
 import { onError } from '@apollo/client/link/error';
 import { getValidAccessToken } from './authSession';
 
+const AUTH_SKIP_OPERATIONS = new Set([
+    'BusinessLogin',
+]);
+
 function normalizeHttpBaseUrl(url: string): string {
     const trimmed = url.trim().replace(/\/+$/, '');
     return trimmed.endsWith('/graphql') ? trimmed.slice(0, -'/graphql'.length) : trimmed;
@@ -98,8 +102,10 @@ const wsLink = new GraphQLWsLink(
 );
 
 // Auth Link
-const authLink = setContext(async (_, { headers }) => {
-    const token = await getValidAccessToken();
+const authLink = setContext(async (operation, { headers }) => {
+    const token = AUTH_SKIP_OPERATIONS.has(operation.operationName ?? '')
+        ? null
+        : await getValidAccessToken();
     return {
         headers: {
             ...headers,

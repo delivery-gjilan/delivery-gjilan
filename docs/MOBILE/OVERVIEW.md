@@ -94,3 +94,5 @@ Recent mobile-business RBAC alignment updates:
 ## Main Documentation Gap
 
 The apps share patterns but not enough explicit documentation. When changing auth, websocket, or generated GraphQL behavior, verify all four apps because schema changes propagate widely.
+
+Shared auth-client behavior now assumes login-style operations must bypass token refresh in the Apollo auth link, and JWT expiry parsing should use `Buffer.from(..., 'base64')` rather than `atob()` to avoid cold-start/runtime inconsistencies on React Native.

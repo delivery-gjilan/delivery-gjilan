@@ -8,6 +8,10 @@ import { persistCache, AsyncStorageWrapper } from 'apollo3-cache-persist';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getValidAccessToken } from './authSession';
 
+const AUTH_SKIP_OPERATIONS = new Set([
+    'Login',
+]);
+
 function getApiUrl(): string | null {
     const apiUrl = process.env.EXPO_PUBLIC_API_URL;
     if (!apiUrl) {
@@ -55,8 +59,10 @@ const errorLink = onError((errorContext: any) => {
     }
 });
 
-const authLink = new SetContextLink(async ({ headers }) => {
-    const token = await getValidAccessToken();
+const authLink = new SetContextLink(async ({ headers }, operation) => {
+    const token = AUTH_SKIP_OPERATIONS.has(operation.operationName ?? '')
+        ? null
+        : await getValidAccessToken();
 
     return {
         headers: {

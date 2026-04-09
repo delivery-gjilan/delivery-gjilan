@@ -1,5 +1,6 @@
 import { useAuthStore } from '@/store/authStore';
 import { deleteTokens, getRefreshToken, getToken, saveRefreshToken, saveToken } from '@/utils/secureTokenStore';
+import { Buffer } from 'buffer';
 
 const REFRESH_TOKEN_MUTATION = `
     mutation RefreshToken($refreshToken: String!) {
@@ -32,7 +33,7 @@ function parseJwtExpiryMs(token: string): number | null {
 
         const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
         const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
-        const decoded = JSON.parse(atob(padded)) as { exp?: number };
+        const decoded = JSON.parse(Buffer.from(padded, 'base64').toString('utf-8')) as { exp?: number };
         return typeof decoded.exp === 'number' ? decoded.exp * 1000 : null;
     } catch {
         return null;
