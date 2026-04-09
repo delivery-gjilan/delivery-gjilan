@@ -32,9 +32,21 @@ app.set('trust proxy', 1);
 app.use(helmet({ contentSecurityPolicy: false })); // CSP disabled for GraphiQL
 
 // ── CORS ──
-const allowedOrigins = process.env.CORS_ORIGINS
-    ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
-    : ['http://localhost:3000', 'http://localhost:8082', 'http://localhost:8083', 'http://localhost:8084'];
+const defaultAllowedOrigins = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:8082',
+    'http://localhost:8083',
+    'http://localhost:8084',
+];
+
+const configuredOrigins = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean)
+    : [];
+
+const allowedOrigins = configuredOrigins.length > 0
+    ? Array.from(new Set([...configuredOrigins, ...defaultAllowedOrigins]))
+    : defaultAllowedOrigins;
 
 // Handle wildcard (*) for development
 const corsOrigin = allowedOrigins.includes('*') ? true : allowedOrigins;

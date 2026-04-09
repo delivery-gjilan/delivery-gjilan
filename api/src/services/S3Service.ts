@@ -16,16 +16,25 @@ interface UploadResult {
 }
 
 class S3Service {
-    private s3Client: S3Client;
+    private s3Client: S3Client | null = null;
     private bucketName: string;
     private region: string;
+    private configError: string | null = null;
 
     constructor() {
         this.region = process.env.AWS_REGION || 'eu-north-1';
         this.bucketName = process.env.AWS_BUCKET || '';
 
+        if (!this.bucketName) {
+            this.configError = 'AWS bucket not configured';
+            log.warn('s3:notConfigured bucket missing - upload routes will be unavailable');
+            return;
+        }
+
         if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
-            throw new Error('AWS credentials not configured');
+            this.configError = 'AWS credentials not configured';
+            log.warn('s3:notConfigured credentials missing - upload routes will be unavailable');
+            return;
         }
 
         this.s3Client = new S3Client({
@@ -37,11 +46,20 @@ class S3Service {
         });
     }
 
+    private getClient(): S3Client {
+        if (!this.s3Client) {
+            throw new Error(this.configError || 'S3 is not configured');
+        }
+
+        return this.s3Client;
+    }
+
     /**
      * Upload a file to S3
      */
     async uploadFile(options: UploadOptions): Promise<UploadResult> {
         try {
+            const s3Client = this.getClient();
             const { folder, file } = options;
 
             // Generate unique filename
@@ -59,7 +77,7 @@ class S3Service {
                 // ACL removed - bucket policy handles public access
             });
 
-            await this.s3Client.send(command);
+            await s3Client.send(command);
 
             // Construct the public URL
             const url = `https://${this.bucketName}.s3.${this.region}.amazonaws.com/${key}`;
@@ -82,6 +100,7 @@ class S3Service {
      */
     async deleteFile(imageUrl: string): Promise<boolean> {
         try {
+            const s3Client = this.getClient();
             // Extract key from URL
             // Format: https://bucket.s3.region.amazonaws.com/folder/filename.ext
             const urlPattern = new RegExp(`https://${this.bucketName}\\.s3\\.${this.region}\\.amazonaws\\.com/(.+)`);
@@ -99,7 +118,7 @@ class S3Service {
                 Key: key,
             });
 
-            await this.s3Client.send(command);
+            await s3Client.send(command);
             return true;
         } catch (error) {
             log.error({ err: error, imageUrl }, 's3:delete:error');
@@ -111,6 +130,10 @@ class S3Service {
      * Check if a URL is an S3 URL from our bucket
      */
     isS3Url(url: string): boolean {
+        if (!this.bucketName) {
+            return false;
+        }
+
         return url.includes(`${this.bucketName}.s3.${this.region}.amazonaws.com`);
     }
 }

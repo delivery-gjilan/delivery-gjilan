@@ -1,6 +1,24 @@
+<!-- MDS:O20 | Domain: Operations | Updated: 2026-04-09 -->
+<!-- Depends-On: O7 -->
+<!-- Depended-By: (none) -->
+<!-- Nav: Production server setup and TLS. For release model and environment boundaries, read O7. -->
+
 # Production Deployment Guide
 
 Step-by-step for deploying ZippGo to the Hetzner CCX13 server.
+
+## Current Production Shape
+
+The production API is served at `https://api.zippgo.uk`.
+
+Current routing behavior:
+
+- Cloudflare DNS points `api.zippgo.uk` at the Hetzner server
+- Caddy terminates TLS on ports `80/443`
+- Caddy reverse proxies to the API container on `api:4000`
+- the API health endpoint used for verification is `/health`
+
+The production Caddyfile in this repo only serves `api.zippgo.uk`. If observability domains such as Grafana or an error dashboard are added later, only include them when DNS records exist and the backing services are actually deployed.
 
 ---
 
@@ -107,6 +125,17 @@ LOG_LEVEL=info
 SENTRY_DSN=
 ```
 
+Upload-related AWS variables are optional for API boot, but required for image upload endpoints to work correctly:
+
+```env
+AWS_REGION=eu-north-1
+AWS_BUCKET=your_bucket_name
+AWS_ACCESS_KEY_ID=your_access_key
+AWS_SECRET_ACCESS_KEY=your_secret_key
+```
+
+If these are missing, the API should still boot and serve GraphQL and health endpoints, while upload routes remain unavailable until the S3 configuration is provided.
+
 Save with `Ctrl+O`, exit with `Ctrl+X`.
 
 ---
@@ -115,16 +144,12 @@ Save with `Ctrl+O`, exit with `Ctrl+X`.
 
 Edit the Caddyfile on the server to replace placeholder domain:
 ```bash
-sed -i 's/api.zippgo.com/api.yourdomain.com/g' /opt/zippgo/api/Caddyfile
-sed -i 's/grafana.zippgo.com/grafana.yourdomain.com/g' /opt/zippgo/api/Caddyfile
-sed -i 's/errors.zippgo.com/errors.yourdomain.com/g' /opt/zippgo/api/Caddyfile
+sed -i 's/api.zippgo.uk/api.yourdomain.com/g' /opt/zippgo/api/Caddyfile
 ```
 
-Replace the `remote_ip 0.0.0.0/0` placeholder with your actual IP (get it from https://myip.io):
-```bash
-nano /opt/zippgo/api/Caddyfile
-# Change  remote_ip 0.0.0.0/0  to  remote_ip YOUR.REAL.IP.ADDRESS
-```
+For the current repo version, the production Caddyfile is intentionally minimal: one site block for the public API domain, with reverse proxying to `api:4000` and WebSocket support for GraphQL subscriptions.
+
+If you add more public domains later, make sure their DNS records exist before restarting Caddy. Otherwise Caddy will keep retrying certificate issuance for those names and clutter the logs with ACME DNS failures.
 
 ---
 
@@ -149,6 +174,7 @@ Check containers are up:
 ```bash
 docker compose -f docker-compose.prod.yml ps
 docker compose -f docker-compose.prod.yml logs api --tail=50
+docker compose -f docker-compose.prod.yml logs caddy --tail=50
 ```
 
 ### 6c. Run database migrations (first deploy only)
@@ -183,7 +209,10 @@ Default credentials: `admin` / `admin` — **change immediately**.
 
 ```bash
 # Health check
-curl https://api.yourdomain.com/ready
+curl https://api.yourdomain.com/health
+
+# Confirm TLS is issued and loaded
+docker logs zippgo-caddy 2>&1 | grep -E "certificate obtained successfully|api\.yourdomain\.com|error"
 
 # Logs
 docker logs zippgo-api --tail=100
@@ -192,9 +221,11 @@ docker logs zippgo-api --tail=100
 docker exec zippgo-db psql -U zippgo -c "\dt"
 
 # Check backup runs OK
-bash /opt/zippgo/backup.sh
+bash /opt/zippgo/backup-db.sh
 ls /opt/zippgo/backups/
 ```
+
+If `curl https://api.yourdomain.com/health` returns `502`, TLS is working but the upstream API is not reachable from Caddy. In that case, check the API container status and its logs before changing DNS or Cloudflare settings.
 
 ---
 
@@ -218,10 +249,10 @@ GF_SMTP_FROM_ADDRESS: "alerts@yourdomain.com"
 
 ## Ongoing: GitHub Actions CI/CD
 
-After all the above is done, every push to `main` automatically:
-1. Builds the Docker image and pushes to GHCR
-2. SSHes into the server and does a rolling restart of just the API container
-3. Waits for `/ready` to respond — rolls back if it fails
+After all the above is done, the production deploy workflow should:
+1. Build the Docker image and push it to GHCR.
+2. SSH into the server and restart the production stack.
+3. Wait for `http://127.0.0.1:4000/health` to respond before considering the deploy healthy.
 
 Secrets needed in GitHub (see Phase 1).
 
