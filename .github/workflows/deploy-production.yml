@@ -119,10 +119,10 @@ jobs:
             # Rolling restart: bring up new api container, leave db/redis/caddy running
             docker compose -f docker-compose.prod.yml up -d --no-deps api
 
-            # Health check — wait up to 60s for /ready to respond
-            echo "Waiting for /ready..."
+            # Health check — wait up to 60s for /health to respond
+            echo "Waiting for /health..."
             for i in $(seq 1 12); do
-              STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:4000/ready || true)
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:80/health || true)
               if [ "$STATUS" = "200" ]; then
                 echo "Health check passed (attempt $i)"
                 break
