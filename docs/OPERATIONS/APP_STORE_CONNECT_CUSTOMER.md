@@ -387,6 +387,43 @@ Recommended screenshot set for Zipp Go:
 6. Order history or active order screen
 7. Profile with support / privacy / terms access
 
+### First Upload Order
+
+If you only want the first screenshot batch to prepare now, use this order:
+
+1. Home screen showing businesses and categories
+2. Business page showing products or menu items
+3. Cart or checkout summary
+4. Live order tracking map or order status screen
+5. Address selection or saved addresses screen
+6. Order history or active orders list
+7. Profile or account screen with settings/support links
+
+If you want an eighth screenshot, add:
+
+8. Product detail or featured items screen
+
+### Practical Screenshot Rule
+
+Your first 3 screenshots matter most. Make those:
+
+1. Home / discovery
+2. Business menu
+3. Cart or checkout
+
+That gives the storefront the clearest story: browse, choose, order.
+
+### What Each Screenshot Should Prove
+
+1. Home: local discovery and variety of merchants
+2. Business page: clear product browsing and pricing
+3. Cart / checkout: real purchase flow exists
+4. Tracking: delivery status and Live Activity-related experience
+5. Address: location is used for delivery, not background tracking
+6. Orders: repeat usage and order history
+7. Profile: account management and support/legal access
+8. Product detail: merchandising depth, if needed
+
 ### Screenshot Rules
 
 - Use clean production-looking data

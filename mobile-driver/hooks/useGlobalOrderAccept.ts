@@ -47,19 +47,15 @@ export function useGlobalOrderAccept() {
 
     // True once the first successful network response arrives — prevents
     // auto-present from firing against a stale persisted Apollo cache on
-    // app cold-start. A failed first fetch must not unlock stale assigned or
-    // available orders, because the backend may have changed while the app was
-    // closed.
+    // app cold-start.  With fetchPolicy: 'network-only', `data` is only
+    // populated from an actual network response (not the persisted cache),
+    // so checking data + ready status is sufficient.
     const [networkReady, setNetworkReady] = useState(false);
-    const seenLoadingRef = useRef(false);
     useEffect(() => {
-        if (networkStatus === NetworkStatus.loading || networkStatus === NetworkStatus.refetch) {
-            seenLoadingRef.current = true;
-        }
-        if (!networkReady && seenLoadingRef.current && networkStatus === NetworkStatus.ready) {
+        if (!networkReady && data && networkStatus === NetworkStatus.ready) {
             setNetworkReady(true);
         }
-    }, [networkStatus, networkReady]);
+    }, [networkStatus, networkReady, data]);
 
     const refreshOrders = useCallback(async () => {
         const now = Date.now();
@@ -76,7 +72,7 @@ export function useGlobalOrderAccept() {
 
     useEffect(() => {
         if (networkReady || !currentDriverId) return;
-        if (!seenLoadingRef.current || networkStatus !== NetworkStatus.error) return;
+        if (networkStatus !== NetworkStatus.error) return;
 
         const retryTimer = setTimeout(() => {
             void refreshOrders();

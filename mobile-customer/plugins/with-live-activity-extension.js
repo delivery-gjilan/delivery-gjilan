@@ -8,22 +8,25 @@ const path = require('path');
 
 const EXTENSION_TARGET_NAME = 'DeliveryLiveActivityExtension';
 
+const DELIVERY_ACTIVITY_CONTENT_STATE_SWIFT = `    public struct ContentState: Codable, Hashable {
+    var driverName: String
+    var estimatedMinutes: Int
+    var phaseInitialMinutes: Int
+    var phaseStartedAt: Int64
+    var status: String
+    var language: String
+    var orderId: String
+    var lastUpdated: Int64  // Unix timestamp ms
+  }
+`;
+
 // Shared between extension AND main app targets
 const DELIVERY_ACTIVITY_ATTRIBUTES_SWIFT = `import ActivityKit
 import Foundation
 
 @available(iOS 16.1, *)
 struct DeliveryActivityAttributes: ActivityAttributes {
-    public struct ContentState: Codable, Hashable {
-        var driverName: String
-        var estimatedMinutes: Int
-    var phaseInitialMinutes: Int
-    var phaseStartedAt: Int64
-        var status: String
-    var language: String
-        var orderId: String
-        var lastUpdated: Int64  // Unix timestamp ms
-    }
+${DELIVERY_ACTIVITY_CONTENT_STATE_SWIFT}
 
     var orderDisplayId: String
     var businessName: String
@@ -39,22 +42,64 @@ import React
 
 @available(iOS 16.1, *)
 struct DeliveryActivityAttributes: ActivityAttributes {
-    public struct ContentState: Codable, Hashable {
-        var driverName: String
-        var estimatedMinutes: Int
-    var phaseInitialMinutes: Int
-    var phaseStartedAt: Int64
-        var status: String
-    var language: String
-        var orderId: String
-        var lastUpdated: Int64  // Unix timestamp ms
-    }
+${DELIVERY_ACTIVITY_CONTENT_STATE_SWIFT}
     var orderDisplayId: String
     var businessName: String
 }
 
 @objc(DeliveryLiveActivities)
-class DeliveryLiveActivities: NSObject {
+class DeliveryLiveActivities: RCTEventEmitter {
+  private var pushTokenTasks: [String: Task<Void, Never>] = [:]
+  private var hasListeners = false
+
+  override func supportedEvents() -> [String]! {
+    return ["LiveActivityPushTokenUpdated"]
+  }
+
+  override func startObserving() {
+    hasListeners = true
+  }
+
+  override func stopObserving() {
+    hasListeners = false
+  }
+
+  private func hexToken(_ tokenData: Data) -> String {
+    tokenData.map { String(format: "%02x", $0) }.joined()
+  }
+
+  @MainActor
+  private func emitPushToken(activityId: String, orderId: String, tokenData: Data) {
+    guard hasListeners else { return }
+    sendEvent(withName: "LiveActivityPushTokenUpdated", body: [
+      "activityId": activityId,
+      "orderId": orderId,
+      "pushToken": hexToken(tokenData),
+    ])
+  }
+
+  private func startMonitoringPushToken(
+    for activity: Activity<DeliveryActivityAttributes>,
+    orderId: String
+  ) {
+    let activityId = activity.id
+    pushTokenTasks[activityId]?.cancel()
+    pushTokenTasks[activityId] = Task { [weak self] in
+      if let tokenData = activity.pushToken {
+        await self?.emitPushToken(activityId: activityId, orderId: orderId, tokenData: tokenData)
+      }
+
+      for await tokenData in activity.pushTokenUpdates {
+        if Task.isCancelled { break }
+        await self?.emitPushToken(activityId: activityId, orderId: orderId, tokenData: tokenData)
+      }
+    }
+  }
+
+  private func stopMonitoringPushToken(activityId: String) {
+    pushTokenTasks[activityId]?.cancel()
+    pushTokenTasks.removeValue(forKey: activityId)
+  }
 
     // MARK: - startActivity
     @objc
@@ -83,6 +128,7 @@ class DeliveryLiveActivities: NSObject {
 
         if !contentState.orderId.isEmpty,
            let existing = Activity<DeliveryActivityAttributes>.activities.first(where: { $0.content.state.orderId == contentState.orderId }) {
+          startMonitoringPushToken(for: existing, orderId: contentState.orderId)
           resolve(existing.id)
           return
         }
@@ -94,6 +140,7 @@ class DeliveryLiveActivities: NSObject {
                 content: content,
                 pushType: .token
             )
+            startMonitoringPushToken(for: activity, orderId: contentState.orderId)
             resolve(activity.id)
         } catch {
             reject("START_ACTIVITY_ERROR", error.localizedDescription, error)
@@ -146,6 +193,7 @@ class DeliveryLiveActivities: NSObject {
         }
         Task {
             await activity.end(nil, dismissalPolicy: .immediate)
+          self.stopMonitoringPushToken(activityId: activityId)
             resolve(nil)
         }
     }
@@ -162,6 +210,7 @@ class DeliveryLiveActivities: NSObject {
         Task {
           for activity in Activity<DeliveryActivityAttributes>.activities {
             await activity.end(nil, dismissalPolicy: .immediate)
+            self.stopMonitoringPushToken(activityId: activity.id)
           }
           resolver(nil)
         }
@@ -181,10 +230,12 @@ class DeliveryLiveActivities: NSObject {
             return
         }
         if let tokenData = activity.pushToken {
+          startMonitoringPushToken(for: activity, orderId: activity.content.state.orderId)
             resolve(tokenData.map { String(format: "%02x", $0) }.joined())
             return
         }
         Task {
+          startMonitoringPushToken(for: activity, orderId: activity.content.state.orderId)
             for await tokenData in activity.pushTokenUpdates {
                 resolve(tokenData.map { String(format: "%02x", $0) }.joined())
                 return
@@ -207,6 +258,7 @@ class DeliveryLiveActivities: NSObject {
           }
 
           if let activity = Activity<DeliveryActivityAttributes>.activities.first(where: { $0.content.state.orderId == orderId }) {
+            startMonitoringPushToken(for: activity, orderId: orderId)
             resolve(activity.id)
             return
           }
@@ -221,8 +273,9 @@ class DeliveryLiveActivities: NSObject {
 
 // Objective-C bridge so RN can find the Swift module via NativeModules.DeliveryLiveActivities
 const DELIVERY_LIVE_ACTIVITIES_OBJC = `#import <React/RCTBridgeModule.h>
+#import <React/RCTEventEmitter.h>
 
-@interface RCT_EXTERN_MODULE(DeliveryLiveActivities, NSObject)
+@interface RCT_EXTERN_MODULE(DeliveryLiveActivities, RCTEventEmitter)
 
 RCT_EXTERN_METHOD(startActivity:(NSDictionary *)attributesDict
                   state:(NSDictionary *)stateDict
@@ -353,17 +406,26 @@ struct DeliveryLiveActivityWidget: Widget {
     }
   }
 
-  private func liveProgress(_ context: ActivityViewContext<DeliveryActivityAttributes>) -> Double {
+  private func withTimeline<Content: View>(
+    _ context: ActivityViewContext<DeliveryActivityAttributes>,
+    @ViewBuilder content: @escaping (Date) -> Content
+  ) -> some View {
+    TimelineView(.periodic(from: Date(), by: 1)) { timeline in
+      content(timeline.date)
+    }
+  }
+
+  private func liveProgress(_ context: ActivityViewContext<DeliveryActivityAttributes>, now: Date = Date()) -> Double {
     let total = max(1, context.state.phaseInitialMinutes)
     let startedAtSeconds = Double(context.state.phaseStartedAt) / 1000
-    let elapsed = max(0, Date().timeIntervalSince1970 - startedAtSeconds)
+    let elapsed = max(0, now.timeIntervalSince1970 - startedAtSeconds)
     let elapsedMinutes = elapsed / 60
     let inferredRemaining = max(0, Double(total) - elapsedMinutes)
     let currentRemaining = min(Double(total), max(0, min(Double(context.state.estimatedMinutes), inferredRemaining)))
     return max(0, min(1, (Double(total) - currentRemaining) / Double(total)))
   }
 
-  private func resolvedProgress(_ context: ActivityViewContext<DeliveryActivityAttributes>) -> Double {
+  private func resolvedProgress(_ context: ActivityViewContext<DeliveryActivityAttributes>, now: Date = Date()) -> Double {
     switch statusKey(context.state.status) {
     case "pending":
       return 0
@@ -372,7 +434,7 @@ struct DeliveryLiveActivityWidget: Widget {
     case "cancelled", "canceled":
       return 0
     default:
-      return liveProgress(context)
+      return liveProgress(context, now: now)
     }
   }
 
@@ -389,8 +451,8 @@ struct DeliveryLiveActivityWidget: Widget {
     return Date(timeIntervalSince1970: Double(context.state.phaseStartedAt) / 1000)
   }
 
-  private func waitingDots(_ context: ActivityViewContext<DeliveryActivityAttributes>) -> String {
-    let elapsed = max(0, Int(Date().timeIntervalSince(phaseStartDate(context))))
+  private func waitingDots(_ context: ActivityViewContext<DeliveryActivityAttributes>, now: Date = Date()) -> String {
+    let elapsed = max(0, Int(now.timeIntervalSince(phaseStartDate(context))))
     switch elapsed % 4 {
     case 0: return "."
     case 1: return ".."
@@ -399,17 +461,17 @@ struct DeliveryLiveActivityWidget: Widget {
     }
   }
 
-  private func etaText(_ context: ActivityViewContext<DeliveryActivityAttributes>) -> String {
+  private func etaText(_ context: ActivityViewContext<DeliveryActivityAttributes>, now: Date = Date()) -> String {
     let total = max(1, context.state.phaseInitialMinutes)
     let startedAtSeconds = Double(context.state.phaseStartedAt) / 1000
-    let elapsed = max(0, Date().timeIntervalSince1970 - startedAtSeconds)
+    let elapsed = max(0, now.timeIntervalSince1970 - startedAtSeconds)
     let elapsedMinutes = elapsed / 60
     let inferredRemaining = max(0, Double(total) - elapsedMinutes)
     let currentRemaining = Int(max(0, min(Double(context.state.estimatedMinutes), inferredRemaining)).rounded(.up))
     return "~\\(currentRemaining)m"
   }
 
-  private func resolvedEtaText(_ context: ActivityViewContext<DeliveryActivityAttributes>) -> String {
+  private func resolvedEtaText(_ context: ActivityViewContext<DeliveryActivityAttributes>, now: Date = Date()) -> String {
     switch statusKey(context.state.status) {
     case "delivered":
       return localized("Done", "Perfunduar", context)
@@ -422,7 +484,7 @@ struct DeliveryLiveActivityWidget: Widget {
     case "ready", "ready_for_pickup":
       return localized("Pickup", "Marrje", context)
     default:
-      return etaText(context)
+      return etaText(context, now: now)
     }
   }
 
@@ -449,6 +511,7 @@ struct DeliveryLiveActivityWidget: Widget {
 
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: DeliveryActivityAttributes.self) { context in
+      withTimeline(context) { now in
       VStack(alignment: .leading, spacing: 10) {
         HStack {
           Text(context.attributes.businessName)
@@ -460,7 +523,7 @@ struct DeliveryLiveActivityWidget: Widget {
               .font(.headline.weight(.semibold))
               .monospacedDigit()
           } else {
-            Text(resolvedEtaText(context))
+            Text(resolvedEtaText(context, now: now))
               .font(.headline.weight(.semibold))
               .foregroundStyle(etaTint(context))
           }
@@ -475,11 +538,11 @@ struct DeliveryLiveActivityWidget: Widget {
         }
 
         if shouldShowProgress(context) {
-          ProgressView(value: resolvedProgress(context))
+          ProgressView(value: resolvedProgress(context, now: now))
             .progressViewStyle(.linear)
             .tint(statusTint(context.state.status))
         } else {
-          Text(statusKey(context.state.status) == "pending" ? pendingMessage(context) : "\(waitingText(context))\(waitingDots(context))")
+          Text(statusKey(context.state.status) == "pending" ? pendingMessage(context) : "\(waitingText(context))\(waitingDots(context, now: now))")
             .font(.caption2)
             .foregroundStyle(.secondary)
             .lineLimit(2)
@@ -500,42 +563,49 @@ struct DeliveryLiveActivityWidget: Widget {
           .widgetURL(URL(string: "zipp://order/\\(context.state.orderId)"))
             .activityBackgroundTint(Color(.systemBackground))
             .activitySystemActionForegroundColor(Color.accentColor)
+      }
     } dynamicIsland: { context in
       DynamicIsland {
         DynamicIslandExpandedRegion(.leading) {
-          if statusKey(context.state.status) == "pending" {
-            EmptyView()
-          } else {
-            HStack(spacing: 4) {
-              Image(systemName: statusIconName(context.state.status))
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(statusTint(context.state.status))
-              Text(normalizedStatus(context))
-                .font(.caption.weight(.semibold))
-                .lineLimit(1)
+          withTimeline(context) { _ in
+            if statusKey(context.state.status) == "pending" {
+              EmptyView()
+            } else {
+              HStack(spacing: 4) {
+                Image(systemName: statusIconName(context.state.status))
+                  .font(.caption2.weight(.semibold))
+                  .foregroundStyle(statusTint(context.state.status))
+                Text(normalizedStatus(context))
+                  .font(.caption.weight(.semibold))
+                  .lineLimit(1)
+              }
             }
           }
         }
         DynamicIslandExpandedRegion(.trailing) {
-          if statusKey(context.state.status) == "pending" {
-            EmptyView()
-          } else {
-            Text(resolvedEtaText(context))
-              .font(.caption.weight(.bold))
-              .foregroundStyle(etaTint(context))
+          withTimeline(context) { now in
+            if statusKey(context.state.status) == "pending" {
+              EmptyView()
+            } else {
+              Text(resolvedEtaText(context, now: now))
+                .font(.caption.weight(.bold))
+                .foregroundStyle(etaTint(context))
+            }
           }
         }
         DynamicIslandExpandedRegion(.bottom) {
-          if statusKey(context.state.status) == "pending" {
-            EmptyView()
-          } else if shouldShowProgress(context) {
-            ProgressView(value: resolvedProgress(context))
-              .progressViewStyle(.linear)
-              .tint(statusTint(context.state.status))
-          } else {
-            Text("\(waitingText(context))\(waitingDots(context))")
-              .font(.caption2)
-              .foregroundStyle(.secondary)
+          withTimeline(context) { now in
+            if statusKey(context.state.status) == "pending" {
+              EmptyView()
+            } else if shouldShowProgress(context) {
+              ProgressView(value: resolvedProgress(context, now: now))
+                .progressViewStyle(.linear)
+                .tint(statusTint(context.state.status))
+            } else {
+              Text("\(waitingText(context))\(waitingDots(context, now: now))")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
           }
         }
       } compactLeading: {
@@ -543,31 +613,35 @@ struct DeliveryLiveActivityWidget: Widget {
           .font(.system(size: 11, weight: .semibold))
           .foregroundStyle(statusTint(context.state.status))
       } compactTrailing: {
-        if statusKey(context.state.status) == "pending" {
-          EmptyView()
-        } else {
-          Text(resolvedEtaText(context))
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(etaTint(context))
+        withTimeline(context) { now in
+          if statusKey(context.state.status) == "pending" {
+            EmptyView()
+          } else {
+            Text(resolvedEtaText(context, now: now))
+              .font(.system(size: 11, weight: .semibold))
+              .foregroundStyle(etaTint(context))
+          }
         }
       } minimal: {
-        if statusKey(context.state.status) == "pending" {
-          Image(systemName: "clock.badge.questionmark")
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(statusTint(context.state.status))
-        } else {
-          ZStack {
-            Circle()
-              .stroke(Color.secondary.opacity(0.35), lineWidth: 2)
-            Circle()
-              .trim(from: 0, to: resolvedProgress(context))
-              .stroke(statusTint(context.state.status), style: StrokeStyle(lineWidth: 2, lineCap: .round))
-              .rotationEffect(.degrees(-90))
-            Image(systemName: statusIconName(context.state.status))
-              .font(.system(size: 10, weight: .semibold))
+        withTimeline(context) { now in
+          if statusKey(context.state.status) == "pending" {
+            Image(systemName: "clock.badge.questionmark")
+              .font(.system(size: 11, weight: .semibold))
               .foregroundStyle(statusTint(context.state.status))
+          } else {
+            ZStack {
+              Circle()
+                .stroke(Color.secondary.opacity(0.35), lineWidth: 2)
+              Circle()
+                .trim(from: 0, to: resolvedProgress(context, now: now))
+                .stroke(statusTint(context.state.status), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+              Image(systemName: statusIconName(context.state.status))
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(statusTint(context.state.status))
+            }
+            .frame(width: 20, height: 20)
           }
-          .frame(width: 20, height: 20)
         }
       }
         }

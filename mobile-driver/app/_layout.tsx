@@ -11,7 +11,7 @@ import DriverMessageBanner from '@/components/DriverMessageBanner';
 import type { AlertType } from '@/components/DriverMessageBanner';
 import { useSubscription } from '@apollo/client/react';
 import { DRIVER_MESSAGE_RECEIVED_SUB } from '@/graphql/operations/driverMessages';
-import { useGlobalOrderAccept } from '@/hooks/useGlobalOrderAccept';
+import { GlobalOrderAcceptProvider, useSharedOrderAccept } from '@/hooks/GlobalOrderAcceptContext';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { OrderAcceptSheet } from '@/components/OrderAcceptSheet';
 import { OrderPoolSheet } from '@/components/OrderPoolSheet';
@@ -33,7 +33,7 @@ function AppContent() {
     const isNetworkConnected = useAuthStore((s) => s.isNetworkConnected);
     const { isAdminTalking, isTalking, pttError, startTalking, stopTalking } = useDriverPttReceiver();
     const { pendingOrder, autoCountdown, accepting, acceptError, takenByOther, networkReady, assignedOrders, availableOrders, poolOrders, handleAcceptOrder, handleSkipOrder, handleAcceptAndNavigate } =
-        useGlobalOrderAccept();
+        useSharedOrderAccept();
 
     const isOnline = useAuthStore((s) => s.isOnline);
     const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -304,7 +304,9 @@ export default function RootLayout() {
 
     return (
         <Providers>
-            <AppContent />
+            <GlobalOrderAcceptProvider>
+                <AppContent />
+            </GlobalOrderAcceptProvider>
         </Providers>
     );
 }

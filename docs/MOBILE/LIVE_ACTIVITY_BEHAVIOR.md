@@ -214,13 +214,19 @@ The payload now also carries `language` (`en` or `al`) so widget labels can foll
 ### Preparing Countdown Behavior
 
 - The widget computes remaining minutes from `phaseInitialMinutes` + `phaseStartedAt` using wall-clock elapsed time.
-- During `PREPARING`, the ETA label (`~Xm`) ticks down continuously even between remote pushes.
+- Lock Screen and Dynamic Island surfaces now render through a timer-driven SwiftUI timeline, so `PREPARING` and `OUT_FOR_DELIVERY` continue ticking between remote pushes instead of waiting for another APNs update.
 - During `OUT_FOR_DELIVERY`, heartbeat pushes still refine ETA, but countdown continues smoothly between heartbeat updates.
 
 ### Status Color Distinction
 
 - `pending` and `preparing` now use distinct color accents in all Live Activity surfaces (Lock Screen and Dynamic Island) to avoid visual ambiguity.
 - `pending` uses amber and `preparing` uses warm red for clearer separation at a glance.
+
+### Token Rotation Handling
+
+- The native ActivityKit bridge now monitors `pushTokenUpdates` for each active Live Activity and emits token-change events back to React Native.
+- The JS hook re-registers rotated tokens with the backend, and also re-syncs the current token when the app returns to the foreground.
+- This reduces the chance of background Live Activity updates silently failing after the initial token registration.
 
 ## Files Changed
 

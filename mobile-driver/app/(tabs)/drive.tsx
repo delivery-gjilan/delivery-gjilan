@@ -16,7 +16,7 @@ import { fetchRouteGeometry } from '@/utils/mapbox';
 import { buildNavOrder, orderToPhase } from '@/utils/orderToNavOrder';
 import { useOrderAcceptStore } from '@/store/orderAcceptStore';
 import { useTranslations } from '@/hooks/useTranslations';
-import { useGlobalOrderAccept } from '@/hooks/useGlobalOrderAccept';
+import { useSharedOrderAccept } from '@/hooks/GlobalOrderAcceptContext';
 import type { Feature, LineString } from 'geojson';
 
 /* ─── Constants ─── */
@@ -76,31 +76,13 @@ export default function MapScreen() {
     const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS);
     const pendingOrder = useOrderAcceptStore((s) => s.pendingOrder);
     const pendingAutoCountdown = useOrderAcceptStore((s) => s.autoCountdown);
-    const { orders, assignedOrders, availableOrders, networkReady } = useGlobalOrderAccept();
+    const { orders, assignedOrders, availableOrders, networkReady } = useSharedOrderAccept();
 
     // ── Route state ──
     const [routeCoords, setRouteCoords] = useState<Array<[number, number]> | null>(null);
     const [previewRouteCoords, setPreviewRouteCoords] = useState<Array<[number, number]> | null>(null);
     const [routeInfo, setRouteInfo] = useState<{ distanceKm: number; durationMin: number } | null>(null);
     const [previewRouteInfo, setPreviewRouteInfo] = useState<{ distanceKm: number; durationMin: number } | null>(null);
-
-    // ── Marching-ants animation for preview route ──
-    // (removed — preview route now uses a simple static style)
-
-    // ── Precise per-order timers: fire exactly when each PREPARING order crosses
-    //    the 5-min threshold for map pin/pool button visibility.
-    const [now, setNow] = useState(() => Date.now());
-    useEffect(() => {
-        const timers: ReturnType<typeof setTimeout>[] = [];
-        for (const o of orders) {
-            if (o.status !== 'PREPARING' || o.driver?.id || !o.estimatedReadyAt) continue;
-            const thresholdMs = new Date(o.estimatedReadyAt).getTime() - 5 * 60 * 1000;
-            const delayMs = thresholdMs - Date.now();
-            if (delayMs <= 0) continue;
-            timers.push(setTimeout(() => setNow(Date.now()), delayMs));
-        }
-        return () => timers.forEach(clearTimeout);
-    }, [orders]);
 
     const visibleAssignedOrders = useMemo(() => {
         return networkReady ? assignedOrders : [];

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { Platform, NativeModules } from 'react-native';
+import { AppState, NativeEventEmitter, NativeModules, Platform } from 'react-native';
 import { useMutation } from '@apollo/client/react';
 import { REGISTER_LIVE_ACTIVITY_TOKEN } from '@/graphql/operations/notifications';
 
@@ -11,10 +11,22 @@ interface DeliveryLiveActivitiesModule {
     endActivity(activityId: string): Promise<void>;
     getPushToken(activityId: string): Promise<string>;
     findActivityByOrderId(orderId: string): Promise<string | null>;
+    addListener?(eventName: string): void;
+    removeListeners?(count: number): void;
 }
 
 const DeliveryLiveActivitiesNative: DeliveryLiveActivitiesModule | undefined =
     (NativeModules as Record<string, unknown>).DeliveryLiveActivities as DeliveryLiveActivitiesModule | undefined;
+
+const liveActivityEvents = DeliveryLiveActivitiesNative
+    ? new NativeEventEmitter(DeliveryLiveActivitiesNative as never)
+    : null;
+
+type LiveActivityPushTokenEvent = {
+    activityId?: string;
+    orderId?: string;
+    pushToken?: string;
+};
 
 interface DeliveryActivityState {
     driverName: string;
@@ -66,6 +78,8 @@ interface LiveActivityRuntimeOptions {
 export function useLiveActivity({ orderId, orderDisplayId, businessName, enabled = false }: UseLiveActivityOptions) {
     const activityIdRef = useRef<string | null>(null);
     const activityOrderIdRef = useRef<string | null>(null);
+    const registeredPushTokenRef = useRef<string | null>(null);
+    const lastPushTokenSyncAtRef = useRef(0);
     const [registerToken] = useMutation(REGISTER_LIVE_ACTIVITY_TOKEN);
 
     // iOS version check: require 16.2+ for ActivityContent API
@@ -88,6 +102,38 @@ export function useLiveActivity({ orderId, orderDisplayId, businessName, enabled
         }),
         [businessName, enabled, orderDisplayId, orderId],
     );
+
+    const syncPushToken = useCallback(async (activityId: string, resolvedOrderId: string, force = false) => {
+        if (!isSupported || !activityId || !resolvedOrderId) {
+            return;
+        }
+
+        const now = Date.now();
+        if (!force && registeredPushTokenRef.current && now - lastPushTokenSyncAtRef.current < 30_000) {
+            return;
+        }
+
+        try {
+            const pushToken = await DeliveryLiveActivitiesNative!.getPushToken(activityId);
+            lastPushTokenSyncAtRef.current = now;
+
+            if (!pushToken || registeredPushTokenRef.current === pushToken) {
+                return;
+            }
+
+            await registerToken({
+                variables: { token: pushToken, activityId, orderId: resolvedOrderId },
+            });
+            registeredPushTokenRef.current = pushToken;
+            console.log('[LiveActivity] Push token registered with backend', {
+                activityId,
+                orderId: resolvedOrderId,
+                tokenPreview: pushToken.substring(0, 30),
+            });
+        } catch (tokenError) {
+            console.error('[LiveActivity] Failed to sync push token:', tokenError);
+        }
+    }, [isSupported, registerToken]);
 
     /**
      * Start a Live Activity for this delivery
@@ -148,29 +194,14 @@ export function useLiveActivity({ orderId, orderDisplayId, businessName, enabled
 
             console.log('[LiveActivity] Live Activity started', { activityId });
 
-            // Get push token and register with backend
-            try {
-                const pushToken = await DeliveryLiveActivitiesNative!.getPushToken(activityId);
-                if (pushToken) {
-                    console.log('[LiveActivity] Got push token, registering with backend', {
-                        activityId,
-                        tokenPreview: pushToken.substring(0, 30),
-                    });
-                    await registerToken({
-                        variables: { token: pushToken, activityId, orderId: resolved.orderId },
-                    });
-                    console.log('[LiveActivity] Push token registered with backend');
-                }
-            } catch (tokenError) {
-                console.error('[LiveActivity] Failed to register push token:', tokenError);
-            }
+            await syncPushToken(activityId, resolved.orderId, true);
 
             return activityId;
         } catch (error) {
             console.error('[LiveActivity] Failed to start Live Activity:', error);
             return null;
         }
-    }, [isSupported, registerToken, resolveRuntimeOptions]);
+    }, [isSupported, resolveRuntimeOptions, syncPushToken]);
 
     /**
      * Update the Live Activity with new data (e.g., updated ETA)
@@ -196,10 +227,11 @@ export function useLiveActivity({ orderId, orderDisplayId, businessName, enabled
             console.log('[LiveActivity] Updating Live Activity', { activityId: activityIdRef.current, newState });
 
             await DeliveryLiveActivitiesNative!.updateActivity(activityIdRef.current, newState);
+            await syncPushToken(activityIdRef.current, resolved.orderId);
         } catch (error) {
             console.error('[LiveActivity] Failed to update Live Activity:', error);
         }
-    }, [isSupported, resolveRuntimeOptions]);
+    }, [isSupported, resolveRuntimeOptions, syncPushToken]);
 
     /**
      * End the Live Activity (call when order is delivered or cancelled)
@@ -214,11 +246,81 @@ export function useLiveActivity({ orderId, orderDisplayId, businessName, enabled
             await DeliveryLiveActivitiesNative!.endActivity(activityIdRef.current);
             activityIdRef.current = null;
             activityOrderIdRef.current = null;
+            registeredPushTokenRef.current = null;
             console.log('[LiveActivity] Live Activity ended');
         } catch (error) {
             console.error('[LiveActivity] Failed to end Live Activity:', error);
         }
     }, [isSupported]);
+
+    useEffect(() => {
+        if (!isSupported || !liveActivityEvents) {
+            return;
+        }
+
+        const subscription = liveActivityEvents.addListener(
+            'LiveActivityPushTokenUpdated',
+            (event: LiveActivityPushTokenEvent) => {
+                const eventActivityId = String(event.activityId ?? '');
+                const eventOrderId = String(event.orderId ?? '');
+                const eventPushToken = String(event.pushToken ?? '');
+
+                if (!eventActivityId || !eventOrderId || !eventPushToken) {
+                    return;
+                }
+
+                if (activityIdRef.current && activityIdRef.current !== eventActivityId) {
+                    return;
+                }
+
+                if (activityOrderIdRef.current && activityOrderIdRef.current !== eventOrderId) {
+                    return;
+                }
+
+                if (registeredPushTokenRef.current === eventPushToken) {
+                    return;
+                }
+
+                void registerToken({
+                    variables: { token: eventPushToken, activityId: eventActivityId, orderId: eventOrderId },
+                })
+                    .then(() => {
+                        registeredPushTokenRef.current = eventPushToken;
+                        lastPushTokenSyncAtRef.current = Date.now();
+                        console.log('[LiveActivity] Rotated push token registered', {
+                            activityId: eventActivityId,
+                            orderId: eventOrderId,
+                            tokenPreview: eventPushToken.substring(0, 30),
+                        });
+                    })
+                    .catch((error) => {
+                        console.error('[LiveActivity] Failed to register rotated push token:', error);
+                    });
+            },
+        );
+
+        return () => {
+            subscription.remove();
+        };
+    }, [isSupported, registerToken]);
+
+    useEffect(() => {
+        if (!isSupported) {
+            return;
+        }
+
+        const subscription = AppState.addEventListener('change', (nextState) => {
+            if (nextState !== 'active' || !activityIdRef.current || !activityOrderIdRef.current) {
+                return;
+            }
+
+            void syncPushToken(activityIdRef.current, activityOrderIdRef.current, true);
+        });
+
+        return () => {
+            subscription.remove();
+        };
+    }, [isSupported, syncPushToken]);
 
     // Safety net: if tracking is disabled (e.g. delivered/cancelled), end active activity.
     useEffect(() => {
