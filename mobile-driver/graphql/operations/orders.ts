@@ -171,3 +171,17 @@ export const ALL_ORDERS_UPDATED = gql`
         }
     }
 `;
+
+export const ORDER_STATUS_UPDATED = gql`
+    subscription OrderStatusUpdated($orderId: ID!) {
+        orderStatusUpdated(orderId: $orderId) {
+            id
+            status
+            driver {
+                id
+                firstName
+                lastName
+            }
+        }
+    }
+`;

@@ -215,6 +215,7 @@ export class OrderLifecycleModule {
             dbOrder.orderDate || null,
         );
 
+        await this.publishing.publishOrderById(id);
         await this.publishing.publishSingleUserOrder(dbOrder.userId, id);
         await this.publishing.publishAllOrders();
         notifyCustomerOrderStatus(notificationService, dbOrder.userId, id, status);

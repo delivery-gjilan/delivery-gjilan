@@ -109,6 +109,15 @@ if (!TaskManager.isTaskDefined(BACKGROUND_HEARTBEAT_TASK)) {
       return;
     }
 
+    // If the driver logged out (or app was killed and store rehydrates as
+    // unauthenticated), stop the background task so it doesn't keep GPS alive.
+    const { token, user } = useAuthStore.getState();
+    if (!token || !user) {
+      console.log('[Heartbeat][Background] Not authenticated — stopping background task');
+      await Location.stopLocationUpdatesAsync(BACKGROUND_HEARTBEAT_TASK).catch(() => {});
+      return;
+    }
+
     const locations = (data as { locations?: Array<{ coords?: { latitude: number; longitude: number } }> } | undefined)?.locations;
     const latest = locations?.[locations.length - 1];
     const coords = latest?.coords;
@@ -540,6 +549,9 @@ export function useDriverHeartbeat() {
     if (isAuthenticated) {
       startHeartbeat();
     } else {
+      // Stop foreground + background heartbeat. This also handles the case
+      // where the app was killed and relaunched — the old OS-level background
+      // location task may still be running from the previous session.
       stopHeartbeat();
     }
 

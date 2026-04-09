@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { MapboxNavigationView } from '@badatgil/expo-mapbox-navigation';
 import { useApolloClient, useMutation, useQuery, useSubscription } from '@apollo/client/react';
-import { GET_ORDERS, UPDATE_ORDER_STATUS, DRIVER_NOTIFY_CUSTOMER } from '@/graphql/operations/orders';
+import { GET_ORDERS, UPDATE_ORDER_STATUS, DRIVER_NOTIFY_CUSTOMER, ORDER_STATUS_UPDATED } from '@/graphql/operations/orders';
 import { buildNavOrder, orderToPhase } from '@/utils/orderToNavOrder';
 import { GET_MY_DRIVER_METRICS } from '@/graphql/operations/driver';
 import { useNavigationStore } from '@/store/navigationStore';
@@ -98,6 +98,7 @@ export default function NavigationScreen() {
         distanceRemainingM,
         durationRemainingS,
         advanceToDropoff,
+        minimizeNavigation,
         stopNavigation,
         updateProgress,
         startNavigation,
@@ -116,6 +117,39 @@ export default function NavigationScreen() {
     const { data } = useQuery(GET_ORDERS, {
         fetchPolicy: 'cache-and-network',
         nextFetchPolicy: 'cache-first',
+    });
+
+    useSubscription(ORDER_STATUS_UPDATED, {
+        skip: !order?.id,
+        variables: { orderId: order?.id },
+        onData: ({ data: subData }) => {
+            const updatedOrder = (subData.data as any)?.orderStatusUpdated;
+            if (!updatedOrder?.id) return;
+
+            apolloClient.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
+                const prev = existing?.orders;
+                if (!Array.isArray(prev)) return existing;
+
+                if (updatedOrder.status === 'DELIVERED' || updatedOrder.status === 'CANCELLED') {
+                    return { ...existing, orders: prev.filter((o: any) => o.id !== updatedOrder.id) };
+                }
+
+                return {
+                    ...existing,
+                    orders: prev.map((o: any) => (o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o)),
+                };
+            });
+
+            const wasReassigned = updatedOrder.driver?.id && updatedOrder.driver.id !== currentDriverId;
+            const isClosed = updatedOrder.status === 'DELIVERED' || updatedOrder.status === 'CANCELLED';
+            if (isClosed || wasReassigned) {
+                setShowDeliveryPanel(false);
+                setShowPickupPanel(false);
+                clearNavigationLocation();
+                stopNavigation();
+                router.replace('/(tabs)/drive' as any);
+            }
+        },
     });
 
     /* â”€â”€ Filter assigned orders â”€â”€ */
@@ -374,7 +408,10 @@ export default function NavigationScreen() {
             {/* â•â•â• Back button â€” returns to map without stopping navigation â•â•â• */}
             <Pressable
                 style={[styles.backBtn, { top: insets.top + 8 }]}
-                onPress={() => router.back()}
+                onPress={() => {
+                    minimizeNavigation();
+                    router.replace('/(tabs)/drive' as any);
+                }}
                 hitSlop={12}
             >
                 <Ionicons name="arrow-back" size={24} color="#fff" />

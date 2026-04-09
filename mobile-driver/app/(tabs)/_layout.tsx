@@ -15,11 +15,12 @@ export default function TabLayout() {
     const { t } = useTranslations();
     const { logout } = useAuth();
     const isNavigating = useNavigationStore((s) => s.isNavigating);
+    const isNavigationMinimized = useNavigationStore((s) => s.isNavigationMinimized);
 
     // If the driver had an active navigation session before the app was killed,
     // restore them to the navigation screen immediately on mount.
     useEffect(() => {
-        if (isNavigating) {
+        if (isNavigating && !isNavigationMinimized) {
             router.replace('/navigation' as any);
         } else {
             // Always open on the map tab at startup

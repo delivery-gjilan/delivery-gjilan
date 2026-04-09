@@ -19,6 +19,13 @@ export class OrderPublishingModule {
         return subscribe(this.deps.pubsub, topics.allOrdersChanged());
     }
 
+    async publishOrderById(orderId: string) {
+        const dbOrder = await this.deps.orderRepository.findById(orderId);
+        if (!dbOrder) return;
+        const order = await this.mapping.mapToOrder(dbOrder);
+        publish(this.deps.pubsub, topics.orderByIdUpdated(orderId), order);
+    }
+
     async publishUserOrders(userId: string) {
         const orders = await this.queryGetUserUncompletedOrders(userId);
         publish(this.deps.pubsub, topics.ordersByUserChanged(userId), {

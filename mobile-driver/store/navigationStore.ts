@@ -24,6 +24,7 @@ export interface NavigationOrder {
 interface NavigationState {
     /* ── State ── */
     isNavigating: boolean;
+    isNavigationMinimized: boolean;
     phase: NavigationPhase;
     order: NavigationOrder | null;
     destination: NavigationDestination | null;
@@ -37,6 +38,7 @@ interface NavigationState {
 
     /* ── Actions ── */
     startNavigation: (order: NavigationOrder, phase: NavigationPhase, originLocation: { latitude: number; longitude: number }) => void;
+    minimizeNavigation: () => void;
     advanceToDropoff: () => void;
     stopNavigation: () => void;
     toggleMute: () => void;
@@ -46,6 +48,7 @@ interface NavigationState {
 export const useNavigationStore = create<NavigationState>()(persist((set, get) => ({
     /* ── Initial state ── */
     isNavigating: false,
+    isNavigationMinimized: false,
     phase: 'to_pickup',
     order: null,
     destination: null,
@@ -60,6 +63,7 @@ export const useNavigationStore = create<NavigationState>()(persist((set, get) =
         const destination = phase === 'to_dropoff' ? order.dropoff : order.pickup;
         set({
             isNavigating: true,
+            isNavigationMinimized: false,
             phase,
             order,
             destination,
@@ -70,10 +74,15 @@ export const useNavigationStore = create<NavigationState>()(persist((set, get) =
         });
     },
 
+    minimizeNavigation: () => {
+        set({ isNavigationMinimized: true });
+    },
+
     advanceToDropoff: () => {
         const { order } = get();
         if (!order?.dropoff) return;
         set({
+            isNavigationMinimized: false,
             phase: 'to_dropoff',
             destination: order.dropoff,
             distanceRemainingM: null,
@@ -85,6 +94,7 @@ export const useNavigationStore = create<NavigationState>()(persist((set, get) =
     stopNavigation: () => {
         set({
             isNavigating: false,
+            isNavigationMinimized: false,
             phase: 'to_pickup',
             order: null,
             destination: null,
