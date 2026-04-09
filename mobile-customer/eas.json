@@ -11,7 +11,7 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://898a-2a03-4b80-bb1f-3360-e9e2-e0b1-a86e-31e9.ngrok-free.app/graphql",
+        "EXPO_PUBLIC_API_URL": "https://api.zippgo.uk/graphql",
         "EXPO_PUBLIC_MAPBOX_TOKEN": "pk.eyJ1IjoiYXJ0c2hhYmFuaTIwMDIiLCJhIjoiY21sZjlkbTNxMDIwOTNkc2F0cTZkYmZoeiJ9.C81uu49ST5NrfHZ58N9EXg",
         "EXPO_PUBLIC_MAPTILER_API_KEY": "J5uv4tZ8MpmOrnqpBl4J"
       }
@@ -21,7 +21,7 @@
       "autoIncrement": true,
       "channel": "production",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api-production-5008.up.railway.app/graphql",
+        "EXPO_PUBLIC_API_URL": "https://api.zippgo.uk/graphql",
         "EXPO_PUBLIC_MAPBOX_TOKEN": "pk.eyJ1IjoiYXJ0c2hhYmFuaTIwMDIiLCJhIjoiY21sZjlkbTNxMDIwOTNkc2F0cTZkYmZoeiJ9.C81uu49ST5NrfHZ58N9EXg",
         "EXPO_PUBLIC_MAPTILER_API_KEY": "J5uv4tZ8MpmOrnqpBl4J"
       }

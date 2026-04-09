@@ -14,16 +14,16 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://colloquial-deadra-cursorily.ngrok-free.dev",
-        "EXPO_PUBLIC_WS_URL": "wss://colloquial-deadra-cursorily.ngrok-free.dev"
+        "EXPO_PUBLIC_API_URL": "https://api.zippgo.uk/graphql",
+        "EXPO_PUBLIC_WS_URL": "wss://api.zippgo.uk/graphql"
       }
     },
     "production": {
       "autoIncrement": true,
       "channel": "production",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://colloquial-deadra-cursorily.ngrok-free.dev",
-        "EXPO_PUBLIC_WS_URL": "wss://colloquial-deadra-cursorily.ngrok-free.dev"
+        "EXPO_PUBLIC_API_URL": "https://api.zippgo.uk/graphql",
+        "EXPO_PUBLIC_WS_URL": "wss://api.zippgo.uk/graphql"
       }
     }
   },

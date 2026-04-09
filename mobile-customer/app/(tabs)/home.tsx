@@ -60,6 +60,7 @@ export default function Discover() {
     const theme = useTheme();
     const router = useRouter();
     const { businesses, loading, error, refetch } = useBusinesses();
+    const hasBusinesses = businesses.length > 0;
     // Only play entering animations on the very first render, not on re-focus
     const hasAnimated = useRef(false);
     const isFirstLoad = businesses.length === 0 && loading;
@@ -256,7 +257,7 @@ export default function Discover() {
                             {renderSkeletonRow()}
                         </View>
                     </ScrollView>
-                ) : error ? (
+                ) : error && !hasBusinesses ? (
                     <View className="flex-1 justify-center items-center px-4 py-20">
                         <Text style={{ color: theme.colors.text }}>{t.home.error_loading}</Text>
                         <Text className="text-sm mt-2" style={{ color: theme.colors.subtext }}>
@@ -265,6 +266,14 @@ export default function Discover() {
                     </View>
                 ) : (
                     <ScrollView showsVerticalScrollIndicator={false}>
+                        {error && hasBusinesses ? (
+                            <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 }}>
+                                <Text className="text-sm" style={{ color: theme.colors.subtext }}>
+                                    {t.common.something_went_wrong}
+                                </Text>
+                            </View>
+                        ) : null}
+
                         {/* Promo Banners */}
                         <Animated.View entering={hasAnimated.current ? undefined : FadeInDown.delay(100).duration(500)} style={{ marginBottom: 20 }}>
                             <PromoSlider banners={promoBanners} />

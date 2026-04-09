@@ -74,6 +74,7 @@ export default function Restaurants() {
     const theme = useTheme();
     const router = useRouter();
     const { businesses, loading, error, refetch } = useBusinesses();
+    const hasBusinesses = businesses.length > 0;
     const [activeFilter, setActiveFilter] = useState<FilterOption>('all');
     const hasAnimated = useRef(false);
     const { t } = useTranslations();
@@ -360,7 +361,7 @@ export default function Restaurants() {
                             </View>
                         ))}
                     </View>
-                ) : error ? (
+                ) : error && !hasBusinesses ? (
                     <View className="flex-1 justify-center items-center px-4 py-20">
                         <Text style={{ color: theme.colors.text }}>{t.restaurants.error_loading}</Text>
                         <Text className="text-sm mt-2" style={{ color: theme.colors.subtext }}>
@@ -389,6 +390,15 @@ export default function Restaurants() {
                         }}
                         showsVerticalScrollIndicator={false}
                         contentContainerStyle={{ paddingBottom: 32, paddingTop: 4 }}
+                        ListHeaderComponent={
+                            error && hasBusinesses ? (
+                                <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
+                                    <Text className="text-sm" style={{ color: theme.colors.subtext }}>
+                                        {t.common.something_went_wrong}
+                                    </Text>
+                                </View>
+                            ) : null
+                        }
                         onLayout={() => { hasAnimated.current = true; }}
                         renderItem={({ item, index }) => {
                             const entering = hasAnimated.current

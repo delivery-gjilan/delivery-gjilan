@@ -16,10 +16,12 @@ const ORDERS_PAGE_SIZE = 30;
 export function useOrders() {
     const setActiveOrders = useActiveOrdersStore((state) => state.setActiveOrders);
     const userId = useAuthStore((state) => state.user?.id);
+    const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
     
     // Show cached data immediately, refresh in background
     const { data, loading, error, refetch, fetchMore } = useQuery(GET_ORDERS, {
         variables: { limit: ORDERS_PAGE_SIZE, offset: 0 },
+        skip: !isAuthenticated || !userId,
         fetchPolicy: 'cache-and-network',
         nextFetchPolicy: 'cache-first',
     });

@@ -10,7 +10,7 @@
       "env": {
         "NODE_ENV": "development",
         "NPM_CONFIG_LEGACY_PEER_DEPS": "true",
-        "EXPO_PUBLIC_API_URL": "https://colloquial-deadra-cursorily.ngrok-free.dev/graphql",
+        "EXPO_PUBLIC_API_URL": "https://api.zippgo.uk/graphql",
         "EXPO_PUBLIC_MAPTILER_API_KEY": "J5uv4tZ8MpmOrnqpBl4J",
         "EXPO_PUBLIC_MAPBOX_TOKEN": "pk.eyJ1IjoiYXJ0c2hhYmFuaTIwMDIiLCJhIjoiY21sZjlkbTNxMDIwOTNkc2F0cTZkYmZoeiJ9.C81uu49ST5NrfHZ58N9EXg",
         "RNMAPBOX_MAPS_DOWNLOAD_TOKEN": "sk.eyJ1IjoiYXJ0c2hhYmFuaTIwMDIiLCJhIjoiY21seDU4cm9mMG5paDNjczU3aTNnbjg4diJ9.7pJd_j8rviQ3yvmGZwCezw"
@@ -21,7 +21,7 @@
       "env": {
         "NODE_ENV": "production",
         "NPM_CONFIG_LEGACY_PEER_DEPS": "true",
-        "EXPO_PUBLIC_API_URL": "https://colloquial-deadra-cursorily.ngrok-free.dev/graphql",
+        "EXPO_PUBLIC_API_URL": "https://api.zippgo.uk/graphql",
         "EXPO_PUBLIC_MAPTILER_API_KEY": "J5uv4tZ8MpmOrnqpBl4J",
         "EXPO_PUBLIC_MAPBOX_TOKEN": "pk.eyJ1IjoiYXJ0c2hhYmFuaTIwMDIiLCJhIjoiY21sZjlkbTNxMDIwOTNkc2F0cTZkYmZoeiJ9.C81uu49ST5NrfHZ58N9EXg",
         "RNMAPBOX_MAPS_DOWNLOAD_TOKEN": "sk.eyJ1IjoiYXJ0c2hhYmFuaTIwMDIiLCJhIjoiY21seDU4cm9mMG5paDNjczU3aTNnbjg4diJ9.7pJd_j8rviQ3yvmGZwCezw"
@@ -33,7 +33,7 @@
       "env": {
         "NODE_ENV": "production",
         "NPM_CONFIG_LEGACY_PEER_DEPS": "true",
-        "EXPO_PUBLIC_API_URL": "https://colloquial-deadra-cursorily.ngrok-free.dev/graphql",
+        "EXPO_PUBLIC_API_URL": "https://api.zippgo.uk/graphql",
         "EXPO_PUBLIC_MAPTILER_API_KEY": "J5uv4tZ8MpmOrnqpBl4J",
         "EXPO_PUBLIC_MAPBOX_TOKEN": "pk.eyJ1IjoiYXJ0c2hhYmFuaTIwMDIiLCJhIjoiY21sZjlkbTNxMDIwOTNkc2F0cTZkYmZoeiJ9.C81uu49ST5NrfHZ58N9EXg",
         "RNMAPBOX_MAPS_DOWNLOAD_TOKEN": "sk.eyJ1IjoiYXJ0c2hhYmFuaTIwMDIiLCJhIjoiY21seDU4cm9mMG5paDNjczU3aTNnbjg4diJ9.7pJd_j8rviQ3yvmGZwCezw"

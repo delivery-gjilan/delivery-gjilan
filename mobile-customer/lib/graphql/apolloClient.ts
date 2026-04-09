@@ -12,6 +12,17 @@ import { useAuthStore } from '../../store/authStore';
 import { toast } from '../../store/toastStore';
 import { getValidAccessToken, refreshAccessToken } from './authSession';
 
+// Operations that never need an auth token — skip getValidAccessToken() entirely
+// so they are never blocked by a slow or failing token refresh.
+const AUTH_SKIP_OPERATIONS = new Set([
+    'Login',
+    'InitiateSignup',
+    'VerifyEmail',
+    'VerifyPhone',
+    'SubmitPhoneNumber',
+    'ResendEmailVerification',
+]);
+
 const logLink = new ApolloLink((operation, forward) => {
     console.log('Request', {
         name: operation.operationName,
@@ -95,17 +106,26 @@ const errorLink = onError(({ error, operation, forward }) => {
         }
     } else {
         // Network or other error
-        if ('statusCode' in error && (error as any).statusCode === 401) {
+        const statusCode = 'statusCode' in error ? (error as any).statusCode : undefined;
+        if (statusCode === 401) {
             console.warn('[Apollo] 401 received; preserving session until manual logout');
             return;
         }
-        console.error('[Apollo] Network error:', error.message);
-        toast.error('Network Error', 'Please check your connection and try again.');
+        const opName = operation.operationName || 'unknown';
+        const detail = statusCode ? ` (HTTP ${statusCode})` : '';
+        console.error(`[Apollo] Network error in ${opName}${detail}:`, error.message);
+        toast.error('Network Error', `Request failed${detail}. Please check your connection.`);
     }
 });
 
-const authLink = new SetContextLink(async ({ headers }) => {
-    const token = await getValidAccessToken();
+const authLink = new SetContextLink(async ({ headers }, operation) => {
+    const opName = operation.operationName ?? '';
+    // Auth operations (login, signup, etc.) never need a token.
+    // Skipping getValidAccessToken() avoids blocking these requests
+    // behind a slow or failing token refresh on cold start.
+    const token = AUTH_SKIP_OPERATIONS.has(opName)
+        ? null
+        : await getValidAccessToken();
 
     return {
         headers: {
@@ -188,7 +208,9 @@ const wsLink = wsUrl
                   },
                   error: (err) => {
                       console.error('[WS] Error', err);
-                      if (reconnectAttempts === 0) {
+                      // Only show toast if user is authenticated — no point
+                      // alerting about WS failures on the login screen.
+                      if (reconnectAttempts === 0 && useAuthStore.getState().isAuthenticated) {
                           toast.error('Connection Error', 'Reconnecting...');
                       }
                   },
