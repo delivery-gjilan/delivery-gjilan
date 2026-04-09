@@ -122,7 +122,7 @@ jobs:
             # Health check — wait up to 60s for /health to respond
             echo "Waiting for /health..."
             for i in $(seq 1 12); do
-              STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:80/health || true)
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:4000/health || true)
               if [ "$STATUS" = "200" ]; then
                 echo "Health check passed (attempt $i)"
                 break

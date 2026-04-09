@@ -3,7 +3,7 @@
 # Caddy automatically obtains and renews TLS certificates
 
 # API — public, proxied through Cloudflare
-api.zippgo.com {
+api.zippgo.uk {
     reverse_proxy api:4000
 
     # WebSocket support (for GraphQL subscriptions)
