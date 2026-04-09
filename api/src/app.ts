@@ -48,12 +48,32 @@ const allowedOrigins = configuredOrigins.length > 0
     ? Array.from(new Set([...configuredOrigins, ...defaultAllowedOrigins]))
     : defaultAllowedOrigins;
 
-// Handle wildcard (*) for development
-const corsOrigin = allowedOrigins.includes('*') ? true : allowedOrigins;
+function matchesAllowedOrigin(origin: string, allowedOrigin: string): boolean {
+    if (allowedOrigin === '*') {
+        return true;
+    }
+
+    if (allowedOrigin.includes('*')) {
+        const pattern = `^${allowedOrigin
+            .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+            .replace(/\*/g, '.*')}$`;
+        return new RegExp(pattern).test(origin);
+    }
+
+    return origin === allowedOrigin;
+}
 
 app.use(
     cors({
-        origin: corsOrigin,
+        origin: (origin, callback) => {
+            if (!origin) {
+                callback(null, true);
+                return;
+            }
+
+            const isAllowed = allowedOrigins.some((allowedOrigin) => matchesAllowedOrigin(origin, allowedOrigin));
+            callback(null, isAllowed);
+        },
         credentials: true,
     }),
 );
