@@ -34,6 +34,8 @@ type LiveActivityUpdateGate = {
     sentAtMs: number;
 };
 
+type LiveActivityLocale = 'en' | 'al';
+
 export interface NotificationPayload {
     title: string;
     body: string;
@@ -100,6 +102,23 @@ export class NotificationService {
 
     private normalizeLocale(locale?: string): string {
         return locale === 'al' ? 'al' : 'en';
+    }
+
+    private async resolveLiveActivityLocale(orderId: string, preferredLocale?: string): Promise<LiveActivityLocale> {
+        if (preferredLocale) {
+            return this.normalizeLocale(preferredLocale) as LiveActivityLocale;
+        }
+
+        const cacheKey = `cache:live-activity:locale:${orderId}`;
+        const cached = await cache.get<string>(cacheKey);
+        if (cached) {
+            return this.normalizeLocale(cached) as LiveActivityLocale;
+        }
+
+        const preferred = await this.repo.getOrderPreferredLanguage(orderId);
+        const resolved = this.normalizeLocale(preferred) as LiveActivityLocale;
+        await cache.set(cacheKey, resolved, 60 * 60);
+        return resolved;
     }
 
     private resolveLocalizedPayload(payload: NotificationPayload, locale?: string): NotificationPayload {
@@ -551,6 +570,7 @@ export class NotificationService {
             status: 'pending' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled';
             phaseInitialMinutes?: number;
             phaseStartedAt?: number;
+            locale?: string;
         },
     ): Promise<void> {
         const gateKey = `cache:live-activity:last-update:${orderId}`;
@@ -590,6 +610,7 @@ export class NotificationService {
         const liveActivityApnsConfig = getLiveActivityApnsConfig();
         const messaging = getMessaging();
         const liveActivityTopic = getLiveActivityApnsTopic();
+        const liveActivityLocale = await this.resolveLiveActivityLocale(orderId, updates.locale);
 
         // Send update to each Live Activity
         for (const tokenRecord of tokens) {
@@ -602,6 +623,7 @@ export class NotificationService {
                             driverName: updates.driverName,
                             estimatedMinutes: updates.estimatedMinutes,
                             status: updates.status,
+                            language: liveActivityLocale,
                             orderId,
                             phaseInitialMinutes: updates.phaseInitialMinutes ?? updates.estimatedMinutes,
                             phaseStartedAt: updates.phaseStartedAt ?? Date.now(),
@@ -639,6 +661,7 @@ export class NotificationService {
                             driverName: updates.driverName,
                             estimatedMinutes: String(updates.estimatedMinutes),
                             status: updates.status,
+                            language: liveActivityLocale,
                             orderId: orderId,
                             phaseInitialMinutes: String(
                                 updates.phaseInitialMinutes ?? updates.estimatedMinutes,
@@ -667,6 +690,7 @@ export class NotificationService {
                                         driverName: updates.driverName,
                                         estimatedMinutes: updates.estimatedMinutes,
                                         status: updates.status,
+                                        language: liveActivityLocale,
                                         orderId: orderId,
                                         phaseInitialMinutes:
                                             updates.phaseInitialMinutes ?? updates.estimatedMinutes,
@@ -728,6 +752,7 @@ export class NotificationService {
         const liveActivityApnsConfig = getLiveActivityApnsConfig();
         const messaging = getMessaging();
         const liveActivityTopic = getLiveActivityApnsTopic();
+        const liveActivityLocale = await this.resolveLiveActivityLocale(orderId);
 
         // Send end event to each Live Activity
         for (const tokenRecord of tokens) {
@@ -736,6 +761,7 @@ export class NotificationService {
                     driverName: 'Your driver',
                     estimatedMinutes: 0,
                     status: finalStatus,
+                    language: liveActivityLocale,
                     orderId,
                     lastUpdated: Date.now(),
                 };

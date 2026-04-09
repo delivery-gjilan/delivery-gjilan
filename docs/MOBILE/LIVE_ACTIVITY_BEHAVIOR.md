@@ -209,6 +209,19 @@ alongside existing:
 
 - `driverName`, `estimatedMinutes`, `status`, `orderId`, `lastUpdated`
 
+The payload now also carries `language` (`en` or `al`) so widget labels can follow customer language preference instead of always rendering English.
+
+### Preparing Countdown Behavior
+
+- The widget computes remaining minutes from `phaseInitialMinutes` + `phaseStartedAt` using wall-clock elapsed time.
+- During `PREPARING`, the ETA label (`~Xm`) ticks down continuously even between remote pushes.
+- During `OUT_FOR_DELIVERY`, heartbeat pushes still refine ETA, but countdown continues smoothly between heartbeat updates.
+
+### Status Color Distinction
+
+- `pending` and `preparing` now use distinct color accents in all Live Activity surfaces (Lock Screen and Dynamic Island) to avoid visual ambiguity.
+- `pending` uses amber and `preparing` uses warm red for clearer separation at a glance.
+
 ## Files Changed
 
 - `api/src/services/NotificationService.ts`

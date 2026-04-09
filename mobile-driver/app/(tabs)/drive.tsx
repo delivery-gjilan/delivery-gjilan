@@ -4,9 +4,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Mapbox from '@rnmapbox/maps';
 
-import { NetworkStatus } from '@apollo/client';
-import { useApolloClient, useMutation, useQuery } from '@apollo/client/react';
-import { GET_ORDERS, UPDATE_ORDER_STATUS } from '@/graphql/operations/orders';
+import { useMutation } from '@apollo/client/react';
+import { UPDATE_ORDER_STATUS } from '@/graphql/operations/orders';
 import { useDriverLocation } from '@/hooks/useDriverLocation';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuthStore } from '@/store/authStore';
@@ -17,6 +16,7 @@ import { fetchRouteGeometry } from '@/utils/mapbox';
 import { buildNavOrder, orderToPhase } from '@/utils/orderToNavOrder';
 import { useOrderAcceptStore } from '@/store/orderAcceptStore';
 import { useTranslations } from '@/hooks/useTranslations';
+import { useGlobalOrderAccept } from '@/hooks/useGlobalOrderAccept';
 import type { Feature, LineString } from 'geojson';
 
 /* ─── Constants ─── */
@@ -47,7 +47,6 @@ export default function MapScreen() {
         READY: t.map.status_ready,
         OUT_FOR_DELIVERY: t.map.status_delivering,
     };
-    const apolloClient = useApolloClient();
     const theme = useTheme();
     const insets = useSafeAreaInsets();
     const router = useRouter();
@@ -77,6 +76,7 @@ export default function MapScreen() {
     const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS);
     const pendingOrder = useOrderAcceptStore((s) => s.pendingOrder);
     const pendingAutoCountdown = useOrderAcceptStore((s) => s.autoCountdown);
+    const { orders, assignedOrders, availableOrders, networkReady } = useGlobalOrderAccept();
 
     // ── Route state ──
     const [routeCoords, setRouteCoords] = useState<Array<[number, number]> | null>(null);
@@ -87,41 +87,10 @@ export default function MapScreen() {
     // ── Marching-ants animation for preview route ──
     // (removed — preview route now uses a simple static style)
 
-    // ── Orders query + real-time subscription ──
-    const { data, loading, refetch, networkStatus } = useQuery(GET_ORDERS, {
-        fetchPolicy: 'cache-and-network',
-        nextFetchPolicy: 'cache-first',
-        notifyOnNetworkStatusChange: true,
-        skip: !hasHydrated,
-    });
-
-    const [networkReady, setNetworkReady] = useState(false);
-    const seenLoadingRef = useRef(false);
-    useEffect(() => {
-        if (networkStatus === NetworkStatus.loading || networkStatus === NetworkStatus.refetch) {
-            seenLoadingRef.current = true;
-        }
-        if (!networkReady) {
-            if (seenLoadingRef.current && networkStatus === NetworkStatus.ready) {
-                setNetworkReady(true);
-            } else if (networkStatus === NetworkStatus.error) {
-                setNetworkReady(true);
-            }
-        }
-    }, [networkReady, networkStatus]);
-
-    useEffect(() => {
-        if (!hasHydrated || !currentDriverId) return;
-        void refetch().catch(() => {
-            // Keep stale cache visible if the cold-start refresh fails.
-        });
-    }, [hasHydrated, currentDriverId, refetch]);
-
     // ── Precise per-order timers: fire exactly when each PREPARING order crosses
     //    the 5-min threshold for map pin/pool button visibility.
     const [now, setNow] = useState(() => Date.now());
     useEffect(() => {
-        const orders = (data as any)?.orders ?? [];
         const timers: ReturnType<typeof setTimeout>[] = [];
         for (const o of orders) {
             if (o.status !== 'PREPARING' || o.driver?.id || !o.estimatedReadyAt) continue;
@@ -131,16 +100,7 @@ export default function MapScreen() {
             timers.push(setTimeout(() => setNow(Date.now()), delayMs));
         }
         return () => timers.forEach(clearTimeout);
-    }, [data]);
-
-    // ── Filter orders ──
-    const assignedOrders = useMemo(() => {
-        const orders = (data as any)?.orders ?? [];
-        return orders.filter((order: any) => {
-            if (order.status === 'DELIVERED' || order.status === 'CANCELLED') return false;
-            return order.driver?.id === currentDriverId;
-        });
-    }, [data, currentDriverId]);
+    }, [orders]);
 
     const visibleAssignedOrders = useMemo(() => {
         return networkReady ? assignedOrders : [];
@@ -187,25 +147,12 @@ export default function MapScreen() {
         });
     }, [followDriver, location]);
 
-    const availableOrders = useMemo(() => {
-        // In dispatch mode the admin assigns orders manually — hide all available pins
-        if (dispatchModeEnabled) return [];
-        const orders = (data as any)?.orders ?? [];
-        return orders.filter((order: any) => {
-            if (order.driver?.id) return false;
-            if (order.status === 'READY') return true;
-            if (order.status === 'PREPARING') {
-                const estimatedReadyAt = order.estimatedReadyAt ? new Date(order.estimatedReadyAt).getTime() : null;
-                return estimatedReadyAt !== null && estimatedReadyAt - now <= 5 * 60 * 1000;
-            }
-            return false;
-        });
-    }, [data, dispatchModeEnabled, now]);
-
     const allMapOrders = useMemo(
         () => [...visibleAssignedOrders, ...availableOrders],
         [visibleAssignedOrders, availableOrders],
     );
+
+    const isInitialOrdersLoading = hasHydrated && !!currentDriverId && !networkReady;
 
     // ── Focused order object ──
     const focusedOrder = useMemo(
@@ -745,7 +692,7 @@ export default function MapScreen() {
             })()}
 
             {/* Loading */}
-            {loading && !data && (
+            {isInitialOrdersLoading && (
                 <View style={styles.loadingOverlay}>
                     <ActivityIndicator size="large" color={theme.colors.primary} />
                 </View>

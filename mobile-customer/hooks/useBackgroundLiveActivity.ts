@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { AppState, AppStateStatus, NativeModules, Platform } from 'react-native';
 import { useActiveOrdersStore } from '@/modules/orders/store/activeOrdersStore';
 import { useLiveActivity } from '@/hooks/useLiveActivity';
+import { useLocaleStore } from '@/store/useLocaleStore';
 
 const LIVE_ACTIVITY_ELIGIBLE_STATUSES = new Set(['PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY']);
 
@@ -60,7 +61,11 @@ function getBusinessName(order: any): string {
     );
 }
 
-function buildStateForOrder(candidateOrder: any, mappedStatus: LiveStatus | null) {
+function buildStateForOrder(
+    candidateOrder: any,
+    mappedStatus: LiveStatus | null,
+    languageChoice: 'en' | 'al',
+) {
     if (!candidateOrder || !mappedStatus) return null;
 
     const nowMs = Date.now();
@@ -92,6 +97,7 @@ function buildStateForOrder(candidateOrder: any, mappedStatus: LiveStatus | null
             phaseInitialMinutes: prepTotal,
             phaseStartedAt: pendingStartedAtMs ?? nowMs,
             status: mappedStatus,
+            language: languageChoice,
         };
     }
 
@@ -102,6 +108,7 @@ function buildStateForOrder(candidateOrder: any, mappedStatus: LiveStatus | null
             phaseInitialMinutes: prepTotal,
             phaseStartedAt: preparingStartedAtMs ?? nowMs,
             status: mappedStatus,
+            language: languageChoice,
         };
     }
 
@@ -116,6 +123,7 @@ function buildStateForOrder(candidateOrder: any, mappedStatus: LiveStatus | null
             phaseInitialMinutes: Math.max(1, liveEtaMinutes + elapsedMinutes),
             phaseStartedAt: deliveryPhaseStartedAt,
             status: mappedStatus,
+            language: languageChoice,
         };
     }
 
@@ -127,11 +135,13 @@ function buildStateForOrder(candidateOrder: any, mappedStatus: LiveStatus | null
         phaseInitialMinutes: fallbackInitialMinutes,
         phaseStartedAt: deliveryPhaseStartedAt,
         status: mappedStatus,
+        language: languageChoice,
     };
 }
 
 export function useBackgroundLiveActivity() {
     const activeOrders = useActiveOrdersStore((state) => state.activeOrders as any[]);
+    const languageChoice = useLocaleStore((state) => state.languageChoice);
 
     const candidateOrder = useMemo(() => {
         return getCandidateOrder(activeOrders);
@@ -173,7 +183,7 @@ export function useBackgroundLiveActivity() {
                 return;
             }
 
-            const state = buildStateForOrder(currentCandidateOrder, currentMappedStatus);
+            const state = buildStateForOrder(currentCandidateOrder, currentMappedStatus, languageChoice);
             if (!state) {
                 return;
             }
@@ -240,7 +250,7 @@ export function useBackgroundLiveActivity() {
                 enabled: true,
             });
         },
-        [startLiveActivity],
+        [languageChoice, startLiveActivity],
     );
 
     const syncLiveActivityRef = useRef(syncLiveActivity);

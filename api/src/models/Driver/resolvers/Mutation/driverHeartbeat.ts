@@ -108,12 +108,16 @@ export const driverHeartbeat: NonNullable<MutationResolvers['driverHeartbeat']> 
       const throttleKey = `cache:live-activity:last-minute:${activeOrderId}`;
       const lastSentMinute = await cache.get<number>(throttleKey);
       if (lastSentMinute !== remainingMinutes) {
+        const customer = await authService.authRepository.findById(dbOrder.userId);
+        const customerPreferredLanguage: 'en' | 'al' = customer?.preferredLanguage === 'al' ? 'al' : 'en';
+
         await notificationService.sendLiveActivityUpdate(activeOrderId, {
           driverName: 'Your driver',
           estimatedMinutes: remainingMinutes,
           status: 'out_for_delivery',
           phaseInitialMinutes,
           phaseStartedAt: outForDeliveryMs,
+          locale: customerPreferredLanguage,
         });
         await cache.set(throttleKey, remainingMinutes, 60 * 60);
       }

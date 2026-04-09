@@ -20,6 +20,7 @@ struct DeliveryActivityAttributes: ActivityAttributes {
     var phaseInitialMinutes: Int
     var phaseStartedAt: Int64
         var status: String
+    var language: String
         var orderId: String
         var lastUpdated: Int64  // Unix timestamp ms
     }
@@ -44,6 +45,7 @@ struct DeliveryActivityAttributes: ActivityAttributes {
     var phaseInitialMinutes: Int
     var phaseStartedAt: Int64
         var status: String
+    var language: String
         var orderId: String
         var lastUpdated: Int64  // Unix timestamp ms
     }
@@ -74,6 +76,7 @@ class DeliveryLiveActivities: NSObject {
           phaseInitialMinutes: (stateDict["phaseInitialMinutes"] as? NSNumber)?.intValue ?? ((stateDict["estimatedMinutes"] as? NSNumber)?.intValue ?? 0),
           phaseStartedAt: (stateDict["phaseStartedAt"] as? NSNumber)?.int64Value ?? Int64(Date().timeIntervalSince1970 * 1000),
             status: stateDict["status"] as? String ?? "",
+            language: stateDict["language"] as? String ?? "en",
             orderId: stateDict["orderId"] as? String ?? "",
             lastUpdated: (stateDict["lastUpdated"] as? NSNumber)?.int64Value ?? Int64(Date().timeIntervalSince1970 * 1000)
         )
@@ -117,6 +120,7 @@ class DeliveryLiveActivities: NSObject {
           phaseInitialMinutes: (stateDict["phaseInitialMinutes"] as? NSNumber)?.intValue ?? ((stateDict["estimatedMinutes"] as? NSNumber)?.intValue ?? 0),
           phaseStartedAt: (stateDict["phaseStartedAt"] as? NSNumber)?.int64Value ?? Int64(Date().timeIntervalSince1970 * 1000),
             status: stateDict["status"] as? String ?? "",
+            language: stateDict["language"] as? String ?? "en",
             orderId: stateDict["orderId"] as? String ?? "",
             lastUpdated: (stateDict["lastUpdated"] as? NSNumber)?.int64Value ?? Int64(Date().timeIntervalSince1970 * 1000)
         )
@@ -260,6 +264,27 @@ struct DeliveryLiveActivityBundle: WidgetBundle {
 }
 
 struct DeliveryLiveActivityWidget: Widget {
+  private func normalizedLanguage(_ context: ActivityViewContext<DeliveryActivityAttributes>) -> String {
+    let raw = context.state.language.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    if raw == "al" || raw == "sq" || raw.hasPrefix("sq-") {
+      return "al"
+    }
+
+    if raw == "en" || raw.hasPrefix("en-") {
+      return "en"
+    }
+
+    if let preferred = Locale.current.language.languageCode?.identifier.lowercased(), preferred == "sq" {
+      return "al"
+    }
+
+    return "en"
+  }
+
+  private func localized(_ en: String, _ al: String, _ context: ActivityViewContext<DeliveryActivityAttributes>) -> String {
+    return normalizedLanguage(context) == "al" ? al : en
+  }
+
   private func statusKey(_ rawStatus: String) -> String {
     return rawStatus
       .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -267,8 +292,25 @@ struct DeliveryLiveActivityWidget: Widget {
       .replacingOccurrences(of: " ", with: "_")
   }
 
-  private func normalizedStatus(_ status: String) -> String {
-    return status.replacingOccurrences(of: "_", with: " ").capitalized
+  private func normalizedStatus(_ context: ActivityViewContext<DeliveryActivityAttributes>) -> String {
+    switch statusKey(context.state.status) {
+    case "pending":
+      return localized("Pending", "Ne pritje", context)
+    case "accepted":
+      return localized("Accepted", "Pranuar", context)
+    case "preparing":
+      return localized("Preparing", "Duke u pergatitur", context)
+    case "ready", "ready_for_pickup":
+      return localized("Ready", "Gati", context)
+    case "picked_up", "on_the_way", "out_for_delivery":
+      return localized("Out for delivery", "Ne dorezim", context)
+    case "delivered":
+      return localized("Delivered", "Dorezuar", context)
+    case "cancelled", "canceled":
+      return localized("Canceled", "Anuluar", context)
+    default:
+      return context.state.status.replacingOccurrences(of: "_", with: " ").capitalized
+    }
   }
 
   private func statusIconName(_ status: String) -> String {
@@ -295,9 +337,9 @@ struct DeliveryLiveActivityWidget: Widget {
   private func statusTint(_ status: String) -> Color {
     switch statusKey(status) {
     case "pending":
-      return Color(red: 0.918, green: 0.620, blue: 0.043) // #EAB308 yellow
+      return Color(red: 0.949, green: 0.620, blue: 0.078) // #F29E14 amber
     case "preparing":
-      return Color(red: 0.976, green: 0.451, blue: 0.086) // #F97316 orange
+      return Color(red: 0.922, green: 0.263, blue: 0.208) // #EB4335 warm red
     case "accepted", "ready", "ready_for_pickup":
       return Color(red: 0.231, green: 0.510, blue: 0.965) // #3B82F6 blue
     case "picked_up", "on_the_way", "out_for_delivery":
@@ -370,15 +412,15 @@ struct DeliveryLiveActivityWidget: Widget {
   private func resolvedEtaText(_ context: ActivityViewContext<DeliveryActivityAttributes>) -> String {
     switch statusKey(context.state.status) {
     case "delivered":
-      return "Done"
+      return localized("Done", "Perfunduar", context)
     case "cancelled", "canceled":
-      return "Canceled"
+      return localized("Canceled", "Anuluar", context)
     case "pending":
-      return "Waiting"
+      return localized("Waiting", "Ne pritje", context)
     case "accepted":
-      return "Accepted"
+      return localized("Accepted", "Pranuar", context)
     case "ready", "ready_for_pickup":
-      return "Pickup"
+      return localized("Pickup", "Marrje", context)
     default:
       return etaText(context)
     }
@@ -393,8 +435,16 @@ struct DeliveryLiveActivityWidget: Widget {
     }
   }
 
-  private func pendingMessage() -> String {
-    return "Waiting for restaurant to approve order"
+  private func waitingText(_ context: ActivityViewContext<DeliveryActivityAttributes>) -> String {
+    return localized("Waiting", "Duke pritur", context)
+  }
+
+  private func pendingMessage(_ context: ActivityViewContext<DeliveryActivityAttributes>) -> String {
+    return localized(
+      "Waiting for restaurant to approve order",
+      "Duke pritur restorantin ta pranoje porosine",
+      context
+    )
   }
 
     var body: some WidgetConfiguration {
@@ -419,7 +469,7 @@ struct DeliveryLiveActivityWidget: Widget {
           Image(systemName: statusIconName(context.state.status))
             .font(.caption)
             .foregroundStyle(statusTint(context.state.status))
-          Text(normalizedStatus(context.state.status))
+          Text(normalizedStatus(context))
                     .font(.caption)
                     .foregroundStyle(.secondary)
         }
@@ -429,7 +479,7 @@ struct DeliveryLiveActivityWidget: Widget {
             .progressViewStyle(.linear)
             .tint(statusTint(context.state.status))
         } else {
-          Text(statusKey(context.state.status) == "pending" ? pendingMessage() : "Waiting\(waitingDots(context))")
+          Text(statusKey(context.state.status) == "pending" ? pendingMessage(context) : "\(waitingText(context))\(waitingDots(context))")
             .font(.caption2)
             .foregroundStyle(.secondary)
             .lineLimit(2)
@@ -460,7 +510,7 @@ struct DeliveryLiveActivityWidget: Widget {
               Image(systemName: statusIconName(context.state.status))
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(statusTint(context.state.status))
-              Text(normalizedStatus(context.state.status))
+              Text(normalizedStatus(context))
                 .font(.caption.weight(.semibold))
                 .lineLimit(1)
             }
@@ -483,7 +533,7 @@ struct DeliveryLiveActivityWidget: Widget {
               .progressViewStyle(.linear)
               .tint(statusTint(context.state.status))
           } else {
-            Text("Waiting\(waitingDots(context))")
+            Text("\(waitingText(context))\(waitingDots(context))")
               .font(.caption2)
               .foregroundStyle(.secondary)
           }
@@ -491,7 +541,7 @@ struct DeliveryLiveActivityWidget: Widget {
       } compactLeading: {
         Image(systemName: statusKey(context.state.status) == "pending" ? "clock.badge.questionmark" : statusIconName(context.state.status))
           .font(.system(size: 11, weight: .semibold))
-          .foregroundStyle(statusKey(context.state.status) == "pending" ? .orange : statusTint(context.state.status))
+          .foregroundStyle(statusTint(context.state.status))
       } compactTrailing: {
         if statusKey(context.state.status) == "pending" {
           EmptyView()
@@ -504,7 +554,7 @@ struct DeliveryLiveActivityWidget: Widget {
         if statusKey(context.state.status) == "pending" {
           Image(systemName: "clock.badge.questionmark")
             .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(.orange)
+            .foregroundStyle(statusTint(context.state.status))
         } else {
           ZStack {
             Circle()

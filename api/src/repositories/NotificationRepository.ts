@@ -17,6 +17,7 @@ import {
     NewDbPushTelemetryEvent,
     DbBusinessDeviceHealth,
 } from '@/database/schema/notifications';
+import { orders } from '@/database/schema/orders';
 import { users } from '@/database/schema/users';
 import { eq, inArray, and, sql, gte, desc } from 'drizzle-orm';
 
@@ -128,6 +129,16 @@ export class NotificationRepository {
             .where(inArray(users.id, userIds));
 
         return Object.fromEntries(rows.map((row) => [row.id, row.preferredLanguage]));
+    }
+
+    async getOrderPreferredLanguage(orderId: string): Promise<string | undefined> {
+        const [row] = await this.db
+            .select({ preferredLanguage: users.preferredLanguage })
+            .from(orders)
+            .innerJoin(users, eq(users.id, orders.userId))
+            .where(eq(orders.id, orderId));
+
+        return row?.preferredLanguage;
     }
 
     async removeTokensForUser(userId: string): Promise<void> {

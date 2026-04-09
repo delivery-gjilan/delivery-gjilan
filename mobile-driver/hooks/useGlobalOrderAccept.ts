@@ -39,31 +39,25 @@ export function useGlobalOrderAccept() {
 
     // ── Orders query (keeps cache warm when driver is off the map) ──
     const { data, refetch, networkStatus } = useQuery(GET_ORDERS, {
-        fetchPolicy: 'cache-and-network',
+        fetchPolicy: 'network-only',
         nextFetchPolicy: 'cache-first',
         notifyOnNetworkStatusChange: true,
         skip: !hasHydrated || !currentDriverId,
     });
 
-    // True once the first real network response arrives — prevents auto-present
-    // from firing against a stale persisted Apollo cache on app cold-start.
-    // With apollo3-cache-persist the cache is pre-populated, so networkStatus
-    // can start at NetworkStatus.ready (7) from cache before any network call
-    // completes. We track whether we've seen a loading/in-flight state first so
-    // we only unblock auto-present after a genuine round-trip.
+    // True once the first successful network response arrives — prevents
+    // auto-present from firing against a stale persisted Apollo cache on
+    // app cold-start. A failed first fetch must not unlock stale assigned or
+    // available orders, because the backend may have changed while the app was
+    // closed.
     const [networkReady, setNetworkReady] = useState(false);
     const seenLoadingRef = useRef(false);
     useEffect(() => {
         if (networkStatus === NetworkStatus.loading || networkStatus === NetworkStatus.refetch) {
             seenLoadingRef.current = true;
         }
-        if (!networkReady) {
-            if (seenLoadingRef.current && networkStatus === NetworkStatus.ready) {
-                setNetworkReady(true);
-            } else if (networkStatus === NetworkStatus.error) {
-                // Network failed; still unblock so driver isn't stuck forever.
-                setNetworkReady(true);
-            }
+        if (!networkReady && seenLoadingRef.current && networkStatus === NetworkStatus.ready) {
+            setNetworkReady(true);
         }
     }, [networkStatus, networkReady]);
 
@@ -79,6 +73,17 @@ export function useGlobalOrderAccept() {
             // Best-effort freshness sync; keep existing cache if refetch fails.
         }
     }, [refetch]);
+
+    useEffect(() => {
+        if (networkReady || !currentDriverId) return;
+        if (!seenLoadingRef.current || networkStatus !== NetworkStatus.error) return;
+
+        const retryTimer = setTimeout(() => {
+            void refreshOrders();
+        }, 3000);
+
+        return () => clearTimeout(retryTimer);
+    }, [currentDriverId, networkReady, networkStatus, refreshOrders]);
 
     // ── Driver metrics for capacity check ──
     const { data: metricsData } = useQuery(GET_MY_DRIVER_METRICS, {
@@ -107,12 +112,6 @@ export function useGlobalOrderAccept() {
         },
     });
 
-    // Refresh once when driver session is active so resume/open always has a fresh baseline.
-    useEffect(() => {
-        if (!currentDriverId) return;
-        void refreshOrders();
-    }, [currentDriverId, refreshOrders]);
-
     // Refetch on foreground transition to backfill any events missed while app was backgrounded.
     useEffect(() => {
         if (!currentDriverId) return;
@@ -126,11 +125,14 @@ export function useGlobalOrderAccept() {
         };
     }, [currentDriverId, refreshOrders]);
 
+    const orders = useMemo(() => {
+        return (data as any)?.orders ?? [];
+    }, [data]);
+
     // ── Precise per-order timers: fire exactly when each PREPARING order crosses
     //    the 5-min threshold instead of polling every 30s.
     const [now, setNow] = useState(() => Date.now());
     useEffect(() => {
-        const orders = (data as any)?.orders ?? [];
         const timers: ReturnType<typeof setTimeout>[] = [];
         for (const o of orders) {
             if (o.status !== 'PREPARING' || o.driver?.id || !o.estimatedReadyAt) continue;
@@ -140,21 +142,25 @@ export function useGlobalOrderAccept() {
             timers.push(setTimeout(() => setNow(Date.now()), delayMs));
         }
         return () => timers.forEach(clearTimeout);
-    }, [data]);
+    }, [orders]);
 
     // ── Derived order lists ──
     const assignedOrders = useMemo(() => {
-        const orders = (data as any)?.orders ?? [];
         return orders.filter((o: any) => {
             if (o.status === 'DELIVERED' || o.status === 'CANCELLED') return false;
             return o.driver?.id === currentDriverId;
         });
-    }, [data, currentDriverId]);
+    }, [orders, currentDriverId]);
+
+    useEffect(() => {
+        const assignedIds = assignedOrders.map((order: any) => String(order.id));
+        useOrderAcceptStore.getState().markAssignedOrders(assignedIds);
+    }, [assignedOrders]);
 
     const availableOrders = useMemo(() => {
         if (dispatchModeEnabled) return [];
-        const orders = (data as any)?.orders ?? [];
-        const skippedIds = useOrderAcceptStore.getState().getActiveSkippedIds();
+        const assignedIds = assignedOrders.map((order: any) => String(order.id));
+        const skippedIds = useOrderAcceptStore.getState().getActiveSkippedIds(assignedIds);
         return orders.filter((o: any) => {
             if (o.driver?.id) return false;
             if (skippedIds.has(o.id)) return false;
@@ -165,12 +171,11 @@ export function useGlobalOrderAccept() {
             }
             return false;
         });
-    }, [data, dispatchModeEnabled, now, skippedAt]);
+    }, [assignedOrders, dispatchModeEnabled, now, orders, skippedAt]);
 
     // Pool shows ALL eligible orders regardless of skip — driver can still manually pick a skipped order.
     const poolOrders = useMemo(() => {
         if (dispatchModeEnabled) return [];
-        const orders = (data as any)?.orders ?? [];
         return orders.filter((o: any) => {
             if (o.driver?.id) return false;
             if (o.status === 'READY') return true;
@@ -180,7 +185,7 @@ export function useGlobalOrderAccept() {
             }
             return false;
         });
-    }, [data, dispatchModeEnabled, now]);
+    }, [dispatchModeEnabled, now, orders]);
 
     // ── Live order: always read the freshest version from Apollo cache ──
     // pendingOrder in the store holds the ID-reference from when it was auto-presented;
@@ -362,6 +367,7 @@ export function useGlobalOrderAccept() {
     const takenByOther = useOrderAcceptStore((s) => s.takenByOther);
 
     return {
+        orders,
         pendingOrder: liveOrder,
         autoCountdown,
         accepting,

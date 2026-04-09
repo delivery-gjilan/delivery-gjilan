@@ -32,6 +32,8 @@ Use this as a dependency map before refactoring.
 ### Frontend restaurant/product entry points
 - Restaurant list screen:
   - `mobile-customer/app/(tabs)/restaurants.tsx`
+- Market tab screen:
+  - `mobile-customer/app/(tabs)/market.tsx`
 - Business details route:
   - `mobile-customer/app/business/[businessId].tsx`
 - Business screen (real restaurant menu rendering):
@@ -327,9 +329,12 @@ If you refactor create/delete flows, update these together:
 - business/product hooks and screen consumers
 
 5. Frontend rendering surfaces
+- `mobile-customer/app/(tabs)/market.tsx`
 - `mobile-customer/app/(tabs)/restaurants.tsx`
 - `mobile-customer/modules/business/BusinessScreen.tsx`
 - `mobile-customer/modules/business/components/ProductCard.tsx`
+
+Current market-tab behavior keeps the browse panel mounted during category and subcategory transitions; forcing remounts on those transitions can blank the visible panel during swipe handoff.
 
 ---
 

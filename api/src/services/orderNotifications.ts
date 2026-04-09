@@ -126,6 +126,7 @@ export function updateLiveActivity(
     estimatedMinutes: number = 0,
     phaseInitialMinutes?: number,
     phaseStartedAt?: number,
+    locale?: 'en' | 'al',
 ): void {
     // Fire-and-forget — do not await
     notificationService
@@ -135,6 +136,7 @@ export function updateLiveActivity(
             status,
             phaseInitialMinutes,
             phaseStartedAt,
+            locale,
         })
         .catch((err) => logger.error({ err, orderId, status }, 'Failed to send Live Activity update'));
 }

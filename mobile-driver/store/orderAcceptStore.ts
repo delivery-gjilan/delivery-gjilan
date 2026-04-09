@@ -1,6 +1,20 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 
 const SKIP_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+type TimestampMap = Record<string, number>;
+
+const pruneTimestampMap = (entries: TimestampMap, now: number): TimestampMap => {
+    const next: TimestampMap = {};
+    Object.entries(entries).forEach(([id, ts]) => {
+        if (now - ts < SKIP_TTL_MS) {
+            next[id] = ts;
+        }
+    });
+    return next;
+};
 
 interface OrderAcceptState {
     pendingOrder: any | null;
@@ -10,7 +24,9 @@ interface OrderAcceptState {
     /** True while showing the "someone else took this order" overlay (3-second auto-dismiss). */
     takenByOther: boolean;
     /** Map of orderId → timestamp when it was skipped. Entries expire after SKIP_TTL_MS. */
-    skippedAt: Map<string, number>;
+    skippedAt: TimestampMap;
+    /** Map of orderId → last timestamp this driver saw it assigned to them. */
+    seenAssignedAt: TimestampMap;
     /** Ref-level debounce: prevents double-tap firing two mutations. */
     _acceptingRef: boolean;
 
@@ -19,61 +35,95 @@ interface OrderAcceptState {
     setAccepting: (v: boolean) => void;
     setAcceptError: (msg: string | null) => void;
     setTakenByOther: (v: boolean) => void;
+    markAssignedOrders: (orderIds: string[]) => void;
     /** Returns IDs that are still within the TTL window. */
-    getActiveSkippedIds: () => Set<string>;
+    getActiveSkippedIds: (currentlyAssignedIds?: Iterable<string>) => Set<string>;
     /** True if accept is already in-flight (debounce check). */
     tryLockAccept: () => boolean;
 }
 
-export const useOrderAcceptStore = create<OrderAcceptState>((set, get) => ({
-    pendingOrder: null,
-    autoCountdown: true,
-    accepting: false,
-    acceptError: null,
-    takenByOther: false,
-    skippedAt: new Map(),
-    _acceptingRef: false,
+export const useOrderAcceptStore = create<OrderAcceptState>()(
+    persist(
+        (set, get) => ({
+            pendingOrder: null,
+            autoCountdown: true,
+            accepting: false,
+            acceptError: null,
+            takenByOther: false,
+            skippedAt: {},
+            seenAssignedAt: {},
+            _acceptingRef: false,
 
-    setPendingOrder: (order, autoCountdown = true) =>
-        set({ pendingOrder: order, autoCountdown }),
+            setPendingOrder: (order, autoCountdown = true) =>
+                set({ pendingOrder: order, autoCountdown }),
 
-    skipOrder: () => {
-        const { pendingOrder, skippedAt, autoCountdown } = get();
-        const now = Date.now();
-        if (pendingOrder && autoCountdown) {
-            const next = new Map(skippedAt);
-            next.set(pendingOrder.id, now);
-            // Prune entries older than TTL while we're here
-            next.forEach((ts, id) => { if (now - ts >= SKIP_TTL_MS) next.delete(id); });
-            set({ skippedAt: next, pendingOrder: null });
-        } else {
-            set({ pendingOrder: null });
-        }
-    },
+            skipOrder: () => {
+                const { pendingOrder, skippedAt, autoCountdown } = get();
+                const now = Date.now();
+                if (pendingOrder && autoCountdown) {
+                    set({
+                        skippedAt: pruneTimestampMap({
+                            ...skippedAt,
+                            [pendingOrder.id]: now,
+                        }, now),
+                        pendingOrder: null,
+                    });
+                } else {
+                    set({ pendingOrder: null });
+                }
+            },
 
-    setAccepting: (v) => {
-        (get() as any)._acceptingRef = v;
-        set({ accepting: v });
-    },
+            setAccepting: (v) => {
+                (get() as any)._acceptingRef = v;
+                set({ accepting: v });
+            },
 
-    setAcceptError: (msg) => set({ acceptError: msg }),
+            setAcceptError: (msg) => set({ acceptError: msg }),
 
-    setTakenByOther: (v) => set({ takenByOther: v }),
+            setTakenByOther: (v) => set({ takenByOther: v }),
 
-    getActiveSkippedIds: () => {
-        const { skippedAt } = get();
-        const now = Date.now();
-        const ids = new Set<string>();
-        skippedAt.forEach((ts, id) => {
-            if (now - ts < SKIP_TTL_MS) ids.add(id);
-        });
-        return ids;
-    },
+            markAssignedOrders: (orderIds) => {
+                const now = Date.now();
+                const nextSeenAssignedAt = pruneTimestampMap({ ...get().seenAssignedAt }, now);
+                orderIds.forEach((id) => {
+                    nextSeenAssignedAt[id] = now;
+                });
+                set({ seenAssignedAt: nextSeenAssignedAt });
+            },
 
-    tryLockAccept: () => {
-        const state = get() as any;
-        if (state._acceptingRef) return false;
-        state._acceptingRef = true;
-        return true;
-    },
-}));
+            getActiveSkippedIds: (currentlyAssignedIds = []) => {
+                const now = Date.now();
+                const assignedSet = new Set(currentlyAssignedIds);
+                const { skippedAt, seenAssignedAt } = get();
+                const ids = new Set<string>();
+
+                Object.entries(pruneTimestampMap(skippedAt, now)).forEach(([id]) => {
+                    ids.add(id);
+                });
+
+                Object.entries(pruneTimestampMap(seenAssignedAt, now)).forEach(([id]) => {
+                    if (!assignedSet.has(id)) {
+                        ids.add(id);
+                    }
+                });
+
+                return ids;
+            },
+
+            tryLockAccept: () => {
+                const state = get() as any;
+                if (state._acceptingRef) return false;
+                state._acceptingRef = true;
+                return true;
+            },
+        }),
+        {
+            name: 'driver-order-accept-storage',
+            storage: createJSONStorage(() => AsyncStorage),
+            partialize: (state) => ({
+                skippedAt: state.skippedAt,
+                seenAssignedAt: state.seenAssignedAt,
+            }),
+        },
+    ),
+);

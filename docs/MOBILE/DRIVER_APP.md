@@ -114,7 +114,11 @@ index.tsx
 - `RootLayout` waits for `authStore.hasHydrated` before rendering `AppContent`, so startup hooks do not race against an unhydrated driver session
 - `login.tsx` redirects straight to `/(tabs)/drive` when a persisted authenticated driver session is restored
 - `useGlobalOrderAccept` and `drive.tsx` defer their initial `GET_ORDERS` work until auth hydration completes
-- `drive.tsx` performs an explicit cold-start `refetch()` once the hydrated driver id is available so admin-side assignments or READY transitions made while the app was closed appear immediately on first open
+- On each app init, `useGlobalOrderAccept` and `drive.tsx` run their first `GET_ORDERS` request as `network-only`; once that baseline succeeds, the same query instances fall back to `cache-first`
+- `drive.tsx` no longer owns a second independent orders query; it consumes the shared order state exposed by `useGlobalOrderAccept`, so startup card visibility, pool state, and map annotations all derive from the same Apollo result
+- The startup assigned-order redirect in `_layout.tsx` waits for the first successful orders-network baseline before routing into drive, so persisted Apollo cache alone does not resurrect stale assigned-order UI after backend unassignments or temporary cold-start fetch failures
+- If the first cold-start orders fetch fails, both `_layout.tsx` and `drive.tsx` keep assigned-order UI gated off and retry until a fresh baseline succeeds instead of trusting persisted cache
+- `orderAcceptStore` persists recently assigned order ids for a short TTL, so an order that was previously assigned to this driver does not immediately resurface as a fresh available-order prompt after an admin unassigns it while the app is closed
 
 ### Token Refresh (`lib/graphql/authSession.ts`)
 
@@ -279,8 +283,8 @@ Renamed from `map.tsx`.
 The map is the primary operational view. It shows all active/available orders and the driver's live location.
 
 **Data layer:**
-- `GET_ORDERS` query (`cache-and-network` → `cache-first`) and an explicit one-shot `refetch()` after auth hydration on cold start
-- `ALL_ORDERS_UPDATED` subscription runs once globally in `useGlobalOrderAccept` (mounted in `AppContent`), merging payloads into the Apollo cache so all active `GET_ORDERS` queries auto-update
+- `GET_ORDERS` query (`network-only` on first mount for each app init → `cache-first` afterward)
+- `ALL_ORDERS_UPDATED` subscription runs once globally in `useGlobalOrderAccept` (mounted in `AppContent`), merging payloads into the Apollo cache so all order-aware driver UI reads the same shared dataset
 - If subscription payload is empty, the global hook falls back to `refetch()`
 
 **Order filtering:**
@@ -327,6 +331,10 @@ Cards sit at the bottom of the map in a `singleCardWrap` container positioned at
 
 **Order accept sheet:**
 The `OrderAcceptSheet` is rendered globally in `AppContent` (`_layout.tsx`), not in drive.tsx or navigation.tsx. When a driver selects an order from the pool FAB, `drive.tsx` calls `useOrderAcceptStore.getState().setPendingOrder(order, false)` directly.
+
+Global order-accept and pool UI only render after the driver session is authenticated, so login-screen startup cannot surface accept modals or pool sheets from background order updates.
+
+Recently skipped orders and recently removed assignments are both suppressed through the same persisted order-accept store TTL, which prevents cold-start reopen flows from re-offering an order that the driver just lost.
 
 **"Order taken" overlay (`takenByOther`):**
 - `orderAcceptStore` has a `takenByOther: boolean` field and `setTakenByOther(v)` action
@@ -572,7 +580,7 @@ When `dispatchModeEnabled` is `true` and the driver is online, an amber pill is 
 | `storeStatusUpdated` | `store.ts` | `useStoreStatus` (real-time dispatch mode + banner updates) |
 | `driverPttSignal(driverId)` | `driverTelemetry.ts` | `useDriverPttReceiver` |
 
-`useGlobalOrderAccept` also refetches `GET_ORDERS` on app foreground and on active session attach, with a short throttle guard, to backfill any events missed while backgrounded.
+`useGlobalOrderAccept` also refetches `GET_ORDERS` on app foreground, with a short throttle guard, to backfill any events missed while backgrounded.
 
 ---
 

@@ -29,10 +29,6 @@ const CARD_HEIGHT = CARD_WIDTH;
 
 const DISCOVER_TAB_ID = '__discover__';
 
-function getRenderedProductKey(product: any): string {
-    return String(product?.product?.id ?? product?.id ?? `${product?.product?.name ?? product?.name ?? 'unknown'}:${product?.product?.imageUrl ?? product?.imageUrl ?? 'no-image'}`);
-}
-
 // ─── Category Card (Discover grid) ─────────────────────────
 function CategoryCard({
     name,
@@ -427,8 +423,6 @@ export default function Market() {
     }, [allProducts, activeCategoryProducts, searchQuery, isDiscover]);
 
     const isSearching = searchQuery.trim().length > 0;
-    const activeBrowsePanelKey = `${activeTabId}:${activeSubcategoryId ?? '__first__'}`;
-    const stagingBrowsePanelKey = `${stagingTabId ?? activeTabId}:${stagingSubcategoryId ?? '__first__'}`;
 
     // Category images for Discover cards
     const categoryImages = useMemo(() => {
@@ -1020,7 +1014,7 @@ export default function Market() {
                 <View onLayout={(e) => { productsContainerY.current = e.nativeEvent.layout.y; }}>
                     <GestureDetector gesture={panGesture}>
                         <View style={{ overflow: 'hidden', width: SCREEN_WIDTH }}>
-                        <Animated.View key={activeBrowsePanelKey} style={contentAnimatedStyle}>
+                        <Animated.View style={contentAnimatedStyle}>
                             {!isSearching && isDiscover && (
                             /* ─── Discover Content ─── */
                             <View style={{ paddingBottom: 60, paddingTop: 20 }}>
@@ -1066,7 +1060,7 @@ export default function Market() {
                                     >
                                         <View style={{ paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingTop: idx === 0 ? 16 : 0 }}>
                                             {section.products.map((product: any) => (
-                                                <View key={getRenderedProductKey(product)} style={{ width: (SCREEN_WIDTH - 44) / 2 }}>
+                                                <View key={product.id} style={{ width: (SCREEN_WIDTH - 44) / 2 }}>
                                                     <MarketProductCard
                                                         product={product.product ?? product}
                                                         onPress={handleProductPress}
@@ -1091,13 +1085,13 @@ export default function Market() {
                         </Animated.View>
 
                         {/* Staging panel — reveals during swipe */}
-                        <Animated.View key={stagingBrowsePanelKey} style={stagingPanelStyle}>
+                        <Animated.View style={stagingPanelStyle}>
                             <View style={{ paddingBottom: 60 }}>
                                 {stagingCategorySections.map((section, idx) => (
                                     <View key={section.subcategoryId}>
                                         <View style={{ paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingTop: idx === 0 ? 16 : 0 }}>
                                             {section.products.map((product: any) => (
-                                                <View key={getRenderedProductKey(product)} style={{ width: (SCREEN_WIDTH - 44) / 2 }}>
+                                                <View key={product.id} style={{ width: (SCREEN_WIDTH - 44) / 2 }}>
                                                     <MarketProductCard
                                                         product={product.product ?? product}
                                                         onPress={handleProductPress}
@@ -1143,7 +1137,7 @@ export default function Market() {
                         ) : (
                             <View style={{ paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
                                 {searchResults.map((product: any) => (
-                                    <View key={getRenderedProductKey(product)} style={{ width: (SCREEN_WIDTH - 44) / 2 }}>
+                                    <View key={product.id} style={{ width: (SCREEN_WIDTH - 44) / 2 }}>
                                         <MarketProductCard
                                             product={product.product ?? product}
                                             onPress={handleProductPress}
