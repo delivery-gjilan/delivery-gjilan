@@ -266,7 +266,7 @@ export default function NavigationScreen() {
     const reassignedAlertShownRef = useRef(false);
     useEffect(() => {
         if (!order?.id || !isNavigating) return;
-        const allOrders = (data as any)?.orders ?? [];
+        const allOrders = (data as any)?.orders?.orders ?? [];
         const rawOrder = allOrders.find((o: any) => o.id === order.id);
         // If the order is DELIVERED or CANCELLED by us, don't show the alert â€”
         // the onConfirm / onCancel handlers already call stopNavigation and navigate away.

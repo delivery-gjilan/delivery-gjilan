@@ -18,6 +18,18 @@
 **Theme:** Dark/Light/System toggle via `useThemeStore` + NativeWind  
 **i18n:** English / Albanian via `useLocaleStore`
 
+## Runtime Environment
+
+The app reads runtime variables from `mobile-admin/.env`:
+
+| Variable | Required | Usage |
+|----------|----------|-------|
+| `EXPO_PUBLIC_API_URL` | Yes | Base GraphQL HTTP URL in Apollo client; subscriptions derive `ws://`/`wss://` by replacing `http` with `ws`. |
+| `EXPO_PUBLIC_MAPBOX_TOKEN` | Yes for live map | Map rendering and Directions API calls on the `Map` tab. |
+| `NODE_ENV` | Recommended | Standard environment mode for Expo/React Native behavior. |
+
+`mobile-admin/.env.example` contains the expected keys and placeholder values.
+
 ---
 
 ## App Architecture

@@ -9,6 +9,11 @@ import { useAuthStore } from '@/store/authStore';
 import { REGISTER_DEVICE_TOKEN, UNREGISTER_DEVICE_TOKEN, TRACK_PUSH_TELEMETRY } from '@/graphql/notifications';
 import { useNotificationSettingsStore } from '@/store/useNotificationSettingsStore';
 
+function isLikelyRawApnsToken(token: string): boolean {
+    // APNs tokens are typically represented as 64 hex chars, while FCM tokens are opaque.
+    return /^[a-fA-F0-9]{64}$/.test(token);
+}
+
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
         shouldShowAlert: true,
@@ -44,12 +49,16 @@ async function registerForPushNotifications(): Promise<string | null> {
         return null;
     }
 
+    if (Platform.OS === 'ios') {
+        await messaging().registerDeviceForRemoteMessages();
+    }
+
     const token = await messaging().getToken();
 
-    if (token.length < 100 || !token.includes(':')) {
+    if (!token || isLikelyRawApnsToken(token)) {
         await new Promise((resolve) => setTimeout(resolve, 3000));
         const retryToken = await messaging().getToken();
-        if (retryToken.length < 100 || !retryToken.includes(':')) {
+        if (!retryToken || isLikelyRawApnsToken(retryToken)) {
             return null;
         }
         return retryToken;
@@ -147,7 +156,7 @@ export function useNotifications() {
         
         if (firebase.apps.length && pushEnabled) {
             unsubscribeTokenRefresh = messaging().onTokenRefresh(async (newToken) => {
-                if (!mounted || newToken === currentPushToken.current) {
+                if (!mounted || newToken === currentPushToken.current || isLikelyRawApnsToken(newToken)) {
                     return;
                 }
 
@@ -170,6 +179,21 @@ export function useNotifications() {
                 }
             });
         }
+
+        const unsubscribeOnMessage = firebase.apps.length
+            ? messaging().onMessage(async (remoteMessage) => {
+                  const data = (remoteMessage?.data || {}) as Record<string, string>;
+                  void sendTelemetry('RECEIVED', {
+                      source: 'fcm_on_message',
+                      notificationTitle: remoteMessage?.notification?.title,
+                      notificationBody: remoteMessage?.notification?.body,
+                      campaignId: data.campaignId,
+                      orderId: data.orderId,
+                      type: data.type,
+                      status: data.status,
+                  });
+              })
+            : undefined;
 
         const notificationListener = Notifications.addNotificationReceivedListener((notification) => {
             void sendTelemetry('RECEIVED', {
@@ -198,6 +222,7 @@ export function useNotifications() {
         return () => {
             mounted = false;
             unsubscribeTokenRefresh?.();
+            unsubscribeOnMessage?.();
             notificationListener.remove();
             responseListener.remove();
         };

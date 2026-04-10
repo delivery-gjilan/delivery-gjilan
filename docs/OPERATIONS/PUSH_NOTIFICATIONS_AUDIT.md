@@ -1,6 +1,6 @@
 # Push Notifications Audit
 
-<!-- MDS:O4 | Domain: Operations | Updated: 2026-03-18 -->
+<!-- MDS:O4 | Domain: Operations | Updated: 2026-04-11 -->
 <!-- Depends-On: O3, M2, M3 -->
 <!-- Depended-By: (none) -->
 <!-- Nav: Token lifecycle changes → update M2 (Push), M3 (Live Activity). App type coverage → review O3 (Notifications). -->
@@ -22,7 +22,7 @@ It covers what works today, how messages flow end-to-end, current gaps, and reco
 
 ## Executive Summary
 
-The project has a real, working push pipeline for customer and driver delivery workflows, plus admin-initiated sends and campaigns.
+The project has a working push pipeline for customer, driver, business, and admin app types, plus admin-initiated sends and campaigns.
 
 Strong points:
 
@@ -33,11 +33,8 @@ Strong points:
 
 Main gaps:
 
-- Token storage is effectively single-device-per-user due to delete-then-insert logic.
-- mobile-driver uses native device token retrieval, which can be APNs on iOS and is less reliable for a Firebase-only backend than FCM token retrieval.
-- mobile-business and mobile-admin do not register push tokens at runtime.
-- Device app type enum only supports CUSTOMER and DRIVER.
-- Delivery observability is limited to send results, not user-level delivery/open analytics.
+- Background handling and UX depth still differ by app (customer remains the most feature-complete runtime consumer).
+- Delivery observability is improving via telemetry, but operational dashboards still need stricter alert thresholds and runbook automation.
 
 ## How It Works Today
 
@@ -52,12 +49,11 @@ Storage model:
 
 - Table: device_tokens
 - Fields: user_id, token, platform, device_id, app_type
-- app_type enum: CUSTOMER | DRIVER
+- app_type enum: CUSTOMER | DRIVER | BUSINESS | ADMIN
 
 Important behavior:
 
-- NotificationRepository.upsertDeviceToken deletes all existing tokens for the user first, then inserts/updates by token.
-- Result: a user is usually left with one active token in DB.
+- Token persistence supports multi-device operation while preserving one active token per user+device+appType.
 
 ## 2. Sending Pipeline
 
@@ -116,22 +112,21 @@ mobile-customer:
 mobile-driver:
 
 - Uses useNotifications hook in app layout
-- Requests permissions and registers token with appType DRIVER
-- Uses Notifications.getDevicePushTokenAsync instead of FCM messaging token retrieval
-- Handles foreground/tap flows and Android channels
-- Does not currently show token refresh listener behavior like customer app
+- Requests permissions and registers token with appType DRIVER via Firebase Messaging
+- Uses iOS APNs-to-FCM handshake hardening (`registerDeviceForRemoteMessages` before `getToken`)
+- Handles foreground/tap flows and token refresh re-registration
 
 mobile-business:
 
-- expo-notifications dependency/plugin exists
-- No notification hook wired in app runtime
-- No GraphQL operations for register/unregister token in source
+- Uses useNotifications hook in app runtime
+- Registers/unregisters BUSINESS app tokens via GraphQL mutations
+- Tracks received/opened/action/token telemetry events
+- Uses Firebase foreground listener and background message handler wiring
 
 mobile-admin:
 
-- expo-notifications dependency/plugin exists
-- No runtime token registration hook
-- Has screen to list and send campaigns (admin action), not device push registration
+- Includes runtime token registration/unregistration and telemetry wiring with appType ADMIN
+- Supports admin send/campaign workflows in parallel with device token lifecycle
 
 ## 5. Live Activity
 
@@ -151,30 +146,23 @@ Operational note:
 
 ## Current Risks and Limitations
 
-1. Multi-device limitation
+1. App parity differences
 
-- Current upsert flow deletes all user tokens before insert.
-- If users switch devices or use multiple devices, old device delivery is lost.
+- Customer runtime handling remains deeper than business/admin/driver for some UX behaviors (categories/actions, deep-link patterns).
 
-2. Driver iOS token reliability risk
+2. iOS token lifecycle fragility if handshake rules regress
 
-- Driver app uses getDevicePushTokenAsync.
-- For Firebase Admin-only sends, FCM token retrieval path is safer and more consistent on iOS.
+- Push reliability depends on keeping APNs-to-FCM handshake hardening in place in all apps.
 
-3. App coverage mismatch
-
-- API device app type only supports CUSTOMER and DRIVER.
-- business/admin apps cannot be fully onboarded to push without schema and API changes.
-
-4. Insufficient delivery analytics
+3. Insufficient delivery analytics
 
 - Campaign counters reflect send attempts/results, not open rate, tap-through, or per-platform delivery quality.
 
-5. Security hardening opportunity
+4. Security hardening opportunity
 
 - unregisterDeviceToken currently accepts raw token and removes it without explicit ownership check in resolver path.
 
-6. UX consistency gap
+5. UX consistency gap
 
 - customer app has richer category/action UX than driver.
 - business/admin have no runtime push UX.

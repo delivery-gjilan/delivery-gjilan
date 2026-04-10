@@ -1,17 +1,18 @@
 # Push And Live Activity
 
-<!-- MDS:M2 | Domain: Mobile | Updated: 2026-04-10 -->
+<!-- MDS:M2 | Domain: Mobile | Updated: 2026-04-11 -->
 <!-- Depends-On: M1, O3, O4 -->
 <!-- Depended-By: M3 -->
 <!-- Nav: Push infra changes → update O3 (Notifications), O4 (Push Audit). Live Activity changes → update M3 (Live Activity Behavior). -->
 
 ## What Exists Today
 
-The repo has one production-shaped push implementation and several partial consumers.
+The repo has production-shaped push implementations across customer, driver, and business.
 
-- `mobile-customer` has the real push token registration and notification handling flow
-- `mobile-driver` uses Firebase Messaging token registration for driver pushes; on iOS it must register for remote messages before requesting the FCM token, bootstrap a Firebase background message handler in `index.tsx`, and include `remote-notification` in iOS background modes so delivery works reliably when app state changes
-- `mobile-business` and `mobile-admin` are much thinner here
+- `mobile-customer` has the most complete runtime flow (token registration, refresh handling, foreground/background listeners, interactive categories)
+- `mobile-driver` uses Firebase Messaging token registration with iOS APNs-to-FCM handshake hardening (`registerDeviceForRemoteMessages` before `getToken`)
+- `mobile-business` registers BUSINESS app tokens at runtime and tracks telemetry; on iOS it follows the same APNs-to-FCM handshake guardrails as customer/driver
+- `mobile-admin` has runtime token registration and telemetry wiring but a lighter notification UX surface than customer
 
 APNs environment variables on the API side are tied to the Live Activity APNs provider-token path, not standard driver/customer FCM push delivery.
 
@@ -59,6 +60,8 @@ Detailed behavior and payload contract are documented in:
 ## Operational Guidance
 
 - treat FCM token registration as required infrastructure, not optional glue code
+- on iOS, call `messaging().registerDeviceForRemoteMessages()` before requesting `messaging().getToken()`
+- reject APNs-like 64-hex token values in Firebase token flows and retry before backend registration
 - keep notification categories aligned between client behavior and backend payloads
 - validate Live Activity changes on a real iOS build, not only by reading config files
 - treat Live Activity widget URL changes as native extension changes that require a new iOS binary build
