@@ -1,13 +1,13 @@
 # Mobile Admin App — Deep Dive
 
-<!-- MDS:M9 | Domain: Mobile | Updated: 2026-03-22 -->
+<!-- MDS:M9 | Domain: Mobile | Updated: 2026-04-11 -->
 <!-- Depends-On: M1, A1, B1, B4, BL1, UI2 -->
 <!-- Depended-By: M1, M6 -->
 <!-- Nav: Any mobile-admin screen change → update M6 tracker in same PR. -->
 
 ## Overview
 
-`mobile-admin` is a React Native / Expo Router app targeted at **ADMIN** and **SUPER_ADMIN** roles. It is the mobile companion to the `admin-panel` web dashboard, providing full operational control from a phone: real-time order management, live driver tracking on a Mapbox map, settlement management, and push-notification campaign dispatch.
+`mobile-admin` is a React Native / Expo Router app targeted at **ADMIN** and **SUPER_ADMIN** roles. It is the mobile companion to the `admin-panel` web dashboard, focused on operational control from a phone: real-time order management, live driver tracking on a Mapbox map, admin push-to-talk signaling to drivers, and operational notification dispatch.
 
 **Package directory:** `mobile-admin/`  
 **Entry:** `mobile-admin/index.tsx`  
@@ -21,6 +21,36 @@
 ---
 
 ## App Architecture
+
+## Current Operational Scope
+
+- Mobile-admin navigation is intentionally reduced to three operational tabs: `Map`, `Orders`, and `Ops`.
+- `Map` and `Orders` are the primary dispatch surfaces.
+- `Ops` contains admin-to-driver PTT controls and operational notification tools.
+- Legacy admin-management surfaces (businesses, users, settlements, generic settings hub) are removed from the mobile-admin route surface.
+- Push token registration remains active and operational order-alert notifications include:
+    - new order arrival alerts
+    - late pending alerts (pending/awaiting-approval orders crossing operational threshold)
+
+---
+
+## Route Shape (Current)
+
+```
+mobile-admin/app/
+├── _layout.tsx
+├── index.tsx
+├── login.tsx
+├── (tabs)/
+│   ├── _layout.tsx          # Tab bar: Map | Orders | Ops
+│   ├── map.tsx
+│   ├── orders.tsx
+│   └── ops.tsx
+├── order/[orderId].tsx
+└── ops-notifications.tsx
+```
+
+---
 
 ```
 mobile-admin/

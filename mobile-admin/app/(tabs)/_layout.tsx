@@ -46,20 +46,11 @@ export default function TabLayout() {
                 }}
             />
             <Tabs.Screen
-                name="dashboard"
+                name="ops"
                 options={{
-                    title: t.tabs.dashboard,
+                    title: t.tabs.ops,
                     tabBarIcon: ({ color, size }) => (
-                        <Ionicons name="stats-chart" size={size} color={color} />
-                    ),
-                }}
-            />
-            <Tabs.Screen
-                name="more"
-                options={{
-                    title: t.tabs.more,
-                    tabBarIcon: ({ color, size }) => (
-                        <Ionicons name="menu" size={size} color={color} />
+                        <Ionicons name="headset" size={size} color={color} />
                     ),
                 }}
             />

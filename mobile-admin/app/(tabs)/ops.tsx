@@ -1,0 +1,229 @@
+import React, { useMemo, useState } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { useMutation, useQuery } from '@apollo/client/react';
+import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '@/hooks/useTheme';
+import { useAuthStore } from '@/store/authStore';
+import { deleteItemAsync } from 'expo-secure-store';
+import { GET_DRIVERS } from '@/graphql/drivers';
+import { ADMIN_SEND_PTT_SIGNAL, ADMIN_SET_SHIFT_DRIVERS } from '@/graphql/ptt';
+
+const CHANNEL_PREFIX = 'admin-driver-ptt';
+
+type PttAction = 'STARTED' | 'STOPPED' | 'MUTE' | 'UNMUTE';
+
+export default function OpsScreen() {
+    const theme = useTheme();
+    const router = useRouter();
+    const { logout } = useAuthStore();
+
+    const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([]);
+    const [channelName, setChannelName] = useState(`${CHANNEL_PREFIX}-${Date.now()}`);
+
+    const { data: driversData, refetch: refetchDrivers }: any = useQuery(GET_DRIVERS);
+    const [sendPttSignal, { loading: sendingPtt }] = useMutation(ADMIN_SEND_PTT_SIGNAL);
+    const [setShiftDrivers, { loading: savingShift }] = useMutation(ADMIN_SET_SHIFT_DRIVERS);
+
+    const onlineDrivers = useMemo(
+        () => (driversData?.drivers || []).filter((d: any) => d.driverConnection?.connectionStatus === 'CONNECTED'),
+        [driversData],
+    );
+
+    const toggleDriver = (driverId: string) => {
+        setSelectedDriverIds((prev) => (prev.includes(driverId) ? prev.filter((id) => id !== driverId) : [...prev, driverId]));
+    };
+
+    const handleSendPtt = async (action: PttAction) => {
+        if (selectedDriverIds.length === 0) {
+            Alert.alert('Select drivers', 'Choose at least one online driver for PTT.');
+            return;
+        }
+
+        try {
+            await sendPttSignal({
+                variables: {
+                    driverIds: selectedDriverIds,
+                    channelName,
+                    action,
+                    muted: action === 'MUTE' ? true : action === 'UNMUTE' ? false : undefined,
+                },
+            });
+
+            if (action === 'STOPPED') {
+                setChannelName(`${CHANNEL_PREFIX}-${Date.now()}`);
+            }
+        } catch (err: any) {
+            Alert.alert('Error', err?.message || 'Failed to send PTT signal');
+        }
+    };
+
+    const handleApplyShift = async () => {
+        try {
+            await setShiftDrivers({ variables: { driverIds: selectedDriverIds } });
+            Alert.alert('Saved', 'Shift drivers updated.');
+        } catch (err: any) {
+            Alert.alert('Error', err?.message || 'Failed to update shift drivers');
+        }
+    };
+
+    const handleLogout = () => {
+        Alert.alert('Logout', 'Do you want to logout?', [
+            { text: 'Cancel', style: 'cancel' },
+            {
+                text: 'Logout',
+                style: 'destructive',
+                onPress: async () => {
+                    await deleteItemAsync('admin_auth_token');
+                    logout();
+                    router.replace('/login');
+                },
+            },
+        ]);
+    };
+
+    return (
+        <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }}>
+            <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 28 }}>
+                <Text className="text-2xl font-bold mb-4" style={{ color: theme.colors.text }}>
+                    Ops Center
+                </Text>
+
+                <View className="rounded-2xl p-4 mb-4" style={{ backgroundColor: theme.colors.card }}>
+                    <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>
+                        Driver PTT
+                    </Text>
+                    <Text className="text-xs mt-1" style={{ color: theme.colors.subtext }}>
+                        Select online drivers and control push-to-talk signaling.
+                    </Text>
+
+                    <View className="flex-row flex-wrap mt-3" style={{ gap: 8 }}>
+                        {onlineDrivers.map((driver: any) => {
+                            const selected = selectedDriverIds.includes(driver.id);
+                            return (
+                                <TouchableOpacity
+                                    key={driver.id}
+                                    onPress={() => toggleDriver(driver.id)}
+                                    className="px-3 py-2 rounded-full"
+                                    style={{
+                                        backgroundColor: selected ? `${theme.colors.primary}22` : theme.colors.background,
+                                        borderWidth: 1,
+                                        borderColor: selected ? theme.colors.primary : theme.colors.border,
+                                    }}>
+                                    <Text style={{ color: selected ? theme.colors.primary : theme.colors.text, fontSize: 12, fontWeight: '600' }}>
+                                        {driver.firstName} {driver.lastName}
+                                    </Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+                        {onlineDrivers.length === 0 && (
+                            <Text className="text-xs" style={{ color: theme.colors.subtext }}>
+                                No drivers online.
+                            </Text>
+                        )}
+                    </View>
+
+                    <View className="flex-row mt-4" style={{ gap: 8 }}>
+                        <TouchableOpacity
+                            onPress={() => handleSendPtt('STARTED')}
+                            disabled={sendingPtt}
+                            className="flex-1 rounded-xl py-2.5 items-center"
+                            style={{ backgroundColor: '#22c55e' }}>
+                            <Text className="text-white text-xs font-semibold">Start</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => handleSendPtt('STOPPED')}
+                            disabled={sendingPtt}
+                            className="flex-1 rounded-xl py-2.5 items-center"
+                            style={{ backgroundColor: '#ef4444' }}>
+                            <Text className="text-white text-xs font-semibold">Stop</Text>
+                        </TouchableOpacity>
+                    </View>
+                    <View className="flex-row mt-2" style={{ gap: 8 }}>
+                        <TouchableOpacity
+                            onPress={() => handleSendPtt('MUTE')}
+                            disabled={sendingPtt}
+                            className="flex-1 rounded-xl py-2.5 items-center"
+                            style={{ backgroundColor: '#f59e0b' }}>
+                            <Text className="text-white text-xs font-semibold">Mute</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => handleSendPtt('UNMUTE')}
+                            disabled={sendingPtt}
+                            className="flex-1 rounded-xl py-2.5 items-center"
+                            style={{ backgroundColor: '#3b82f6' }}>
+                            <Text className="text-white text-xs font-semibold">Unmute</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                <View className="rounded-2xl p-4 mb-4" style={{ backgroundColor: theme.colors.card }}>
+                    <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>
+                        Dispatch Admin
+                    </Text>
+                    <Text className="text-xs mt-1" style={{ color: theme.colors.subtext }}>
+                        New-order push notifications are enabled. Late pending alerts trigger after 15 minutes.
+                    </Text>
+                    <TouchableOpacity
+                        className="mt-3 rounded-xl py-2.5 px-3 flex-row items-center justify-center"
+                        style={{ backgroundColor: `${theme.colors.primary}18` }}
+                        onPress={() => router.push('/ops-notifications')}>
+                        <Ionicons name="notifications" size={14} color={theme.colors.primary} />
+                        <Text className="ml-2 text-xs font-semibold" style={{ color: theme.colors.primary }}>
+                            Open Notification Campaigns
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+
+                <View className="rounded-2xl p-4 mb-4" style={{ backgroundColor: theme.colors.card }}>
+                    <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>
+                        Shift Drivers
+                    </Text>
+                    <Text className="text-xs mt-1" style={{ color: theme.colors.subtext }}>
+                        Restrict dispatch notifications to selected drivers.
+                    </Text>
+                    <View className="flex-row mt-3" style={{ gap: 8 }}>
+                        <TouchableOpacity
+                            onPress={handleApplyShift}
+                            disabled={savingShift}
+                            className="flex-1 rounded-xl py-2.5 items-center"
+                            style={{ backgroundColor: theme.colors.primary }}>
+                            <Text className="text-white text-xs font-semibold">Apply Selected</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={async () => {
+                                setSelectedDriverIds([]);
+                                try {
+                                    await setShiftDrivers({ variables: { driverIds: [] } });
+                                    Alert.alert('Cleared', 'Shift restriction removed.');
+                                } catch (err: any) {
+                                    Alert.alert('Error', err?.message || 'Failed to clear shift drivers');
+                                }
+                            }}
+                            disabled={savingShift}
+                            className="flex-1 rounded-xl py-2.5 items-center"
+                            style={{ backgroundColor: '#334155' }}>
+                            <Text className="text-white text-xs font-semibold">Clear Restriction</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                <View className="rounded-2xl p-4" style={{ backgroundColor: theme.colors.card }}>
+                    <TouchableOpacity
+                        className="rounded-xl py-2.5 items-center"
+                        style={{ backgroundColor: '#ef4444' }}
+                        onPress={handleLogout}>
+                        <Text className="text-white text-xs font-semibold">Logout</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        className="mt-2 rounded-xl py-2.5 items-center"
+                        style={{ backgroundColor: '#0f172a' }}
+                        onPress={() => refetchDrivers()}>
+                        <Text className="text-white text-xs font-semibold">Refresh Drivers</Text>
+                    </TouchableOpacity>
+                </View>
+            </ScrollView>
+        </SafeAreaView>
+    );
+}

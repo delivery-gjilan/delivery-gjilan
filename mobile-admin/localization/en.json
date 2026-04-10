@@ -36,6 +36,7 @@
     "tabs": {
         "map": "Map",
         "orders": "Orders",
+        "ops": "Ops",
         "dashboard": "Dashboard",
         "more": "More"
     },

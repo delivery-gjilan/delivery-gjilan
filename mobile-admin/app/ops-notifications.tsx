@@ -8,7 +8,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { GET_NOTIFICATION_CAMPAIGNS, SEND_CAMPAIGN } from '@/graphql/misc';
 import { formatRelativeTime } from '@/utils/helpers';
 
-export default function NotificationsScreen() {
+export default function OpsNotificationsScreen() {
     const theme = useTheme();
     const { data, loading, refetch }: any = useQuery(GET_NOTIFICATION_CAMPAIGNS);
     const [sendCampaign] = useMutation(SEND_CAMPAIGN);
@@ -33,7 +33,14 @@ export default function NotificationsScreen() {
 
     return (
         <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }}>
-            <Stack.Screen options={{ title: 'Notifications', headerShown: true, headerStyle: { backgroundColor: theme.colors.background }, headerTintColor: theme.colors.text }} />
+            <Stack.Screen
+                options={{
+                    title: 'Notification Campaigns',
+                    headerShown: true,
+                    headerStyle: { backgroundColor: theme.colors.background },
+                    headerTintColor: theme.colors.text,
+                }}
+            />
             <FlatList
                 data={campaigns}
                 keyExtractor={(item: any) => item.id}
@@ -75,7 +82,9 @@ export default function NotificationsScreen() {
                 ListEmptyComponent={
                     <View className="items-center justify-center py-20">
                         <Ionicons name="notifications-outline" size={40} color={theme.colors.subtext} />
-                        <Text className="text-sm mt-3" style={{ color: theme.colors.subtext }}>No campaigns found</Text>
+                        <Text className="text-sm mt-3" style={{ color: theme.colors.subtext }}>
+                            No campaigns found
+                        </Text>
                     </View>
                 }
             />

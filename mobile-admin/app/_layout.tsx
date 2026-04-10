@@ -5,11 +5,13 @@ import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import Providers from '@/lib/graphql/providers';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useOperationalOrderAlerts } from '@/hooks/useOperationalOrderAlerts';
 import Mapbox from '@rnmapbox/maps';
 import { MAPBOX_TOKEN } from '@/utils/mapbox';
 
 function AppContent() {
     useNotifications();
+    useOperationalOrderAlerts();
 
     return (
         <Stack screenOptions={{ headerShown: false }}>
@@ -26,30 +28,7 @@ function AppContent() {
                 }}
             />
             <Stack.Screen
-                name="driver/[driverId]"
-                options={{
-                    presentation: 'modal',
-                    animation: 'slide_from_bottom',
-                    gestureDirection: 'vertical',
-                    gestureEnabled: true,
-                    headerShown: false,
-                }}
-            />
-            <Stack.Screen
-                name="business/[businessId]"
-                options={{
-                    presentation: 'modal',
-                    animation: 'slide_from_bottom',
-                    gestureDirection: 'vertical',
-                    gestureEnabled: true,
-                    headerShown: false,
-                }}
-            />
-            <Stack.Screen name="businesses" options={{ headerShown: false }} />
-            <Stack.Screen name="drivers" options={{ headerShown: false }} />
-            <Stack.Screen name="users" options={{ headerShown: false }} />
-            <Stack.Screen name="notifications" options={{ headerShown: false }} />
-            <Stack.Screen name="settlements" options={{ headerShown: false }} />
+            <Stack.Screen name="ops-notifications" options={{ headerShown: false }} />
         </Stack>
     );
 }

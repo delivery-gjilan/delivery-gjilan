@@ -152,16 +152,16 @@ export default function NavigationScreen() {
             if (!updatedOrder?.id) return;
 
             apolloClient.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
-                const prev = existing?.orders;
+                const prev = existing?.orders?.orders;
                 if (!Array.isArray(prev)) return existing;
 
                 if (updatedOrder.status === 'DELIVERED' || updatedOrder.status === 'CANCELLED') {
-                    return { ...existing, orders: prev.filter((o: any) => o.id !== updatedOrder.id) };
+                    return { ...existing, orders: { ...existing.orders, orders: prev.filter((o: any) => o.id !== updatedOrder.id) } };
                 }
 
                 return {
                     ...existing,
-                    orders: prev.map((o: any) => (o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o)),
+                    orders: { ...existing.orders, orders: prev.map((o: any) => (o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o)) },
                 };
             });
 
@@ -180,7 +180,7 @@ export default function NavigationScreen() {
 
     /* â”€â”€ Filter assigned orders â”€â”€ */
     const assignedOrders = useMemo(() => {
-        const orders = (data as any)?.orders ?? [];
+        const orders = (data as any)?.orders?.orders ?? [];
         return orders.filter((o: any) => {
             if (o.status === 'DELIVERED' || o.status === 'CANCELLED') return false;
             return o.driver?.id === currentDriverId;
@@ -189,7 +189,7 @@ export default function NavigationScreen() {
 
     /* â”€â”€ Guard: if the active order was externally completed/cancelled (admin), exit navigation â”€â”€ */
     useEffect(() => {
-        const orders = (data as any)?.orders;
+        const orders = (data as any)?.orders?.orders;
         if (!orders) return; // query not yet resolved
         if (!order) return;
         const liveOrder = orders.find((o: any) => o.id === order.id);
@@ -789,9 +789,9 @@ export default function NavigationScreen() {
                         // drive tab doesn't wait for a subscription round-trip to clear it.
                         if (deliveredId) {
                             apolloClient.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
-                                const prev = existing?.orders;
+                                const prev = existing?.orders?.orders;
                                 if (!Array.isArray(prev)) return existing;
-                                return { ...existing, orders: prev.filter((o: any) => o.id !== deliveredId) };
+                                return { ...existing, orders: { ...existing.orders, orders: prev.filter((o: any) => o.id !== deliveredId) } };
                             });
                         }
                         resetSuccessAnimation();

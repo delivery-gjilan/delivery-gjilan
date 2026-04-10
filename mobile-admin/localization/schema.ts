@@ -38,6 +38,7 @@ export const translationSchema = z.object({
     tabs: z.object({
         map: z.string(),
         orders: z.string(),
+        ops: z.string(),
         dashboard: z.string(),
         more: z.string(),
     }),
