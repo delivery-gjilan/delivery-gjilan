@@ -111,6 +111,7 @@ For every mobile parity PR:
 
 ## Change Log
 
+- 2026-04-11: Mobile-admin orders tab now uses sectioned card layout aligned to admin-panel scanning flow: removed status filter chip row, added `Active Orders` + optional `Completed Orders` sections, enriched cards with approval-reason chips, customer/driver block, item preview lines, address line, and clearer actions (`Assign Driver`, next-step progression, `Details`).
 - 2026-04-11: Mobile-admin scope is now operations-only: tab surface reduced to `Map`, `Orders`, and `Ops`; non-operational routes (business/users/settlements/dashboard/settings hub) removed. Ops tab includes admin-to-driver PTT controls (`STARTED`/`STOPPED`/`MUTE`/`UNMUTE` + shift driver selection) and notification campaign access. Background operational alerts now issue local push notifications for new orders and late pending orders.
 - 2026-03-22: Seeder business locations updated to proper Gjilan city center (42.4604, 21.4694 ± ~650m) — previously restaurants used 42.6629 with ±0.1° spread placing them far outside the city.
 - 2026-03-22: Mobile-customer order details `BusinessMarker` restyled to match admin panel: violet circle (`#7C3AED`) border with business image (36px via `expo-image`), fallback restaurant icon. Pulse animation color changed from amber to violet.

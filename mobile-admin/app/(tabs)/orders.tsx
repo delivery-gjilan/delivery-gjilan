@@ -1,12 +1,12 @@
 import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, FlatList, RefreshControl, ScrollView, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, RefreshControl, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useApolloClient, useQuery, useSubscription, useMutation } from '@apollo/client/react';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
-import { StatusBadge, FilterChip } from '@/components/StatusBadge';
+import { StatusBadge } from '@/components/StatusBadge';
 import { EmptyState } from '@/components/EmptyState';
 import { BottomSheet } from '@/components/BottomSheet';
 import {
@@ -21,16 +21,6 @@ import { GET_DRIVERS } from '@/graphql/drivers';
 import { ORDER_STATUS_COLORS } from '@/utils/constants';
 import { formatRelativeTime, formatCurrency } from '@/utils/helpers';
 
-type StatusTab =
-    | 'ALL'
-    | 'AWAITING_APPROVAL'
-    | 'PENDING'
-    | 'PREPARING'
-    | 'READY'
-    | 'OUT_FOR_DELIVERY'
-    | 'DELIVERED'
-    | 'CANCELLED';
-
 const QUICK_PREPARATION_MINUTES = 20;
 
 export default function OrdersScreen() {
@@ -39,8 +29,8 @@ export default function OrdersScreen() {
     const { t } = useTranslations();
     const router = useRouter();
 
-    const [activeTab, setActiveTab] = useState<StatusTab>('ALL');
     const [assignOrderId, setAssignOrderId] = useState<string | null>(null);
+    const [showCompleted, setShowCompleted] = useState(false);
     const { data, loading, refetch }: any = useQuery(GET_ORDERS);
     const { data: driversData }: any = useQuery(GET_DRIVERS);
     const refetchCooldownRef = useRef(0);
@@ -121,23 +111,33 @@ export default function OrdersScreen() {
     const [startPreparing, { loading: startingPrep }] = useMutation(START_PREPARING);
     const [approveOrder, { loading: approvingOrder }] = useMutation(APPROVE_ORDER);
 
-    const filteredOrders = useMemo(() => {
-        if (activeTab === 'ALL') return orders;
-        return orders.filter((o: any) => o.status === activeTab);
-    }, [orders, activeTab]);
+    const sortedOrders = useMemo(
+        () => [...orders].sort((a: any, b: any) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime()),
+        [orders],
+    );
 
-    const statusCounts = useMemo(() => {
-        const counts: Record<string, number> = { ALL: orders.length };
-        orders.forEach((o: any) => {
-            counts[o.status] = (counts[o.status] || 0) + 1;
-        });
-        return counts;
-    }, [orders]);
+    const activeOrders = useMemo(
+        () => sortedOrders.filter((o: any) => ['AWAITING_APPROVAL', 'PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'].includes(o.status)),
+        [sortedOrders],
+    );
+
+    const completedOrders = useMemo(
+        () => sortedOrders.filter((o: any) => ['DELIVERED', 'CANCELLED'].includes(o.status)),
+        [sortedOrders],
+    );
 
     const selectedOrderForAssign = useMemo(
         () => orders.find((order: any) => order.id === assignOrderId) || null,
         [orders, assignOrderId],
     );
+
+    const parseApprovalReason = useCallback((reason: string) => {
+        const value = String(reason || '').toUpperCase();
+        if (value.includes('FIRST')) return { label: 'First Order', color: '#22c55e' };
+        if (value.includes('HIGH')) return { label: 'High Value', color: '#f59e0b' };
+        if (value.includes('ZONE') || value.includes('LOCATION')) return { label: 'Out of Zone', color: '#fb923c' };
+        return { label: reason, color: '#94a3b8' };
+    }, []);
 
     const getQuickActionLabel = useCallback(
         (order: any) => {
@@ -213,12 +213,24 @@ export default function OrdersScreen() {
         [approveOrder, refetch, startPreparing, updateStatus],
     );
 
-    const renderOrderItem = useCallback(
-        ({ item: order }: { item: any }) => (
+    const renderOrderCard = useCallback(
+        (order: any, completed = false) => {
+            const items = (order.businesses || []).flatMap((businessBlock: any) => businessBlock.items || []);
+            const previewItems = items.slice(0, 3);
+            const hasMoreItems = items.length > previewItems.length;
+            const statusColor = ORDER_STATUS_COLORS[order.status] || '#6b7280';
+
+            return (
             <TouchableOpacity
+                key={order.id}
                 className="mx-5 mb-3 p-4 rounded-2xl"
                 style={{
                     backgroundColor: theme.colors.card,
+                    borderWidth: 1,
+                    borderColor: `${statusColor}55`,
+                    borderLeftWidth: 4,
+                    borderLeftColor: statusColor,
+                    opacity: completed ? 0.86 : 1,
                     shadowColor: '#000',
                     shadowOffset: { width: 0, height: 2 },
                     shadowOpacity: 0.08,
@@ -227,18 +239,10 @@ export default function OrdersScreen() {
                 }}
                 onPress={() => router.push(`/order/${order.id}`)}
                 activeOpacity={0.7}>
-                {/* Header */}
                 <View className="flex-row items-center justify-between mb-3">
                     <View className="flex-row items-center">
                         <StatusBadge status={order.status} label={t.orders.status[order.status as keyof typeof t.orders.status]} />
-                        {order.needsApproval && (
-                            <View className="ml-2 px-2 py-0.5 rounded-full" style={{ backgroundColor: '#f9731625' }}>
-                                <Text className="text-[10px] font-semibold" style={{ color: '#f97316' }}>
-                                    Approval
-                                </Text>
-                            </View>
-                        )}
-                        {order.locationFlagged && (
+                        {order.locationFlagged && !completed && (
                             <Ionicons name="warning" size={14} color="#f59e0b" style={{ marginLeft: 6 }} />
                         )}
                     </View>
@@ -251,7 +255,41 @@ export default function OrdersScreen() {
                     #{order.displayId || order.id.slice(-6)}
                 </Text>
 
-                {/* Business & Items */}
+                {!!order.approvalReasons?.length && !completed && (
+                    <View className="flex-row flex-wrap mb-2" style={{ gap: 6 }}>
+                        {order.approvalReasons.slice(0, 3).map((reason: string, idx: number) => {
+                            const parsed = parseApprovalReason(reason);
+                            return (
+                                <View key={`${order.id}-reason-${idx}`} className="px-2 py-0.5 rounded-full" style={{ backgroundColor: `${parsed.color}22` }}>
+                                    <Text className="text-[10px] font-semibold" style={{ color: parsed.color }}>
+                                        {parsed.label}
+                                    </Text>
+                                </View>
+                            );
+                        })}
+                    </View>
+                )}
+
+                <View className="py-2 mb-2" style={{ borderTopWidth: 1, borderTopColor: theme.colors.border, borderBottomWidth: 1, borderBottomColor: theme.colors.border }}>
+                    <View className="flex-row items-center mb-1">
+                        <Ionicons name="person-outline" size={14} color={theme.colors.subtext} />
+                        <Text className="text-sm ml-1.5 flex-1" style={{ color: theme.colors.text }} numberOfLines={1}>
+                            {order.user?.firstName} {order.user?.lastName}
+                        </Text>
+                        {order.user?.phoneNumber && (
+                            <Text className="text-xs" style={{ color: theme.colors.subtext }} numberOfLines={1}>
+                                {order.user.phoneNumber}
+                            </Text>
+                        )}
+                    </View>
+                    <View className="flex-row items-center">
+                        <Ionicons name="bicycle-outline" size={14} color={theme.colors.subtext} />
+                        <Text className="text-sm ml-1.5" style={{ color: theme.colors.subtext }} numberOfLines={1}>
+                            {order.driver ? `${order.driver.firstName} ${order.driver.lastName}` : t.orders.detail.unassigned}
+                        </Text>
+                    </View>
+                </View>
+
                 <View className="mb-3">
                     {order.businesses?.map((b: any, i: number) => (
                         <View key={i} className="flex-row items-center mb-1">
@@ -263,35 +301,44 @@ export default function OrdersScreen() {
                             <Text className="text-base font-semibold ml-2" style={{ color: theme.colors.text }}>
                                 {b.business?.name}
                             </Text>
-                            <Text className="text-sm ml-1.5" style={{ color: theme.colors.subtext }}>
-                                ({b.items?.length} {b.items?.length === 1 ? 'item' : 'items'})
-                            </Text>
                         </View>
                     ))}
+
+                    {previewItems.map((item: any, index: number) => (
+                        <Text key={`${order.id}-item-${index}`} className="text-xs ml-6" style={{ color: theme.colors.subtext }} numberOfLines={1}>
+                            x{item.quantity} {item.name}
+                        </Text>
+                    ))}
+                    {hasMoreItems && (
+                        <Text className="text-xs ml-6 mt-0.5" style={{ color: theme.colors.subtext }}>
+                            +{items.length - previewItems.length} more items
+                        </Text>
+                    )}
                 </View>
 
-                {/* Customer & Price */}
-                <View className="flex-row items-center justify-between">
-                    <View className="flex-row items-center flex-1">
-                        <Ionicons name="person-outline" size={14} color={theme.colors.subtext} />
-                        <Text className="text-sm ml-1.5 flex-1" style={{ color: theme.colors.subtext }} numberOfLines={1}>
-                            {order.user?.firstName} {order.user?.lastName}
+                {!!order.dropOffLocation?.address && (
+                    <View className="flex-row items-center mb-3">
+                        <Ionicons name="location-outline" size={14} color={theme.colors.subtext} />
+                        <Text className="text-xs ml-1.5 flex-1" style={{ color: theme.colors.subtext }} numberOfLines={1}>
+                            {order.dropOffLocation.address}
                         </Text>
                     </View>
-                    {order.driver && (
-                        <View className="flex-row items-center mx-3">
-                            <Ionicons name="bicycle-outline" size={14} color={theme.colors.primary} />
-                            <Text className="text-sm ml-1" style={{ color: theme.colors.primary }} numberOfLines={1}>
-                                {order.driver.firstName}
-                            </Text>
-                        </View>
-                    )}
+                )}
+
+                <View className="flex-row items-center justify-between">
                     <Text className="text-lg font-bold" style={{ color: theme.colors.text }}>
                         {formatCurrency(order.totalPrice)}
                     </Text>
+                    <TouchableOpacity
+                        className="px-3 py-1.5 rounded-lg"
+                        style={{ backgroundColor: `${theme.colors.primary}20` }}
+                        onPress={() => router.push(`/order/${order.id}`)}>
+                        <Text className="text-xs font-semibold" style={{ color: theme.colors.primary }}>
+                            Details
+                        </Text>
+                    </TouchableOpacity>
                 </View>
 
-                {/* Prep time if preparing */}
                 {order.status === 'PREPARING' && order.estimatedReadyAt && (
                     <View className="flex-row items-center mt-3 pt-3" style={{ borderTopWidth: 1, borderTopColor: theme.colors.border }}>
                         <Ionicons name="timer-outline" size={14} color="#6366f1" />
@@ -302,7 +349,7 @@ export default function OrdersScreen() {
                     </View>
                 )}
 
-                {getQuickActionLabel(order) && (
+                {!completed && getQuickActionLabel(order) && (
                     <View className="flex-row items-center mt-3 pt-3" style={{ borderTopWidth: 1, borderTopColor: theme.colors.border }}>
                         <TouchableOpacity
                             className="flex-1 rounded-xl py-2.5 items-center mr-2"
@@ -321,49 +368,56 @@ export default function OrdersScreen() {
                     </View>
                 )}
             </TouchableOpacity>
-        ),
-        [theme, t, router, getQuickActionLabel, handleQuickProgress],
+            );
+        },
+        [theme, t, router, parseApprovalReason, getQuickActionLabel, handleQuickProgress],
     );
-
-    const TABS: StatusTab[] = ['ALL', 'AWAITING_APPROVAL', 'PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'];
 
     return (
         <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }}>
-            {/* Header */}
             <View className="px-5 pt-3 pb-4">
                 <Text className="text-3xl font-bold" style={{ color: theme.colors.text }}>
                     {t.orders.title}
                 </Text>
+                <Text className="text-xs mt-1" style={{ color: theme.colors.subtext }}>
+                    Active: {activeOrders.length} · Completed: {completedOrders.length}
+                </Text>
             </View>
 
-            {/* Status Tabs */}
             <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                className="pb-4"
-                contentContainerStyle={{ paddingHorizontal: 20 }}>
-                {TABS.map((tab) => (
-                    <FilterChip
-                        key={tab}
-                        label={`${tab === 'ALL' ? 'All' : t.orders.status[tab as keyof typeof t.orders.status]} ${statusCounts[tab] ? `(${statusCounts[tab]})` : ''}`}
-                        active={activeTab === tab}
-                        onPress={() => setActiveTab(tab)}
-                        color={tab !== 'ALL' ? ORDER_STATUS_COLORS[tab] : undefined}
-                    />
-                ))}
-            </ScrollView>
-
-            {/* Orders List */}
-            <FlatList
-                data={filteredOrders}
-                keyExtractor={(item: any) => item.id}
-                renderItem={renderOrderItem}
-                contentContainerStyle={{ paddingBottom: 20, paddingTop: 8 }}
                 refreshControl={<RefreshControl refreshing={loading} onRefresh={refetch} tintColor={theme.colors.primary} />}
-                ListEmptyComponent={
-                    <EmptyState icon="receipt-outline" title={t.orders.empty} message="No orders match the selected filter" />
-                }
-            />
+                contentContainerStyle={{ paddingBottom: 20, paddingTop: 8 }}>
+                <View className="px-5 mb-2">
+                    <Text className="text-xs font-semibold uppercase" style={{ color: theme.colors.subtext }}>
+                        Active Orders
+                    </Text>
+                </View>
+
+                {activeOrders.length === 0 ? (
+                    <EmptyState icon="receipt-outline" title="No active orders" message="Waiting for incoming orders" />
+                ) : (
+                    activeOrders.map((order: any) => renderOrderCard(order, false))
+                )}
+
+                <View className="px-5 mt-2 mb-2">
+                    <TouchableOpacity
+                        className="rounded-xl py-2.5 px-3 flex-row items-center justify-center"
+                        style={{ backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border }}
+                        onPress={() => setShowCompleted((prev) => !prev)}>
+                        <Ionicons name={showCompleted ? 'chevron-up' : 'chevron-down'} size={14} color={theme.colors.subtext} />
+                        <Text className="text-xs font-semibold ml-1.5" style={{ color: theme.colors.subtext }}>
+                            {showCompleted ? 'Hide completed orders' : `Show completed orders (${completedOrders.length})`}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+
+                {showCompleted &&
+                    (completedOrders.length === 0 ? (
+                        <EmptyState icon="checkmark-done-outline" title="No completed orders" message="Delivered and cancelled orders will appear here" />
+                    ) : (
+                        completedOrders.map((order: any) => renderOrderCard(order, true))
+                    ))}
+            </ScrollView>
 
             <BottomSheet visible={Boolean(assignOrderId)} onClose={() => setAssignOrderId(null)} title="Assign Driver">
                 {!selectedOrderForAssign ? (

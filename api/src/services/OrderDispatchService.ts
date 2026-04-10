@@ -185,7 +185,8 @@ export class OrderDispatchService {
             //    - "pushOnly": onlinePreference=true but app killed/offline → always get wave-1 push
             //      (they need to open the app to accept anyway, so proximity doesn't matter for them).
             const allDrivers = await this.driverRepository.getAllDrivers();
-            const shiftIds = await this._getShiftDriverIds();
+            const allDriverUserIds = new Set(allDrivers.map((d) => d.userId));
+            const shiftIds = await this._getShiftDriverIds(allDriverUserIds);
             const onlineDrivers = allDrivers.filter(
                 (d) => d.onlinePreference && (shiftIds === null || shiftIds.has(d.userId)),
             );
@@ -306,7 +307,8 @@ export class OrderDispatchService {
         }
 
         const allDrivers = await this.driverRepository.getAllDrivers();
-        const shiftIds = await this._getShiftDriverIds();
+        const allDriverUserIds = new Set(allDrivers.map((d) => d.userId));
+        const shiftIds = await this._getShiftDriverIds(allDriverUserIds);
         // Wave 2: all online-preference on-shift drivers not already notified in wave 1.
         // No connectionStatus restriction — push works even if the app is killed.
         const remaining = allDrivers.filter(
@@ -341,7 +343,8 @@ export class OrderDispatchService {
         excludeIds: string[],
     ): Promise<void> {
         const allDrivers = await this.driverRepository.getAllDrivers();
-        const shiftIds = await this._getShiftDriverIds();
+        const allDriverUserIds = new Set(allDrivers.map((d) => d.userId));
+        const shiftIds = await this._getShiftDriverIds(allDriverUserIds);
         const ids = allDrivers
             .filter(
                 (d) =>
@@ -359,10 +362,42 @@ export class OrderDispatchService {
      * Returns the set of driver userIds currently on shift.
      * If no shift is configured (empty set), returns null — meaning all drivers are eligible.
      */
-    private async _getShiftDriverIds(): Promise<Set<string> | null> {
+    private async _getShiftDriverIds(knownDriverUserIds?: Set<string>): Promise<Set<string> | null> {
         const ids = await cache.get<string[]>(SHIFT_DRIVERS_CACHE_KEY);
         if (!ids || ids.length === 0) return null;
-        return new Set(ids);
+
+        const normalized = ids.filter((id): id is string => typeof id === 'string' && id.length > 0);
+        if (normalized.length === 0) return null;
+
+        if (!knownDriverUserIds) {
+            return new Set(normalized);
+        }
+
+        const filtered = normalized.filter((id) => knownDriverUserIds.has(id));
+
+        if (filtered.length === 0) {
+            // Defensive fallback: stale shift IDs should not block all dispatches.
+            log.warn(
+                {
+                    cachedShiftCount: normalized.length,
+                    knownDriversCount: knownDriverUserIds.size,
+                },
+                'dispatch:shiftFilter:invalid — no overlap with active drivers, ignoring shift restriction',
+            );
+            return null;
+        }
+
+        if (filtered.length !== normalized.length) {
+            log.warn(
+                {
+                    cachedShiftCount: normalized.length,
+                    validShiftCount: filtered.length,
+                },
+                'dispatch:shiftFilter:pruned — ignoring unknown driver IDs',
+            );
+        }
+
+        return new Set(filtered);
     }
 
     /** Fetch the lat/lng + name of the first business attached to this order. */
