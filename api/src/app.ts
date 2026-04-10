@@ -134,6 +134,7 @@ const apiLimiter = rateLimit({
     max: 500, // 500 requests per window
     keyGenerator: getRateLimitKey,
     store: makeStore('api'),
+    passOnStoreError: true,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests, please try again later.' },
@@ -145,6 +146,7 @@ const authLimiter = rateLimit({
     max: 20, // 20 attempts per window
     keyGenerator: getRateLimitKey,
     store: makeStore('auth'),
+    passOnStoreError: true,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many authentication attempts, please try again later.' },
@@ -156,6 +158,7 @@ const uploadLimiter = rateLimit({
     max: 50, // 50 uploads per window
     keyGenerator: getRateLimitKey,
     store: makeStore('upload'),
+    passOnStoreError: true,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many upload requests, please try again later.' },
@@ -167,6 +170,7 @@ const directionsLimiter = rateLimit({
     max: 200,
     keyGenerator: getRateLimitKey,
     store: makeStore('directions'),
+    passOnStoreError: true,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many directions requests, please try again later.' },

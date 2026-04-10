@@ -301,11 +301,23 @@ export class NotificationService {
         const preferredLanguage = await this.repo.getUserPreferredLanguage(userId);
         const localizedPayload = this.resolveLocalizedPayload(payload, preferredLanguage);
 
+        logger.info(
+            { userId, appType, title: localizedPayload.title },
+            'notification:sendToUserByAppType — looking up device tokens',
+        );
         const tokens = await this.repo.getTokensByUserIdAndAppType(userId, appType);
         if (tokens.length === 0) {
+            logger.warn(
+                { userId, appType },
+                'notification:sendToUserByAppType — NO device tokens found for user/appType, skipping push',
+            );
             return { successCount: 0, failureCount: 0, staleTokens: [] };
         }
 
+        logger.info(
+            { userId, appType, tokenCount: tokens.length, platforms: tokens.map((t) => t.platform) },
+            'notification:sendToUserByAppType — found tokens, sending multicast',
+        );
         const result = await this.sendMulticast(tokens, localizedPayload);
 
         await this.repo.createNotification({
@@ -388,9 +400,17 @@ export class NotificationService {
             const localizedPayload = this.resolveLocalizedPayload(payload, locale);
             const allTokens = await this.repo.getTokensByUserIdsAndAppType(localeUserIds, appType);
             if (allTokens.length === 0) {
+                logger.warn(
+                    { appType, locale, userCount: localeUserIds.length },
+                    'notification:sendToUsersByAppType — NO device tokens found for locale/appType group, skipping push',
+                );
                 continue;
             }
 
+            logger.info(
+                { appType, locale, userCount: localeUserIds.length, tokenCount: allTokens.length },
+                'notification:sendToUsersByAppType — found tokens, sending multicast',
+            );
             const result = await this.sendMulticast(allTokens, localizedPayload);
             results.push(result);
 

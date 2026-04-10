@@ -107,17 +107,25 @@ export default function MapScreen() {
     // ── Camera follow ──
     const [followDriver, setFollowDriver] = useState(false);
 
-    const recenterOnDriver = useCallback(() => {
-        if (location) {
-            cameraRef.current?.setCamera({
-                centerCoordinate: [location.longitude, location.latitude],
-                bearing: location.heading ?? 0,
-                zoomLevel: hasActiveNavigation ? 16 : 14.5,
-                animationDuration: 600,
-                animationMode: 'easeTo',
-            });
+    const centerCameraOnDriver = useCallback((enableFollow: boolean) => {
+        if (!location) return;
+
+        if (enableFollow) {
+            setFollowDriver(true);
         }
+
+        cameraRef.current?.setCamera({
+            centerCoordinate: [location.longitude, location.latitude],
+            bearing: hasActiveNavigation ? (location.heading ?? 0) : 0,
+            zoomLevel: hasActiveNavigation ? 16 : 14.5,
+            animationDuration: 600,
+            animationMode: 'easeTo',
+        });
     }, [location, hasActiveNavigation]);
+
+    const recenterOnDriver = useCallback(() => {
+        centerCameraOnDriver(true);
+    }, [centerCameraOnDriver]);
 
     const handleMapTouchEnd = useCallback(() => {
         if (!followDriver || !location) return;
@@ -244,6 +252,10 @@ export default function MapScreen() {
 
         setFocusedOrderId(order.id);
 
+        if (followDriver) {
+            return;
+        }
+
         // Padding: respect the info sheet at top and card bar at bottom
         const padTop = 20;
         const padBottom = BOTTOM_BAR_HEIGHT + 20;
@@ -272,7 +284,7 @@ export default function MapScreen() {
                 animationDuration: 1200,
             });
         }
-    }, [location]);
+    }, [followDriver, location]);
 
     const toggleFollowDriver = useCallback(() => {
         if (followDriver) {
@@ -284,18 +296,9 @@ export default function MapScreen() {
                 animationMode: 'easeTo',
             });
         } else {
-            setFollowDriver(true);
-            if (location) {
-                cameraRef.current?.setCamera({
-                    centerCoordinate: [location.longitude, location.latitude],
-                    bearing: location.heading ?? 0,
-                    zoomLevel: hasActiveNavigation ? 16 : 14.5,
-                    animationDuration: 700,
-                    animationMode: 'flyTo',
-                });
-            }
+            centerCameraOnDriver(true);
         }
-    }, [followDriver, location, hasActiveNavigation]);
+    }, [followDriver, centerCameraOnDriver]);
 
     const handleMarkPickedUp = useCallback(async (orderId?: string) => {
         const targetId = orderId ?? focusedOrder?.id;
@@ -326,6 +329,7 @@ export default function MapScreen() {
     // ── Camera fit when global accept sheet auto-presents a new order ──
     useEffect(() => {
         if (!pendingOrder || !pendingAutoCountdown) return;
+        if (followDriver) return;
         const bizLoc = pendingOrder.businesses?.[0]?.business?.location;
         if (!bizLoc || !cameraRef.current) return;
         if (location) {
@@ -343,7 +347,7 @@ export default function MapScreen() {
             });
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [pendingOrder?.id, pendingAutoCountdown]);
+    }, [followDriver, pendingOrder?.id, pendingAutoCountdown]);
 
     // ── Card swipe PanResponder ──
     const swipePanResponder = useRef(

@@ -215,7 +215,12 @@ export const OrdersFloatingBar = () => {
         }
 
         if (isAwaitingApproval) {
-            openModal(activeOrderId);
+            // Open on the next frame so the press gesture can fully settle.
+            // This avoids TouchableOpacity getting visually stuck in a pressed
+            // (dimmed) state when a native Modal appears mid-gesture.
+            requestAnimationFrame(() => {
+                openModal(activeOrderId);
+            });
             return;
         }
 
@@ -227,7 +232,7 @@ export const OrdersFloatingBar = () => {
 
     return (
         <AnimatedTouchable
-                activeOpacity={0.9}
+                activeOpacity={1}
                 onPress={() => {
                     void handlePress();
                 }}

@@ -131,6 +131,19 @@ export const CartScreen = () => {
     const insets = useSafeAreaInsets();
     const suppressAutoCloseRef = useRef(false);
 
+    const pickerInitialLocation = useMemo<CheckoutLocation | null>(() => {
+        if (userContextLocation) {
+            return {
+                latitude: userContextLocation.latitude,
+                longitude: userContextLocation.longitude,
+                address: userContextLocation.address,
+                label: t.cart.use_current_address,
+                isOverridden: false,
+            };
+        }
+        return selectedLocation;
+    }, [userContextLocation, selectedLocation, t.cart.use_current_address]);
+
     const formatCurrency = useCallback((value: number) => `€${value.toFixed(2)}`, []);
 
     // Repeat-or-customize modal state for complex cart items
@@ -693,11 +706,14 @@ export const CartScreen = () => {
 
     const prioritySurcharge = isPriority ? serverPrioritySurcharge : 0;
 
-    const baseDeliveryPrice = manualPromoApplied
+    const effectiveDeliveryPrice = manualPromoApplied
         ? promoResult?.effectiveDeliveryPrice ?? deliveryPrice
         : deliveryPrice;
 
-    const appliedDeliveryPrice = baseDeliveryPrice + prioritySurcharge;
+    const deliveryPromoDiscount = Math.max(0, deliveryPrice - effectiveDeliveryPrice);
+    const nonDeliveryPromoDiscount = Math.max(0, appliedDiscount - deliveryPromoDiscount);
+
+    const appliedDeliveryPrice = effectiveDeliveryPrice + prioritySurcharge;
 
     const finalTotal = (manualPromoApplied
         ? promoResult?.totalPrice ?? Math.max(0, total + deliveryPrice - appliedDiscount)
@@ -851,7 +867,7 @@ export const CartScreen = () => {
             // stored deliveryPrice while keeping zone/tier validation intact.
             // deliveryPrice = base/promo delivery fee WITHOUT priority surcharge.
             // prioritySurcharge is sent separately for independent server validation.
-            const apiDeliveryPrice = baseDeliveryPrice;
+            const apiDeliveryPrice = deliveryPrice;
             const order = await createOrder(
                 selectedLocation,
                 apiDeliveryPrice,
@@ -914,7 +930,7 @@ export const CartScreen = () => {
         }
     };
 
-    if (isEmpty) {
+    if (isEmpty && !suppressAutoCloseRef.current) {
         return (
             <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
                 <View style={{ alignItems: 'center', paddingVertical: 8 }}>
@@ -1004,7 +1020,7 @@ export const CartScreen = () => {
                     embedded
                     visible={step === 2}
                     savedAddresses={savedAddresses}
-                    initialLocation={selectedLocation}
+                    initialLocation={pickerInitialLocation}
                     onSelect={handleAddressSelected}
                     onClose={() => goToStep(1)}
                 />
@@ -1016,7 +1032,8 @@ export const CartScreen = () => {
                     items={items}
                     selectedLocation={selectedLocation}
                     total={total}
-                    baseDeliveryPrice={baseDeliveryPrice}
+                    originalDeliveryPrice={deliveryPrice}
+                    effectiveDeliveryPrice={effectiveDeliveryPrice}
                     deliveryZoneName={deliveryZoneName}
                     deliveryPriceLoading={deliveryPriceLoading}
                     freeDeliveryApplied={freeDeliveryApplied}
@@ -1028,7 +1045,8 @@ export const CartScreen = () => {
                     promoResult={promoResult}
                     promoError={promoError}
                     manualPromoLoading={manualPromoLoading}
-                    appliedDiscount={appliedDiscount}
+                    appliedDiscount={nonDeliveryPromoDiscount}
+                    deliveryPromoDiscount={deliveryPromoDiscount}
                     finalTotal={finalTotal}
                     minimumMet={minimumMet}
                     minOrderAmount={minOrderAmount}

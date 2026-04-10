@@ -2,7 +2,8 @@ import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { useAuthStore } from '@/store/authStore';
-import { useState, useRef } from 'react';
+import { useState } from 'react';
+
 import { useRouter, type Href } from 'expo-router';
 import { AppLanguage, SetMyPreferredLanguageDocument, SignupStep } from '@/gql/graphql';
 import { useTranslations } from '@/hooks/useTranslations';
@@ -111,11 +112,11 @@ export default function SignupScreen() {
     const {
         initiateSignup,
         submitPhoneNumber,
-        login,
         loading: authLoading,
     } = useAuth();
     // Subscribe directly so re-render is guaranteed when signupStep changes
     const user = useAuthStore((state) => state.user);
+    const updateUser = useAuthStore((state) => state.updateUser);
     const router = useRouter();
     const { t } = useTranslations();
     const theme = useTheme();
@@ -132,7 +133,6 @@ export default function SignupScreen() {
     const [password, setPassword] = useState('');
 
     const [focusedField, setFocusedField] = useState<string | null>(null);
-    const credentialsRef = useRef<{ email: string; password: string } | null>(null);
 
     const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
     const fieldBorderColor = (field: string, isValid: boolean) => {
@@ -175,7 +175,6 @@ export default function SignupScreen() {
         setError(null);
         setLoading(true);
         try {
-            credentialsRef.current = { email: email.trim().toLowerCase(), password };
             await initiateSignup(email, password, firstName, lastName);
             // Persist the chosen language to the user's profile
             const apiLanguage = languageChoice === 'al' ? AppLanguage.Al : AppLanguage.En;
@@ -201,14 +200,7 @@ export default function SignupScreen() {
         setLoading(true);
         try {
             await submitPhoneNumber(phoneNumber);
-            // Auto-login to get a full session with refresh token
-            if (credentialsRef.current) {
-                await login(credentialsRef.current.email, credentialsRef.current.password);
-                credentialsRef.current = null;
-            }
-            setTimeout(() => {
-                router.replace('/brand-splash');
-            }, 500);
+            router.replace('/brand-splash');
         } catch (err) {
             setError(err instanceof Error ? err.message : t.auth.signup.phone_submit_failed);
         } finally {
@@ -389,7 +381,14 @@ export default function SignupScreen() {
                 {/* Back button */}
                 <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 }}>
                     <TouchableOpacity
-                        onPress={() => router.back()}
+                        onPress={() => {
+                            if (currentStep === SignupStep.EmailVerified || currentStep === SignupStep.PhoneSent) {
+                                // Go back to account details step
+                                if (user) updateUser({ ...user, signupStep: SignupStep.Initial });
+                            } else {
+                                router.back();
+                            }
+                        }}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         style={{
                             width: 40,

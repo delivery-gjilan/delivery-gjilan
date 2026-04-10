@@ -33,7 +33,8 @@
         "NSLocationAlwaysUsageDescription": "We need your location even when the app is closed to track deliveries.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "We need your location in the background to track deliveries in real-time.",
         "UIBackgroundModes": [
-          "audio"
+          "audio",
+          "remote-notification"
         ],
         "MBXAccessToken": "pk.eyJ1IjoiYXJ0c2hhYmFuaTIwMDIiLCJhIjoiY21sZjlkbTNxMDIwOTNkc2F0cTZkYmZoeiJ9.C81uu49ST5NrfHZ58N9EXg",
         "ITSAppUsesNonExemptEncryption": false

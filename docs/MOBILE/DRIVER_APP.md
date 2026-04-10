@@ -86,12 +86,13 @@ index.tsx
             ├── ThemeProvider (@react-navigation/native)
             └── <AppContent>
                  ├── useDriverTracking()   → heartbeat + battery reporting
-                 ├── useNotifications()    → FCM token registration
+                 ├── useNotifications()    → FCM token registration (iOS registers for remote messages before token fetch and ignores APNs-like raw tokens)
                  ├── useNetworkStatus()    → OS-level connectivity → authStore.isNetworkConnected
                  ├── useDriverPttReceiver() → Agora RTC PTT listener
                  ├── useStoreStatus()      → GET_STORE_STATUS poll (30s)
                  ├── useGlobalOrderAccept() → single ALL_ORDERS_UPDATED subscription + OrderAcceptSheet
                  ├── <Stack> screens
+                 ├── PTT button            → floating microphone button on the middle-right edge for driver push-to-talk
                  ├── Pool FAB button       → opens OrderPoolSheet (rendered AFTER Stack so it overlays screens)
                  └── <OrderPoolSheet>      → props: onAccept, onAcceptAndNavigate, accepting
 ```
@@ -128,7 +129,8 @@ index.tsx
 - Parses JWT `exp` claim from Base64 payload without a library
 - If token expires within 60 s, calls `refreshAccessToken()` using `refreshToken` mutation
 - Deduplication: a single `refreshInFlight` promise is shared so concurrent callers don't fire multiple refresh requests
-- On refresh failure the old token is returned as fallback (no forced logout)
+- On refresh `UNAUTHENTICATED`/401/403, auth is only cleared when the current access token is already expired; if the current token is still valid, it is retained and retried later to avoid false session drops during transient refresh failures
+- On other refresh failures (transport/parsing/server errors), the current token is returned as fallback (no forced logout)
 
 ### Auth Store
 
@@ -196,6 +198,8 @@ The `Query.order` field has a local-only read resolver that resolves individual 
 ### Error Handling
 
 The `errorLink` logs `UNAUTHENTICATED` errors and 401 network errors but does **not** force logout. This was a deliberate choice to avoid disrupting drivers mid-delivery due to temporary auth issues.
+
+The API-side Redis-backed rate limiters for `/graphql`, `/api/upload`, and `/api/directions` are configured to fail open if the limiter store is unavailable, so Redis saturation should not block driver requests with transport-level failures.
 
 ---
 
@@ -290,6 +294,7 @@ The map is the primary operational view. It shows all active/available orders an
 - `GET_ORDERS` query (`network-only` on first mount for each app init → `cache-first` afterward)
 - `ALL_ORDERS_UPDATED` subscription runs once globally in `useGlobalOrderAccept` (mounted in `AppContent`), merging payloads into the Apollo cache so all order-aware driver UI reads the same shared dataset
 - If subscription payload is empty, the global hook falls back to `refetch()`
+- Driver order documents include `estimatedReadyAt`, `preparingAt`, and `preparationMinutes`; near-ready eligibility can be computed from either explicit `estimatedReadyAt` or `preparingAt + preparationMinutes` when needed.
 
 **Order filtering:**
 - `assignedOrders`: `order.driver.id === currentDriverId` AND not `DELIVERED`/`CANCELLED`
@@ -304,6 +309,11 @@ The map is the primary operational view. It shows all active/available orders an
 - On marker tap → Mapbox Directions API call via `fetchRouteGeometry()`
 - Preview route rendered as GeoJSON `LineString` on the map
 - Focused order shows route info card (distance km, duration min)
+
+**Camera controls:**
+- Recenter snaps the map back to the driver's live location and re-enables follow mode
+- Camera lock latches the camera to the driver's live location instead of only toggling the follow flag
+- While lock is enabled, order-focus and accept-sheet camera-fit flows no longer pull the map away from the driver
 
 **Navigation launch:**
 - `PREPARING` order → "Navigate to Pickup" button → `startNavigation(order, 'to_pickup', currentLocation)` → router pushes to `navigation`
@@ -335,6 +345,10 @@ Cards sit at the bottom of the map in a `singleCardWrap` container positioned at
 
 **Order accept sheet:**
 The `OrderAcceptSheet` is rendered globally in `AppContent` (`_layout.tsx`), not in drive.tsx or navigation.tsx. When a driver selects an order from the pool FAB, `drive.tsx` calls `useOrderAcceptStore.getState().setPendingOrder(order, false)` directly.
+
+Global auto-present eligibility includes unassigned `PREPARING` orders that are within 5 minutes of ready time. The 5-minute threshold uses a precise per-order timer plus a 60-second fallback ticker to avoid missed threshold transitions after app state/timer pauses.
+
+Auto-present trigger watches a stable available-order signature (order id/status/readiness fields) rather than list length only, so modal presentation still fires when eligible order identity changes while list count stays the same.
 
 Global order-accept and pool UI only render after the driver session is authenticated, so login-screen startup cannot surface accept modals or pool sheets from background order updates.
 

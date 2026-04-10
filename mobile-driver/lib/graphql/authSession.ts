@@ -51,6 +51,19 @@ function isTokenFresh(token: string | null, minValidityMs = 60_000): boolean {
     return expiryMs - Date.now() > minValidityMs;
 }
 
+function isTokenExpired(token: string | null): boolean {
+    if (!token) {
+        return true;
+    }
+
+    const expiryMs = parseJwtExpiryMs(token);
+    if (!expiryMs) {
+        return true;
+    }
+
+    return expiryMs <= Date.now();
+}
+
 export async function getStoredAccessToken(): Promise<string | null> {
     const memoryToken = useAuthStore.getState().token;
     if (memoryToken) {
@@ -119,6 +132,13 @@ export async function refreshAccessToken(currentToken?: string | null): Promise<
 
         const gqlCode = payload?.errors?.[0]?.extensions?.code;
         if (response.status === 401 || response.status === 403 || gqlCode === 'UNAUTHENTICATED') {
+            // Keep the current token when it is still usable; proactive refresh can fail
+            // transiently while the active access token remains valid.
+            if (!isTokenExpired(currentToken ?? null)) {
+                console.warn('[Auth] Refresh rejected but current access token is still valid');
+                return currentToken ?? null;
+            }
+
             await deleteTokens();
             useAuthStore.getState().setToken(null);
             return null;

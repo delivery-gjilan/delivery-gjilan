@@ -560,7 +560,7 @@ struct DeliveryLiveActivityWidget: Widget {
         }
             }
             .padding(12)
-          .widgetURL(URL(string: "zipp://order/\\(context.state.orderId)"))
+          .widgetURL(URL(string: "zipp://orders/\\(context.state.orderId)"))
             .activityBackgroundTint(Color(.systemBackground))
             .activitySystemActionForegroundColor(Color.accentColor)
       }

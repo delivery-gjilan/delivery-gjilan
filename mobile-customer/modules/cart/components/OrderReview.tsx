@@ -16,7 +16,8 @@ interface OrderReviewProps {
     selectedLocation: SelectedAddress;
     total: number;
     /** Delivery */
-    baseDeliveryPrice: number;
+    originalDeliveryPrice: number;
+    effectiveDeliveryPrice: number;
     deliveryZoneName: string | null;
     deliveryPriceLoading: boolean;
     freeDeliveryApplied: boolean;
@@ -30,6 +31,7 @@ interface OrderReviewProps {
     promoResult: any | null;
     promoError: string | null;
     manualPromoLoading: boolean;
+    deliveryPromoDiscount: number;
     appliedDiscount: number;
     /** Totals */
     finalTotal: number;
@@ -56,7 +58,8 @@ export function OrderReview({
     items,
     selectedLocation,
     total,
-    baseDeliveryPrice,
+    originalDeliveryPrice,
+    effectiveDeliveryPrice,
     deliveryZoneName,
     deliveryPriceLoading,
     freeDeliveryApplied,
@@ -68,6 +71,7 @@ export function OrderReview({
     promoResult,
     promoError,
     manualPromoLoading,
+    deliveryPromoDiscount,
     appliedDiscount,
     finalTotal,
     minimumMet,
@@ -159,12 +163,14 @@ export function OrderReview({
                 {/* Price Breakdown */}
                 <PriceBreakdown
                     subtotal={total}
-                    baseDeliveryPrice={baseDeliveryPrice}
+                    originalDeliveryPrice={originalDeliveryPrice}
+                    effectiveDeliveryPrice={effectiveDeliveryPrice}
                     deliveryZoneName={deliveryZoneName}
                     deliveryPriceLoading={deliveryPriceLoading}
                     freeDeliveryApplied={freeDeliveryApplied}
                     isPriority={isPriority}
                     prioritySurcharge={prioritySurcharge}
+                    deliveryPromoDiscount={deliveryPromoDiscount}
                     appliedDiscount={appliedDiscount}
                     finalTotal={finalTotal}
                     formatCurrency={formatCurrency}

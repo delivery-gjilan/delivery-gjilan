@@ -267,6 +267,10 @@ async function registerForPushNotifications(): Promise<string | null> {
         return null;
     }
 
+    if (Platform.OS === 'ios') {
+        await messaging().registerDeviceForRemoteMessages();
+    }
+
     // Use Firebase Messaging token for parity across all apps.
     const token = await messaging().getToken();
 

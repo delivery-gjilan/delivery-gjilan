@@ -5,7 +5,8 @@ import { useCart } from '../hooks/useCart';
 import { useCartAnimationStore } from '../store/cartAnimationStore';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
-import { useEffect, useRef } from 'react';
+import { useSuccessModalStore } from '@/store/useSuccessModalStore';
+import { useEffect, useRef, useState } from 'react';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -24,6 +25,10 @@ export const CartFloatingBar = () => {
     const { t } = useTranslations();
     const { total, count, isEmpty } = useCart();
     const { triggerCount } = useCartAnimationStore();
+    const successModalVisible = useSuccessModalStore((state) => state.visible);
+    const successModalType = useSuccessModalStore((state) => state.type);
+    const suppressCartBarUntil = useSuccessModalStore((state) => state.suppressCartBarUntil);
+    const [isPostSuccessCooldownActive, setIsPostSuccessCooldownActive] = useState(false);
     const mountTriggerCount = useRef(triggerCount);
 
     // Slide-up entrance / slide-down exit
@@ -48,6 +53,21 @@ export const CartFloatingBar = () => {
         );
     }, [triggerCount]);
 
+    useEffect(() => {
+        const remainingMs = suppressCartBarUntil - Date.now();
+        if (remainingMs <= 0) {
+            setIsPostSuccessCooldownActive(false);
+            return;
+        }
+
+        setIsPostSuccessCooldownActive(true);
+        const timeoutId = setTimeout(() => {
+            setIsPostSuccessCooldownActive(false);
+        }, remainingMs);
+
+        return () => clearTimeout(timeoutId);
+    }, [suppressCartBarUntil]);
+
     const wrapperStyle = useAnimatedStyle(() => ({
         opacity: opacity.value,
         transform: [{ translateY: translateY.value }],
@@ -64,7 +84,11 @@ export const CartFloatingBar = () => {
         };
     });
 
-    if (isEmpty) return null;
+    const hideForSuccessTransition =
+        (successModalVisible && successModalType === 'order_created') ||
+        isPostSuccessCooldownActive;
+
+    if (isEmpty || hideForSuccessTransition) return null;
 
     return (
         <AnimatedTouchable

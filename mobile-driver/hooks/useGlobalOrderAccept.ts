@@ -163,20 +163,51 @@ export function useGlobalOrderAccept() {
         networkStatus === NetworkStatus.loading &&
         !bootstrapExpired;
 
+    const getEstimatedReadyMs = useCallback((order: any): number | null => {
+        const estimatedReadyRaw = order?.estimatedReadyAt;
+        if (estimatedReadyRaw) {
+            const estimatedReadyMs = new Date(estimatedReadyRaw).getTime();
+            if (Number.isFinite(estimatedReadyMs)) {
+                return estimatedReadyMs;
+            }
+        }
+
+        const preparingAtRaw = order?.preparingAt;
+        const prepMinutes = Number(order?.preparationMinutes);
+        if (preparingAtRaw && Number.isFinite(prepMinutes) && prepMinutes > 0) {
+            const preparingAtMs = new Date(preparingAtRaw).getTime();
+            if (Number.isFinite(preparingAtMs)) {
+                return preparingAtMs + prepMinutes * 60 * 1000;
+            }
+        }
+
+        return null;
+    }, []);
+
     // ── Precise per-order timers: fire exactly when each PREPARING order crosses
     //    the 5-min threshold instead of polling every 30s.
     const [now, setNow] = useState(() => Date.now());
     useEffect(() => {
         const timers: ReturnType<typeof setTimeout>[] = [];
         for (const o of orders) {
-            if (o.status !== 'PREPARING' || o.driver?.id || !o.estimatedReadyAt) continue;
-            const thresholdMs = new Date(o.estimatedReadyAt).getTime() - 5 * 60 * 1000;
+            if (o.status !== 'PREPARING' || o.driver?.id) continue;
+            const readyAtMs = getEstimatedReadyMs(o);
+            if (!readyAtMs) continue;
+            const thresholdMs = readyAtMs - 5 * 60 * 1000;
             const delayMs = thresholdMs - Date.now();
             if (delayMs <= 0) continue; // already past threshold — useMemo handles it immediately
             timers.push(setTimeout(() => setNow(Date.now()), delayMs));
         }
         return () => timers.forEach(clearTimeout);
-    }, [orders]);
+    }, [orders, getEstimatedReadyMs]);
+
+    // Fallback ticker to avoid missing threshold transitions when JS timers are
+    // paused (e.g. brief backgrounding) or when ETA fields change without a
+    // full orders list identity change.
+    useEffect(() => {
+        const id = setInterval(() => setNow(Date.now()), 60_000);
+        return () => clearInterval(id);
+    }, []);
 
     // ── Derived order lists ──
     const assignedOrders = useMemo(() => {
@@ -200,12 +231,21 @@ export function useGlobalOrderAccept() {
             if (skippedIds.has(o.id)) return false;
             if (o.status === 'READY') return true;
             if (o.status === 'PREPARING') {
-                const estimatedReadyAt = o.estimatedReadyAt ? new Date(o.estimatedReadyAt).getTime() : null;
-                return estimatedReadyAt !== null && estimatedReadyAt - now <= 5 * 60 * 1000;
+                const estimatedReadyMs = getEstimatedReadyMs(o);
+                return estimatedReadyMs !== null && estimatedReadyMs - now <= 5 * 60 * 1000;
             }
             return false;
+        }).sort((a: any, b: any) => {
+            // Keep READY ahead of PREPARING, then sort PREPARING by nearest ETA.
+            const rank = (status: string) => (status === 'READY' ? 0 : status === 'PREPARING' ? 1 : 2);
+            const rankDiff = rank(a.status) - rank(b.status);
+            if (rankDiff !== 0) return rankDiff;
+
+            const aEta = getEstimatedReadyMs(a) ?? Number.MAX_SAFE_INTEGER;
+            const bEta = getEstimatedReadyMs(b) ?? Number.MAX_SAFE_INTEGER;
+            return aEta - bEta;
         });
-    }, [assignedOrders, dispatchModeEnabled, now, orders, skippedAt]);
+    }, [assignedOrders, dispatchModeEnabled, getEstimatedReadyMs, now, orders, skippedAt]);
 
     // Pool shows ALL eligible orders regardless of skip — driver can still manually pick a skipped order.
     const poolOrders = useMemo(() => {
@@ -214,12 +254,12 @@ export function useGlobalOrderAccept() {
             if (o.driver?.id) return false;
             if (o.status === 'READY') return true;
             if (o.status === 'PREPARING') {
-                const estimatedReadyAt = o.estimatedReadyAt ? new Date(o.estimatedReadyAt).getTime() : null;
-                return estimatedReadyAt !== null && estimatedReadyAt - now <= 5 * 60 * 1000;
+                const estimatedReadyMs = getEstimatedReadyMs(o);
+                return estimatedReadyMs !== null && estimatedReadyMs - now <= 5 * 60 * 1000;
             }
             return false;
         });
-    }, [dispatchModeEnabled, now, orders]);
+    }, [dispatchModeEnabled, getEstimatedReadyMs, now, orders]);
 
     // ── Live order: always read the freshest version from Apollo cache ──
     // pendingOrder in the store holds the ID-reference from when it was auto-presented;
@@ -253,6 +293,12 @@ export function useGlobalOrderAccept() {
 
     // ── Auto-present (capacity-aware) ──
     // Depends on pendingOrder so after skip/dismiss the next order surfaces immediately.
+    const availableOrdersSignature = useMemo(() => {
+        return availableOrders
+            .map((o: any) => `${o.id}:${o.status}:${o.estimatedReadyAt ?? ''}:${o.preparingAt ?? ''}:${o.preparationMinutes ?? ''}`)
+            .join('|');
+    }, [availableOrders]);
+
     useEffect(() => {
         const store = useOrderAcceptStore.getState();
         if (!networkReady || !isOnline || store.pendingOrder || dispatchModeEnabled) return;
@@ -261,7 +307,7 @@ export function useGlobalOrderAccept() {
         if (!next) return;
         store.setPendingOrder(next, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [availableOrders.length, pendingOrder, networkReady, isOnline, dispatchModeEnabled, assignedOrders.length, maxActiveOrders]);
+    }, [availableOrdersSignature, pendingOrder, networkReady, isOnline, dispatchModeEnabled, assignedOrders.length, maxActiveOrders]);
 
     // ── Accept ──
     const handleAcceptOrder = useCallback(async (orderId: string) => {

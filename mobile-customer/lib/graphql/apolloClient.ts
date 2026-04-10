@@ -18,8 +18,6 @@ const AUTH_SKIP_OPERATIONS = new Set([
     'Login',
     'InitiateSignup',
     'VerifyEmail',
-    'VerifyPhone',
-    'SubmitPhoneNumber',
     'ResendEmailVerification',
 ]);
 

@@ -177,11 +177,12 @@ function AppContent() {
             {isAuthenticated && isOnline && (
                 <View style={{
                     position: 'absolute',
-                    bottom: showPoolFab ? 230 : 160,
-                    left: 16,
+                    top: '50%',
+                    right: 16,
                     zIndex: 60,
-                    alignItems: 'center',
+                    alignItems: 'flex-end',
                     gap: 4,
+                    transform: [{ translateY: -29 }],
                 }}>
                     {isTalking && (
                         <View style={{

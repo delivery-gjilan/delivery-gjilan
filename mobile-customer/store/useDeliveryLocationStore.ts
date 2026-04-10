@@ -15,19 +15,11 @@ type DeliveryLocationStore = {
     setLocation: (location: DeliveryLocation | null) => void;
 };
 
-// Default location: Gjilan city center
-const DEFAULT_LOCATION: DeliveryLocation = {
-    latitude: 42.4635,
-    longitude: 21.4694,
-    address: 'Gjilan, Kosovo',
-    label: 'Default location',
-};
-
 export const useDeliveryLocationStore = create<DeliveryLocationStore>()(
     persist(
         (set) => ({
-            location: DEFAULT_LOCATION,
-            setLocation: (location) => set({ location: location || DEFAULT_LOCATION }),
+            location: null,
+            setLocation: (location) => set({ location }),
         }),
         {
             name: 'delivery-location-storage',

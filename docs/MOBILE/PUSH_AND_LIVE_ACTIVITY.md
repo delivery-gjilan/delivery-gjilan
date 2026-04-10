@@ -10,8 +10,10 @@
 The repo has one production-shaped push implementation and several partial consumers.
 
 - `mobile-customer` has the real push token registration and notification handling flow
-- `mobile-driver` appears push-capable, but is not at the same maturity for richer notification features
+- `mobile-driver` uses Firebase Messaging token registration for driver pushes; on iOS it must register for remote messages before requesting the FCM token, bootstrap a Firebase background message handler in `index.tsx`, and include `remote-notification` in iOS background modes so delivery works reliably when app state changes
 - `mobile-business` and `mobile-admin` are much thinner here
+
+APNs environment variables on the API side are tied to the Live Activity APNs provider-token path, not standard driver/customer FCM push delivery.
 
 ## Customer Push Flow
 

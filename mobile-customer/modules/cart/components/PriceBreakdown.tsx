@@ -6,12 +6,14 @@ import { useTranslations } from '@/hooks/useTranslations';
 
 interface PriceBreakdownProps {
     subtotal: number;
-    baseDeliveryPrice: number;
+    originalDeliveryPrice: number;
+    effectiveDeliveryPrice: number;
     deliveryZoneName: string | null;
     deliveryPriceLoading: boolean;
     freeDeliveryApplied: boolean;
     isPriority: boolean;
     prioritySurcharge: number;
+    deliveryPromoDiscount: number;
     appliedDiscount: number;
     finalTotal: number;
     formatCurrency: (value: number) => string;
@@ -19,12 +21,14 @@ interface PriceBreakdownProps {
 
 export function PriceBreakdown({
     subtotal,
-    baseDeliveryPrice,
+    originalDeliveryPrice,
+    effectiveDeliveryPrice,
     deliveryZoneName,
     deliveryPriceLoading,
     freeDeliveryApplied,
     isPriority,
     prioritySurcharge,
+    deliveryPromoDiscount,
     appliedDiscount,
     finalTotal,
     formatCurrency,
@@ -44,14 +48,33 @@ export function PriceBreakdown({
             <View style={styles.row}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <Text style={[styles.label, { color: theme.colors.subtext }]}>{t.common.delivery}</Text>
-                    {deliveryZoneName && !freeDeliveryApplied && (
+                    {deliveryZoneName && (
                         <Text style={{ fontSize: 11, color: theme.colors.primary }}>({deliveryZoneName})</Text>
                     )}
                 </View>
-                <Text style={[styles.value, { color: theme.colors.text }]}>
-                    {deliveryPriceLoading ? '...' : freeDeliveryApplied ? t.common.free : formatCurrency(baseDeliveryPrice)}
-                </Text>
+                {deliveryPriceLoading ? (
+                    <Text style={[styles.value, { color: theme.colors.text }]}>...</Text>
+                ) : freeDeliveryApplied && deliveryPromoDiscount > 0 ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={[styles.value, { color: theme.colors.subtext, textDecorationLine: 'line-through' }]}>
+                            {formatCurrency(originalDeliveryPrice)}
+                        </Text>
+                        <Text style={[styles.value, { color: theme.colors.income }]}>{t.common.free}</Text>
+                    </View>
+                ) : (
+                    <Text style={[styles.value, { color: theme.colors.text }]}>{formatCurrency(effectiveDeliveryPrice)}</Text>
+                )}
             </View>
+
+            {/* Delivery promo discount */}
+            {deliveryPromoDiscount > 0 && (
+                <View style={styles.row}>
+                    <Text style={[styles.label, { color: theme.colors.subtext }]}>{t.common.delivery} {t.cart.promo}</Text>
+                    <Text style={[styles.value, { color: theme.colors.income }]}>
+                        -{formatCurrency(deliveryPromoDiscount)}
+                    </Text>
+                </View>
+            )}
 
             {/* Priority surcharge */}
             {isPriority && (
@@ -65,11 +88,11 @@ export function PriceBreakdown({
             )}
 
             {/* Promo discount */}
-            {(appliedDiscount > 0 || freeDeliveryApplied) && (
+            {appliedDiscount > 0 && (
                 <View style={styles.row}>
                     <Text style={[styles.label, { color: theme.colors.subtext }]}>{t.cart.promo}</Text>
                     <Text style={[styles.value, { color: theme.colors.income }]}>
-                        {freeDeliveryApplied && appliedDiscount === 0 ? t.cart.free_delivery : `-€${appliedDiscount.toFixed(2)}`}
+                        -{formatCurrency(appliedDiscount)}
                     </Text>
                 </View>
             )}
