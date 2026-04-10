@@ -34,15 +34,44 @@ interface ActiveOrdersState {
     patchOrderLifecycle: (orderId: string, patch: OrderLifecyclePatch) => void;
 }
 
+const TERMINAL_STATUSES = ['DELIVERED', 'CANCELLED'];
+
+// Track recently-removed order IDs so that a stale cache-and-network backfill
+// cannot revive an order that the subscription just removed.
+const _recentlyRemoved = new Map<string, number>();
+const RECENTLY_REMOVED_TTL_MS = 10_000; // 10 seconds
+
+function markRecentlyRemoved(orderId: string) {
+    _recentlyRemoved.set(orderId, Date.now());
+}
+
+function isRecentlyRemoved(orderId: string): boolean {
+    const ts = _recentlyRemoved.get(orderId);
+    if (!ts) return false;
+    if (Date.now() - ts > RECENTLY_REMOVED_TTL_MS) {
+        _recentlyRemoved.delete(orderId);
+        return false;
+    }
+    return true;
+}
+
 export const useActiveOrdersStore = create<ActiveOrdersState>()((set) => ({
     activeOrders: [],
     hasActiveOrders: false,
 
-    setActiveOrders: (orders) =>
+    setActiveOrders: (orders) => {
+        // Defensive: filter out terminal statuses and recently-removed orders
+        // so a stale Apollo cache backfill cannot revive a delivered/cancelled order.
+        const filtered = orders.filter(
+            (o) =>
+                !TERMINAL_STATUSES.includes(o.status as string) &&
+                !isRecentlyRemoved(String(o.id)),
+        );
         set({
-            activeOrders: orders,
-            hasActiveOrders: orders.length > 0,
-        }),
+            activeOrders: filtered,
+            hasActiveOrders: filtered.length > 0,
+        });
+    },
 
     updateOrder: (updatedOrder) =>
         set((state) => {
@@ -52,6 +81,7 @@ export const useActiveOrdersStore = create<ActiveOrdersState>()((set) => ({
 
             // If order is completed (DELIVERED or CANCELLED), remove it
             if (updatedOrder.status === 'DELIVERED' || updatedOrder.status === 'CANCELLED') {
+                markRecentlyRemoved(String(updatedOrder.id));
                 newOrders = state.activeOrders.filter((order) => order.id !== updatedOrder.id);
             } else {
                 // Update existing or add new order
@@ -71,6 +101,7 @@ export const useActiveOrdersStore = create<ActiveOrdersState>()((set) => ({
 
     removeOrder: (orderId) =>
         set((state) => {
+            markRecentlyRemoved(orderId);
             const newOrders = state.activeOrders.filter((order) => order.id !== orderId);
             return {
                 activeOrders: newOrders,

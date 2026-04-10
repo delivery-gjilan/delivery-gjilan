@@ -141,6 +141,20 @@ export function useNotifications() {
             }
         });
 
+        // Listen for Firebase foreground messages (FCM data+notification messages
+        // are delivered here when the app is in foreground — Expo's listener may not
+        // bridge all Firebase messages).
+        const unsubscribeOnMessage = messaging().onMessage(async (remoteMessage) => {
+            console.log('[Notifications] Firebase foreground message:', remoteMessage.notification?.title);
+            const msgData = remoteMessage.data;
+            const msgType = msgData?.type;
+            if (msgType === 'ORDER_READY_POOL' || msgType === 'ORDER_ASSIGNED') {
+                apolloClient
+                    .query({ query: GET_ORDERS, fetchPolicy: 'network-only' })
+                    .catch(() => null);
+            }
+        });
+
         // Listen for notifications received while app is in foreground
         notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
             console.log('[Notifications] Received in foreground:', notification.request.content.title);
@@ -180,6 +194,7 @@ export function useNotifications() {
         return () => {
             mounted = false;
             unsubscribeTokenRefresh();
+            unsubscribeOnMessage();
             if (notificationListener.current) {
                 notificationListener.current.remove();
             }

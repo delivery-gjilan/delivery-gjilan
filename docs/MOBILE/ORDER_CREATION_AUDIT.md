@@ -1,6 +1,6 @@
 # Mobile Customer Order Creation Audit
 
-<!-- MDS:M4 | Domain: Mobile | Updated: 2026-03-19 -->
+<!-- MDS:M4 | Domain: Mobile | Updated: 2026-04-10 -->
 <!-- Depends-On: B2, B3, BL1 -->
 <!-- Depended-By: BL3 -->
 <!-- Nav: Payment collection UI changes → update BL1 (Settlements). Checkout flow → update BL3 (Cart Flow). Price validation → review B3 (Validation). -->
@@ -51,6 +51,10 @@ Scope reviewed:
 17. Both map pickers also enforce an active touch-hold lock (`isTouchingMap`), so confirm remains disabled while finger is down and only becomes eligible after finger release plus full settle and current-pin geocode completion.
 18. Touch-responder lock was removed from confirm gating due inconsistent native responder delivery in map views; confirm eligibility now relies on stable motion-state (`isMapInMotion`) plus current-pin geocode-complete and in-zone checks, which remain the source of truth.
 19. To avoid sticky disable states on certain devices, confirm gating no longer blocks directly on `isMapInMotion`; eligibility is driven by reverse-geocoding completion + current-pin geocode coordinate match + in-zone validation.
+20. Checkout price breakdown uses delivery split values (`originalDeliveryPrice`, `effectiveDeliveryPrice`, `deliveryPromoDiscount`) so delivery promotions show the original fee, effective fee, and delivery discount as separate facts.
+21. When delivery promotion makes delivery free, checkout UI shows the original delivery fee struck through and `Free` as the effective delivery value while preserving non-delivery promo discount as a separate line.
+22. Cart address picker initial map location prioritizes live GPS (`userContextLocation`) when available, then falls back to persisted delivery selection.
+23. Delivery-location persisted state initializes with `null` location (no hardcoded city-center default), preventing stale default coordinates from overriding GPS-first picker initialization.
 
 ## Confirmed Gaps
 

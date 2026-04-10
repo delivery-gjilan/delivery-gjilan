@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useRef, useState, useEffect } from 'react';
+﻿import React, { useMemo, useCallback, useRef, useState, useEffect } from 'react';
 import { View, Text, Image, StyleSheet, ActivityIndicator, Pressable, Alert, useColorScheme, Animated, PanResponder } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -19,7 +19,7 @@ import { useTranslations } from '@/hooks/useTranslations';
 import { useSharedOrderAccept } from '@/hooks/GlobalOrderAcceptContext';
 import type { Feature, LineString } from 'geojson';
 
-/* ─── Constants ─── */
+/* â”€â”€â”€ Constants â”€â”€â”€ */
 const BOTTOM_BAR_HEIGHT = 108;
 const GJILAN_CENTER: [number, number] = [21.4694, 42.4635];
 const GJILAN_NE: [number, number] = [21.51, 42.50];
@@ -78,33 +78,29 @@ export default function MapScreen() {
     const pendingAutoCountdown = useOrderAcceptStore((s) => s.autoCountdown);
     const { orders, assignedOrders, availableOrders, isOrdersBootstrapping } = useSharedOrderAccept();
 
-    // ── Route state ──
+    // â”€â”€ Route state â”€â”€
     const [routeCoords, setRouteCoords] = useState<Array<[number, number]> | null>(null);
     const [previewRouteCoords, setPreviewRouteCoords] = useState<Array<[number, number]> | null>(null);
     const [routeInfo, setRouteInfo] = useState<{ distanceKm: number; durationMin: number } | null>(null);
     const [previewRouteInfo, setPreviewRouteInfo] = useState<{ distanceKm: number; durationMin: number } | null>(null);
 
-    const visibleAssignedOrders = useMemo(() => {
-        return assignedOrders;
-    }, [assignedOrders]);
-
-    // ── Adaptive GPS interval based on activity ──
+    // â”€â”€ Adaptive GPS interval based on activity â”€â”€
     const hasActiveNavigation = useMemo(() => {
-        return visibleAssignedOrders.some((order: any) =>
+        return assignedOrders.some((order: any) =>
             order.status === 'READY' || order.status === 'OUT_FOR_DELIVERY'
         );
-    }, [visibleAssignedOrders]);
+    }, [assignedOrders]);
 
     const gpsInterval = hasActiveNavigation ? 1000 : 5000;
 
-    // ── Driver location ──
+    // â”€â”€ Driver location â”€â”€
     const { location, permissionGranted } = useDriverLocation({
         smoothing: true,
         timeInterval: gpsInterval,
         distanceFilter: hasActiveNavigation ? 5 : 10,
     });
 
-    // ── Camera follow ──
+    // â”€â”€ Camera follow â”€â”€
     const [followDriver, setFollowDriver] = useState(false);
 
     const centerCameraOnDriver = useCallback((enableFollow: boolean) => {
@@ -138,19 +134,19 @@ export default function MapScreen() {
     }, [followDriver, location]);
 
     const allMapOrders = useMemo(
-        () => [...visibleAssignedOrders, ...availableOrders],
-        [visibleAssignedOrders, availableOrders],
+        () => [...assignedOrders, ...availableOrders],
+        [assignedOrders, availableOrders],
     );
 
     const isInitialOrdersLoading = hasHydrated && !!currentDriverId && isOrdersBootstrapping;
 
-    // ── Focused order object ──
+    // â”€â”€ Focused order object â”€â”€
     const focusedOrder = useMemo(
         () => allMapOrders.find((o: any) => o.id === focusedOrderId) ?? null,
         [allMapOrders, focusedOrderId],
     );
 
-    // ── Fetch route when focused order changes ──
+    // â”€â”€ Fetch route when focused order changes â”€â”€
     const locationRef = useRef(location);
     locationRef.current = location;
     const hasLocation = Boolean(location);
@@ -181,7 +177,7 @@ export default function MapScreen() {
                 : null;
 
             if (focusedOrder.status === 'OUT_FOR_DELIVERY' && dropoffCoord) {
-                // Clear the pickup→dropoff preview — not needed while delivering
+                // Clear the pickupâ†’dropoff preview â€” not needed while delivering
                 if (!cancelled) {
                     setPreviewRouteCoords(null);
                     setPreviewRouteInfo(null);
@@ -211,7 +207,7 @@ export default function MapScreen() {
         return () => { cancelled = true; };
     }, [focusedOrder?.id, focusedOrder?.status, hasLocation]);
 
-    // ── Auto-refit camera when a focused order's status changes ──
+    // â”€â”€ Auto-refit camera when a focused order's status changes â”€â”€
     const prevFocusedStatusRef = useRef<string | null>(null);
     useEffect(() => {
         if (!focusedOrder) {
@@ -225,7 +221,7 @@ export default function MapScreen() {
         return () => clearTimeout(t);
     }, [focusedOrder?.status, focusedOrder?.id]);
 
-    // ── GeoJSON shapes for route lines ──
+    // â”€â”€ GeoJSON shapes for route lines â”€â”€
     const routeShape = useMemo<Feature<LineString> | null>(() => {
         const coords = routeCoords;
         if (!coords || coords.length < 2) return null;
@@ -245,7 +241,7 @@ export default function MapScreen() {
         };
     }, [previewRouteCoords]);
 
-    // ── Focus on an order: fly camera to its pickup location ──
+    // â”€â”€ Focus on an order: fly camera to its pickup location â”€â”€
     const focusOrder = useCallback((order: any) => {
         const bizLoc = order.businesses?.[0]?.business?.location;
         const dropLoc = order.dropOffLocation;
@@ -326,7 +322,7 @@ export default function MapScreen() {
         }
     }, [focusedOrder?.id, updateOrderStatus, allMapOrders, location, startNavigation, router]);
 
-    // ── Camera fit when global accept sheet auto-presents a new order ──
+    // â”€â”€ Camera fit when global accept sheet auto-presents a new order â”€â”€
     useEffect(() => {
         if (!pendingOrder || !pendingAutoCountdown) return;
         if (followDriver) return;
@@ -349,7 +345,7 @@ export default function MapScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [followDriver, pendingOrder?.id, pendingAutoCountdown]);
 
-    // ── Card swipe PanResponder ──
+    // â”€â”€ Card swipe PanResponder â”€â”€
     const swipePanResponder = useRef(
         PanResponder.create({
             onMoveShouldSetPanResponder: (_, gs) =>
@@ -364,32 +360,32 @@ export default function MapScreen() {
         }),
     ).current;
 
-    // ── Clamp card index when orders are removed ──
+    // â”€â”€ Clamp card index when orders are removed â”€â”€
     useEffect(() => {
         assignedOrdersLenRef.current = assignedOrders.length;
-        if (visibleAssignedOrders.length === 0) {
+        if (assignedOrders.length === 0) {
             setCurrentCardIndex(0);
             setFocusedOrderId(null);
             return;
         }
-        setCurrentCardIndex(prev => Math.min(prev, visibleAssignedOrders.length - 1));
-    }, [assignedOrders.length, visibleAssignedOrders.length]);
+        setCurrentCardIndex(prev => Math.min(prev, assignedOrders.length - 1));
+    }, [assignedOrders.length]);
 
-    // ── Focus camera on the current card's order ──
+    // â”€â”€ Focus camera on the current card's order â”€â”€
     useEffect(() => {
-        if (visibleAssignedOrders.length === 0) return;
-        const idx = Math.min(currentCardIndex, visibleAssignedOrders.length - 1);
-        const order = visibleAssignedOrders[idx];
+        if (assignedOrders.length === 0) return;
+        const idx = Math.min(currentCardIndex, assignedOrders.length - 1);
+        const order = assignedOrders[idx];
         if (order) focusOrder(order);
-    // focusOrder dep intentionally omitted — it changes on every render due to location
+    // focusOrder dep intentionally omitted â€” it changes on every render due to location
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentCardIndex, visibleAssignedOrders.length]);
+    }, [currentCardIndex, assignedOrders.length]);
 
-    // ── Pulse animation for READY orders ──
+    // â”€â”€ Pulse animation for READY orders â”€â”€
     useEffect(() => {
-        if (visibleAssignedOrders.length === 0) return;
-        const idx = Math.min(currentCardIndex, visibleAssignedOrders.length - 1);
-        const order = visibleAssignedOrders[idx];
+        if (assignedOrders.length === 0) return;
+        const idx = Math.min(currentCardIndex, assignedOrders.length - 1);
+        const order = assignedOrders[idx];
         if (order?.status === 'READY') {
             const loop = Animated.loop(
                 Animated.sequence([
@@ -403,9 +399,9 @@ export default function MapScreen() {
             readyPulse.setValue(1);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentCardIndex, visibleAssignedOrders.length]);
+    }, [currentCardIndex, assignedOrders.length]);
 
-    // ── Launch Mapbox Navigation SDK ──
+    // â”€â”€ Launch Mapbox Navigation SDK â”€â”€
     const handleStartNavigation = useCallback((targetOrder?: any) => {
         const order = targetOrder ?? focusedOrder;
         if (!order || !location) return;
@@ -417,7 +413,7 @@ export default function MapScreen() {
         router.push('/navigation' as any);
     }, [focusedOrder, location, startNavigation, router]);
 
-    // ── Initial camera center ──
+    // â”€â”€ Initial camera center â”€â”€
     const initialCenter = useMemo<[number, number]>(() => {
         if (location) return [location.longitude, location.latitude];
         return GJILAN_CENTER;
@@ -425,7 +421,7 @@ export default function MapScreen() {
 
     return (
         <View style={styles.container}>
-            {/* ═══ Full-screen Map ═══ */}
+            {/* â•â•â• Full-screen Map â•â•â• */}
             <Mapbox.MapView
                 style={styles.map}
                 styleURL={mapStyle}
@@ -444,7 +440,7 @@ export default function MapScreen() {
                     minZoomLevel={12}
                     padding={{
                         paddingTop: 0,
-                        paddingBottom: visibleAssignedOrders.length > 0 ? BOTTOM_BAR_HEIGHT : 0,
+                        paddingBottom: assignedOrders.length > 0 ? BOTTOM_BAR_HEIGHT : 0,
                         paddingLeft: 0,
                         paddingRight: 0,
                     }}
@@ -457,7 +453,7 @@ export default function MapScreen() {
                     } : {})}
                 />
 
-                {/* ── Preview route (pickup → dropoff) — only while picking up ── */}
+                {/* â”€â”€ Preview route (pickup â†’ dropoff) â€” only while picking up â”€â”€ */}
                 {previewRouteShape && focusedOrder?.status !== 'OUT_FOR_DELIVERY' && (
                     <Mapbox.ShapeSource id="preview-route-source" shape={previewRouteShape}>
                         <Mapbox.LineLayer
@@ -479,7 +475,7 @@ export default function MapScreen() {
                     </Mapbox.ShapeSource>
                 )}
 
-                {/* ── Active route (driver → destination) ── */}
+                {/* â”€â”€ Active route (driver â†’ destination) â”€â”€ */}
                 {routeShape && (
                     <Mapbox.ShapeSource id="active-route-source" shape={routeShape}>
                         {/* Layer 1: neon glow bloom */}
@@ -537,7 +533,7 @@ export default function MapScreen() {
                     </Mapbox.ShapeSource>
                 )}
 
-                {/* Driver position — native Mapbox location layer (smooth interpolation) */}
+                {/* Driver position â€” native Mapbox location layer (smooth interpolation) */}
                 {permissionGranted && (
                     <Mapbox.UserLocation
                         visible
@@ -546,7 +542,7 @@ export default function MapScreen() {
                     />
                 )}
 
-                {/* Order markers — pickup pins for assigned orders only; drop-off pins always */}
+                {/* Order markers â€” pickup pins for assigned orders only; drop-off pins always */}
                 {allMapOrders.map((order: any) => {
                     const statusColor = STATUS_COLORS[order.status] ?? '#6B7280';
                     const isAssigned = order.driver?.id === currentDriverId;
@@ -615,13 +611,13 @@ export default function MapScreen() {
                 })}
             </Mapbox.MapView>
 
-            {/* ═══ Right-side buttons ═══ */}
-            <View style={[styles.rightButtons, { bottom: (visibleAssignedOrders.length > 0 ? BOTTOM_BAR_HEIGHT + 12 : 20 + insets.bottom) }]}>
+            {/* â•â•â• Right-side buttons â•â•â• */}
+            <View style={[styles.rightButtons, { bottom: (assignedOrders.length > 0 ? BOTTOM_BAR_HEIGHT + 12 : 20 + insets.bottom) }]}>
                 {/* Arrived at pickup shortcut */}
                 {(() => {
-                    const t = visibleAssignedOrders.length === 1
-                        ? visibleAssignedOrders[0]
-                        : visibleAssignedOrders.find((o: any) => o.id === focusedOrderId) ?? null;
+                    const t = assignedOrders.length === 1
+                        ? assignedOrders[0]
+                        : assignedOrders.find((o: any) => o.id === focusedOrderId) ?? null;
                     if (t?.status !== 'READY') return null;
                     return (
                         <Pressable
@@ -658,9 +654,9 @@ export default function MapScreen() {
                 </View>
             </View>
 
-            {/* ═══ Connection status pill ═══ */}
+            {/* â•â•â• Connection status pill â•â•â• */}
 
-            {/* ═══ Connection status pill ═══ (needs to stay inside MapView container) */}
+            {/* â•â•â• Connection status pill â•â•â• (needs to stay inside MapView container) */}
             {(() => {
                 const connColor =
                     connectionStatus === 'CONNECTED' ? '#22c55e' :
@@ -684,10 +680,10 @@ export default function MapScreen() {
                 </View>
             )}
 
-            {/* ═══ Single swipeable active order card ═══ */}
-            {visibleAssignedOrders.length > 0 && (() => {
-                const idx = Math.min(currentCardIndex, visibleAssignedOrders.length - 1);
-                const order = visibleAssignedOrders[idx];
+            {/* â•â•â• Single swipeable active order card â•â•â• */}
+            {assignedOrders.length > 0 && (() => {
+                const idx = Math.min(currentCardIndex, assignedOrders.length - 1);
+                const order = assignedOrders[idx];
                 const statusColor = STATUS_COLORS[order.status] ?? '#6B7280';
                 const bizName = order.businesses?.[0]?.business?.name ?? '?';
                 const initial = bizName.charAt(0).toUpperCase();
@@ -701,7 +697,7 @@ export default function MapScreen() {
                 const prepMinsLeft = isPreparing && order.estimatedReadyAt
                     ? Math.max(0, Math.ceil((new Date(order.estimatedReadyAt).getTime() - nowTs) / 60000))
                     : null;
-                const total = visibleAssignedOrders.length;
+                const total = assignedOrders.length;
 
                 return (
                     <View style={[styles.singleCardWrap, { bottom: 12 + insets.bottom }]}>
@@ -711,7 +707,7 @@ export default function MapScreen() {
                         )}
 
                         <View style={styles.singleCard} {...swipePanResponder.panHandlers}>
-                        {/* READY glow border — animated pulse */}
+                        {/* READY glow border â€” animated pulse */}
                         {isReady && (
                             <Animated.View
                                 style={[styles.readyGlow, { opacity: readyPulse, borderColor: statusColor }]}
@@ -719,7 +715,7 @@ export default function MapScreen() {
                             />
                         )}
 
-                        {/* Order counter — top right */}
+                        {/* Order counter â€” top right */}
                         {total > 1 && (
                             <View style={styles.cardCounter}>
                                 <Text style={styles.cardCounterText}>{idx + 1} / {total}</Text>
@@ -738,7 +734,7 @@ export default function MapScreen() {
                                 ) : null}
                             </View>
                             <View style={styles.cardEarningsBadge}>
-                                <Text style={styles.cardEarningsText}>€{earnings}</Text>
+                                <Text style={styles.cardEarningsText}>â‚¬{earnings}</Text>
                             </View>
                         </View>
 
@@ -762,7 +758,7 @@ export default function MapScreen() {
                                     {prepMinsLeft === 0 ? t.drive.almost_ready : t.drive.ready_min.replace('{{min}}', String(prepMinsLeft))}
                                 </Text>
                             )}
-                            {/* Swipe hint — only when multiple orders */}
+                            {/* Swipe hint â€” only when multiple orders */}
                             {total > 1 && (
                                 <Text style={styles.cardSwipeHint}>{t.drive.swipe_hint}</Text>
                             )}
@@ -815,7 +811,7 @@ export default function MapScreen() {
                 );
             })()}
 
-            {/* Dot pager — shown below card when 2+ orders */}
+            {/* Dot pager â€” shown below card when 2+ orders */}
             {assignedOrders.length > 1 && (() => {
                 const idx = Math.min(currentCardIndex, assignedOrders.length - 1);
                 return (
@@ -844,7 +840,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
 
-    /* ── Connection pill ── */
+    /* â”€â”€ Connection pill â”€â”€ */
     connPill: {
         position: 'absolute',
         left: 16,
@@ -868,7 +864,7 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
 
-    /* ── Driver marker ── */
+    /* â”€â”€ Driver marker â”€â”€ */
     driverMarkerWrap: {
         width: 24,
         height: 24,
@@ -889,7 +885,7 @@ const styles = StyleSheet.create({
         elevation: 8,
     },
 
-    /* ── Order markers ── */
+    /* â”€â”€ Order markers â”€â”€ */
     bizMarker: {
         width: 30,
         height: 30,
@@ -943,7 +939,7 @@ const styles = StyleSheet.create({
         marginTop: -1,
     },
 
-    /* ── Right-side buttons ── */
+    /* â”€â”€ Right-side buttons â”€â”€ */
     rightButtons: {
         position: 'absolute',
         right: 16,
@@ -1015,8 +1011,8 @@ const styles = StyleSheet.create({
         fontWeight: '800',
     },
 
-    /* ── Single swipeable active order card ── */
-    /* ── Multi-order card wrap + stack ── */
+    /* â”€â”€ Single swipeable active order card â”€â”€ */
+    /* â”€â”€ Multi-order card wrap + stack â”€â”€ */
     singleCardWrap: {
         position: 'absolute',
         left: 12,
@@ -1046,7 +1042,7 @@ const styles = StyleSheet.create({
         shadowRadius: 16,
         elevation: 16,
     },
-    /* ── Dot pager ── */
+    /* â”€â”€ Dot pager â”€â”€ */
     dotPager: {
         position: 'absolute',
         left: 0,
@@ -1191,7 +1187,7 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
 
-    /* ── Loading ── */
+    /* â”€â”€ Loading â”€â”€ */
     loadingOverlay: {
         ...StyleSheet.absoluteFillObject,
         justifyContent: 'center',

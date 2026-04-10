@@ -53,7 +53,7 @@ export function useGlobalOrderAccept() {
     // so checking data + ready status is sufficient.
     const [networkReady, setNetworkReady] = useState(false);
     useEffect(() => {
-        if (!networkReady && data && networkStatus === NetworkStatus.ready) {
+        if (!networkReady && data && (data as any)?.orders?.orders && networkStatus === NetworkStatus.ready) {
             setNetworkReady(true);
         }
     }, [networkStatus, networkReady, data]);
@@ -119,7 +119,14 @@ export function useGlobalOrderAccept() {
             }
             // Replace cache with full server list. Empty array [] is valid — means all orders done.
             apolloClient.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
-                return { ...(existing ?? {}), orders: incomingOrders };
+                return {
+                    ...(existing ?? {}),
+                    orders: {
+                        ...(existing?.orders ?? {}),
+                        orders: incomingOrders,
+                        __typename: 'OrderConnection',
+                    },
+                };
             });
             // Store subscription data directly — while the initial query is
             // still in network-only mode, cache writes don't propagate to
@@ -147,15 +154,19 @@ export function useGlobalOrderAccept() {
 
     const cachedOrders = useMemo(() => {
         try {
-            return ((apolloClient.readQuery({ query: GET_ORDERS }) as any)?.orders ?? []) as any[];
+            return ((apolloClient.readQuery({ query: GET_ORDERS }) as any)?.orders?.orders ?? []) as any[];
         } catch {
             return [];
         }
     }, [apolloClient, data, subscriptionOrders]);
 
     const orders = useMemo(() => {
-        return (data as any)?.orders ?? subscriptionOrders ?? cachedOrders;
-    }, [data, subscriptionOrders, cachedOrders]);
+        // Prefer the query response, then live subscription payload.
+        // Fall back to the persisted Apollo cache ONLY after the first
+        // successful network response (networkReady) so stale data from a
+        // previous app session never leaks into the UI on cold start.
+        return (data as any)?.orders?.orders ?? subscriptionOrders ?? (networkReady ? cachedOrders : []);
+    }, [data, subscriptionOrders, cachedOrders, networkReady]);
 
     const isOrdersBootstrapping =
         !!currentDriverId &&
@@ -309,12 +320,14 @@ export function useGlobalOrderAccept() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [availableOrdersSignature, pendingOrder, networkReady, isOnline, dispatchModeEnabled, assignedOrders.length, maxActiveOrders]);
 
-    // ── Accept ──
-    const handleAcceptOrder = useCallback(async (orderId: string) => {
+    // ── Shared accept mutation with guards and error handling ──
+    const executeAcceptMutation = useCallback(async (
+        orderId: string,
+        onSuccess: () => void,
+    ): Promise<void> => {
         if (!currentDriverId) return;
-        // Debounce: block if a mutation is already in-flight
         if (!useOrderAcceptStore.getState().tryLockAccept()) return;
-        // Offline guard — check both driver toggle and OS network state
+
         const authState = useAuthStore.getState();
         if (!authState.isOnline || !authState.isNetworkConnected) {
             useOrderAcceptStore.getState().setAcceptError('You are offline. Please check your connection.');
@@ -322,22 +335,20 @@ export function useGlobalOrderAccept() {
             (useOrderAcceptStore.getState() as any)._acceptingRef = false;
             return;
         }
+
         useOrderAcceptStore.getState().setAcceptError(null);
         useOrderAcceptStore.getState().setAccepting(true);
         try {
             await assignDriver({ variables: { id: orderId, driverId: currentDriverId } });
             useOrderAcceptStore.getState().setPendingOrder(null);
-            // Force immediate refetch — bypass debounce — so this order vanishes from the pool right away
             lastOrdersRefreshAt.current = 0;
             void refetch();
-            // Redirect to the map/drive tab so the driver sees their new order immediately
-            router.push('/(tabs)/drive' as any);
+            onSuccess();
         } catch (err: any) {
             const msg = err?.message?.toLowerCase() ?? '';
             console.error('[accept] assignDriverToOrder failed:', err?.message, err?.graphQLErrors);
             if (msg.includes('already') || msg.includes('assigned') || msg.includes('taken')) {
                 useOrderAcceptStore.getState().setTakenByOther(true);
-                // pendingOrder stays alive — layout timer will clear both after 3s
             } else {
                 useOrderAcceptStore.getState().setPendingOrder(null);
                 if (msg.includes('maximum') || msg.includes('max active')) {
@@ -353,6 +364,13 @@ export function useGlobalOrderAccept() {
         }
     }, [currentDriverId, assignDriver, refetch]);
 
+    // ── Accept ──
+    const handleAcceptOrder = useCallback(async (orderId: string) => {
+        await executeAcceptMutation(orderId, () => {
+            router.push('/(tabs)/drive' as any);
+        });
+    }, [executeAcceptMutation, router]);
+
     // ── Skip ──
     const handleSkipOrder = useCallback(() => {
         useOrderAcceptStore.getState().skipOrder();
@@ -360,27 +378,10 @@ export function useGlobalOrderAccept() {
 
     // ── Accept & immediately start navigation ──
     const handleAcceptAndNavigate = useCallback(async (orderId: string) => {
-        if (!currentDriverId) return;
-        if (!useOrderAcceptStore.getState().tryLockAccept()) return;
-        // Offline guard — check both driver toggle and OS network state
-        const authState = useAuthStore.getState();
-        if (!authState.isOnline || !authState.isNetworkConnected) {
-            useOrderAcceptStore.getState().setAcceptError('You are offline. Please check your connection.');
-            useOrderAcceptStore.getState().setAccepting(false);
-            (useOrderAcceptStore.getState() as any)._acceptingRef = false;
-            return;
-        }
         const order = useOrderAcceptStore.getState().pendingOrder;
         if (!order) return;
 
-        useOrderAcceptStore.getState().setAccepting(true);
-        try {
-            await assignDriver({ variables: { id: orderId, driverId: currentDriverId } });
-            useOrderAcceptStore.getState().setPendingOrder(null);
-            lastOrdersRefreshAt.current = 0;
-            void refetch();
-
-            // Build navigation params from the order data we have right now
+        await executeAcceptMutation(orderId, () => {
             const bizLoc = order.businesses?.[0]?.business?.location;
             const dropLoc = order.dropOffLocation;
             if (!bizLoc) return;
@@ -421,26 +422,8 @@ export function useGlobalOrderAccept() {
 
             startNavigation(navOrder, phase, loc);
             router.push('/navigation' as any);
-        } catch (err: any) {
-            const msg = err?.message?.toLowerCase() ?? '';
-            console.error('[accept+nav] assignDriverToOrder failed:', err?.message, err?.graphQLErrors);
-            if (msg.includes('already') || msg.includes('assigned') || msg.includes('taken')) {
-                useOrderAcceptStore.getState().setTakenByOther(true);
-                // pendingOrder stays alive — layout timer will clear both after 3s
-            } else {
-                useOrderAcceptStore.getState().setPendingOrder(null);
-                if (msg.includes('maximum') || msg.includes('max active')) {
-                    useOrderAcceptStore.getState().setAcceptError('You have reached your maximum active orders.');
-                } else if (msg.includes('not available') || msg.includes('not available for driver')) {
-                    useOrderAcceptStore.getState().setAcceptError('This order is no longer available.');
-                } else {
-                    useOrderAcceptStore.getState().setAcceptError(`Failed to accept: ${err?.message ?? 'Please try again.'}`);
-                }
-            }
-        } finally {
-            useOrderAcceptStore.getState().setAccepting(false);
-        }
-    }, [currentDriverId, assignDriver, startNavigation, router, refetch]);
+        });
+    }, [executeAcceptMutation, startNavigation, router]);
 
     const takenByOther = useOrderAcceptStore((s) => s.takenByOther);
 

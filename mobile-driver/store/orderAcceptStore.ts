@@ -124,6 +124,12 @@ export const useOrderAcceptStore = create<OrderAcceptState>()(
                 skippedAt: state.skippedAt,
                 seenAssignedAt: state.seenAssignedAt,
             }),
+            onRehydrateStorage: () => (state) => {
+                if (!state) return;
+                const now = Date.now();
+                state.skippedAt = pruneTimestampMap(state.skippedAt, now);
+                state.seenAssignedAt = pruneTimestampMap(state.seenAssignedAt, now);
+            },
         },
     ),
 );

@@ -67,6 +67,7 @@
         "empty": "No orders found",
         "status": {
             "PENDING": "Pending",
+            "AWAITING_APPROVAL": "Awaiting Approval",
             "PREPARING": "Preparing",
             "READY": "Ready",
             "OUT_FOR_DELIVERY": "Out for Delivery",

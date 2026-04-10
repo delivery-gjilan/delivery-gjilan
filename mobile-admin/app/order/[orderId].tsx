@@ -17,6 +17,7 @@ import {
     UPDATE_PREPARATION_TIME,
     CANCEL_ORDER,
     ASSIGN_DRIVER_TO_ORDER,
+    APPROVE_ORDER,
 } from '@/graphql/orders';
 import { GET_DRIVERS } from '@/graphql/drivers';
 import { formatCurrency, formatTime, formatDate } from '@/utils/helpers';
@@ -41,6 +42,7 @@ export default function OrderDetailScreen() {
     const [cancelOrder, { loading: cancelLoading }] = useMutation(CANCEL_ORDER);
     const [assignDriver, { loading: assignLoading }] = useMutation(ASSIGN_DRIVER_TO_ORDER);
     const [updatePrepTime] = useMutation(UPDATE_PREPARATION_TIME);
+    const [approveOrder, { loading: approveLoading }] = useMutation(APPROVE_ORDER);
 
     const order = data?.order;
     const drivers = driversData?.drivers || [];
@@ -230,7 +232,7 @@ export default function OrderDetailScreen() {
                                     <Text className="text-sm flex-1" style={{ color: theme.colors.text }}>{item.name}</Text>
                                 </View>
                                 <Text className="text-sm font-medium" style={{ color: theme.colors.text }}>
-                                    {formatCurrency(item.price * item.quantity)}
+                                    {formatCurrency((item.unitPrice ?? item.price ?? 0) * item.quantity)}
                                 </Text>
                             </View>
                         ))}
@@ -257,6 +259,22 @@ export default function OrderDetailScreen() {
 
                 {/* Action Buttons */}
                 <View className="mb-8">
+                    {order.status === 'AWAITING_APPROVAL' && (
+                        <Button
+                            title="Approve Order"
+                            onPress={async () => {
+                                try {
+                                    await approveOrder({ variables: { id: orderId } });
+                                    refetch();
+                                } catch (err: any) {
+                                    Alert.alert('Error', err.message);
+                                }
+                            }}
+                            loading={approveLoading}
+                            size="lg"
+                            style={{ backgroundColor: '#f97316' }}
+                        />
+                    )}
                     {order.status === 'PENDING' && (
                         <Button
                             title={t.orders.detail.startPreparing}

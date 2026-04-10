@@ -267,13 +267,13 @@ export function useDriverHeartbeat() {
     // Priority 1: Check for navigation SDK location (when actively navigating)
     const navLocationState = useNavigationLocationStore.getState();
     if (navLocationState.isFresh() && navLocationState.location) {
-      console.log('[Heartbeat] Using Navigation SDK location', navLocationState.location);
+      if (__DEV__) console.log('[Heartbeat] Using Navigation SDK location', navLocationState.location);
       return navLocationState.location;
     }
 
     // Priority 2: Use cached location from location watch
     if (lastLocationRef.current) {
-      console.log('[Heartbeat] Using cached location from watch');
+      if (__DEV__) console.log('[Heartbeat] Using cached location from watch');
       return lastLocationRef.current;
     }
 
@@ -293,7 +293,7 @@ export function useDriverHeartbeat() {
           latitude: location.coords.latitude,
           longitude: location.coords.longitude,
         };
-        console.log('[Heartbeat] Got fresh GPS', coords);
+        if (__DEV__) console.log('[Heartbeat] Got fresh GPS', coords);
         lastLocationRef.current = coords;
         return coords;
       }
@@ -309,7 +309,7 @@ export function useDriverHeartbeat() {
           latitude: lastKnown.coords.latitude,
           longitude: lastKnown.coords.longitude,
         };
-        console.log('[Heartbeat] Using last known position from system');
+        if (__DEV__) console.log('[Heartbeat] Using last known position from system');
         lastLocationRef.current = coords;
         return coords;
       }
@@ -348,10 +348,6 @@ export function useDriverHeartbeat() {
             latitude: location.coords.latitude,
             longitude: location.coords.longitude,
           };
-          console.log('[Heartbeat] Watch location update', {
-            lat: location.coords.latitude,
-            lng: location.coords.longitude,
-          });
         }
       );
       console.log('[Heartbeat] Location watch started');
@@ -410,10 +406,6 @@ export function useDriverHeartbeat() {
         consecutiveFailuresRef.current = 0; // Reset backoff on success
         setConnectionStatus(data.connectionStatus as ConnectionStatus);
         useAuthStore.getState().setConnectionStatus(data.connectionStatus);
-        console.log('[Heartbeat] Sent', {
-          status: data.connectionStatus,
-          locationUpdated: data.locationUpdated,
-        });
       } else {
         console.warn('[Heartbeat] Failed:', result.error);
       }

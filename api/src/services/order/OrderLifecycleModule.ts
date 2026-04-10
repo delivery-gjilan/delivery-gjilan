@@ -232,19 +232,19 @@ export class OrderLifecycleModule {
             try {
                 const dispatchService = getDispatchService();
                 const earlyState = await cache.get<string>(`dispatch:early:${id}`);
-                if (earlyState === 'fired') {
-                    log.info({ orderId: id }, 'updateStatus:READY — early dispatch already fired, skipping');
-                } else {
-                    if (earlyState === 'pending') {
-                        // Remove the pending BullMQ job so it doesn't fire after READY dispatch.
-                        dispatchService.cancelDispatch(id);
-                        log.info({ orderId: id }, 'updateStatus:READY — order ready before early timer, dispatching now');
-                    }
-                    await cache.set(`dispatch:early:${id}`, 'fired', 3600);
-                    dispatchService.dispatchOrder(id, notificationService).catch((err) =>
-                        log.error({ err, orderId: id }, 'updateStatus:dispatch:error'),
-                    );
+                if (earlyState === 'pending') {
+                    // Remove the pending BullMQ job so it doesn't fire after READY dispatch.
+                    dispatchService.cancelDispatch(id);
+                    log.info({ orderId: id }, 'updateStatus:READY — order ready before early timer, dispatching now');
+                } else if (earlyState === 'fired') {
+                    // Clean up previous dispatch state so a fresh wave-1/wave-2 cycle runs.
+                    dispatchService.cancelDispatch(id);
+                    log.info({ orderId: id }, 'updateStatus:READY — early dispatch already fired, re-dispatching for READY');
                 }
+                await cache.set(`dispatch:early:${id}`, 'fired', 3600);
+                dispatchService.dispatchOrder(id, notificationService).catch((err) =>
+                    log.error({ err, orderId: id }, 'updateStatus:dispatch:error'),
+                );
             } catch (err) {
                 log.warn({ err }, 'updateStatus:dispatch:serviceNotReady');
             }

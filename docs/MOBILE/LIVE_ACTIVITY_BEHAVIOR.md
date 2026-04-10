@@ -1,6 +1,6 @@
 # Live Activity Behavior (Customer iOS)
 
-<!-- MDS:M3 | Domain: Mobile | Updated: 2026-03-22 -->
+<!-- MDS:M3 | Domain: Mobile | Updated: 2026-04-10 -->
 <!-- Depends-On: M2, B4 -->
 <!-- Depended-By: O4 -->
 <!-- Nav: ETA/progress changes → update B4 (Watchdog heartbeat). Token lifecycle → update O4 (Push Audit). Status mapping → review B2 (Order Creation). -->
@@ -109,6 +109,12 @@ Lock Screen presentation includes:
 - order ID + driver name row
 
 This layout is intentionally concise for default compact island constraints.
+
+## Tap Navigation Target
+
+- Live Activity tap URL is generated as `zipp://orders/{orderId}` in the iOS widget template (`with-live-activity-extension.js`).
+- The deep link resolves directly to the customer order-details route (`/orders/[orderId]`).
+- Since this URL is compiled into generated iOS extension Swift code during prebuild, route changes require a new iOS binary build (not OTA update alone).
 
 ## Background Update Behavior
 

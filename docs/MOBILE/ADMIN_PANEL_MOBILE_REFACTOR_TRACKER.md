@@ -1,6 +1,6 @@
 # Admin Panel To Mobile Refactor Tracker
 
-<!-- MDS:M6 | Domain: Mobile | Updated: 2026-03-19 -->
+<!-- MDS:M6 | Domain: Mobile | Updated: 2026-04-11 -->
 <!-- Depends-On: UI1, UI2, M1 -->
 <!-- Depended-By: M1 -->
 <!-- Nav: Any admin-panel UX/role/permissions/filters update -> update this file in same PR. -->
@@ -33,10 +33,24 @@ Primary mobile source docs:
 |---|---|---|---|
 | Business settlements (`/dashboard/business-settlements`) | `mobile-business` finances tab | Partial | Filters and reasoning exist, but must align exactly with web semantics and date modes. |
 | Settlement order details modal | `mobile-business` settlement detail screen/sheet | Partial | Ensure business-scoped item breakdown and fallback behavior are mirrored. |
+| Admin orders operational controls (`/dashboard/orders`) | `mobile-admin` orders tab + order detail | Partial | Mobile-admin supports live order list, quick assign-driver sheet, and quick status progression (`AWAITING_APPROVAL -> approve`, `PENDING -> PREPARING`, `PREPARING -> READY`, `READY -> OUT_FOR_DELIVERY`, `OUT_FOR_DELIVERY -> DELIVERED`) plus full detail controls. |
+| Admin map operational controls (`/dashboard/map`) | `mobile-admin` map tab | Partial | Focused order panel supports quick assign-driver sheet and quick status progression with driver-required guard before `OUT_FOR_DELIVERY`. |
 | Admin orders earnings signal (`/dashboard/orders`) | `mobile-admin` orders list/detail | Planned | Add `+earnings` indicator and breakdown (delivery commission, restaurant commission, markup), with business commission sourced from active settlement rules and delivery included only after driver assignment/out-for-delivery (`DEL+` marker). |
 | Business products/categories sorting and actions | `mobile-business` products flow | Partial | Keep sort persistence and role-specific affordances consistent with web constraints. |
 | Super-admin financial ops (`/admin/financial/*`) | `mobile-admin` financial module | Planned | Keep clearly separate from business flows; no mixed semantics. |
 | Role-based nav separation (business vs admin) | `mobile-business` vs `mobile-admin` app shells | Planned | No cross-role leakage in nav or screens. |
+
+## Current Mobile-Admin Orders And Map State
+
+- Orders tab includes all operational statuses used for active flow visibility (`AWAITING_APPROVAL`, `PENDING`, `PREPARING`, `READY`, `OUT_FOR_DELIVERY`) and terminal statuses.
+- Orders cards expose direct operational actions without entering detail first:
+   - assign/reassign driver from an inline bottom sheet
+   - quick next-step progression aligned to the current status
+- Order detail includes direct approval action for `AWAITING_APPROVAL` and preserves full status/driver/prep-time controls.
+- Map tab includes `AWAITING_APPROVAL` in the active-order surface and keeps focused order controls actionable:
+   - assign/reassign driver from the focused panel
+   - quick next-step progression from focused panel
+   - `READY -> OUT_FOR_DELIVERY` remains blocked when no driver is assigned
 
 ## Current Parity Backlog
 

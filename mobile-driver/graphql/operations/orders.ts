@@ -3,48 +3,50 @@ import { gql } from '@apollo/client';
 export const GET_ORDERS = gql`
     query GetOrders {
         orders {
-            id
-            displayId
-            orderDate
-            status
-            preparationMinutes
-            estimatedReadyAt
-            preparingAt
-            orderPrice
-            deliveryPrice
-            totalPrice
-            dropOffLocation {
-                latitude
-                longitude
-                address
-            }
-            driverNotes
-            businesses {
-                business {
-                    id
-                    name
-                    location {
-                        latitude
-                        longitude
-                        address
+            orders {
+                id
+                displayId
+                orderDate
+                status
+                preparationMinutes
+                estimatedReadyAt
+                preparingAt
+                orderPrice
+                deliveryPrice
+                totalPrice
+                dropOffLocation {
+                    latitude
+                    longitude
+                    address
+                }
+                driverNotes
+                businesses {
+                    business {
+                        id
+                        name
+                        location {
+                            latitude
+                            longitude
+                            address
+                        }
+                    }
+                    items {
+                        name
+                        quantity
+                        notes
                     }
                 }
-                items {
-                    name
-                    quantity
-                    notes
+                user {
+                    id
+                    firstName
+                    lastName
+                    phoneNumber
                 }
-            }
-            user {
-                id
-                firstName
-                lastName
-                phoneNumber
-            }
-            driver {
-                id
-                firstName
-                lastName
+                driver {
+                    id
+                    firstName
+                    lastName
+                }
             }
         }
     }

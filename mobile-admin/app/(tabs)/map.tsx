@@ -1,19 +1,28 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useApolloClient, useQuery, useSubscription } from '@apollo/client/react';
+import { useApolloClient, useQuery, useSubscription, useMutation } from '@apollo/client/react';
 import { Ionicons } from '@expo/vector-icons';
 import Mapbox from '@rnmapbox/maps';
-import { GET_ORDERS, ALL_ORDERS_SUBSCRIPTION } from '@/graphql/orders';
+import {
+    GET_ORDERS,
+    ALL_ORDERS_SUBSCRIPTION,
+    ASSIGN_DRIVER_TO_ORDER,
+    UPDATE_ORDER_STATUS,
+    START_PREPARING,
+    APPROVE_ORDER,
+} from '@/graphql/orders';
 import { GET_DRIVERS, DRIVERS_UPDATED_SUBSCRIPTION } from '@/graphql/drivers';
 import { GJILAN_CENTER, GJILAN_BOUNDS, ORDER_STATUS_COLORS } from '@/utils/constants';
 import { getInitials } from '@/utils/helpers';
 import { calculateRouteDistance } from '@/utils/mapbox';
 import { useTheme } from '@/hooks/useTheme';
+import { BottomSheet } from '@/components/BottomSheet';
 
 const STATUS_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
     PENDING: 'time-outline',
+    AWAITING_APPROVAL: 'alert-circle-outline',
     PREPARING: 'restaurant-outline',
     READY: 'bag-check-outline',
     OUT_FOR_DELIVERY: 'bicycle-outline',
@@ -21,10 +30,13 @@ const STATUS_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
 
 const STATUS_LABELS: Record<string, string> = {
     PENDING: 'Pending',
+    AWAITING_APPROVAL: 'Awaiting Approval',
     PREPARING: 'Preparing',
     READY: 'Ready',
     OUT_FOR_DELIVERY: 'Delivering',
 };
+
+const QUICK_PREPARATION_MINUTES = 20;
 
 type RouteData = {
     distanceKm: number;
@@ -52,6 +64,7 @@ export default function MapScreen() {
 
     const [focusedOrderId, setFocusedOrderId] = useState<string | null>(null);
     const [trackingDriverId, setTrackingDriverId] = useState<string | null>(null);
+    const [assignSheetVisible, setAssignSheetVisible] = useState(false);
     const [orderRoutes, setOrderRoutes] = useState<Record<string, { toPickup?: RouteData; toDropoff?: RouteData; cacheKey: string }>>({});
 
     const { data: ordersData, loading: ordersLoading, refetch: refetchOrders }: any = useQuery(GET_ORDERS);
@@ -149,7 +162,7 @@ export default function MapScreen() {
     const drivers = driversData?.drivers || [];
 
     const activeOrders = useMemo(
-        () => orders.filter((o: any) => ['PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'].includes(o.status)),
+        () => orders.filter((o: any) => ['AWAITING_APPROVAL', 'PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'].includes(o.status)),
         [orders],
     );
 
@@ -164,6 +177,10 @@ export default function MapScreen() {
     );
 
     const focusedRoute = focusedOrder ? orderRoutes[focusedOrder.id] : null;
+    const [assignDriver] = useMutation(ASSIGN_DRIVER_TO_ORDER);
+    const [updateStatus] = useMutation(UPDATE_ORDER_STATUS);
+    const [startPreparing] = useMutation(START_PREPARING);
+    const [approveOrder] = useMutation(APPROVE_ORDER);
 
     useEffect(() => {
         const calcRoutes = async () => {
@@ -280,6 +297,76 @@ export default function MapScreen() {
     const dismissFocusedOrder = useCallback(() => {
         setFocusedOrderId(null);
     }, []);
+
+    const handleAssignDriver = useCallback(
+        async (driverId: string) => {
+            if (!focusedOrderId) return;
+            try {
+                await assignDriver({ variables: { id: focusedOrderId, driverId } });
+                setAssignSheetVisible(false);
+                await refetchOrders();
+            } catch (err: any) {
+                Alert.alert('Error', err?.message || 'Failed to assign driver');
+            }
+        },
+        [assignDriver, focusedOrderId, refetchOrders],
+    );
+
+    const handleNextStatus = useCallback(async () => {
+        if (!focusedOrder) return;
+
+        try {
+            if (focusedOrder.status === 'AWAITING_APPROVAL') {
+                await approveOrder({ variables: { id: focusedOrder.id } });
+                await refetchOrders();
+                return;
+            }
+
+            if (focusedOrder.status === 'PENDING') {
+                await startPreparing({
+                    variables: {
+                        id: focusedOrder.id,
+                        preparationMinutes: QUICK_PREPARATION_MINUTES,
+                    },
+                });
+                await refetchOrders();
+                return;
+            }
+
+            if (focusedOrder.status === 'PREPARING') {
+                await updateStatus({ variables: { id: focusedOrder.id, status: 'READY' } });
+                await refetchOrders();
+                return;
+            }
+
+            if (focusedOrder.status === 'READY') {
+                if (!focusedOrder.driver?.id) {
+                    Alert.alert('Driver required', 'Assign a driver before starting delivery.');
+                    return;
+                }
+                await updateStatus({ variables: { id: focusedOrder.id, status: 'OUT_FOR_DELIVERY' } });
+                await refetchOrders();
+                return;
+            }
+
+            if (focusedOrder.status === 'OUT_FOR_DELIVERY') {
+                await updateStatus({ variables: { id: focusedOrder.id, status: 'DELIVERED' } });
+                await refetchOrders();
+            }
+        } catch (err: any) {
+            Alert.alert('Error', err?.message || 'Failed to update order');
+        }
+    }, [approveOrder, focusedOrder, refetchOrders, startPreparing, updateStatus]);
+
+    const nextActionLabel = useMemo(() => {
+        if (!focusedOrder) return null;
+        if (focusedOrder.status === 'AWAITING_APPROVAL') return 'Approve';
+        if (focusedOrder.status === 'PENDING') return 'Start Preparing';
+        if (focusedOrder.status === 'PREPARING') return 'Mark Ready';
+        if (focusedOrder.status === 'READY') return 'Start Delivery';
+        if (focusedOrder.status === 'OUT_FOR_DELIVERY') return 'Mark Delivered';
+        return null;
+    }, [focusedOrder]);
 
     return (
         <View style={styles.container}>
@@ -515,6 +602,18 @@ export default function MapScreen() {
                                     </View>
                                 </View>
                             )}
+                            <View style={styles.focusedActionsRow}>
+                                <TouchableOpacity style={styles.focusedActionBtn} onPress={() => setAssignSheetVisible(true)}>
+                                    <Ionicons name="person-add-outline" size={14} color="#fff" />
+                                    <Text style={styles.focusedActionText}>{focusedOrder.driver ? 'Reassign' : 'Assign'}</Text>
+                                </TouchableOpacity>
+                                {nextActionLabel && (
+                                    <TouchableOpacity style={styles.focusedActionBtn} onPress={handleNextStatus}>
+                                        <Ionicons name="play-circle-outline" size={14} color="#fff" />
+                                        <Text style={styles.focusedActionText}>{nextActionLabel}</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
                         </View>
                         <Pressable
                             style={styles.focusedViewBtn}
@@ -533,6 +632,28 @@ export default function MapScreen() {
                     <ActivityIndicator size="large" color="#6366f1" />
                 </View>
             )}
+
+            <BottomSheet visible={assignSheetVisible} onClose={() => setAssignSheetVisible(false)} title="Assign Driver">
+                {onlineDrivers.length === 0 ? (
+                    <Text style={styles.assignEmptyText}>No drivers online</Text>
+                ) : (
+                    onlineDrivers.map((driver: any) => (
+                        <TouchableOpacity
+                            key={driver.id}
+                            style={styles.assignDriverRow}
+                            onPress={() => handleAssignDriver(driver.id)}>
+                            <View style={styles.assignDriverAvatar}>
+                                <Text style={styles.assignDriverAvatarText}>{getInitials(`${driver.firstName} ${driver.lastName}`)}</Text>
+                            </View>
+                            <View style={styles.assignDriverInfo}>
+                                <Text style={styles.assignDriverName}>{driver.firstName} {driver.lastName}</Text>
+                                <Text style={styles.assignDriverMeta}>{driver.phoneNumber || driver.email}</Text>
+                            </View>
+                            {focusedOrder?.driver?.id === driver.id && <Ionicons name="checkmark-circle" size={20} color="#22c55e" />}
+                        </TouchableOpacity>
+                    ))
+                )}
+            </BottomSheet>
         </View>
     );
 }
@@ -745,6 +866,25 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#fff',
     },
+    focusedActionsRow: {
+        marginTop: 8,
+        flexDirection: 'row',
+        gap: 8,
+    },
+    focusedActionBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        borderRadius: 999,
+        paddingVertical: 6,
+        paddingHorizontal: 10,
+    },
+    focusedActionText: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: '700',
+    },
     focusedViewBtn: {
         width: 44,
         height: 44,
@@ -758,5 +898,47 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: 'rgba(0,0,0,0.1)',
+    },
+    assignEmptyText: {
+        color: '#64748b',
+        textAlign: 'center',
+        paddingVertical: 24,
+        fontSize: 14,
+    },
+    assignDriverRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 12,
+        marginBottom: 8,
+        backgroundColor: '#0f172a12',
+    },
+    assignDriverAvatar: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#22c55e',
+    },
+    assignDriverAvatarText: {
+        color: '#fff',
+        fontWeight: '800',
+        fontSize: 11,
+    },
+    assignDriverInfo: {
+        flex: 1,
+        marginLeft: 10,
+    },
+    assignDriverName: {
+        color: '#0f172a',
+        fontWeight: '700',
+        fontSize: 14,
+    },
+    assignDriverMeta: {
+        color: '#64748b',
+        fontSize: 12,
+        marginTop: 1,
     },
 });

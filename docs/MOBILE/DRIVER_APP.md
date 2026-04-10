@@ -1,6 +1,6 @@
 # Mobile Driver App
 
-<!-- MDS:M8 | Domain: Mobile | Updated: 2026-04-09 -->
+<!-- MDS:M8 | Domain: Mobile | Updated: 2026-04-10 -->
 <!-- Depends-On: A1, B1, B4, B5, B7, BL1 -->
 <!-- Depended-By: M1, O4 -->
 <!-- Nav: Heartbeat changes → also update B4 (Watchdog). Auth changes → also update B5. Subscription shape changes → verify map.tsx and navigation.tsx cache update logic. -->
@@ -117,16 +117,17 @@ index.tsx
 - `useGlobalOrderAccept` and `drive.tsx` defer their initial `GET_ORDERS` work until auth hydration completes
 - On each app init, `useGlobalOrderAccept` and `drive.tsx` run their first `GET_ORDERS` request as `network-only`; once that baseline succeeds, the same query instances fall back to `cache-first`
 - `drive.tsx` no longer owns a second independent orders query; it consumes the shared order state exposed by `useGlobalOrderAccept`, so startup card visibility, pool state, and map annotations all derive from the same Apollo result
-- `useGlobalOrderAccept` resolves orders from three sources in priority order: active query result, latest subscription payload, then Apollo cache snapshot. This keeps map/order state available during cold-start network races.
+- `useGlobalOrderAccept` resolves orders from three sources in priority order: active query result, latest subscription payload, then Apollo cache snapshot. The cache snapshot fallback is only used after the first successful network response (`networkReady`) so stale persisted data from a killed-app session never leaks into the UI on cold start.
 - `networkReady` gates auto-present behavior (order accept sheet and startup assigned-order redirect) so stale cache cannot auto-surface actionable prompts before a fresh network baseline.
-- `drive.tsx` renders assigned-order cards from shared `assignedOrders` immediately and does not gate card visibility behind `networkReady`; map cards can rehydrate from cache/subscription while network baseline is still in-flight.
+- `drive.tsx` renders assigned-order cards from shared `assignedOrders` immediately and does not gate card visibility behind `networkReady`; map cards can rehydrate from cache/subscription while network baseline is still in-flight. (`visibleAssignedOrders` alias was removed — `assignedOrders` is used directly throughout.)
 - The drive loading overlay uses a bounded bootstrap state (`isOrdersBootstrapping`) tied to initial query loading and a 12s timeout guard, so the map never stays behind an infinite spinner when startup requests hang.
-- `orderAcceptStore` persists recently assigned order ids for a short TTL, so an order that was previously assigned to this driver does not immediately resurface as a fresh available-order prompt after an admin unassigns it while the app is closed
+- `orderAcceptStore` persists recently assigned order ids for a short TTL, so an order that was previously assigned to this driver does not immediately resurface as a fresh available-order prompt after an admin unassigns it while the app is closed. Expired TTL entries are pruned on store rehydration so AsyncStorage does not accumulate stale skip/seen maps across sessions.
 
 ### Token Refresh (`lib/graphql/authSession.ts`)
 
 - `getValidAccessToken(minValidityMs)` is called by the Apollo `authLink` on every HTTP request and by the background heartbeat before each fetch
 - Parses JWT `exp` claim from Base64 payload without a library
+- Driver access tokens are issued with a longer lifetime (24h) to avoid frequent mid-shift reauthentication; non-driver roles keep shorter access token TTLs
 - If token expires within 60 s, calls `refreshAccessToken()` using `refreshToken` mutation
 - Deduplication: a single `refreshInFlight` promise is shared so concurrent callers don't fire multiple refresh requests
 - On refresh `UNAUTHENTICATED`/401/403, auth is only cleared when the current access token is already expired; if the current token is still valid, it is retained and retried later to avoid false session drops during transient refresh failures
@@ -197,7 +198,7 @@ The `Query.order` field has a local-only read resolver that resolves individual 
 
 ### Error Handling
 
-The `errorLink` logs `UNAUTHENTICATED` errors and 401 network errors but does **not** force logout. This was a deliberate choice to avoid disrupting drivers mid-delivery due to temporary auth issues.
+The `errorLink` logs `UNAUTHENTICATED` errors and 401 network errors but does **not** force logout. This was a deliberate choice to avoid disrupting drivers mid-delivery due to temporary auth issues. The `logLink` only emits request name/variables in `__DEV__` builds; production builds skip it entirely to avoid log noise.
 
 The API-side Redis-backed rate limiters for `/graphql`, `/api/upload`, and `/api/directions` are configured to fail open if the limiter store is unavailable, so Redis saturation should not block driver requests with transport-level failures.
 
@@ -242,7 +243,7 @@ mutation DriverHeartbeat(
 - Active delivery (status `OUT_FOR_DELIVERY`): every **2 seconds**
 - Interval is re-evaluated on each tick by reading `navigationStore` state directly (avoids stale closures)
 
-**Retry strategy:** Exponential backoff with jitter on consecutive failures: 2 s → 4 s → 8 s → 16 s, capped at 30 s. Jitter is ±20% to prevent thundering herd. After 3 consecutive failures the heartbeat `connectionStatus` transitions to `STALE`. Backoff resets on next successful heartbeat.
+**Retry strategy:** Exponential backoff with jitter on consecutive failures: 2 s → 4 s → 8 s → 16 s, capped at 30 s. Jitter is ±20% to prevent thundering herd. After 3 consecutive failures the heartbeat `connectionStatus` transitions to `STALE`. Backoff resets on next successful heartbeat. Location-source selection and per-tick heartbeat confirmations only log in `__DEV__` builds.
 
 **Location source priority:**
 1. `navigationLocationStore` — live feed from `MapboxNavigationView` SDK (when navigating)
@@ -353,6 +354,9 @@ Auto-present trigger watches a stable available-order signature (order id/status
 Global order-accept and pool UI only render after the driver session is authenticated, so login-screen startup cannot surface accept modals or pool sheets from background order updates.
 
 Recently skipped orders and recently removed assignments are both suppressed through the same persisted order-accept store TTL, which prevents cold-start reopen flows from re-offering an order that the driver just lost.
+
+**Accept mutation flow:**
+Both `handleAcceptOrder` and `handleAcceptAndNavigate` delegates to a shared `executeAcceptMutation(orderId, onSuccess)` helper that encapsulates: driver-id guard, `tryLockAccept()` debounce, offline guard (checks both `isOnline` and `isNetworkConnected`), error clearing, `ASSIGN_DRIVER_TO_ORDER` mutation, refetch, and all conflict/capacity/availability error handling. The `onSuccess` callback differs per handler — `handleAcceptOrder` navigates to the drive tab; `handleAcceptAndNavigate` builds nav params and pushes to the navigation screen.
 
 **"Order taken" overlay (`takenByOther`):**
 - `orderAcceptStore` has a `takenByOther: boolean` field and `setTakenByOther(v)` action

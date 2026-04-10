@@ -1,6 +1,6 @@
 # Real-Time Subscriptions — mobile-customer Audit
 
-<!-- MDS:M10 | Domain: Mobile | Updated: 2026-04-09 -->
+<!-- MDS:M10 | Domain: Mobile | Updated: 2026-04-10 -->
 <!-- Depends-On: A1, B1, B4, M7, BL3 -->
 <!-- Depended-By: M1 -->
 <!-- Nav: Subscription topology, connection count, payload sizing, optimization assessment. Update when subscription definitions, Apollo WS config, or PubSub architecture change. -->
@@ -143,6 +143,15 @@ Current rule for startup safety:
 
 This keeps app launch resilient when mobile bundles and API deployments are temporarily out of sync.
 
+### F11 — ✅ RESOLVED: Active-order stale-banner race hardening
+
+`cache-and-network` order query hydration can briefly surface stale cached active orders immediately after a terminal status event. The client now applies defensive filtering at two layers:
+
+- `activeOrdersStore.setActiveOrders` filters terminal statuses (`DELIVERED`, `CANCELLED`) and ignores IDs marked as recently removed for a short cooldown window.
+- `OrdersFloatingBar` includes a terminal-status render guard and does not render if the lead order is terminal.
+
+Result: delivered/cancelled orders are not revived into the floating active-order banner during short cache/subscription timing races.
+
 ---
 
 ## 5. Stability Assessment
@@ -155,6 +164,7 @@ This keeps app launch resilient when mobile bundles and API deployments are temp
 | Auth on reconnect | ✅ Solid | Token refresh → force WS reconnect → `connectionParams` re-run |
 | Fallback recovery | ✅ Good | `useOrdersSubscription` has throttled fallback refetch on error/reconnect |
 | Topic scoping | ✅ Correct | Per-user topics prevent data leakage and reduce noise |
+| Active-order banner consistency | ✅ Hardened | Store and UI guards suppress terminal-order banner revival during cache races |
 | Skip logic | ✅ Good | Live tracking only active during delivery phase |
 | Server guards | ✅ Good | Rate limiting on subscription ops, role-based resolver auth |
 | Lazy connection | ✅ Correct | `lazy: true` — WS only connects when first subscription mounts |

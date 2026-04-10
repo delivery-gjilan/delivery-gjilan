@@ -8,6 +8,8 @@ import logger from '@/lib/logger';
 import { AppError } from '@/lib/errors';
 
 const log = logger.child({ service: 'AuthService' });
+const DEFAULT_ACCESS_TOKEN_TTL = '15m';
+const DRIVER_ACCESS_TOKEN_TTL = '24h';
 
 export class AuthService {
     constructor(public authRepository: AuthRepository) {}
@@ -229,13 +231,15 @@ export class AuthService {
     }
 
     /**
-     * Generate JWT access token with short expiration (15 minutes)
+     * Generate JWT access token.
+     * Drivers use a longer TTL to reduce disruptive re-auth while working shifts.
      */
     async generateJWT(userId: string): Promise<string> {
         const secret = this.getJwtSecret();
         const user = await this.authRepository.findById(userId);
         if (!user) throw AppError.notFound('User');
-        return jwt.sign({ userId, role: user.role, businessId: user.businessId }, secret, { algorithm: 'HS256', expiresIn: '15m' });
+        const expiresIn = user.role === 'DRIVER' ? DRIVER_ACCESS_TOKEN_TTL : DEFAULT_ACCESS_TOKEN_TTL;
+        return jwt.sign({ userId, role: user.role, businessId: user.businessId }, secret, { algorithm: 'HS256', expiresIn });
     }
 
     /**

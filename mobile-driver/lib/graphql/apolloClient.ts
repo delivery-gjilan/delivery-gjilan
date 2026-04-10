@@ -33,11 +33,12 @@ function getNextReconnectDelay(retries: number): number {
 }
 
 const logLink = new ApolloLink((operation, forward) => {
-    console.log('Request', {
-        name: operation.operationName,
-        vars: operation.variables,
-        query: operation.query?.loc?.source?.body,
-    });
+    if (__DEV__) {
+        console.log('Request', {
+            name: operation.operationName,
+            vars: operation.variables,
+        });
+    }
     return forward(operation);
 });
 

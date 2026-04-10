@@ -69,6 +69,7 @@ export const translationSchema = z.object({
         empty: z.string(),
         status: z.object({
             PENDING: z.string(),
+            AWAITING_APPROVAL: z.string(),
             PREPARING: z.string(),
             READY: z.string(),
             OUT_FOR_DELIVERY: z.string(),

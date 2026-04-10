@@ -6,12 +6,16 @@ export const GET_ORDERS = gql`
     query GetOrders {
         orders(limit: 200) {
             id
+            displayId
             orderPrice
             deliveryPrice
             totalPrice
             orderDate
             updatedAt
             status
+            needsApproval
+            locationFlagged
+            approvalReasons
             preparationMinutes
             estimatedReadyAt
             preparingAt
@@ -63,12 +67,16 @@ export const GET_ORDER = gql`
     query GetOrder($id: ID!) {
         order(id: $id) {
             id
+            displayId
             orderPrice
             deliveryPrice
             totalPrice
             orderDate
             updatedAt
             status
+            needsApproval
+            locationFlagged
+            approvalReasons
             preparationMinutes
             estimatedReadyAt
             preparingAt
@@ -172,6 +180,16 @@ export const ASSIGN_DRIVER_TO_ORDER = gql`
     }
 `;
 
+export const APPROVE_ORDER = gql`
+    mutation ApproveOrder($id: ID!) {
+        approveOrder(id: $id) {
+            id
+            status
+            needsApproval
+        }
+    }
+`;
+
 export const CREATE_TEST_ORDER = gql`
     mutation CreateTestOrder {
         createTestOrder {
@@ -188,12 +206,16 @@ export const ALL_ORDERS_SUBSCRIPTION = gql`
     subscription AllOrdersUpdated {
         allOrdersUpdated {
             id
+            displayId
             orderPrice
             deliveryPrice
             totalPrice
             orderDate
             updatedAt
             status
+            needsApproval
+            locationFlagged
+            approvalReasons
             preparationMinutes
             estimatedReadyAt
             preparingAt

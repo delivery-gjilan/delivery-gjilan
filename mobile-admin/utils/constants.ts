@@ -5,6 +5,7 @@ export const SUPPORTED_LANGUAGES = ['en', 'al'] as const;
 
 export const ORDER_STATUS_COLORS: Record<string, string> = {
     PENDING: '#f59e0b',
+    AWAITING_APPROVAL: '#f97316',
     PREPARING: '#6366f1',
     READY: '#22c55e',
     OUT_FOR_DELIVERY: '#3b82f6',

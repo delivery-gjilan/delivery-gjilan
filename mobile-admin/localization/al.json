@@ -67,6 +67,7 @@
         "empty": "Nuk u gjetën porosi",
         "status": {
             "PENDING": "Në pritje",
+            "AWAITING_APPROVAL": "Në pritje të aprovimit",
             "PREPARING": "Duke u përgatitur",
             "READY": "Gati",
             "OUT_FOR_DELIVERY": "Në dërgesë",

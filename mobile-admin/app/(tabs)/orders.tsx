@@ -1,18 +1,37 @@
 import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, FlatList, RefreshControl, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, RefreshControl, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useApolloClient, useQuery, useSubscription } from '@apollo/client/react';
+import { useApolloClient, useQuery, useSubscription, useMutation } from '@apollo/client/react';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { StatusBadge, FilterChip } from '@/components/StatusBadge';
 import { EmptyState } from '@/components/EmptyState';
-import { GET_ORDERS, ALL_ORDERS_SUBSCRIPTION } from '@/graphql/orders';
+import { BottomSheet } from '@/components/BottomSheet';
+import {
+    GET_ORDERS,
+    ALL_ORDERS_SUBSCRIPTION,
+    ASSIGN_DRIVER_TO_ORDER,
+    UPDATE_ORDER_STATUS,
+    START_PREPARING,
+    APPROVE_ORDER,
+} from '@/graphql/orders';
+import { GET_DRIVERS } from '@/graphql/drivers';
 import { ORDER_STATUS_COLORS } from '@/utils/constants';
 import { formatRelativeTime, formatCurrency } from '@/utils/helpers';
 
-type StatusTab = 'ALL' | 'PENDING' | 'PREPARING' | 'READY' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED';
+type StatusTab =
+    | 'ALL'
+    | 'AWAITING_APPROVAL'
+    | 'PENDING'
+    | 'PREPARING'
+    | 'READY'
+    | 'OUT_FOR_DELIVERY'
+    | 'DELIVERED'
+    | 'CANCELLED';
+
+const QUICK_PREPARATION_MINUTES = 20;
 
 export default function OrdersScreen() {
     const apolloClient = useApolloClient();
@@ -21,7 +40,9 @@ export default function OrdersScreen() {
     const router = useRouter();
 
     const [activeTab, setActiveTab] = useState<StatusTab>('ALL');
+    const [assignOrderId, setAssignOrderId] = useState<string | null>(null);
     const { data, loading, refetch }: any = useQuery(GET_ORDERS);
+    const { data: driversData }: any = useQuery(GET_DRIVERS);
     const refetchCooldownRef = useRef(0);
     const refetchInFlightRef = useRef(false);
     const refetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -90,6 +111,15 @@ export default function OrdersScreen() {
     });
 
     const orders = data?.orders || [];
+    const onlineDrivers = useMemo(
+        () => (driversData?.drivers || []).filter((driver: any) => driver.driverConnection?.connectionStatus === 'CONNECTED'),
+        [driversData],
+    );
+
+    const [assignDriver, { loading: assigningDriver }] = useMutation(ASSIGN_DRIVER_TO_ORDER);
+    const [updateStatus, { loading: updatingStatus }] = useMutation(UPDATE_ORDER_STATUS);
+    const [startPreparing, { loading: startingPrep }] = useMutation(START_PREPARING);
+    const [approveOrder, { loading: approvingOrder }] = useMutation(APPROVE_ORDER);
 
     const filteredOrders = useMemo(() => {
         if (activeTab === 'ALL') return orders;
@@ -103,6 +133,85 @@ export default function OrdersScreen() {
         });
         return counts;
     }, [orders]);
+
+    const selectedOrderForAssign = useMemo(
+        () => orders.find((order: any) => order.id === assignOrderId) || null,
+        [orders, assignOrderId],
+    );
+
+    const getQuickActionLabel = useCallback(
+        (order: any) => {
+            if (order.status === 'AWAITING_APPROVAL') return 'Approve';
+            if (order.status === 'PENDING') return t.orders.detail.startPreparing;
+            if (order.status === 'PREPARING') return t.orders.detail.markReady;
+            if (order.status === 'READY') return 'Start Delivery';
+            if (order.status === 'OUT_FOR_DELIVERY') return 'Mark Delivered';
+            return null;
+        },
+        [t],
+    );
+
+    const handleAssignDriver = useCallback(
+        async (driverId: string) => {
+            if (!assignOrderId) return;
+
+            try {
+                await assignDriver({ variables: { id: assignOrderId, driverId } });
+                setAssignOrderId(null);
+                await refetch();
+            } catch (err: any) {
+                Alert.alert('Error', err?.message || 'Failed to assign driver');
+            }
+        },
+        [assignDriver, assignOrderId, refetch],
+    );
+
+    const handleQuickProgress = useCallback(
+        async (order: any) => {
+            try {
+                if (order.status === 'AWAITING_APPROVAL') {
+                    await approveOrder({ variables: { id: order.id } });
+                    await refetch();
+                    return;
+                }
+
+                if (order.status === 'PENDING') {
+                    await startPreparing({
+                        variables: {
+                            id: order.id,
+                            preparationMinutes: QUICK_PREPARATION_MINUTES,
+                        },
+                    });
+                    await refetch();
+                    return;
+                }
+
+                if (order.status === 'PREPARING') {
+                    await updateStatus({ variables: { id: order.id, status: 'READY' } });
+                    await refetch();
+                    return;
+                }
+
+                if (order.status === 'READY') {
+                    if (!order.driver?.id) {
+                        Alert.alert('Driver required', 'Assign a driver before starting delivery.');
+                        return;
+                    }
+                    await updateStatus({ variables: { id: order.id, status: 'OUT_FOR_DELIVERY' } });
+                    await refetch();
+                    return;
+                }
+
+                if (order.status === 'OUT_FOR_DELIVERY') {
+                    await updateStatus({ variables: { id: order.id, status: 'DELIVERED' } });
+                    await refetch();
+                }
+            } catch (err: any) {
+                Alert.alert('Error', err?.message || 'Failed to update order');
+            }
+        },
+        [approveOrder, refetch, startPreparing, updateStatus],
+    );
 
     const renderOrderItem = useCallback(
         ({ item: order }: { item: any }) => (
@@ -120,11 +229,27 @@ export default function OrdersScreen() {
                 activeOpacity={0.7}>
                 {/* Header */}
                 <View className="flex-row items-center justify-between mb-3">
-                    <StatusBadge status={order.status} label={t.orders.status[order.status as keyof typeof t.orders.status]} />
+                    <View className="flex-row items-center">
+                        <StatusBadge status={order.status} label={t.orders.status[order.status as keyof typeof t.orders.status]} />
+                        {order.needsApproval && (
+                            <View className="ml-2 px-2 py-0.5 rounded-full" style={{ backgroundColor: '#f9731625' }}>
+                                <Text className="text-[10px] font-semibold" style={{ color: '#f97316' }}>
+                                    Approval
+                                </Text>
+                            </View>
+                        )}
+                        {order.locationFlagged && (
+                            <Ionicons name="warning" size={14} color="#f59e0b" style={{ marginLeft: 6 }} />
+                        )}
+                    </View>
                     <Text className="text-xs font-medium" style={{ color: theme.colors.subtext }}>
                         {formatRelativeTime(order.orderDate)}
                     </Text>
                 </View>
+
+                <Text className="text-xs mb-2" style={{ color: theme.colors.subtext }}>
+                    #{order.displayId || order.id.slice(-6)}
+                </Text>
 
                 {/* Business & Items */}
                 <View className="mb-3">
@@ -176,12 +301,31 @@ export default function OrdersScreen() {
                         </Text>
                     </View>
                 )}
+
+                {getQuickActionLabel(order) && (
+                    <View className="flex-row items-center mt-3 pt-3" style={{ borderTopWidth: 1, borderTopColor: theme.colors.border }}>
+                        <TouchableOpacity
+                            className="flex-1 rounded-xl py-2.5 items-center mr-2"
+                            style={{ backgroundColor: theme.colors.primary }}
+                            onPress={() => setAssignOrderId(order.id)}>
+                            <Text className="text-xs font-semibold text-white">
+                                {order.driver ? 'Reassign Driver' : 'Assign Driver'}
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            className="flex-1 rounded-xl py-2.5 items-center"
+                            style={{ backgroundColor: '#0f172a' }}
+                            onPress={() => handleQuickProgress(order)}>
+                            <Text className="text-xs font-semibold text-white">{getQuickActionLabel(order)}</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
             </TouchableOpacity>
         ),
-        [theme, t, router],
+        [theme, t, router, getQuickActionLabel, handleQuickProgress],
     );
 
-    const TABS: StatusTab[] = ['ALL', 'PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'];
+    const TABS: StatusTab[] = ['ALL', 'AWAITING_APPROVAL', 'PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'];
 
     return (
         <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }}>
@@ -220,6 +364,42 @@ export default function OrdersScreen() {
                     <EmptyState icon="receipt-outline" title={t.orders.empty} message="No orders match the selected filter" />
                 }
             />
+
+            <BottomSheet visible={Boolean(assignOrderId)} onClose={() => setAssignOrderId(null)} title="Assign Driver">
+                {!selectedOrderForAssign ? (
+                    <Text className="text-sm py-6 text-center" style={{ color: theme.colors.subtext }}>
+                        Order not found
+                    </Text>
+                ) : onlineDrivers.length === 0 ? (
+                    <Text className="text-sm py-6 text-center" style={{ color: theme.colors.subtext }}>
+                        No drivers online
+                    </Text>
+                ) : (
+                    onlineDrivers.map((driver: any) => (
+                        <TouchableOpacity
+                            key={driver.id}
+                            className="flex-row items-center p-3 rounded-xl mb-2"
+                            style={{ backgroundColor: theme.colors.card }}
+                            onPress={() => handleAssignDriver(driver.id)}>
+                            <View className="w-10 h-10 rounded-full bg-green-500 items-center justify-center mr-3">
+                                <Text className="text-white font-bold">
+                                    {driver.firstName?.[0]}
+                                    {driver.lastName?.[0]}
+                                </Text>
+                            </View>
+                            <View className="flex-1">
+                                <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>
+                                    {driver.firstName} {driver.lastName}
+                                </Text>
+                                <Text className="text-xs" style={{ color: theme.colors.subtext }}>
+                                    {driver.phoneNumber || driver.email}
+                                </Text>
+                            </View>
+                            {selectedOrderForAssign.driver?.id === driver.id && <Ionicons name="checkmark-circle" size={20} color="#22c55e" />}
+                        </TouchableOpacity>
+                    ))
+                )}
+            </BottomSheet>
         </SafeAreaView>
     );
 }

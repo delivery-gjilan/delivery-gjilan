@@ -6,6 +6,8 @@ import { DriverRepository } from '@/repositories/DriverRepository';
 import { DriverConnectionStatusType } from '@/database/schema/drivers';
 import { AppError } from '@/lib/errors';
 
+const DRIVER_ACCESS_TOKEN_TTL = '24h';
+
 export interface DriverAuthResult {
     token: string;
     refreshToken: string;
@@ -55,7 +57,7 @@ export class DriverAuthService {
         const token = jwt.sign(
             { userId, role, businessId },
             this.getJwtSecret(),
-            { expiresIn: '15m' }
+            { expiresIn: DRIVER_ACCESS_TOKEN_TTL }
         );
         const refreshToken = jwt.sign(
             { userId, type: 'refresh', jti: randomUUID() },

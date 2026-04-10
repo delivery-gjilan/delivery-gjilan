@@ -200,7 +200,10 @@ export const OrdersFloatingBar = () => {
 
     const pressInFlightRef = useRef(false);
 
-    if (!hasActiveOrders || activeOrders.length === 0 || !activeOrder) {
+    // Defensive: never render if the lead active order has a terminal status
+    // (e.g. stale cache data briefly slipping through before subscription cleans it up).
+    const isTerminalStatus = activeOrder?.status === 'DELIVERED' || activeOrder?.status === 'CANCELLED';
+    if (!hasActiveOrders || activeOrders.length === 0 || !activeOrder || isTerminalStatus) {
         return null;
     }
 
