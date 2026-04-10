@@ -111,6 +111,7 @@ export default function SignupScreen() {
     const {
         initiateSignup,
         submitPhoneNumber,
+        login,
         loading: authLoading,
     } = useAuth();
     // Subscribe directly so re-render is guaranteed when signupStep changes
@@ -131,6 +132,7 @@ export default function SignupScreen() {
     const [password, setPassword] = useState('');
 
     const [focusedField, setFocusedField] = useState<string | null>(null);
+    const credentialsRef = useRef<{ email: string; password: string } | null>(null);
 
     const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
     const fieldBorderColor = (field: string, isValid: boolean) => {
@@ -173,6 +175,7 @@ export default function SignupScreen() {
         setError(null);
         setLoading(true);
         try {
+            credentialsRef.current = { email: email.trim().toLowerCase(), password };
             await initiateSignup(email, password, firstName, lastName);
             // Persist the chosen language to the user's profile
             const apiLanguage = languageChoice === 'al' ? AppLanguage.Al : AppLanguage.En;
@@ -198,6 +201,11 @@ export default function SignupScreen() {
         setLoading(true);
         try {
             await submitPhoneNumber(phoneNumber);
+            // Auto-login to get a full session with refresh token
+            if (credentialsRef.current) {
+                await login(credentialsRef.current.email, credentialsRef.current.password);
+                credentialsRef.current = null;
+            }
             setTimeout(() => {
                 router.replace('/brand-splash');
             }, 500);

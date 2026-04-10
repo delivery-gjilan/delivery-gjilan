@@ -6,6 +6,9 @@ import { useActiveOrdersStore } from '../store/activeOrdersStore';
 import { useAuthStore } from '@/store/authStore';
 import { addWsReconnectListener } from '@/lib/graphql/apolloClient';
 
+// Must match the variables used by useOrders() so cache.updateQuery hits the correct entry.
+const GET_ORDERS_VARIABLES = { limit: 30, offset: 0 };
+
 /**
  * Single authoritative subscription for order updates.
  * Writes the latest orders into the Apollo cache (which updates all active
@@ -38,6 +41,7 @@ export function useOrdersSubscription() {
         if (!userId) return;
         const { data } = await client.query({
             query: GET_ORDERS,
+            variables: GET_ORDERS_VARIABLES,
             fetchPolicy: 'network-only',
         });
         const orders = (data as any)?.orders?.orders ?? [];
@@ -71,7 +75,7 @@ export function useOrdersSubscription() {
             return false;
         }
 
-        client.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
+        client.cache.updateQuery({ query: GET_ORDERS, variables: GET_ORDERS_VARIABLES }, (existing: any) => {
             const currentOrders = Array.isArray(existing?.orders?.orders) ? existing.orders.orders : [];
             const existingIndex = currentOrders.findIndex(
                 (order: any) => String(order?.id) === String(nextOrder.id),
@@ -114,7 +118,7 @@ export function useOrdersSubscription() {
             return false;
         }
 
-        client.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
+        client.cache.updateQuery({ query: GET_ORDERS, variables: GET_ORDERS_VARIABLES }, (existing: any) => {
             const currentOrders = Array.isArray(existing?.orders?.orders) ? existing.orders.orders : [];
             const byId = new Map(currentOrders.map((o: any) => [String(o?.id), o]));
             nextOrders.forEach((o: any) => {

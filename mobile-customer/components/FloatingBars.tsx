@@ -3,8 +3,8 @@ import { usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CartFloatingBar } from '@/modules/cart/components/CartFloatingBar';
 import { OrdersFloatingBar } from '@/modules/orders/components/OrdersFloatingBar';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
-import { useEffect } from 'react';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, cancelAnimation } from 'react-native-reanimated';
+import { useEffect, useRef } from 'react';
 
 export const FloatingBars = () => {
     const pathname = usePathname();
@@ -27,11 +27,21 @@ export const FloatingBars = () => {
         : isOnTabRoute ? 56 + insets.bottom : 20 + insets.bottom;
 
     // Animate opacity so the bars don't hard-snap during back-navigation transitions.
-    // Hide instantly (0ms) to avoid showing bars on entry to a hidden route,
-    // but fade in slowly (250ms) when returning so the bar doesn't flash mid-transition.
+    // Hide: cancel any running fade-in and set to 0 directly (avoids stale animation state).
+    // Show: fade in over 300ms so the bar doesn't flash mid-transition.
     const opacity = useSharedValue(shouldHide ? 0 : 1);
+    const prevShouldHideRef = useRef(shouldHide);
     useEffect(() => {
-        opacity.value = withTiming(shouldHide ? 0 : 1, { duration: shouldHide ? 0 : 250 });
+        // Skip the initial effect — useSharedValue already set the correct value.
+        if (prevShouldHideRef.current === shouldHide) return;
+        prevShouldHideRef.current = shouldHide;
+
+        cancelAnimation(opacity);
+        if (shouldHide) {
+            opacity.value = 0;
+        } else {
+            opacity.value = withTiming(1, { duration: 300 });
+        }
     }, [shouldHide]);
 
     const animatedStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));

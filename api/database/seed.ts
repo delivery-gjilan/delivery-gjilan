@@ -44,6 +44,258 @@ const RESTAURANTS_DATA = [
             },
         ],
     },
+    {
+        name: 'Napoli Pizza',
+        type: 'RESTAURANT' as const,
+        image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&q=80',
+        lat: 42.464812,
+        lng: 21.469118,
+        categories: [
+            {
+                name: 'Pizza',
+                products: [
+                    {
+                        name: 'Margherita Pizza',
+                        price: 4.5,
+                        image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&q=80',
+                        desc: 'Tomato sauce, mozzarella, and basil',
+                    },
+                    {
+                        name: 'Pepperoni Pizza',
+                        price: 5.5,
+                        image: 'https://images.unsplash.com/photo-1534308983496-4fabb1a015ee?w=800&q=80',
+                        desc: 'Classic pepperoni with mozzarella',
+                    },
+                    {
+                        name: 'Vegetarian Pizza',
+                        price: 5.0,
+                        image: 'https://images.unsplash.com/photo-1593560708920-61dd98c46a4e?w=800&q=80',
+                        desc: 'Bell peppers, mushrooms, olives, and onions',
+                    },
+                ],
+            },
+            {
+                name: 'Pasta',
+                products: [
+                    {
+                        name: 'Spaghetti Bolognese',
+                        price: 4.8,
+                        image: 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=800&q=80',
+                        desc: 'Spaghetti with rich meat sauce',
+                    },
+                    {
+                        name: 'Chicken Alfredo',
+                        price: 5.2,
+                        image: 'https://images.unsplash.com/photo-1645112411341-6c4fd023882c?w=800&q=80',
+                        desc: 'Creamy alfredo pasta with grilled chicken',
+                    },
+                ],
+            },
+            {
+                name: 'Salads',
+                products: [
+                    {
+                        name: 'Caesar Salad',
+                        price: 3.7,
+                        image: 'https://images.unsplash.com/photo-1546793665-c74683f339c1?w=800&q=80',
+                        desc: 'Crisp romaine, parmesan, croutons, and Caesar dressing',
+                    },
+                ],
+            },
+        ],
+    },
+    {
+        name: 'Balkan Grill House',
+        type: 'RESTAURANT' as const,
+        image: 'https://images.unsplash.com/photo-1558030006-450675393462?w=800&q=80',
+        lat: 42.460982,
+        lng: 21.471934,
+        categories: [
+            {
+                name: 'Grill Plates',
+                products: [
+                    {
+                        name: 'Mixed Grill Plate',
+                        price: 6.9,
+                        image: 'https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?w=800&q=80',
+                        desc: 'Cevapi, chicken skewers, sausage, and fries',
+                    },
+                    {
+                        name: 'Chicken Fillet Plate',
+                        price: 5.8,
+                        image: 'https://images.unsplash.com/photo-1532550907401-a500c9a57435?w=800&q=80',
+                        desc: 'Grilled chicken fillet with rice and salad',
+                    },
+                    {
+                        name: 'Cevapi Plate',
+                        price: 5.1,
+                        image: 'https://images.unsplash.com/photo-1525755662778-989d0524087e?w=800&q=80',
+                        desc: 'Traditional cevapi with flatbread and onions',
+                    },
+                ],
+            },
+            {
+                name: 'Sandwiches',
+                products: [
+                    {
+                        name: 'Chicken Club Sandwich',
+                        price: 4.2,
+                        image: 'https://images.unsplash.com/photo-1521390188846-e2a3a97453a0?w=800&q=80',
+                        desc: 'Toasted sandwich with chicken, cheese, and vegetables',
+                    },
+                    {
+                        name: 'Beef Burger',
+                        price: 4.6,
+                        image: 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=800&q=80',
+                        desc: 'Juicy beef burger with house sauce',
+                    },
+                ],
+            },
+            {
+                name: 'Sides',
+                products: [
+                    {
+                        name: 'Seasoned Fries',
+                        price: 2.0,
+                        image: 'https://images.unsplash.com/photo-1576107232684-1279f390859f?w=800&q=80',
+                        desc: 'Crispy seasoned fries',
+                    },
+                    {
+                        name: 'Shopska Salad',
+                        price: 2.8,
+                        image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&q=80',
+                        desc: 'Tomatoes, cucumbers, peppers, and white cheese',
+                    },
+                ],
+            },
+        ],
+    },
+    {
+        name: 'Golden Wok',
+        type: 'RESTAURANT' as const,
+        image: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?w=800&q=80',
+        lat: 42.468154,
+        lng: 21.466502,
+        categories: [
+            {
+                name: 'Noodles',
+                products: [
+                    {
+                        name: 'Chicken Chow Mein',
+                        price: 5.4,
+                        image: 'https://images.unsplash.com/photo-1617093727343-374698b1b08d?w=800&q=80',
+                        desc: 'Stir-fried noodles with chicken and vegetables',
+                    },
+                    {
+                        name: 'Beef Noodles',
+                        price: 5.9,
+                        image: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=800&q=80',
+                        desc: 'Savory beef noodles with soy garlic sauce',
+                    },
+                ],
+            },
+            {
+                name: 'Rice Bowls',
+                products: [
+                    {
+                        name: 'Sweet Chili Chicken Bowl',
+                        price: 5.3,
+                        image: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?w=800&q=80',
+                        desc: 'Steamed rice topped with sweet chili chicken',
+                    },
+                    {
+                        name: 'Vegetable Fried Rice',
+                        price: 4.4,
+                        image: 'https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=800&q=80',
+                        desc: 'Fried rice with mixed vegetables and eggs',
+                    },
+                ],
+            },
+            {
+                name: 'Starters',
+                products: [
+                    {
+                        name: 'Spring Rolls',
+                        price: 2.6,
+                        image: 'https://images.unsplash.com/photo-1607330289024-1535c6b4e1c1?w=800&q=80',
+                        desc: 'Crispy vegetable spring rolls',
+                    },
+                    {
+                        name: 'Chicken Dumplings',
+                        price: 3.1,
+                        image: 'https://images.unsplash.com/photo-1496116218417-1a781b1c416c?w=800&q=80',
+                        desc: 'Steamed dumplings served with soy dip',
+                    },
+                ],
+            },
+        ],
+    },
+    {
+        name: 'Sunrise Cafe',
+        type: 'RESTAURANT' as const,
+        image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80',
+        lat: 42.463318,
+        lng: 21.458741,
+        categories: [
+            {
+                name: 'Breakfast',
+                products: [
+                    {
+                        name: 'Avocado Toast',
+                        price: 3.9,
+                        image: 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=800&q=80',
+                        desc: 'Sourdough toast with avocado and feta',
+                    },
+                    {
+                        name: 'Omelette Plate',
+                        price: 4.1,
+                        image: 'https://images.unsplash.com/photo-1510693206972-df098062cb71?w=800&q=80',
+                        desc: 'Three-egg omelette with salad and bread',
+                    },
+                    {
+                        name: 'Pancake Stack',
+                        price: 3.8,
+                        image: 'https://images.unsplash.com/photo-1528207776546-365bb710ee93?w=800&q=80',
+                        desc: 'Fluffy pancakes with syrup and berries',
+                    },
+                ],
+            },
+            {
+                name: 'Sandwiches',
+                products: [
+                    {
+                        name: 'Turkey Sandwich',
+                        price: 4.0,
+                        image: 'https://images.unsplash.com/photo-1539252554453-80ab65ce3586?w=800&q=80',
+                        desc: 'Turkey, cheese, tomatoes, and greens',
+                    },
+                    {
+                        name: 'Tuna Melt',
+                        price: 4.2,
+                        image: 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?w=800&q=80',
+                        desc: 'Warm tuna sandwich with melted cheese',
+                    },
+                ],
+            },
+            {
+                name: 'Desserts',
+                products: [
+                    {
+                        name: 'Cheesecake Slice',
+                        price: 2.9,
+                        image: 'https://images.unsplash.com/photo-1533134242443-d4fd215305ad?w=800&q=80',
+                        desc: 'Creamy cheesecake with berry topping',
+                    },
+                    {
+                        name: 'Chocolate Brownie',
+                        price: 2.5,
+                        image: 'https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=800&q=80',
+                        desc: 'Rich chocolate brownie',
+                    },
+                ],
+            },
+        ],
+    },
 ];
 
 const MARKET_DATA = [
