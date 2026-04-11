@@ -22,6 +22,16 @@ import { ORDER_STATUS_COLORS } from '@/utils/constants';
 import { formatRelativeTime, formatCurrency } from '@/utils/helpers';
 
 const QUICK_PREPARATION_MINUTES = 20;
+const ACTIVE_ORDER_STATUSES = ['AWAITING_APPROVAL', 'PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'] as const;
+const ORDER_STATUS_OPTIONS = [
+    { value: 'AWAITING_APPROVAL', label: 'Awaiting Approval' },
+    { value: 'PENDING', label: 'Pending' },
+    { value: 'PREPARING', label: 'Preparing' },
+    { value: 'READY', label: 'Ready' },
+    { value: 'OUT_FOR_DELIVERY', label: 'Out for delivery' },
+    { value: 'DELIVERED', label: 'Delivered' },
+    { value: 'CANCELLED', label: 'Cancelled' },
+] as const;
 
 export default function OrdersScreen() {
     const apolloClient = useApolloClient();
@@ -30,8 +40,15 @@ export default function OrdersScreen() {
     const router = useRouter();
 
     const [assignOrderId, setAssignOrderId] = useState<string | null>(null);
-    const [showCompleted, setShowCompleted] = useState(false);
-    const { data, loading, refetch }: any = useQuery(GET_ORDERS);
+    const [statusOrderId, setStatusOrderId] = useState<string | null>(null);
+    const [showCompleted, setShowCompleted] = useState(true);
+    const orderQueryVariables = useMemo(() => ({ limit: 200, offset: 0 }), []);
+    const { data, loading, refetch }: any = useQuery(GET_ORDERS, {
+        variables: orderQueryVariables,
+        fetchPolicy: 'network-only',
+        nextFetchPolicy: 'cache-and-network',
+        notifyOnNetworkStatusChange: true,
+    });
     const { data: driversData }: any = useQuery(GET_DRIVERS);
     const refetchCooldownRef = useRef(0);
     const refetchInFlightRef = useRef(false);
@@ -77,30 +94,38 @@ export default function OrdersScreen() {
 
     useSubscription(ALL_ORDERS_SUBSCRIPTION, {
         onData: ({ data: subscriptionData }) => {
-            const incomingOrders = subscriptionData.data?.allOrdersUpdated as any[] | undefined;
+            const incomingOrders = (subscriptionData.data as any)?.allOrdersUpdated as any[] | undefined;
             if (!incomingOrders || incomingOrders.length === 0) {
                 scheduleRefetch();
                 return;
             }
 
-            apolloClient.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
-                const currentOrders = Array.isArray(existing?.orders) ? existing.orders : [];
+            apolloClient.cache.updateQuery({ query: GET_ORDERS, variables: orderQueryVariables }, (existing: any) => {
+                const currentConnection = existing?.orders;
+                const currentOrders = Array.isArray(currentConnection?.orders) ? currentConnection.orders : [];
                 const byId = new Map(currentOrders.map((order: any) => [String(order?.id), order]));
 
                 incomingOrders.forEach((order: any) => {
                     const existingOrder = byId.get(String(order?.id));
-                    byId.set(String(order?.id), { ...existingOrder, ...order });
+                    if (existingOrder && typeof existingOrder === 'object') {
+                        byId.set(String(order?.id), { ...existingOrder, ...order });
+                    } else {
+                        byId.set(String(order?.id), order);
+                    }
                 });
 
                 return {
                     ...(existing ?? {}),
-                    orders: Array.from(byId.values()),
+                    orders: {
+                        ...(currentConnection ?? {}),
+                        orders: Array.from(byId.values()),
+                    },
                 };
             });
         },
     });
 
-    const orders = data?.orders || [];
+    const orders = data?.orders?.orders || [];
     const onlineDrivers = useMemo(
         () => (driversData?.drivers || []).filter((driver: any) => driver.driverConnection?.connectionStatus === 'CONNECTED'),
         [driversData],
@@ -117,7 +142,7 @@ export default function OrdersScreen() {
     );
 
     const activeOrders = useMemo(
-        () => sortedOrders.filter((o: any) => ['AWAITING_APPROVAL', 'PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'].includes(o.status)),
+        () => sortedOrders.filter((o: any) => ACTIVE_ORDER_STATUSES.includes(o.status)),
         [sortedOrders],
     );
 
@@ -129,6 +154,11 @@ export default function OrdersScreen() {
     const selectedOrderForAssign = useMemo(
         () => orders.find((order: any) => order.id === assignOrderId) || null,
         [orders, assignOrderId],
+    );
+
+    const selectedOrderForStatus = useMemo(
+        () => orders.find((order: any) => order.id === statusOrderId) || null,
+        [orders, statusOrderId],
     );
 
     const parseApprovalReason = useCallback((reason: string) => {
@@ -211,6 +241,21 @@ export default function OrdersScreen() {
             }
         },
         [approveOrder, refetch, startPreparing, updateStatus],
+    );
+
+    const handleSelectStatus = useCallback(
+        async (status: string) => {
+            if (!statusOrderId) return;
+
+            try {
+                await updateStatus({ variables: { id: statusOrderId, status } });
+                setStatusOrderId(null);
+                await refetch();
+            } catch (err: any) {
+                Alert.alert('Error', err?.message || 'Failed to update status');
+            }
+        },
+        [refetch, statusOrderId, updateStatus],
     );
 
     const renderOrderCard = useCallback(
@@ -367,6 +412,19 @@ export default function OrdersScreen() {
                         </TouchableOpacity>
                     </View>
                 )}
+
+                {!completed && (
+                    <View className="mt-2">
+                        <TouchableOpacity
+                            className="rounded-xl py-2.5 items-center"
+                            style={{ backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border }}
+                            onPress={() => setStatusOrderId(order.id)}>
+                            <Text className="text-xs font-semibold" style={{ color: theme.colors.text }}>
+                                Change Status
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
             </TouchableOpacity>
             );
         },
@@ -452,6 +510,33 @@ export default function OrdersScreen() {
                             {selectedOrderForAssign.driver?.id === driver.id && <Ionicons name="checkmark-circle" size={20} color="#22c55e" />}
                         </TouchableOpacity>
                     ))
+                )}
+            </BottomSheet>
+
+            <BottomSheet visible={Boolean(statusOrderId)} onClose={() => setStatusOrderId(null)} title="Change Status">
+                {!selectedOrderForStatus ? (
+                    <Text className="text-sm py-6 text-center" style={{ color: theme.colors.subtext }}>
+                        Order not found
+                    </Text>
+                ) : (
+                    ORDER_STATUS_OPTIONS.map((option) => {
+                        const selected = selectedOrderForStatus.status === option.value;
+
+                        return (
+                            <TouchableOpacity
+                                key={option.value}
+                                className="flex-row items-center p-3 rounded-xl mb-2"
+                                style={{ backgroundColor: theme.colors.card }}
+                                onPress={() => handleSelectStatus(option.value)}>
+                                <View className="flex-1">
+                                    <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>
+                                        {option.label}
+                                    </Text>
+                                </View>
+                                {selected && <Ionicons name="checkmark-circle" size={20} color="#22c55e" />}
+                            </TouchableOpacity>
+                        );
+                    })
                 )}
             </BottomSheet>
         </SafeAreaView>

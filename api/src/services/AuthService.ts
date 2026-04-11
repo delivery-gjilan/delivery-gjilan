@@ -84,8 +84,25 @@ export class AuthService {
         // Generate JWT token for authenticated signup steps
         const token = await this.generateJWT(user.id);
 
+        // Generate refresh token so the short-lived access token can be refreshed
+        // without forcing the user back to the login screen mid-signup.
+        let refreshToken: string | undefined;
+        try {
+            const candidateRefreshToken = await this.generateRefreshToken(user.id);
+            const refreshTokenHash = this.hashRefreshToken(candidateRefreshToken);
+            await this.authRepository.createRefreshTokenSession(
+                user.id,
+                refreshTokenHash,
+                this.getRefreshTokenExpiryDate().toISOString(),
+            );
+            refreshToken = candidateRefreshToken;
+        } catch (err) {
+            log.warn({ userId: user.id }, 'auth:signup:refreshTokenGenerationFailed');
+        }
+
         return {
             token,
+            refreshToken,
             user: (verifiedUser ?? user) as any,
             message: 'Account created. Please add your phone number.',
         };
