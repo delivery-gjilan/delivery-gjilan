@@ -54,6 +54,19 @@ export const GET_BUSINESS_ORDERS = graphql(`
     }
 `);
 
+export const GET_BUSINESS_ORDER_REVIEWS = graphql(`
+    query GetBusinessOrderReviews($limit: Int, $offset: Int) {
+        businessOrderReviews(limit: $limit, offset: $offset) {
+            id
+            orderId
+            rating
+            comment
+            quickFeedback
+            createdAt
+        }
+    }
+`);
+
 // Order mutations
 export const UPDATE_ORDER_STATUS = graphql(`
     mutation UpdateOrderStatus($id: ID!, $status: OrderStatus!) {

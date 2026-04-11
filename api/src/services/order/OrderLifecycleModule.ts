@@ -6,7 +6,7 @@ import {
     orderPromotions as orderPromotionsTable,
     promotions as promotionsTable,
 } from '@/database/schema';
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Order, OrderStatus } from '@/generated/types.generated';
 import type { DbOrder } from '@/database/schema/orders';
 import { AppError } from '@/lib/errors';
@@ -122,6 +122,38 @@ export class OrderLifecycleModule {
         return this.mapping.mapToOrder(updated);
     }
 
+    private async syncProductOrderCountForDeliveredTransition(orderId: string, fromStatus: OrderStatus, toStatus: OrderStatus): Promise<void> {
+        const movedIntoDelivered = fromStatus !== 'DELIVERED' && toStatus === 'DELIVERED';
+        const movedOutOfDelivered = fromStatus === 'DELIVERED' && toStatus !== 'DELIVERED';
+        if (!movedIntoDelivered && !movedOutOfDelivered) {
+            return;
+        }
+
+        const delta = movedIntoDelivered ? 1 : -1;
+        const rows = await this.deps.db
+            .select({
+                productId: orderItemsTable.productId,
+                totalQty: sql<number>`COALESCE(SUM(${orderItemsTable.quantity}), 0)::int`.as('total_qty'),
+            })
+            .from(orderItemsTable)
+            .where(and(eq(orderItemsTable.orderId, orderId), isNull(orderItemsTable.parentOrderItemId)))
+            .groupBy(orderItemsTable.productId);
+
+        if (rows.length === 0) {
+            return;
+        }
+
+        for (const row of rows) {
+            const amount = Number(row.totalQty) * delta;
+            await this.deps.db
+                .update(productsTable)
+                .set({
+                    orderCount: sql<number>`GREATEST(${productsTable.orderCount} + ${amount}, 0)`,
+                })
+                .where(eq(productsTable.id, row.productId));
+        }
+    }
+
     async updateStatusWithSideEffects(id: string, status: OrderStatus, context: GraphQLContext): Promise<Order> {
         const { userData, db, notificationService, financialService } = context;
         log.info({ orderId: id, status }, 'order:updateStatusWithSideEffects');
@@ -196,6 +228,10 @@ export class OrderLifecycleModule {
             order = await this.updateOrderStatus(id, status, true);
         }
 
+        if (currentStatus !== status) {
+            await this.syncProductOrderCountForDeliveredTransition(id, currentStatus, status);
+        }
+
         // Side Effects
         if (status === 'DELIVERED' && currentStatus !== 'DELIVERED') {
             const items = await this.deps.db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, id));
@@ -214,6 +250,10 @@ export class OrderLifecycleModule {
             Number(dbOrder.actualPrice) + Number(dbOrder.deliveryPrice) + Number((dbOrder as any).prioritySurcharge ?? 0),
             dbOrder.orderDate || null,
         );
+
+        if (currentStatus !== status) {
+            await cache.invalidateProducts(dbOrder.businessId);
+        }
 
         await this.publishing.publishOrderById(id);
         await this.publishing.publishSingleUserOrder(dbOrder.userId, id);

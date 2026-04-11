@@ -706,7 +706,8 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     const driver = driverData?.order?.driver ?? (order as any)?.driver ?? null;
     const hasAssignedDriver = Boolean(driver?.id);
     const driverName = driver?.firstName ? `${driver.firstName} ${driver?.lastName || ''}`.trim() : null;
-    const driverPhone = driver?.phoneNumber || '+383 44 123 456';
+    const driverPhone = driver?.phoneNumber || null;
+    const cancellationPhone = process.env.EXPO_PUBLIC_ORDER_CANCELLATION_PHONE || '+383 45 205 045';
     const driverImageUrl = driver?.imageUrl || null;
     const queriedDriverLocation = driver?.driverLocation ?? null;
     const liveDriverRawLocation =
@@ -1243,6 +1244,12 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
         try { await Linking.openURL(`tel:${driverPhone}`); }
         catch { Alert.alert(t.orders.details.call_failed, t.orders.details.unable_open_dialer); }
     }, [driverPhone, t.orders.details.call_failed, t.orders.details.unable_open_dialer]);
+
+    const handleCallForCancellation = useCallback(async () => {
+        if (!cancellationPhone) return;
+        try { await Linking.openURL(`tel:${cancellationPhone}`); }
+        catch { Alert.alert(t.orders.details.call_failed, t.orders.details.unable_open_dialer); }
+    }, [cancellationPhone, t.orders.details.call_failed, t.orders.details.unable_open_dialer]);
 
     const markerScale = useMemo(() => {
         const normalized = clamp((mapZoomLevel - 13) / 4, 0, 1);
@@ -2148,6 +2155,31 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                     <IconStepper status={customerVisibleStatus} color={config.color} theme={theme} t={t} businessType={primaryBusinessType} />
                                 </View>
                             )}
+                        </View>
+
+                        {/* ── Cancellation Notice (phone-only) ──────────────────── */}
+                        <View style={{
+                            backgroundColor: '#F59E0B14',
+                            borderRadius: 16,
+                            padding: 14,
+                            marginBottom: 12,
+                            borderWidth: 1,
+                            borderColor: '#F59E0B33',
+                        }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                                <Ionicons name="information-circle" size={18} color="#B45309" style={{ marginTop: 1, marginRight: 8 }} />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ color: theme.colors.text, fontSize: 13, fontWeight: '700', marginBottom: 6 }}>
+                                        {t.orders.details.cancel_order_phone_only}
+                                    </Text>
+                                    <TouchableOpacity onPress={handleCallForCancellation} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <Ionicons name="call" size={14} color="#B45309" />
+                                        <Text style={{ color: '#B45309', fontSize: 13, fontWeight: '800', marginLeft: 6 }}>
+                                            {cancellationPhone}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
                         </View>
 
                         {/* ── Driver Card ──────────────────── */}

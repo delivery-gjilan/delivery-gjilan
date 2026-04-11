@@ -142,6 +142,27 @@ Upload calls in the admin panel use `process.env.NEXT_PUBLIC_API_URL` as the bas
 
 ---
 
+## Pricing And Tier Visibility
+
+The upload implementation uses standard AWS S3 APIs and does not contain account-tier metadata. Free-tier eligibility is determined at the AWS account level, not in application code.
+
+Use AWS Billing and Cost Management to determine current S3 tier and limits for the active account:
+
+1. Billing and Cost Management → Free Tier.
+2. Check S3 free-tier usage and month-to-date consumption.
+3. Billing and Cost Management → Bills or Cost Explorer to see charged S3 dimensions (storage GB-month, requests, data transfer out).
+4. Confirm the same AWS account as the `AWS_ACCESS_KEY_ID` configured for this API environment.
+
+App-level limits in this repository:
+
+- Upload file size limit: 5 MB per file (Multer `limits.fileSize`).
+- Allowed image MIME types: JPEG, JPG, PNG, WebP.
+- Upload paths are restricted to `businesses`, `products`, and `categories`.
+
+Operationally, S3 spend is driven by object count, object size, request volume (`PutObject`, `DeleteObject`, reads from public URLs), and outbound data transfer.
+
+---
+
 ## Known Gaps / Security Notes
 
 - **No role check on upload** — any authenticated user (including customers) can upload to any folder (`businesses/`, `products/`, `categories/`). Role enforcement should be added to `requireAuth` or a separate middleware. _(Tracked in O6)_

@@ -265,6 +265,67 @@ export const CartScreen = () => {
     const selectedEligiblePromotion = eligiblePromotions[0] ?? null;
     const hasEligiblePromotion = !!selectedEligiblePromotion;
 
+    const getPromotionDisplayName = useCallback(
+        (promotion?: { name?: string | null; type?: string | null; target?: string | null; code?: string | null } | null) => {
+            if (!promotion) return '';
+
+            const normalizeLabel = (value?: string | null) => {
+                if (!value) return '';
+
+                const cleaned = value
+                    .replace(/^(\s*\[[^\]]+\]\s*)+/, '')
+                    .replace(/^\s*(recovery|compensation)\s*[:\-]?\s*/i, '')
+                    .replace(/[\-_]+/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+
+                if (!cleaned) return '';
+
+                const isTechnicalToken = /^[A-Z0-9\-\s]+$/.test(cleaned) || /\d{2,}/.test(cleaned);
+                if (!isTechnicalToken) return cleaned;
+
+                return cleaned
+                    .toLowerCase()
+                    .split(' ')
+                    .filter(Boolean)
+                    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+                    .join(' ');
+            };
+
+            const type = promotion.type ?? '';
+            const typeLabel =
+                type === 'FREE_DELIVERY' || type === 'SPEND_X_GET_FREE'
+                    ? t.cart.free_delivery
+                    : type === 'PERCENTAGE' || type === 'SPEND_X_PERCENT'
+                      ? t.cart.promo_type_percentage
+                      : type === 'FIXED_AMOUNT' || type === 'SPEND_X_FIXED'
+                        ? t.cart.promo_type_fixed
+                        : t.cart.promo_type_generic;
+
+            const rawName = promotion.name ?? '';
+            const normalizedName = normalizeLabel(rawName);
+            const normalizedCode = normalizeLabel(promotion.code);
+            const isRecoveryPromo = /^\s*\[?\s*(recovery|compensation)\s*\]?/i.test(rawName);
+
+            if (isRecoveryPromo) {
+                if (type === 'FREE_DELIVERY' || type === 'SPEND_X_GET_FREE') {
+                    return t.cart.compensation_promo_free_delivery;
+                }
+                if (type === 'PERCENTAGE' || type === 'SPEND_X_PERCENT') {
+                    return t.cart.compensation_promo_percentage;
+                }
+                if (type === 'FIXED_AMOUNT' || type === 'SPEND_X_FIXED') {
+                    return t.cart.compensation_promo_fixed;
+                }
+
+                return t.cart.compensation_promo_generic;
+            }
+
+            return normalizedName || normalizedCode || typeLabel;
+        },
+        [t],
+    );
+
     // Celebration overlay state
     const [showCelebration, setShowCelebration] = useState(false);
     const [celebrationMessage, setCelebrationMessage] = useState('');
@@ -337,10 +398,11 @@ export const CartScreen = () => {
                     totalPrice: Number(result.finalTotal ?? ctx.subtotal + ctx.deliveryPrice),
                     source: 'eligible',
                 });
+                const promoDisplayName = getPromotionDisplayName(selectedEligiblePromotion);
                 showNotifier(
                     t.cart.promotion_applied_notifier.replace(
                         '{{name}}',
-                        selectedEligiblePromotion.name ? `: ${selectedEligiblePromotion.name}` : '',
+                        promoDisplayName ? `: ${promoDisplayName}` : '',
                     ),
                     'success',
                 );
@@ -356,7 +418,7 @@ export const CartScreen = () => {
         return () => {
             mounted = false;
         };
-    }, [selectedEligiblePromotion, promoResult?.promotionId, promoResult?.source, t]);
+    }, [getPromotionDisplayName, selectedEligiblePromotion, promoResult?.promotionId, promoResult?.source, t]);
 
     // Get saved addresses sorted by priority (default first)
     const savedAddresses = useMemo(() => {

@@ -228,6 +228,8 @@ export type Business = {
   name: Scalars['String']['output'];
   phoneNumber?: Maybe<Scalars['String']['output']>;
   prepTimeOverrideMinutes?: Maybe<Scalars['Int']['output']>;
+  ratingAverage: Scalars['Float']['output'];
+  ratingCount: Scalars['Int']['output'];
   schedule: Array<BusinessDayHours>;
   temporaryClosureReason?: Maybe<Scalars['String']['output']>;
   updatedAt: Scalars['Date']['output'];
@@ -350,6 +352,7 @@ export type BusinessPerformanceStat = {
 
 export type BusinessPromotion = {
   __typename?: 'BusinessPromotion';
+  creatorType: PromotionCreatorType;
   description?: Maybe<Scalars['String']['output']>;
   discountValue?: Maybe<Scalars['Float']['output']>;
   id: Scalars['ID']['output'];
@@ -1075,6 +1078,7 @@ export type Mutation = {
   /** Settle unsettled settlements for a driver. Supports partial payment. */
   settleWithDriver: SettleResult;
   startPreparing: Order;
+  submitOrderReview: OrderReview;
   submitPhoneNumber: SignupStepResponse;
   trackPushTelemetry: Scalars['Boolean']['output'];
   unregisterDeviceToken: Scalars['Boolean']['output'];
@@ -1618,6 +1622,14 @@ export type MutationstartPreparingArgs = {
 };
 
 
+export type MutationsubmitOrderReviewArgs = {
+  comment?: InputMaybe<Scalars['String']['input']>;
+  orderId: Scalars['ID']['input'];
+  quickFeedback?: InputMaybe<Array<Scalars['String']['input']>>;
+  rating: Scalars['Int']['input'];
+};
+
+
 export type MutationsubmitPhoneNumberArgs = {
   input: SubmitPhoneNumberInput;
 };
@@ -1891,6 +1903,7 @@ export type Order = {
   preparingAt?: Maybe<Scalars['Date']['output']>;
   prioritySurcharge: Scalars['Float']['output'];
   readyAt?: Maybe<Scalars['Date']['output']>;
+  review?: Maybe<OrderReview>;
   settlementPreview?: Maybe<OrderSettlementPreview>;
   status: OrderStatus;
   totalPrice: Scalars['Float']['output'];
@@ -1958,6 +1971,19 @@ export type OrderPromotion = {
   id: Scalars['ID']['output'];
   promoCode?: Maybe<Scalars['String']['output']>;
   promotionId: Scalars['ID']['output'];
+};
+
+export type OrderReview = {
+  __typename?: 'OrderReview';
+  businessId: Scalars['ID']['output'];
+  comment?: Maybe<Scalars['String']['output']>;
+  createdAt: Scalars['DateTime']['output'];
+  id: Scalars['ID']['output'];
+  orderId: Scalars['ID']['output'];
+  quickFeedback: Array<Scalars['String']['output']>;
+  rating: Scalars['Int']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+  userId: Scalars['ID']['output'];
 };
 
 export type OrderSettlementLineItem = {
@@ -2042,6 +2068,7 @@ export type ProductCard = {
   imageUrl?: Maybe<Scalars['String']['output']>;
   isOffer: Scalars['Boolean']['output'];
   name: Scalars['String']['output'];
+  orderCount: Scalars['Int']['output'];
   product?: Maybe<Product>;
   variants: Array<Product>;
 };
@@ -2231,6 +2258,7 @@ export type Query = {
   businessMessageThreads: Array<BusinessMessageThread>;
   /** Admin: full conversation with a specific business user */
   businessMessages: Array<BusinessMessage>;
+  businessOrderReviews: Array<OrderReview>;
   businessPerformanceStats: Array<BusinessPerformanceStat>;
   businesses: Array<Business>;
   calculateDeliveryPrice: DeliveryPriceResult;
@@ -2354,6 +2382,12 @@ export type QuerybusinessKPIsArgs = {
 
 export type QuerybusinessMessagesArgs = {
   businessUserId: Scalars['ID']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
+export type QuerybusinessOrderReviewsArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
 };
@@ -3153,6 +3187,7 @@ export type UpdateProductSubcategoryInput = {
 
 export type UpdatePromotionInput = {
   code?: InputMaybe<Scalars['String']['input']>;
+  description?: InputMaybe<Scalars['String']['input']>;
   id: Scalars['ID']['input'];
   name?: InputMaybe<Scalars['String']['input']>;
 };
@@ -3419,7 +3454,7 @@ export type ResolversTypes = {
   BusinessMessageThread: ResolverTypeWrapper<Omit<BusinessMessageThread, 'lastMessage'> & { lastMessage?: Maybe<ResolversTypes['BusinessMessage']> }>;
   BusinessMessageUser: ResolverTypeWrapper<BusinessMessageUser>;
   BusinessPerformanceStat: ResolverTypeWrapper<BusinessPerformanceStat>;
-  BusinessPromotion: ResolverTypeWrapper<Omit<BusinessPromotion, 'type'> & { type: ResolversTypes['PromotionType'] }>;
+  BusinessPromotion: ResolverTypeWrapper<Omit<BusinessPromotion, 'creatorType' | 'type'> & { creatorType: ResolversTypes['PromotionCreatorType'], type: ResolversTypes['PromotionType'] }>;
   BusinessType: ResolverTypeWrapper<'MARKET' | 'PHARMACY' | 'RESTAURANT'>;
   CampaignStatus: ResolverTypeWrapper<'DRAFT' | 'SENDING' | 'SENT' | 'FAILED'>;
   CartContextInput: CartContextInput;
@@ -3499,6 +3534,7 @@ export type ResolversTypes = {
   OrderItemOption: ResolverTypeWrapper<OrderItemOption>;
   OrderPaymentCollection: ResolverTypeWrapper<'CASH_TO_DRIVER' | 'PREPAID_TO_PLATFORM'>;
   OrderPromotion: ResolverTypeWrapper<Omit<OrderPromotion, 'appliesTo'> & { appliesTo: ResolversTypes['PromotionAppliesTo'] }>;
+  OrderReview: ResolverTypeWrapper<OrderReview>;
   OrderSettlementLineItem: ResolverTypeWrapper<OrderSettlementLineItem>;
   OrderSettlementPreview: ResolverTypeWrapper<OrderSettlementPreview>;
   OrderStatus: ResolverTypeWrapper<'PENDING' | 'PREPARING' | 'READY' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED' | 'AWAITING_APPROVAL'>;
@@ -3683,6 +3719,7 @@ export type ResolversParentTypes = {
   OrderItem: OrderItem;
   OrderItemOption: OrderItemOption;
   OrderPromotion: OrderPromotion;
+  OrderReview: OrderReview;
   OrderSettlementLineItem: OrderSettlementLineItem;
   OrderSettlementPreview: OrderSettlementPreview;
   PeakHourAnalysis: PeakHourAnalysis;
@@ -3881,6 +3918,8 @@ export type BusinessResolvers<ContextType = GraphQLContext, ParentType extends R
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   phoneNumber?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   prepTimeOverrideMinutes?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
+  ratingAverage?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  ratingCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   schedule?: Resolver<Array<ResolversTypes['BusinessDayHours']>, ParentType, ContextType>;
   temporaryClosureReason?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   updatedAt?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
@@ -3979,6 +4018,7 @@ export type BusinessPerformanceStatResolvers<ContextType = GraphQLContext, Paren
 };
 
 export type BusinessPromotionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['BusinessPromotion'] = ResolversParentTypes['BusinessPromotion']> = {
+  creatorType?: Resolver<ResolversTypes['PromotionCreatorType'], ParentType, ContextType>;
   description?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   discountValue?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
@@ -4334,6 +4374,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   settleWithBusiness?: Resolver<ResolversTypes['SettleResult'], ParentType, ContextType, RequireFields<MutationsettleWithBusinessArgs, 'amount' | 'businessId'>>;
   settleWithDriver?: Resolver<ResolversTypes['SettleResult'], ParentType, ContextType, RequireFields<MutationsettleWithDriverArgs, 'driverId'>>;
   startPreparing?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationstartPreparingArgs, 'id' | 'preparationMinutes'>>;
+  submitOrderReview?: Resolver<ResolversTypes['OrderReview'], ParentType, ContextType, RequireFields<MutationsubmitOrderReviewArgs, 'orderId' | 'rating'>>;
   submitPhoneNumber?: Resolver<ResolversTypes['SignupStepResponse'], ParentType, ContextType, RequireFields<MutationsubmitPhoneNumberArgs, 'input'>>;
   trackPushTelemetry?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationtrackPushTelemetryArgs, 'input'>>;
   unregisterDeviceToken?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationunregisterDeviceTokenArgs, 'token'>>;
@@ -4471,6 +4512,7 @@ export type OrderResolvers<ContextType = GraphQLContext, ParentType extends Reso
   preparingAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
   prioritySurcharge?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   readyAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
+  review?: Resolver<Maybe<ResolversTypes['OrderReview']>, ParentType, ContextType>;
   settlementPreview?: Resolver<Maybe<ResolversTypes['OrderSettlementPreview']>, ParentType, ContextType>;
   status?: Resolver<ResolversTypes['OrderStatus'], ParentType, ContextType>;
   totalPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
@@ -4536,6 +4578,19 @@ export type OrderPromotionResolvers<ContextType = GraphQLContext, ParentType ext
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   promoCode?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   promotionId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type OrderReviewResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['OrderReview'] = ResolversParentTypes['OrderReview']> = {
+  businessId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  comment?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  createdAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  orderId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  quickFeedback?: Resolver<Array<ResolversTypes['String']>, ParentType, ContextType>;
+  rating?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  updatedAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
+  userId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -4608,6 +4663,7 @@ export type ProductCardResolvers<ContextType = GraphQLContext, ParentType extend
   imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   isOffer?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  orderCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   product?: Resolver<Maybe<ResolversTypes['Product']>, ParentType, ContextType>;
   variants?: Resolver<Array<ResolversTypes['Product']>, ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
@@ -4765,6 +4821,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   businessKPIs?: Resolver<Array<ResolversTypes['BusinessKPI']>, ParentType, ContextType, RequireFields<QuerybusinessKPIsArgs, 'endDate' | 'startDate'>>;
   businessMessageThreads?: Resolver<Array<ResolversTypes['BusinessMessageThread']>, ParentType, ContextType>;
   businessMessages?: Resolver<Array<ResolversTypes['BusinessMessage']>, ParentType, ContextType, RequireFields<QuerybusinessMessagesArgs, 'businessUserId'>>;
+  businessOrderReviews?: Resolver<Array<ResolversTypes['OrderReview']>, ParentType, ContextType, Partial<QuerybusinessOrderReviewsArgs>>;
   businessPerformanceStats?: Resolver<Array<ResolversTypes['BusinessPerformanceStat']>, ParentType, ContextType, Partial<QuerybusinessPerformanceStatsArgs>>;
   businesses?: Resolver<Array<ResolversTypes['Business']>, ParentType, ContextType>;
   calculateDeliveryPrice?: Resolver<ResolversTypes['DeliveryPriceResult'], ParentType, ContextType, RequireFields<QuerycalculateDeliveryPriceArgs, 'businessId' | 'dropoffLat' | 'dropoffLng'>>;
@@ -5216,6 +5273,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   OrderItemOption?: OrderItemOptionResolvers<ContextType>;
   OrderPaymentCollection?: OrderPaymentCollectionResolvers;
   OrderPromotion?: OrderPromotionResolvers<ContextType>;
+  OrderReview?: OrderReviewResolvers<ContextType>;
   OrderSettlementLineItem?: OrderSettlementLineItemResolvers<ContextType>;
   OrderSettlementPreview?: OrderSettlementPreviewResolvers<ContextType>;
   OrderStatus?: OrderStatusResolvers;

@@ -307,10 +307,15 @@ export class PromotionService {
     }
 
     async updatePromotion(input: UpdatePromotionInput): Promise<DbPromotion> {
-        // Editing promotions is intentionally limited for now (name + code only)
+        // Editing supports name, description, and code
         const updates: any = {};
 
         if (input.name !== undefined) updates.name = input.name;
+
+        if ((input as any).description !== undefined) {
+            const description = String((input as any).description ?? '').trim();
+            updates.description = description.length > 0 ? description : null;
+        }
 
         if (input.code !== undefined) {
             const normalized = input.code.trim() ? input.code.trim().toUpperCase() : null;

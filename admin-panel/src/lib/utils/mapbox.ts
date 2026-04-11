@@ -1,12 +1,12 @@
-// MAPBOX_TOKEN is no longer exposed to the browser.
-// All directions calls go through /api/directions (Next.js server route)
-// which reads MAPBOX_TOKEN from the server-side environment.
+// MAPBOX_TOKEN is never exposed to the browser.
+// All directions calls go through the shared backend /api/directions route.
 
 // Must be >= ROUTE_RECALC_MIN_MS (60 s) in useOrderRouteDistances so the cache
 // is always alive for the full recalc-gate window. 65 s gives a small buffer.
 const ROUTE_CACHE_TTL_MS = 65000;
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql';
+const API_BASE = API_URL.replace(/\/graphql$/, '');
 
 function parseJwtExpiryMs(token: string): number | null {
     try {
@@ -110,7 +110,7 @@ export function getDirectionsTelemetry() {
 
 /**
  * Calculate route distance between two coordinates.
- * Proxied through the local Next.js API route (/api/directions) so the
+ * Proxied through the shared backend API route (/api/directions) so the
  * Mapbox token never leaves the server.
  */
 export async function calculateRouteDistance(
@@ -141,7 +141,7 @@ export async function calculateRouteDistance(
             }
 
             const points = `${from.longitude},${from.latitude};${to.longitude},${to.latitude}`;
-            const url = `/api/directions?points=${encodeURIComponent(points)}`;
+            const url = `${API_BASE}/api/directions?points=${encodeURIComponent(points)}`;
             recordNetworkCall();
 
             const response = await fetch(url, {

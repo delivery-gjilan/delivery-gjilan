@@ -205,3 +205,19 @@ export const CANCEL_ORDER = gql`
         }
     }
 `;
+
+export const SUBMIT_ORDER_REVIEW = gql`
+    mutation SubmitOrderReview($orderId: ID!, $rating: Int!, $comment: String, $quickFeedback: [String!]) {
+        submitOrderReview(orderId: $orderId, rating: $rating, comment: $comment, quickFeedback: $quickFeedback) {
+            id
+            orderId
+            businessId
+            userId
+            rating
+            comment
+            quickFeedback
+            createdAt
+            updatedAt
+        }
+    }
+`;

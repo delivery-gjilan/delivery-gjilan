@@ -8,6 +8,8 @@ export const GET_FEATURED_BUSINESSES = gql`
             imageUrl
             description
             isOpen
+            ratingAverage
+            ratingCount
             avgPrepTimeMinutes
             prepTimeOverrideMinutes
             location {

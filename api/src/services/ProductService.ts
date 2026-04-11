@@ -7,7 +7,6 @@ import { DbProduct } from '@/database/schema/products';
 import type { DbType } from '@/database';
 import { businesses } from '@/database/schema/businesses';
 import { productVariantGroups } from '@/database/schema/productVariantGroups';
-import { products as productsTable } from '@/database/schema/products';
 import { and, eq, isNull, inArray } from 'drizzle-orm';
 import logger from '@/lib/logger';
 import { AppError } from '@/lib/errors';
@@ -27,6 +26,10 @@ export class ProductService {
             this.optionGroupRepository = new OptionGroupRepository(db);
             this.optionRepository = new OptionRepository(db);
         }
+    }
+
+    private getProductOrderCount(product: Product): number {
+        return Number((product as Product & { orderCount?: number }).orderCount ?? 0);
     }
 
     private mapToProduct(product: DbProduct): Product {
@@ -166,6 +169,7 @@ export class ProductService {
             const representative = variants[0];
             if (!representative) continue;
             const basePrice = Math.min(...variants.map((v) => v.price));
+            const groupOrderCount = variants.reduce((sum, v) => sum + this.getProductOrderCount(v), 0);
             cards.push({
                 id: groupId,
                 // Prefer canonical variant group name; fallback to representative product name.
@@ -174,6 +178,7 @@ export class ProductService {
                 basePrice,
                 isOffer: representative.isOffer,
                 hasOptionGroups: variants.some((v) => productsWithOptionGroups.has(v.id as string)),
+                orderCount: groupOrderCount,
                 variants,
                 product: undefined,
             });
@@ -188,6 +193,7 @@ export class ProductService {
                 basePrice: product.price, // Product.price maps from DB basePrice
                 isOffer: product.isOffer,
                 hasOptionGroups: productsWithOptionGroups.has(product.id as string),
+                orderCount: this.getProductOrderCount(product),
                 variants: [],
                 product,
             });

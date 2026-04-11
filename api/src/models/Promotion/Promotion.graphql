@@ -178,6 +178,7 @@ input CreatePromotionInput {
 input UpdatePromotionInput {
   id: ID!
   name: String
+  description: String
   code: String
 }
 

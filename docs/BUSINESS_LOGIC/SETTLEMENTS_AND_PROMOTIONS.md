@@ -243,6 +243,15 @@ Links orders to applied promotions:
 | `promotion_business_eligibility` | Restricts a promo to specific businesses |
 | `user_promo_metadata` | Per-user stats: first order promo used, total savings |
 
+### Recovery promo labels on customer UI
+
+Recovery/compensation promotions can use internal names for operations (for example names prefixed with `[Recovery]`).
+Customer-facing surfaces should present a clean label and strip internal recovery/compensation prefixes before rendering.
+The mobile-customer cart auto-apply notifier presents recovery promotions as type-based labels (for example free-delivery compensation promo) instead of exposing internal naming prefixes.
+The same notifier also normalizes regular promotion names/codes (removes technical prefixes/tokens) and falls back to friendly type labels when names are not customer-friendly.
+On the mobile-customer business page, business-created active promotions are shown as a tappable promo card that opens an offer-details modal explaining how the promo applies, minimum spend (when present), and that the discount auto-applies at checkout.
+Promotion descriptions can be edited from the admin Promotions edit modal and are shown in the business promo offer-details modal; when empty, the modal shows fallback explanatory copy.
+
 ### Business-funded promotions (item discounts)
 
 - `creator_type = BUSINESS` + non-delivery promotions are treated as business-funded item discounts.

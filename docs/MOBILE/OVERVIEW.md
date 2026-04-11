@@ -23,6 +23,17 @@ The apps are separate packages, but they share a set of conventions:
 - app-local stores and hooks rather than one shared mobile package
 - realtime behavior implemented selectively rather than everywhere
 
+## Directions API Usage (Customer + Driver)
+
+- `mobile-customer`, `mobile-driver`, `mobile-admin`, and admin-panel fetch route geometry through the backend proxy endpoint `GET /api/directions` for delivery tracking/navigation/admin route calculations.
+- The proxy in `api/src/routes/directionsRoutes.ts` calls Mapbox server-side and caches results in Redis for 65 seconds using a normalized coordinate cache key (5 decimals) plus `steps` and `language` flags.
+- The backend directions proxy deduplicates concurrent cache-miss requests for the same route key, so parallel callers share one upstream Mapbox request.
+- Each app also has local in-memory route caches with in-flight request deduplication:
+	- `mobile-customer/utils/route.ts`: 10-minute TTL, key rounded to 4 decimals.
+	- `mobile-driver/utils/mapbox.ts`: 10-minute simple-route TTL and 5-minute navigation-step TTL, with max 50 entries per cache.
+- Cross-app route reuse is backend-mediated (through the shared Redis cache), not direct app-to-app sharing.
+- The admin map tab has been removed from `mobile-customer`; admin map flows live in `mobile-admin` and admin-panel.
+
 ## Where Realtime Matters Most
 
 - `mobile-customer` consumes order updates and live driver tracking for active orders
@@ -48,9 +59,19 @@ Customer checkout/cart UI now uses a three-step flow shell (cart, address, revie
 
 Active-order floating and order-history surfaces in mobile-customer now use localized status and CTA copy consistently, including multi-active-order guidance and unified status badge wording across list and floating entry points.
 
+After an order transitions to DELIVERED, mobile-customer queues a post-delivery review prompt after the delivery success modal closes. The review prompt supports a star rating, optional private comment, quick feedback chips (for example "The food was perfect"), one-time-per-order behavior, and persistent opt-outs for either a specific business or all future review prompts.
+
+The post-delivery review prompt in mobile-customer uses localized text through the app translation dictionaries (EN/AL), including submit/loading states and skip/mute actions.
+
 OrderDetails screen in mobile-customer now uses localized strings for all user-visible copy: order number label, price summary heading, delivery address heading, order items heading, show/hide summary toggle, map unavailable fallback, unknown date fallback, and cancelled status banner. Removed all `as any` translation key workarounds by adding proper schema keys.
 
+OrderDetails in mobile-customer shows a dedicated cancellation notice in the active-order panel that instructs customers to call a phone number for cancellation, and the UX treats phone call as the only cancellation path presented in that screen.
+
+OrderDetails driver contact in mobile-customer shows the assigned driver's actual phone number when available, and no longer falls back to a hardcoded placeholder number in the customer-facing UI.
+
 `mobile-business` finances now supports business-focused settlement review with filters (period, status, direction, order search) and table-style settlement rows.
+
+`mobile-business` orders now include a private customer-reviews surface that reads from `businessOrderReviews`, showing recent star ratings, quick feedback tags, and customer comments for business-side follow-up.
 
 Settlement semantics in mobile-business are aligned to web UI2 formulas:
 

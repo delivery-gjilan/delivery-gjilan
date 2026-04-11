@@ -15,6 +15,13 @@
       "when": 1775739669395,
       "tag": "0001_sturdy_red_hulk",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1775943600000,
+      "tag": "0002_glistening_popular_products",
+      "breakpoints": true
     }
   ]
 }

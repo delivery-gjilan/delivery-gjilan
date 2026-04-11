@@ -24,6 +24,8 @@ type Business {
     isFeatured: Boolean!
     featuredSortOrder: Int!
     isOpen: Boolean!
+    ratingAverage: Float!
+    ratingCount: Int!
     activePromotion: BusinessPromotion
     createdAt: Date!
     updatedAt: Date!
@@ -34,6 +36,7 @@ type BusinessPromotion {
     name: String!
     description: String
     type: PromotionType!
+    creatorType: PromotionCreatorType!
     discountValue: Float
     spendThreshold: Float
 }

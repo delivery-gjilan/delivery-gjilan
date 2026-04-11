@@ -18,6 +18,7 @@ export * from './auditLogs';
 export * from './userBehaviors';
 export * from './promotions';
 export * from './orderPromotions';
+export * from './orderReviews';
 export * from './userAddress';
 export * from './storeSettings';
 export * from './deviceTokens';

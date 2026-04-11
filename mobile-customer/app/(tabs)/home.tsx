@@ -209,6 +209,7 @@ export default function Discover() {
                         onPress={handleBusinessPress}
                         deliveryFee={fee}
                         deliveryTime={getPrepTimeLabel(item)}
+                        rating={(item as any).ratingAverage ?? undefined}
                         activePromotion={(item as any).activePromotion}
                     />
                 </Animated.View>

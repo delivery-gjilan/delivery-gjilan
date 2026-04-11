@@ -29,6 +29,8 @@ export const GET_BUSINESSES = gql`
                 closesAt
             }
             isOpen
+            ratingAverage
+            ratingCount
             activePromotion {
                 id
                 name
@@ -73,6 +75,17 @@ export const GET_BUSINESS = gql`
                 closesAt
             }
             isOpen
+            ratingAverage
+            ratingCount
+            activePromotion {
+                id
+                name
+                description
+                type
+                creatorType
+                discountValue
+                spendThreshold
+            }
             minOrderAmount
             createdAt
             updatedAt

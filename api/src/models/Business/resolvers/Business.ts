@@ -1,5 +1,6 @@
 import type { BusinessResolvers } from './../../../generated/types.generated';
 import { getDB } from '@/database';
+import { orderReviews } from '@/database/schema';
 import { promotions, userPromotions } from '@/database/schema/promotions';
 import { eq, and, isNull, lte, gte, or, sql, inArray } from 'drizzle-orm';
 
@@ -68,6 +69,7 @@ export const Business: BusinessResolvers = {
                 name: promotions.name,
                 description: promotions.description,
                 type: promotions.type,
+                creatorType: promotions.creatorType,
                 discountValue: promotions.discountValue,
                 spendThreshold: promotions.spendThreshold,
                 priority: promotions.priority,
@@ -133,8 +135,30 @@ export const Business: BusinessResolvers = {
             name: promo.name,
             description: promo.description ?? null,
             type: promo.type,
+            creatorType: promo.creatorType,
             discountValue: promo.discountValue ?? null,
             spendThreshold: promo.spendThreshold ?? null,
         };
+    },
+
+    ratingAverage: async (parent) => {
+        const db = await getDB();
+        const [result] = await db
+            .select({ avg: sql<number | null>`avg(${orderReviews.rating})` })
+            .from(orderReviews)
+            .where(eq(orderReviews.businessId, String(parent.id)));
+
+        if (!result?.avg) return 0;
+        return Number(result.avg);
+    },
+
+    ratingCount: async (parent) => {
+        const db = await getDB();
+        const [result] = await db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(orderReviews)
+            .where(eq(orderReviews.businessId, String(parent.id)));
+
+        return result?.count ?? 0;
     },
 };

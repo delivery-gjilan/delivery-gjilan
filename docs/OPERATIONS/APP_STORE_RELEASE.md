@@ -1,6 +1,6 @@
 # App Store Release
 
-<!-- MDS:O10 | Domain: Operations | Updated: 2026-04-09 -->
+<!-- MDS:O10 | Domain: Operations | Updated: 2026-04-11 -->
 <!-- Depends-On: O7 -->
 <!-- Depended-By: O15, O19 -->
 <!-- Nav: Compliance changes → review O5 (Security). Production validation → review O7 (Environments). -->
@@ -43,6 +43,7 @@ Before submission, validate against production infrastructure rather than develo
 - push notification behavior
 - store closed and banner behavior
 - account deletion and support/contact pathways
+- Info.plist privacy purpose strings for all referenced protected APIs (for example `NSCameraUsageDescription` when camera APIs are linked by app code or SDKs)
 
 ## Recommendation
 

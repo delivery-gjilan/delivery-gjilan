@@ -319,6 +319,24 @@ export const GET_ORDER_DRIVER = gql`
     }
 `;
 
+export const GET_ORDER_REVIEW_CONTEXT = gql`
+    query GetOrderReviewContext($id: ID!) {
+        order(id: $id) {
+            id
+            status
+            review {
+                id
+            }
+            businesses {
+                business {
+                    id
+                    name
+                }
+            }
+        }
+    }
+`;
+
 export const UNCOMPLETED_ORDERS = gql`
     query UncompletedOrders {
         uncompletedOrders {

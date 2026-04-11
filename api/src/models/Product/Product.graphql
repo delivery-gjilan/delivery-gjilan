@@ -61,6 +61,8 @@ type ProductCard {
     basePrice: Float!
     isOffer: Boolean!
     hasOptionGroups: Boolean!
+    # Total quantity ordered across all delivered orders. Used for "Popular" badge.
+    orderCount: Int!
     variants: [Product!]!
     product: Product
 }

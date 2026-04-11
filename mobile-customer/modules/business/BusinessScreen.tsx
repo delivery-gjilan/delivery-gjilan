@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity,
-    ScrollView as RNScrollView, LayoutChangeEvent,
+    ScrollView as RNScrollView, LayoutChangeEvent, Modal,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import Animated, {
@@ -33,6 +33,13 @@ type ProductCardItem = GetProductsQuery['products'][number];
 interface BusinessScreenProps {
     businessId: string;
 }
+
+type PromoLike = {
+    name?: string | null;
+    type?: string | null;
+    discountValue?: number | null;
+    spendThreshold?: number | null;
+};
 
 // ─── Category Tabs (Underline style) ────────────────────────
 function CategoryTabs({
@@ -193,12 +200,50 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
     const [searchFocused, setSearchFocused] = useState(false);
     const [showStickySearch, setShowStickySearch] = useState(false);
     const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
+    const [showPromoDetails, setShowPromoDetails] = useState(false);
     const searchInputRef = useRef<TextInput>(null);
     const showStickySearchRef = useRef(false);
     const searchVisibilityProgress = useSharedValue(0);
     const sectionOffsetsRef = useRef<{ id: string; y: number }[]>([]);
     const productsContainerY = useRef(0);
     const stickyHeight = useRef(0);
+
+    const formatPromotionLabel = useCallback(
+        (promotion: PromoLike) => {
+            if (promotion.type === 'PERCENTAGE' && promotion.discountValue) {
+                return t.business.item_discount.replace('{{percent}}', String(Math.round(promotion.discountValue)));
+            }
+            if (promotion.type === 'FIXED_AMOUNT' && promotion.discountValue) {
+                return t.business.flat_discount.replace('{{amount}}', promotion.discountValue.toFixed(2));
+            }
+            if (promotion.type === 'FREE_DELIVERY') {
+                return t.business.free_delivery;
+            }
+            if (promotion.type === 'SPEND_X_GET_FREE' && promotion.spendThreshold) {
+                return t.business.free_delivery_over.replace('{{threshold}}', String(Math.round(promotion.spendThreshold)));
+            }
+            if (promotion.type === 'SPEND_X_GET_FREE') {
+                return t.business.free_delivery;
+            }
+            if (promotion.type === 'SPEND_X_PERCENT' && promotion.discountValue) {
+                return promotion.spendThreshold
+                    ? t.business.percent_off_over
+                        .replace('{{percent}}', String(Math.round(promotion.discountValue)))
+                        .replace('{{threshold}}', String(Math.round(promotion.spendThreshold)))
+                    : t.business.item_discount.replace('{{percent}}', String(Math.round(promotion.discountValue)));
+            }
+            if (promotion.type === 'SPEND_X_FIXED' && promotion.discountValue) {
+                return promotion.spendThreshold
+                    ? t.business.flat_off_over
+                        .replace('{{amount}}', promotion.discountValue.toFixed(2))
+                        .replace('{{threshold}}', String(Math.round(promotion.spendThreshold)))
+                    : t.business.flat_discount.replace('{{amount}}', promotion.discountValue.toFixed(2));
+            }
+
+            return promotion.name || t.business.promo_details_title;
+        },
+        [t],
+    );
 
     // ─── Derived Data ───────────────────────────────────────
     const categories = useMemo(() => {
@@ -458,6 +503,9 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
     const scheduleLabel = todaySchedule.length > 0
         ? todaySchedule.map((s) => `${s.opensAt}–${s.closesAt}`).join(', ')
         : null;
+    const activePromotion = (business as any)?.activePromotion as (PromoLike & { creatorType?: string | null; description?: string | null; code?: string | null }) | null;
+    const businessPromo = activePromotion?.creatorType === 'BUSINESS' ? activePromotion : null;
+    const businessPromoLabel = businessPromo ? formatPromotionLabel(businessPromo) : null;
 
     // ─── Render ─────────────────────────────────────────────
     return (<SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['bottom']}>
@@ -619,6 +667,54 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                                 <Text style={{ fontSize: 12, color: theme.colors.subtext }}>
                                     Min. order €{Number((business as any).minOrderAmount).toFixed(2)}
                                 </Text>
+                            </Animated.View>
+                        )}
+
+                        {businessPromo && (
+                            <Animated.View
+                                entering={FadeInDown.delay(380).duration(350).springify().damping(28).stiffness(140)}
+                                style={{ width: '100%', marginTop: 8 }}
+                            >
+                                <TouchableOpacity
+                                    activeOpacity={0.9}
+                                    onPress={() => setShowPromoDetails(true)}
+                                    style={{
+                                        borderRadius: 12,
+                                        borderWidth: 1,
+                                        borderColor: theme.colors.primary + '40',
+                                        backgroundColor: theme.colors.primary + '12',
+                                        paddingHorizontal: 12,
+                                        paddingVertical: 10,
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                    }}
+                                >
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 10 }}>
+                                        <View
+                                            style={{
+                                                width: 28,
+                                                height: 28,
+                                                borderRadius: 14,
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                backgroundColor: theme.colors.primary + '22',
+                                                marginRight: 8,
+                                            }}
+                                        >
+                                            <Ionicons name="pricetag" size={14} color={theme.colors.primary} />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={{ color: theme.colors.text, fontSize: 13, fontWeight: '700' }} numberOfLines={1}>
+                                                {businessPromoLabel}
+                                            </Text>
+                                            <Text style={{ color: theme.colors.subtext, fontSize: 12, marginTop: 1 }} numberOfLines={1}>
+                                                {t.business.promo_tap_for_details}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    <Ionicons name="chevron-forward" size={15} color={theme.colors.subtext} />
+                                </TouchableOpacity>
                             </Animated.View>
                         )}
                     </View>
@@ -950,6 +1046,93 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                     </RNScrollView>
                 </View>
             )}
+
+            <Modal
+                visible={showPromoDetails}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowPromoDetails(false)}
+            >
+                <TouchableOpacity
+                    activeOpacity={1}
+                    onPress={() => setShowPromoDetails(false)}
+                    style={{
+                        flex: 1,
+                        backgroundColor: 'rgba(0,0,0,0.45)',
+                        justifyContent: 'center',
+                        paddingHorizontal: 24,
+                    }}
+                >
+                    <TouchableOpacity
+                        activeOpacity={1}
+                        onPress={(e) => e.stopPropagation()}
+                        style={{
+                            borderRadius: 16,
+                            borderWidth: 1,
+                            borderColor: theme.colors.border,
+                            backgroundColor: theme.colors.card,
+                            padding: 16,
+                        }}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: '800', flex: 1 }}>
+                                {t.business.promo_details_title}
+                            </Text>
+                            <TouchableOpacity onPress={() => setShowPromoDetails(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                                <Ionicons name="close" size={20} color={theme.colors.subtext} />
+                            </TouchableOpacity>
+                        </View>
+
+                        {businessPromoLabel && (
+                            <View
+                                style={{
+                                    marginTop: 12,
+                                    borderRadius: 10,
+                                    backgroundColor: theme.colors.primary + '15',
+                                    borderWidth: 1,
+                                    borderColor: theme.colors.primary + '45',
+                                    paddingHorizontal: 10,
+                                    paddingVertical: 8,
+                                    alignSelf: 'flex-start',
+                                }}
+                            >
+                                <Text style={{ color: theme.colors.primary, fontSize: 13, fontWeight: '700' }}>
+                                    {businessPromoLabel}
+                                </Text>
+                            </View>
+                        )}
+
+                        <Text style={{ color: theme.colors.subtext, fontSize: 13, lineHeight: 19, marginTop: 12 }}>
+                            {businessPromo?.description || t.business.promo_auto_apply_hint}
+                        </Text>
+
+                        <View style={{ marginTop: 12, gap: 8 }}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                <Text style={{ color: theme.colors.subtext, fontSize: 12 }}>{t.business.promo_scope_label}</Text>
+                                <Text style={{ color: theme.colors.text, fontSize: 12, fontWeight: '600' }}>{t.business.promo_scope_business}</Text>
+                            </View>
+                            {typeof businessPromo?.spendThreshold === 'number' && businessPromo.spendThreshold > 0 && (
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                    <Text style={{ color: theme.colors.subtext, fontSize: 12 }}>{t.business.promo_minimum_label}</Text>
+                                    <Text style={{ color: theme.colors.text, fontSize: 12, fontWeight: '600' }}>
+                                        €{Number(businessPromo.spendThreshold).toFixed(2)}
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+
+                        <View style={{ marginTop: 14, borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: 12 }}>
+                            <Text style={{ color: theme.colors.text, fontSize: 12, fontWeight: '700' }}>
+                                {t.business.promo_how_it_works_title}
+                            </Text>
+                            <Text style={{ color: theme.colors.subtext, fontSize: 12, marginTop: 6, lineHeight: 18 }}>
+                                {t.business.promo_how_it_works_body}
+                            </Text>
+                        </View>
+                    </TouchableOpacity>
+                </TouchableOpacity>
+            </Modal>
+
             {/* ═══ Bottom Action Panel — View Cart + Progress Bar ═══ */}
             {businessCartItems.length > 0 && (
                 <Animated.View

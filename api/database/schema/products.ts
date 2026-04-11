@@ -37,6 +37,7 @@ export const products = pgTable(
         isAvailable: boolean('is_available').default(true),
         isDeleted: boolean('is_deleted').default(false).notNull(),
         sortOrder: integer('sort_order').default(0).notNull(),
+        orderCount: integer('order_count').default(0).notNull(),
         createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
             .default(sql`CURRENT_TIMESTAMP`)
             .notNull(),

@@ -76,6 +76,7 @@ npm run db:studio     # open Drizzle Studio at https://local.drizzle.studio
 | `sale_price` | Active sale price |
 | `is_available` | False hides from ordering |
 | `sort_order` | Display order |
+| `order_count` | Cumulative delivered-item quantity used for storefront popularity badges and ranking |
 
 ---
 

@@ -5,7 +5,6 @@ import { useQuery, useMutation, useSubscription } from "@apollo/client/react";
 import { DRIVERS_QUERY } from "@/graphql/operations/users/queries";
 import { DRIVERS_UPDATED_SUBSCRIPTION } from "@/graphql/operations/users/subscriptions";
 import {
-    CREATE_USER_MUTATION,
     DELETE_USER_MUTATION,
     ADMIN_UPDATE_DRIVER_SETTINGS_MUTATION,
     UPDATE_USER_MUTATION,
@@ -24,6 +23,32 @@ import {
     Search, AlertCircle, CheckCircle2, Radio, BatteryCharging, BatteryLow,
     BatteryMedium, Phone, Mail, Percent, Layers, Wifi, WifiOff,
 } from "lucide-react";
+import { gql } from "@apollo/client";
+
+const DRIVER_REGISTER_MUTATION = gql`
+    mutation DriverRegister(
+        $email: String!
+        $password: String!
+        $firstName: String!
+        $lastName: String!
+        $phoneNumber: String
+    ) {
+        driverRegister(
+            input: {
+                email: $email
+                password: $password
+                firstName: $firstName
+                lastName: $lastName
+                phoneNumber: $phoneNumber
+            }
+        ) {
+            message
+            driver {
+                id
+            }
+        }
+    }
+`;
 
 interface DriverItem {
     id: string;
@@ -82,9 +107,7 @@ export default function DriversPage() {
         },
     });
 
-    const [createDriver] = useMutation(CREATE_USER_MUTATION, {
-        onCompleted: () => { refetch(); handleCloseCreateModal(); },
-    });
+    const [createDriver] = useMutation(DRIVER_REGISTER_MUTATION);
     const [deleteDriver] = useMutation(DELETE_USER_MUTATION, {
         onCompleted: () => refetch(),
     });
@@ -94,7 +117,7 @@ export default function DriversPage() {
     const [updateUser] = useMutation(UPDATE_USER_MUTATION);
 
     const [showCreateModal, setShowCreateModal] = useState(false);
-    const [createForm, setCreateForm] = useState({ email: "", password: "", firstName: "", lastName: "", isDemoAccount: false });
+    const [createForm, setCreateForm] = useState({ email: "", password: "", firstName: "", lastName: "", phoneNumber: "", isDemoAccount: false });
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<DriverItem | null>(null);
@@ -134,7 +157,7 @@ export default function DriversPage() {
 
     const handleCloseCreateModal = () => {
         setShowCreateModal(false);
-        setCreateForm({ email: "", password: "", firstName: "", lastName: "", isDemoAccount: false });
+        setCreateForm({ email: "", password: "", firstName: "", lastName: "", phoneNumber: "", isDemoAccount: false });
         setFormError("");
     };
 
@@ -198,12 +221,37 @@ export default function DriversPage() {
         }
         try {
             const { data: created } = await createDriver({
-                variables: { ...createForm, role: UserRole.Driver },
+                variables: {
+                    email: createForm.email,
+                    password: createForm.password,
+                    firstName: createForm.firstName,
+                    lastName: createForm.lastName,
+                    phoneNumber: createForm.phoneNumber.trim() || null,
+                },
             }) as any;
-            if (created?.createUser) {
-                setFormSuccess(created.createUser.message || "Driver created successfully");
-                setTimeout(() => setFormSuccess(""), 3000);
+            const createdDriverId = created?.driverRegister?.driver?.id as string | undefined;
+
+            if (!createdDriverId) {
+                throw new Error("Driver creation failed");
             }
+
+            if (createForm.isDemoAccount) {
+                await updateUser({
+                    variables: {
+                        id: createdDriverId,
+                        firstName: createForm.firstName,
+                        lastName: createForm.lastName,
+                        role: UserRole.Driver,
+                        businessId: null,
+                        isDemoAccount: true,
+                    },
+                });
+            }
+
+            await refetch();
+            setFormSuccess(created?.driverRegister?.message || "Driver created successfully");
+            setTimeout(() => setFormSuccess(""), 3000);
+            handleCloseCreateModal();
         } catch (err) {
             setFormError(err instanceof Error ? err.message : "Failed to create driver");
         }
@@ -660,6 +708,13 @@ export default function DriversPage() {
                             onChange={(e) => setCreateForm(f => ({ ...f, password: e.target.value }))}
                             placeholder="••••••••"
                             required
+                        />
+                        <Input
+                            label="Phone Number"
+                            type="tel"
+                            value={createForm.phoneNumber}
+                            onChange={(e) => setCreateForm(f => ({ ...f, phoneNumber: e.target.value }))}
+                            placeholder="+383 44 123 456"
                         />
                         <label className="flex items-start gap-3 rounded-xl border border-sky-500/20 bg-sky-500/5 p-3.5 cursor-pointer transition-colors hover:bg-sky-500/10">
                             <input

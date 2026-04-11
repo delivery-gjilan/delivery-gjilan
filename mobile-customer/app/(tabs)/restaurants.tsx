@@ -449,6 +449,7 @@ export default function Restaurants() {
                                         locationLng={(restaurant as any).location?.longitude || 21.4694}
                                         avgPrepTimeMinutes={(restaurant as any).avgPrepTimeMinutes}
                                         prepTimeOverrideMinutes={(restaurant as any).prepTimeOverrideMinutes}
+                                        rating={(restaurant as any).ratingAverage ?? undefined}
                                         activePromotion={(restaurant as any).activePromotion}
                                         isSponsored={restaurant.id === promoRestaurant?.id}
                                     />

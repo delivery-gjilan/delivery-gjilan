@@ -353,6 +353,13 @@
         "step_review": "Shqyrtimi",
         "promotion_label": "promovim",
         "promotion_applied_notifier": "Promovimi u aplikua{{name}}",
+        "promo_type_generic": "Promo speciale",
+        "promo_type_percentage": "Zbritje me përqindje",
+        "promo_type_fixed": "Zbritje fikse",
+        "compensation_promo_generic": "Promo kompensimi",
+        "compensation_promo_free_delivery": "Promo kompensimi me transport falas",
+        "compensation_promo_percentage": "Promo kompensimi me zbritje përqindje",
+        "compensation_promo_fixed": "Promo kompensimi me zbritje fikse",
         "items_unavailable_removed": "Disa artikuj në shportën tuaj nuk janë më të disponueshëm dhe u hoqën. Ju lutem shqyrtoni shportën dhe provoni përsëri.",
         "item_notes_placeholder": "Shto udhëzime të veçanta...",
         "driver_notes": "Shënime për shoferin",
@@ -396,6 +403,17 @@
         "order_history": "Historiku i porosive",
         "no_past_orders": "Ende asnjë porosi e kaluar",
         "no_past_orders_subtitle": "Porosinë e përfunduara dhe të anuluara do të shfaqen këtu.",
+        "review_modal": {
+            "title": "Si ishte porosia juaj?",
+            "title_with_business": "Si ishte porosia juaj nga {{business}}?",
+            "subtitle_private": "Komenti juaj është privat dhe shihet vetëm nga biznesi.",
+            "comment_placeholder": "Shto një koment privat (opsional)",
+            "submit": "Dërgo vlerësimin",
+            "submitting": "Duke dërguar...",
+            "not_now": "Jo tani",
+            "hide_for_business": "Mos pyet për këtë biznes",
+            "hide_all": "Mos pyet më"
+        },
         "unknown_date": "Datë e panjohur",
         "restaurant_fallback": "Restorant",
         "details": {
@@ -459,7 +477,8 @@
             "hide_order_summary": "Fshih përmbledhjen",
             "show_order_summary": "Shfaq përmbledhjen",
             "map_unavailable": "Harta e padisponueshme",
-            "unknown_date": "Data e panjohur"
+            "unknown_date": "Data e panjohur",
+            "cancel_order_phone_only": "Për ta anuluar këtë porosi, telefononi në këtë numër. Thirrja telefonike është mënyra e vetme e anulimit."
         },
         "active_bar": "Porosi Aktive",
         "status": {
@@ -508,7 +527,16 @@
         "free_delivery": "Transporti Falas",
         "free_delivery_over": "Transport Falas mbi €{{threshold}}",
         "percent_off_over": "-{{percent}}% mbi €{{threshold}}",
-        "flat_off_over": "-€{{amount}} mbi €{{threshold}}"
+        "flat_off_over": "-€{{amount}} mbi €{{threshold}}",
+        "promo_tap_for_details": "Preke për detajet e ofertës",
+        "promo_details_title": "Detajet e ofertës",
+        "promo_auto_apply_hint": "Kjo ofertë aplikohet automatikisht në checkout kur porosia i plotëson kushtet.",
+        "promo_scope_label": "Vlen për",
+        "promo_scope_business": "Vetëm për këtë biznes",
+        "promo_minimum_label": "Minimumi i shpenzimit",
+        "promo_how_it_works_title": "Si funksionon oferta",
+        "promo_how_it_works_body": "Shto artikujt e përshtatshëm nga ky biznes dhe vazhdo te checkout. Zbritja aplikohet automatikisht kur kushtet plotësohen.",
+        "popular": "Popullore"
     },
     "product": {
         "not_found": "Produkti nuk u gjet",

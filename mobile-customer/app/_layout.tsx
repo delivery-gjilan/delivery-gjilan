@@ -21,6 +21,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ToastContainer } from '@/components/Toast';
 import SuccessModalContainer from '@/components/SuccessModalContainer';
 import AwaitingApprovalModalContainer from '@/components/AwaitingApprovalModalContainer';
+import OrderReviewModalContainer from '@/components/OrderReviewModalContainer';
 import { useBackgroundLiveActivity } from '@/hooks/useBackgroundLiveActivity';
 import { useEffect } from 'react';
 import Mapbox from '@rnmapbox/maps';
@@ -99,6 +100,7 @@ function AppContent() {
                     <FloatingBars />
                     <ToastContainer />
                     <SuccessModalContainer />
+                    <OrderReviewModalContainer />
                     <AwaitingApprovalModalContainer />
                 </SafeAreaProvider>
             </GestureHandlerRootView>

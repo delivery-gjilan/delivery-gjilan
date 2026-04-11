@@ -37,7 +37,7 @@
 | FF4 | [FUTURE_FEATURES/EMAIL_SERVICE.md](FUTURE_FEATURES/EMAIL_SERVICE.md) | Future Feature | Transactional email via Resend — order receipt on delivery, email verification migration, react-email templates, EmailService architecture |
 | FF5 | [FUTURE_FEATURES/MINIMUM_ORDER_AMOUNT.md](FUTURE_FEATURES/MINIMUM_ORDER_AMOUNT.md) | Future Feature | Per-business minimum order subtotal — DB column, API enforcement in createOrder, admin panel edit form, mobile-customer cart bar + disabled checkout |
 | FF6 | [FUTURE_FEATURES/BUSINESS_PREP_TIME_UPDATE.md](FUTURE_FEATURES/BUSINESS_PREP_TIME_UPDATE.md) | Future Feature | Business can extend prep time on PREPARING orders — "Add Time" UI in mobile-business, notifies customer/driver/admins (push), amber badge + map marker pulse in admin panel orders & map pages via `usePrepTimeAlerts` hook |
-| M1 | [MOBILE/OVERVIEW.md](MOBILE/OVERVIEW.md) | Mobile | Four-app architecture, shared patterns |
+| M1 | [MOBILE/OVERVIEW.md](MOBILE/OVERVIEW.md) | Mobile | Four-app architecture, shared patterns, customer post-delivery review prompt, and business-side private review visibility |
 | M2 | [MOBILE/PUSH_AND_LIVE_ACTIVITY.md](MOBILE/PUSH_AND_LIVE_ACTIVITY.md) | Mobile | FCM tokens, Live Activity, notification maturity |
 | M3 | [MOBILE/LIVE_ACTIVITY_BEHAVIOR.md](MOBILE/LIVE_ACTIVITY_BEHAVIOR.md) | Mobile | iOS widget, progress calculation, APNs pushes |
 | M4 | [MOBILE/ORDER_CREATION_AUDIT.md](MOBILE/ORDER_CREATION_AUDIT.md) | Mobile | Checkout gaps, payment collection missing in UI |

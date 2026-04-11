@@ -229,6 +229,17 @@
         "order_history": "Order history",
         "credits": "Credits",
         "buy_gift_card": "Buy gift card",
+        "review_modal": {
+            "title": "How was your order?",
+            "title_with_business": "How was your order from {{business}}?",
+            "subtitle_private": "Your comment is private and only visible to the business.",
+            "comment_placeholder": "Add a private comment (optional)",
+            "submit": "Submit review",
+            "submitting": "Submitting...",
+            "not_now": "Not now",
+            "hide_for_business": "Don't ask for this business",
+            "hide_all": "Don't ask again"
+        },
         "your_favorites": "Your favorites",
         "favorites_empty": "Add a restaurant to your favorites by tapping the heart icon. Your favorites will appear here!",
         "quick_links": "Quick links",
@@ -353,6 +364,13 @@
         "step_review": "Review",
         "promotion_label": "promotion",
         "promotion_applied_notifier": "Promotion applied{{name}}",
+        "promo_type_generic": "Special promotion",
+        "promo_type_percentage": "Percentage discount",
+        "promo_type_fixed": "Fixed discount",
+        "compensation_promo_generic": "Compensation promo",
+        "compensation_promo_free_delivery": "Free delivery compensation promo",
+        "compensation_promo_percentage": "Percentage discount compensation promo",
+        "compensation_promo_fixed": "Fixed discount compensation promo",
         "items_unavailable_removed": "Some items in your cart are no longer available and were removed. Please review your cart and try again.",
         "item_notes_placeholder": "Add special instructions...",
         "driver_notes": "Notes for Driver",
@@ -459,7 +477,8 @@
             "hide_order_summary": "Hide order summary",
             "show_order_summary": "Show order summary",
             "map_unavailable": "Map unavailable",
-            "unknown_date": "Unknown date"
+            "unknown_date": "Unknown date",
+            "cancel_order_phone_only": "To cancel this order, call this number. Phone call is the only cancellation method."
         },
         "active_bar": "Active Order",
         "status": {
@@ -508,7 +527,16 @@
         "free_delivery": "Free Delivery",
         "free_delivery_over": "Free Delivery over €{{threshold}}",
         "percent_off_over": "-{{percent}}% over €{{threshold}}",
-        "flat_off_over": "-€{{amount}} over €{{threshold}}"
+        "flat_off_over": "-€{{amount}} over €{{threshold}}",
+        "promo_tap_for_details": "Tap to view offer details",
+        "promo_details_title": "Offer details",
+        "promo_auto_apply_hint": "This offer is applied automatically at checkout when your order meets the requirements.",
+        "promo_scope_label": "Applies to",
+        "promo_scope_business": "This business only",
+        "promo_minimum_label": "Minimum spend",
+        "promo_how_it_works_title": "How this offer works",
+        "promo_how_it_works_body": "Add eligible items from this business and proceed to checkout. The discount is applied automatically when conditions are met.",
+        "popular": "Popular"
     },
     "product": {
         "not_found": "Product not found",

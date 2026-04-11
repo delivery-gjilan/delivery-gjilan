@@ -152,6 +152,8 @@ export class OrderMappingModule {
                             schedule: [],
                             prepTimeOverrideMinutes: (business as any).prepTimeOverrideMinutes ?? null,
                             temporaryClosureReason: (business as any).temporaryClosureReason ?? null,
+                            ratingAverage: 0,
+                            ratingCount: 0,
                         },
                         items: businessItems,
                     });

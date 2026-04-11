@@ -69,7 +69,7 @@ export const ListRestaurantCard = React.memo(function ListRestaurantCard({
     deliveryFee,
     avgPrepTimeMinutes,
     prepTimeOverrideMinutes,
-    rating = 8.6,
+    rating,
     priceRange = '€€',
     distance = 1.3,
     isSponsored,
@@ -233,22 +233,24 @@ export const ListRestaurantCard = React.memo(function ListRestaurantCard({
                     >
                         {name}
                     </Text>
-                    <View
-                        style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 3,
-                            backgroundColor: theme.colors.background,
-                            paddingHorizontal: 8,
-                            paddingVertical: 4,
-                            borderRadius: 10,
-                        }}
-                    >
-                        <Ionicons name="star" size={11} color="#FBBF24" />
-                        <Text style={{ color: theme.colors.text, fontSize: 12, fontWeight: '700' }}>
-                            {rating.toFixed(1)}
-                        </Text>
-                    </View>
+                    {rating != null && (
+                        <View
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 3,
+                                backgroundColor: theme.colors.background,
+                                paddingHorizontal: 8,
+                                paddingVertical: 4,
+                                borderRadius: 10,
+                            }}
+                        >
+                            <Ionicons name="star" size={11} color="#FBBF24" />
+                            <Text style={{ color: theme.colors.text, fontSize: 12, fontWeight: '700' }}>
+                                {rating.toFixed(1)}
+                            </Text>
+                        </View>
+                    )}
                 </View>
 
                 {/* Chips row */}

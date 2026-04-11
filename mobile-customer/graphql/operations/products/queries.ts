@@ -9,6 +9,7 @@ export const GET_PRODUCTS = gql`
             basePrice
             isOffer
             hasOptionGroups
+            orderCount
             variants {
                 id
                 name

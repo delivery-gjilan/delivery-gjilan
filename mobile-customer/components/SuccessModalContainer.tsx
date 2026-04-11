@@ -3,6 +3,7 @@ import { Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import OrderSuccessScreen from './OrderSuccessScreen';
 import { useSuccessModalStore } from '@/store/useSuccessModalStore';
+import { useOrderReviewPromptStore } from '@/store/useOrderReviewPromptStore';
 
 const AUTO_DISMISS_MS = 4000;
 // Approximate duration of the RN Modal 'fade' animation — used to delay
@@ -12,11 +13,13 @@ const MODAL_FADE_MS = 320;
 export default function SuccessModalContainer() {
     const router = useRouter();
     const { visible, orderId, type, phase, hideSuccess, suppressCartBarFor } = useSuccessModalStore();
+    const requestReviewPrompt = useOrderReviewPromptStore((state) => state.requestPrompt);
     const hasScheduledDismissRef = useRef(false);
     const autoDismissRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     // Holds the orderId to navigate to after the modal has finished fading out.
     const pendingTrackOrderIdRef = useRef<string | null>(null);
     const pendingGoHomeRef = useRef(false);
+    const pendingReviewOrderIdRef = useRef<string | null>(null);
     // Tracks whether the modal was ever opened so the !visible branch only
     // runs on genuine dismiss events, not on the initial render.
     const wasVisibleRef = useRef(false);
@@ -64,8 +67,16 @@ export default function SuccessModalContainer() {
                     router.replace('/(tabs)/home');
                 }, MODAL_FADE_MS);
             }
+
+            if (pendingReviewOrderIdRef.current) {
+                const reviewOrderId = pendingReviewOrderIdRef.current;
+                pendingReviewOrderIdRef.current = null;
+                setTimeout(() => {
+                    requestReviewPrompt(reviewOrderId);
+                }, MODAL_FADE_MS + 60);
+            }
         }
-    }, [visible, phase, type, router, hideSuccess, suppressCartBarFor]);
+    }, [visible, phase, type, router, hideSuccess, suppressCartBarFor, requestReviewPrompt]);
 
     const cancelAutoDismiss = useCallback(() => {
         if (autoDismissRef.current) {
@@ -81,19 +92,24 @@ export default function SuccessModalContainer() {
             // Store the id, then dismiss. Navigation fires after the fade in the
             // !visible branch above — prevents screen flashes during the animation.
             pendingTrackOrderIdRef.current = orderId;
+            if (type === 'order_delivered') {
+                pendingReviewOrderIdRef.current = orderId;
+            }
             hideSuccess();
         }
-    }, [orderId, hideSuccess, cancelAutoDismiss]);
+    }, [orderId, type, hideSuccess, cancelAutoDismiss]);
 
     const handleGoHome = useCallback(() => {
         cancelAutoDismiss();
         if (type === 'order_created') {
             suppressCartBarFor(MODAL_FADE_MS + 700);
             pendingGoHomeRef.current = true;
+        } else if (type === 'order_delivered' && orderId) {
+            pendingReviewOrderIdRef.current = orderId;
         }
         // Dismiss now; optional route correction runs after fade in the effect above.
         hideSuccess();
-    }, [type, hideSuccess, cancelAutoDismiss, suppressCartBarFor]);
+    }, [type, orderId, hideSuccess, cancelAutoDismiss, suppressCartBarFor]);
 
     if (!visible || !type) return null;
 

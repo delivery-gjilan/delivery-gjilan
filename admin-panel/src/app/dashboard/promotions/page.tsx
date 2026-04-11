@@ -160,12 +160,13 @@ export default function PromotionsPage() {
     };
 
     const handleOpenEdit = (promotion: GetPromotionsQuery["getAllPromotions"][number]) => {
-        // Editing is intentionally limited (name + code only)
+        // Editing supports name, description, and code
         setEditingPromotion(promotion);
         setWizardStep(1);
         setFormData({
             ...emptyForm,
             name: promotion.name,
+            description: promotion.description ?? "",
             code: promotion.code ?? "",
         });
         setShowModal(true);
@@ -198,8 +199,9 @@ export default function PromotionsPage() {
                     input: {
                         id: editingPromotion.id,
                         name: formData.name.trim(),
+                        description: formData.description.trim() || null,
                         code,
-                    },
+                    } as any,
                 },
             });
             handleCloseModal();
@@ -618,19 +620,15 @@ export default function PromotionsPage() {
                                     Internal name for this promotion (visible to admins only)
                                 </div>
                                 
-                                {!editingPromotion && (
-                                    <>
-                                        <Input
-                                            label="Description"
-                                            value={formData.description}
-                                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                            placeholder="Get 20% off your first order!"
-                                        />
-                                        <div className="text-xs text-zinc-600 -mt-2">
-                                            Customer-facing description shown in the app
-                                        </div>
-                                    </>
-                                )}
+                                <Input
+                                    label="Description"
+                                    value={formData.description}
+                                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                    placeholder="Get 20% off your first order!"
+                                />
+                                <div className="text-xs text-zinc-600 -mt-2">
+                                    Customer-facing description shown in the app and promo details modal
+                                </div>
 
                                 <Input
                                     label="Promo Code (Optional)"

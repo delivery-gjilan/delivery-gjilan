@@ -64,6 +64,18 @@ type OrderPromotion {
     promoCode: String
 }
 
+type OrderReview {
+    id: ID!
+    orderId: ID!
+    businessId: ID!
+    userId: ID!
+    rating: Int!
+    comment: String
+    quickFeedback: [String!]!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+}
+
 type OrderDriverLiveTracking {
     orderId: ID!
     driverId: ID!
@@ -146,6 +158,7 @@ type Order {
     approvalReasons: [ApprovalReason!]
     businesses: [OrderBusiness!]!
     orderPromotions: [OrderPromotion!]
+    review: OrderReview
     settlementPreview: OrderSettlementPreview
 }
 
@@ -163,6 +176,7 @@ type Query {
     uncompletedOrders: [Order!]!
     prioritySurchargeAmount: Float!
     driverOrderFinancials(orderId: ID!): DriverOrderFinancials
+    businessOrderReviews(limit: Int, offset: Int): [OrderReview!]!
 }
 
 type Mutation {
@@ -175,6 +189,7 @@ type Mutation {
     adminCancelOrder(id: ID!, reason: String!, settleDriver: Boolean, settleBusiness: Boolean): Order!
     setOrderAdminNote(id: ID!, note: String): Order!
     approveOrder(id: ID!): Order!
+    submitOrderReview(orderId: ID!, rating: Int!, comment: String, quickFeedback: [String!]): OrderReview!
     createOrder(input: CreateOrderInput!): Order!
     createTestOrder: Order!
 }

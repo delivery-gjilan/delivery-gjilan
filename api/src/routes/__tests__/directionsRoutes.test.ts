@@ -174,6 +174,17 @@ describe('GET /api/directions — cache hit', () => {
         expect(res.body.distanceKm).toBe(5);
         expect(fetchSpy).not.toHaveBeenCalled();
     });
+
+    it('normalizes coordinates in cache key for better reuse', async () => {
+        stubMapboxSuccess(5000, 600);
+
+        await request(app)
+            .get('/api/directions?points=21.1234567,42.7654321;21.7654321,42.1234567')
+            .set('Authorization', `Bearer ${makeToken()}`);
+
+        const cacheGetKey = mockCacheGet.mock.calls.at(-1)?.[0] as string;
+        expect(cacheGetKey).toContain('21.12346,42.76543;21.76543,42.12346');
+    });
 });
 
 describe('GET /api/directions — Mapbox proxy', () => {
@@ -209,6 +220,42 @@ describe('GET /api/directions — Mapbox proxy', () => {
             expect.objectContaining({ distanceKm: expect.any(Number) }),
             65,
         );
+    });
+
+    it('deduplicates concurrent cache-miss requests for the same route', async () => {
+        const delayedFetch = vi.fn().mockImplementation(() =>
+            new Promise((resolve) => {
+                setTimeout(() => {
+                    resolve({
+                        ok: true,
+                        json: vi.fn().mockResolvedValue({
+                            routes: [
+                                {
+                                    distance: 5000,
+                                    duration: 600,
+                                    geometry: { coordinates: [[21.16, 42.66], [21.18, 42.68]] },
+                                    legs: [],
+                                },
+                            ],
+                        }),
+                    });
+                }, 15);
+            }),
+        );
+        vi.stubGlobal('fetch', delayedFetch as any);
+
+        const [res1, res2] = await Promise.all([
+            request(app)
+                .get('/api/directions?points=21.16,42.66;21.18,42.68')
+                .set('Authorization', `Bearer ${makeToken()}`),
+            request(app)
+                .get('/api/directions?points=21.16,42.66;21.18,42.68')
+                .set('Authorization', `Bearer ${makeToken()}`),
+        ]);
+
+        expect(res1.status).toBe(200);
+        expect(res2.status).toBe(200);
+        expect(delayedFetch).toHaveBeenCalledTimes(1);
     });
 
     it('returns 404 when Mapbox returns no routes', async () => {

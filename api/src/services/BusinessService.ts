@@ -57,6 +57,8 @@ export class BusinessService {
             createdAt: new Date(business.createdAt),
             updatedAt: new Date(business.updatedAt),
             isOpen: true, // computed by field resolver
+            ratingAverage: 0,
+            ratingCount: 0,
         };
     }
 

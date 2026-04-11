@@ -10,6 +10,13 @@ const MAPBOX_TOKEN = process.env.MAPBOX_TOKEN ?? '';
 
 /** 65 s — must be >= the 60 s recalc gate used by all clients. */
 const CACHE_TTL_SECONDS = 65;
+/** Round coordinates for cache keys only (Mapbox request keeps original precision). */
+const CACHE_KEY_DECIMALS = 5;
+
+type DirectionsResult = Record<string, unknown>;
+
+// Deduplicate concurrent cache-miss requests for the same route/options.
+const inFlightRequests = new Map<string, Promise<DirectionsResult>>();
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -57,6 +64,71 @@ function parsePoints(raw: string): string | null {
     return validated.join(';');
 }
 
+function normalizePointsForCache(points: string): string {
+    return points
+        .split(';')
+        .map((pair) => {
+            const [lonRaw, latRaw] = pair.split(',');
+            const lon = Number(lonRaw);
+            const lat = Number(latRaw);
+            return `${lon.toFixed(CACHE_KEY_DECIMALS)},${lat.toFixed(CACHE_KEY_DECIMALS)}`;
+        })
+        .join(';');
+}
+
+async function fetchAndTransformDirections(
+    safePoints: string,
+    withSteps: boolean,
+    lang: string,
+): Promise<DirectionsResult> {
+    if (!MAPBOX_TOKEN) {
+        throw { status: 503, body: { error: 'Directions service unavailable' } };
+    }
+
+    const extras = withSteps ? `&steps=true&language=${lang}` : '';
+    const mapboxUrl =
+        `https://api.mapbox.com/directions/v5/mapbox/driving/${safePoints}` +
+        `?access_token=${MAPBOX_TOKEN}&geometries=geojson&overview=full${extras}`;
+
+    const upstream = await fetch(mapboxUrl);
+    if (!upstream.ok) {
+        let mapboxBody: unknown;
+        try { mapboxBody = await upstream.json(); } catch { mapboxBody = await upstream.text().catch(() => null); }
+        log.error({ status: upstream.status, mapboxBody }, 'Mapbox upstream error');
+        throw {
+            status: 502,
+            body: { error: 'Upstream directions error', mapboxStatus: upstream.status, detail: mapboxBody },
+        };
+    }
+
+    const data: any = await upstream.json();
+    if (!data.routes?.length) {
+        throw { status: 404, body: { error: 'No route found' } };
+    }
+
+    const route = data.routes[0];
+    const result: DirectionsResult = {
+        distanceKm: route.distance / 1000,
+        durationMin: route.duration / 60,
+        geometry: route.geometry.coordinates as Array<[number, number]>,
+    };
+
+    if (withSteps) {
+        result.steps = (route.legs ?? []).flatMap((leg: any) =>
+            (leg.steps ?? []).map((step: any) => ({
+                instruction: step.maneuver.instruction ?? 'Continue straight',
+                distanceM: step.distance,
+                durationS: step.duration,
+                maneuverType: step.maneuver.type,
+                maneuverModifier: step.maneuver.modifier,
+                maneuverLocation: step.maneuver.location,
+            })),
+        );
+    }
+
+    return result;
+}
+
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 /**
@@ -86,7 +158,8 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
     const withSteps = steps === 'true';
     const lang = typeof language === 'string' && /^[a-z]{2,5}$/.test(language) ? language : 'en';
 
-    const cacheKey = `dir:${safePoints}:s=${withSteps}:l=${lang}`;
+    const normalizedPoints = normalizePointsForCache(safePoints);
+    const cacheKey = `dir:${normalizedPoints}:s=${withSteps}:l=${lang}`;
 
     const cached = await cache.get<object>(cacheKey);
     if (cached) {
@@ -94,56 +167,41 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
         return;
     }
 
-    if (!MAPBOX_TOKEN) {
-        log.warn('MAPBOX_TOKEN not set — directions unavailable');
-        res.status(503).json({ error: 'Directions service unavailable' });
-        return;
-    }
-
-    const extras = withSteps ? `&steps=true&language=${lang}` : '';
-    const mapboxUrl =
-        `https://api.mapbox.com/directions/v5/mapbox/driving/${safePoints}` +
-        `?access_token=${MAPBOX_TOKEN}&geometries=geojson&overview=full${extras}`;
-
     try {
-        const upstream = await fetch(mapboxUrl);
-        if (!upstream.ok) {
-            let mapboxBody: unknown;
-            try { mapboxBody = await upstream.json(); } catch { mapboxBody = await upstream.text().catch(() => null); }
-            log.error({ status: upstream.status, mapboxBody }, 'Mapbox upstream error');
-            res.status(502).json({ error: 'Upstream directions error', mapboxStatus: upstream.status, detail: mapboxBody });
+        const existingInFlight = inFlightRequests.get(cacheKey);
+        if (existingInFlight) {
+            const sharedResult = await existingInFlight;
+            res.json(sharedResult);
             return;
         }
 
-        const data: any = await upstream.json();
-        if (!data.routes?.length) {
-            res.status(404).json({ error: 'No route found' });
-            return;
-        }
+        const inFlightPromise = (async () => {
+            const freshResult = await fetchAndTransformDirections(safePoints, withSteps, lang);
+            await cache.set(cacheKey, freshResult, CACHE_TTL_SECONDS);
+            return freshResult;
+        })();
 
-        const route = data.routes[0];
-        const result: Record<string, unknown> = {
-            distanceKm: route.distance / 1000,
-            durationMin: route.duration / 60,
-            geometry: route.geometry.coordinates as Array<[number, number]>,
-        };
-
-        if (withSteps) {
-            result.steps = (route.legs ?? []).flatMap((leg: any) =>
-                (leg.steps ?? []).map((step: any) => ({
-                    instruction: step.maneuver.instruction ?? 'Continue straight',
-                    distanceM: step.distance,
-                    durationS: step.duration,
-                    maneuverType: step.maneuver.type,
-                    maneuverModifier: step.maneuver.modifier,
-                    maneuverLocation: step.maneuver.location,
-                })),
-            );
-        }
-
-        await cache.set(cacheKey, result, CACHE_TTL_SECONDS);
+        inFlightRequests.set(cacheKey, inFlightPromise);
+        inFlightPromise.then(
+            () => {
+                inFlightRequests.delete(cacheKey);
+            },
+            () => {
+                inFlightRequests.delete(cacheKey);
+            },
+        );
+        const result = await inFlightPromise;
         res.json(result);
     } catch (err) {
+        const maybeError = err as { status?: number; body?: unknown };
+        if (maybeError?.status && maybeError?.body) {
+            if (maybeError.status === 503) {
+                log.warn('MAPBOX_TOKEN not set — directions unavailable');
+            }
+            res.status(maybeError.status).json(maybeError.body);
+            return;
+        }
+
         log.error({ err }, 'Directions proxy error');
         res.status(500).json({ error: 'Internal directions error' });
     }

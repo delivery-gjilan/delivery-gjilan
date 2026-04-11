@@ -70,7 +70,7 @@ export function RestaurantCard({
     deliveryFee,
     avgPrepTimeMinutes,
     prepTimeOverrideMinutes,
-    rating = 8.6,
+    rating,
     priceRange = '$$$$',
     discount,
     isNew,
@@ -286,15 +286,19 @@ export function RestaurantCard({
                         {priceRange}
                     </Text>
 
-                    <Text style={{ color: theme.colors.subtext }}>•</Text>
+                    {rating != null && (
+                        <>
+                            <Text style={{ color: theme.colors.subtext }}>•</Text>
 
-                    {/* Rating */}
-                    <View className="flex-row items-center gap-1">
-                        <Ionicons name="happy-outline" size={16} color={theme.colors.subtext} />
-                        <Text className="text-sm" style={{ color: theme.colors.subtext }}>
-                            {rating.toFixed(1)}
-                        </Text>
-                    </View>
+                            {/* Rating */}
+                            <View className="flex-row items-center gap-1">
+                                <Ionicons name="happy-outline" size={16} color={theme.colors.subtext} />
+                                <Text className="text-sm" style={{ color: theme.colors.subtext }}>
+                                    {rating.toFixed(1)}
+                                </Text>
+                            </View>
+                        </>
+                    )}
                 </View>
 
                 {/* Open/Closed Status (if closed, show it prominently) */}

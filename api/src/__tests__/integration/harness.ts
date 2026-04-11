@@ -39,7 +39,7 @@ import {
     userPromotions,
     users,
 } from '@/database/schema';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { OrderService } from '@/services/OrderService';
 import { PricingService } from '@/services/PricingService';
 import { PromotionEngine, type CartContext, type PromotionResult } from '@/services/PromotionEngine';
@@ -893,6 +893,15 @@ export class OrderFlowHarness {
                 })),
             )
             .returning();
+
+        for (const item of params.items) {
+            await this.db
+                .update(products)
+                .set({
+                    orderCount: sql<number>`GREATEST(${products.orderCount} + ${item.quantity}, 0)`,
+                })
+                .where(eq(products.id, item.productId));
+        }
 
         if (promoRows.length > 0) {
             await this.db.insert(orderPromotions).values(

@@ -24,13 +24,6 @@ export default function AdminTabsLayout() {
                 tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
             }}>
             <Tabs.Screen
-                name="map"
-                options={{
-                    title: 'Map',
-                    tabBarIcon: ({ color, size }) => <Ionicons name="map" size={size} color={color} />,
-                }}
-            />
-            <Tabs.Screen
                 name="orders"
                 options={{
                     title: 'Orders',

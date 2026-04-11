@@ -1,6 +1,6 @@
 import type { OrderResolvers } from './../../../generated/types.generated';
 import { SettlementCalculationEngine } from '@/services/SettlementCalculationEngine';
-import { orders as ordersTable, orderItems as orderItemsTable } from '@/database/schema';
+import { orderItems as orderItemsTable, orderReviews, orders as ordersTable } from '@/database/schema';
 import { eq } from 'drizzle-orm';
 import logger from '@/lib/logger';
 
@@ -34,6 +34,35 @@ export const Order: OrderResolvers = {
             logger.error({ err: error, orderId: parent.id }, 'order:resolvePromotions failed');
             return [];
         }
+    },
+
+    review: async (parent, _args, { db, userData }) => {
+        if (!userData.userId) return null;
+
+        const role = userData.role;
+        const canViewAsCustomer = role === 'CUSTOMER' && String((parent as any).userId || '') === userData.userId;
+        const canViewAsBusiness =
+            (role === 'BUSINESS_OWNER' || role === 'BUSINESS_EMPLOYEE') &&
+            !!userData.businessId &&
+            String((parent as any).businessId || '') === userData.businessId;
+
+        if (!canViewAsCustomer && !canViewAsBusiness) {
+            return null;
+        }
+
+        const row = await db.query.orderReviews.findFirst({
+            where: eq(orderReviews.orderId, String(parent.id)),
+        });
+
+        if (!row) return null;
+
+        return {
+            ...row,
+            comment: row.comment ?? null,
+            quickFeedback: row.quickFeedback ?? [],
+            createdAt: new Date(row.createdAt),
+            updatedAt: new Date(row.updatedAt),
+        };
     },
 
     settlementPreview: async (parent, _args, { db, userData }) => {

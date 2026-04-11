@@ -12,9 +12,13 @@ export const updatePromotion: NonNullable<MutationResolvers['updatePromotion']> 
 
   const db = await getDB();
   
-  // Editing promotions is intentionally limited for now (name + code only)
+  // Editing supports name, description, and code
   const updateData: any = {};
   if (input.name !== undefined) updateData.name = input.name;
+  if ((input as any).description !== undefined) {
+    const description = String((input as any).description ?? '').trim();
+    updateData.description = description.length > 0 ? description : null;
+  }
   if (input.code !== undefined) updateData.code = input.code?.trim() ? input.code.toUpperCase() : null;
 
   const [promo] = await db
