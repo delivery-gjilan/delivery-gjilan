@@ -18,17 +18,17 @@
 **Theme:** Dark/Light/System toggle via `useThemeStore` + NativeWind  
 **i18n:** English / Albanian via `useLocaleStore`
 
-## Runtime Environment
+## Firebase Wiring
 
-The app reads runtime variables from `mobile-admin/.env`:
+- Android Firebase config is sourced from `mobile-admin/google-services.json`.
+- iOS Firebase config is sourced from `mobile-admin/GoogleService-Info.plist`.
+- The mobile-admin Android package and iOS bundle IDs are both `com.zippdelivery.mobileadmin`.
+- Firebase project linkage for mobile-admin points to project `delivery-gjilan` with sender ID `283403304701`.
 
-| Variable | Required | Usage |
-|----------|----------|-------|
-| `EXPO_PUBLIC_API_URL` | Yes | Base GraphQL HTTP URL in Apollo client; subscriptions derive `ws://`/`wss://` by replacing `http` with `ws`. |
-| `EXPO_PUBLIC_MAPBOX_TOKEN` | Yes for live map | Map rendering and Directions API calls on the `Map` tab. |
-| `NODE_ENV` | Recommended | Standard environment mode for Expo/React Native behavior. |
+## iOS Privacy Strings
 
-`mobile-admin/.env.example` contains the expected keys and placeholder values.
+- The iOS build includes `NSLocationWhenInUseUsageDescription` for map centering on admin location.
+- The iOS build includes `NSCameraUsageDescription` for camera access required by camera-referencing SDK code paths and admin operational capture/scan flows.
 
 ---
 

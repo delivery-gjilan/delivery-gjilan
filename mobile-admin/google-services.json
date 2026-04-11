@@ -36,9 +36,9 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:283403304701:android:7e02e4c9106e2edfca0894",
+        "mobilesdk_app_id": "1:283403304701:android:efc741c28d97945bca0894",
         "android_client_info": {
-          "package_name": "com.zippdelivery.mobilebusiness"
+          "package_name": "com.zippdelivery.mobileadmin"
         }
       },
       "oauth_client": [
@@ -65,9 +65,9 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:283403304701:android:efc741c28d97945bca0894",
+        "mobilesdk_app_id": "1:283403304701:android:1c89e5a421aaa2e7ca0894",
         "android_client_info": {
-          "package_name": "com.zippdelivery.mobileadmin"
+          "package_name": "com.zippdelivery.mobilebusiness"
         }
       },
       "oauth_client": [

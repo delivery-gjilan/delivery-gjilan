@@ -264,7 +264,7 @@ export function notifyDriverOrderReassigned(
     };
 
     notificationService
-        .sendToUserByAppType(previousDriverId, 'DRIVER', payload, 'ORDER_STATUS')
+        .sendToUserByAppType(previousDriverId, 'DRIVER', payload, 'ORDER_REASSIGNED' as any)
         .catch((err) => logger.error({ err, previousDriverId, orderId }, 'Failed to send driver reassignment notification'));
 }
 
@@ -368,7 +368,7 @@ export function notifyDriversOrderReady(
     };
 
     notificationService
-        .sendToUsersByAppType(driverIds, 'DRIVER', payload, 'ORDER_STATUS')
+        .sendToUsersByAppType(driverIds, 'DRIVER', payload, 'ORDER_READY_POOL' as any)
         .catch((err) => logger.error({ err, orderId }, 'Failed to notify drivers of ready order'));
 }
 
@@ -401,7 +401,7 @@ export function notifyDriversOrderExpanded(
     };
 
     notificationService
-        .sendToUsersByAppType(driverIds, 'DRIVER', payload, 'ORDER_STATUS')
+        .sendToUsersByAppType(driverIds, 'DRIVER', payload, 'ORDER_READY_POOL' as any)
         .catch((err) => logger.error({ err, orderId }, 'Failed to notify expanded drivers'));
 }
 
