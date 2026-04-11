@@ -3,60 +3,64 @@ import { gql } from '@apollo/client';
 // ─── Orders Queries ───
 
 export const GET_ORDERS = gql`
-    query GetOrders {
-        orders(limit: 200) {
-            id
-            displayId
-            orderPrice
-            deliveryPrice
-            totalPrice
-            orderDate
-            updatedAt
-            status
-            needsApproval
-            locationFlagged
-            approvalReasons
-            preparationMinutes
-            estimatedReadyAt
-            preparingAt
-            user {
+    query GetOrders($limit: Int, $offset: Int, $statuses: [OrderStatus!]) {
+        orders(limit: $limit, offset: $offset, statuses: $statuses) {
+            totalCount
+            hasMore
+            orders {
                 id
-                firstName
-                lastName
-                email
-                address
-                phoneNumber
-            }
-            driver {
-                id
-                firstName
-                lastName
-                email
-                phoneNumber
-            }
-            dropOffLocation {
-                latitude
-                longitude
-                address
-            }
-            businesses {
-                business {
+                displayId
+                orderPrice
+                deliveryPrice
+                totalPrice
+                orderDate
+                updatedAt
+                status
+                needsApproval
+                locationFlagged
+                approvalReasons
+                preparationMinutes
+                estimatedReadyAt
+                preparingAt
+                user {
                     id
-                    name
+                    firstName
+                    lastName
+                    email
+                    address
                     phoneNumber
-                    businessType
-                    location {
-                        latitude
-                        longitude
-                        address
-                    }
                 }
-                items {
-                    productId
-                    name
-                    imageUrl
-                    quantity
-                    unitPrice
+                driver {
+                    id
+                    firstName
+                    lastName
+                    email
+                    phoneNumber
+                }
+                dropOffLocation {
+                    latitude
+                    longitude
+                    address
+                }
+                businesses {
+                    business {
+                        id
+                        name
+                        phoneNumber
+                        businessType
+                        location {
+                            latitude
+                            longitude
+                            address
+                        }
+                    }
+                    items {
+                        productId
+                        name
+                        imageUrl
+                        quantity
+                        unitPrice
+                    }
                 }
             }
         }

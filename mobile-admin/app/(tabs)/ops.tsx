@@ -8,11 +8,10 @@ import { useTheme } from '@/hooks/useTheme';
 import { useAuthStore } from '@/store/authStore';
 import { deleteItemAsync } from 'expo-secure-store';
 import { GET_DRIVERS } from '@/graphql/drivers';
-import { ADMIN_SEND_PTT_SIGNAL, ADMIN_SET_SHIFT_DRIVERS } from '@/graphql/ptt';
+import { ADMIN_SET_SHIFT_DRIVERS } from '@/graphql/ptt';
+import { useAdminPtt } from '@/hooks/useAdminPtt';
 
 const CHANNEL_PREFIX = 'admin-driver-ptt';
-
-type PttAction = 'STARTED' | 'STOPPED' | 'MUTE' | 'UNMUTE';
 
 export default function OpsScreen() {
     const theme = useTheme();
@@ -23,8 +22,13 @@ export default function OpsScreen() {
     const [channelName, setChannelName] = useState(`${CHANNEL_PREFIX}-${Date.now()}`);
 
     const { data: driversData, refetch: refetchDrivers }: any = useQuery(GET_DRIVERS);
-    const [sendPttSignal, { loading: sendingPtt }] = useMutation(ADMIN_SEND_PTT_SIGNAL);
     const [setShiftDrivers, { loading: savingShift }] = useMutation(ADMIN_SET_SHIFT_DRIVERS);
+
+    const { isTalking, isDriverTalking, pttError, startTalking, stopTalking, muteDrivers } = useAdminPtt(
+        selectedDriverIds,
+        channelName,
+        () => setChannelName(`${CHANNEL_PREFIX}-${Date.now()}`),
+    );
 
     const onlineDrivers = useMemo(
         () => (driversData?.drivers || []).filter((d: any) => d.driverConnection?.connectionStatus === 'CONNECTED'),
@@ -35,27 +39,23 @@ export default function OpsScreen() {
         setSelectedDriverIds((prev) => (prev.includes(driverId) ? prev.filter((id) => id !== driverId) : [...prev, driverId]));
     };
 
-    const handleSendPtt = async (action: PttAction) => {
+    const handleStartPtt = async () => {
         if (selectedDriverIds.length === 0) {
             Alert.alert('Select drivers', 'Choose at least one online driver for PTT.');
             return;
         }
-
         try {
-            await sendPttSignal({
-                variables: {
-                    driverIds: selectedDriverIds,
-                    channelName,
-                    action,
-                    muted: action === 'MUTE' ? true : action === 'UNMUTE' ? false : undefined,
-                },
-            });
-
-            if (action === 'STOPPED') {
-                setChannelName(`${CHANNEL_PREFIX}-${Date.now()}`);
-            }
+            await startTalking();
         } catch (err: any) {
-            Alert.alert('Error', err?.message || 'Failed to send PTT signal');
+            Alert.alert('Error', err?.message || 'Failed to start PTT');
+        }
+    };
+
+    const handleStopPtt = async () => {
+        try {
+            await stopTalking();
+        } catch (err: any) {
+            Alert.alert('Error', err?.message || 'Failed to stop PTT');
         }
     };
 
@@ -124,17 +124,26 @@ export default function OpsScreen() {
                         )}
                     </View>
 
+                    {isDriverTalking && (
+                        <View className="mt-2 rounded-lg px-3 py-2 flex-row items-center" style={{ backgroundColor: '#22c55e22' }}>
+                            <Ionicons name="mic" size={12} color="#22c55e" />
+                            <Text className="ml-2 text-xs font-semibold" style={{ color: '#22c55e' }}>Driver talking</Text>
+                        </View>
+                    )}
+                    {!!pttError && (
+                        <Text className="mt-2 text-xs" style={{ color: '#ef4444' }}>{pttError}</Text>
+                    )}
                     <View className="flex-row mt-4" style={{ gap: 8 }}>
                         <TouchableOpacity
-                            onPress={() => handleSendPtt('STARTED')}
-                            disabled={sendingPtt}
+                            onPress={handleStartPtt}
+                            disabled={isTalking}
                             className="flex-1 rounded-xl py-2.5 items-center"
-                            style={{ backgroundColor: '#22c55e' }}>
-                            <Text className="text-white text-xs font-semibold">Start</Text>
+                            style={{ backgroundColor: isTalking ? '#166534' : '#22c55e' }}>
+                            <Text className="text-white text-xs font-semibold">{isTalking ? 'Talking…' : 'Start'}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
-                            onPress={() => handleSendPtt('STOPPED')}
-                            disabled={sendingPtt}
+                            onPress={handleStopPtt}
+                            disabled={!isTalking}
                             className="flex-1 rounded-xl py-2.5 items-center"
                             style={{ backgroundColor: '#ef4444' }}>
                             <Text className="text-white text-xs font-semibold">Stop</Text>
@@ -142,15 +151,15 @@ export default function OpsScreen() {
                     </View>
                     <View className="flex-row mt-2" style={{ gap: 8 }}>
                         <TouchableOpacity
-                            onPress={() => handleSendPtt('MUTE')}
-                            disabled={sendingPtt}
+                            onPress={() => muteDrivers(true)}
+                            disabled={!isTalking}
                             className="flex-1 rounded-xl py-2.5 items-center"
                             style={{ backgroundColor: '#f59e0b' }}>
                             <Text className="text-white text-xs font-semibold">Mute</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
-                            onPress={() => handleSendPtt('UNMUTE')}
-                            disabled={sendingPtt}
+                            onPress={() => muteDrivers(false)}
+                            disabled={!isTalking}
                             className="flex-1 rounded-xl py-2.5 items-center"
                             style={{ backgroundColor: '#3b82f6' }}>
                             <Text className="text-white text-xs font-semibold">Unmute</Text>

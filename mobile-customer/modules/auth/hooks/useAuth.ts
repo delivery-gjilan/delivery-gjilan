@@ -42,9 +42,12 @@ export const useAuth = () => {
         });
 
         if (data?.initiateSignup) {
-            const { token, user } = data.initiateSignup;
+            const { token, refreshToken, user } = data.initiateSignup;
             console.log('[Auth] Signup successful, saving token');
             await saveToken(token);
+            if (refreshToken) {
+                await saveRefreshToken(refreshToken);
+            }
             storeLogin(token, user as User);
         }
 

@@ -15,9 +15,10 @@ export function useOperationalOrderAlerts() {
     const ordersRef = useRef<any[]>([]);
 
     const { data } = useQuery(GET_ORDERS, {
+        variables: { limit: 200, offset: 0 },
         skip: !isAuthenticated,
-        fetchPolicy: 'cache-and-network',
-        nextFetchPolicy: 'cache-first',
+        fetchPolicy: 'network-only',
+        nextFetchPolicy: 'cache-and-network',
     });
 
     const notify = useCallback(async (title: string, body: string, orderId: string) => {
@@ -69,7 +70,7 @@ export function useOperationalOrderAlerts() {
             return;
         }
 
-        const orders = Array.isArray(data?.orders) ? data.orders : [];
+        const orders = Array.isArray((data as any)?.orders?.orders) ? (data as any).orders.orders : [];
         ordersRef.current = orders;
 
         if (!initializedRef.current && orders.length > 0) {
@@ -84,12 +85,12 @@ export function useOperationalOrderAlerts() {
         if (initializedRef.current) {
             void evaluateLatePending(orders);
         }
-    }, [data?.orders, evaluateLatePending, isAuthenticated]);
+    }, [(data as any)?.orders?.orders, evaluateLatePending, isAuthenticated]);
 
     useSubscription(ALL_ORDERS_SUBSCRIPTION, {
         skip: !isAuthenticated,
         onData: ({ data: subData }) => {
-            const incoming = subData.data?.allOrdersUpdated as any[] | undefined;
+            const incoming = (subData.data as any)?.allOrdersUpdated as any[] | undefined;
             if (!incoming || incoming.length === 0) return;
 
             incoming.forEach((order) => {

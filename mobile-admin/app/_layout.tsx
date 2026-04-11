@@ -27,7 +27,6 @@ function AppContent() {
                     headerShown: false,
                 }}
             />
-            <Stack.Screen
             <Stack.Screen name="ops-notifications" options={{ headerShown: false }} />
         </Stack>
     );

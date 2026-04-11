@@ -37,6 +37,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const QUICK_PREPARATION_MINUTES = 20;
+const ACTIVE_ORDER_STATUSES = ['AWAITING_APPROVAL', 'PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'] as const;
 
 type RouteData = {
     distanceKm: number;
@@ -67,20 +68,26 @@ export default function MapScreen() {
     const [assignSheetVisible, setAssignSheetVisible] = useState(false);
     const [orderRoutes, setOrderRoutes] = useState<Record<string, { toPickup?: RouteData; toDropoff?: RouteData; cacheKey: string }>>({});
 
-    const { data: ordersData, loading: ordersLoading, refetch: refetchOrders }: any = useQuery(GET_ORDERS);
-    const { data: driversData, refetch: refetchDrivers }: any = useQuery(GET_DRIVERS);
+    const orderQueryVariables = useMemo(
+        () => ({ limit: 200, offset: 0, statuses: [...ACTIVE_ORDER_STATUSES] }),
+        [],
+    );
+
+    const { data: ordersData, loading: ordersLoading, refetch: refetchOrders }: any = useQuery(GET_ORDERS, {
+        variables: orderQueryVariables,
+        fetchPolicy: 'network-only',
+        nextFetchPolicy: 'cache-and-network',
+        notifyOnNetworkStatusChange: true,
+    });
+    const { data: driversData }: any = useQuery(GET_DRIVERS);
 
     const ordersRefetchCooldownRef = useRef(0);
     const ordersRefetchInFlightRef = useRef(false);
     const ordersRefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const driversRefetchCooldownRef = useRef(0);
-    const driversRefetchInFlightRef = useRef(false);
-    const driversRefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         return () => {
             if (ordersRefetchTimerRef.current) clearTimeout(ordersRefetchTimerRef.current);
-            if (driversRefetchTimerRef.current) clearTimeout(driversRefetchTimerRef.current);
         };
     }, []);
 
@@ -108,61 +115,63 @@ export default function MapScreen() {
         });
     }, [refetchOrders]);
 
-    const scheduleDriversRefetch = useCallback(() => {
-        const now = Date.now();
-        const canRunNow = now - driversRefetchCooldownRef.current >= 1200 && !driversRefetchInFlightRef.current;
-        if (!canRunNow) {
-            if (driversRefetchTimerRef.current) return;
-            driversRefetchTimerRef.current = setTimeout(() => {
-                driversRefetchTimerRef.current = null;
-                if (driversRefetchInFlightRef.current) return;
-                driversRefetchInFlightRef.current = true;
-                driversRefetchCooldownRef.current = Date.now();
-                refetchDrivers().finally(() => {
-                    driversRefetchInFlightRef.current = false;
-                });
-            }, 350);
-            return;
-        }
-
-        driversRefetchInFlightRef.current = true;
-        driversRefetchCooldownRef.current = now;
-        refetchDrivers().finally(() => {
-            driversRefetchInFlightRef.current = false;
-        });
-    }, [refetchDrivers]);
-
     useSubscription(ALL_ORDERS_SUBSCRIPTION, {
         onData: ({ data: subscriptionData }) => {
-            const incomingOrders = subscriptionData.data?.allOrdersUpdated as any[] | undefined;
+            const incomingOrders = (subscriptionData.data as any)?.allOrdersUpdated as any[] | undefined;
             if (!incomingOrders || incomingOrders.length === 0) {
                 scheduleOrdersRefetch();
                 return;
             }
 
-            apolloClient.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
-                const currentOrders = Array.isArray(existing?.orders) ? existing.orders : [];
+            apolloClient.cache.updateQuery({ query: GET_ORDERS, variables: orderQueryVariables }, (existing: any) => {
+                const currentConnection = existing?.orders;
+                const currentOrders = Array.isArray(currentConnection?.orders) ? currentConnection.orders : [];
                 const byId = new Map(currentOrders.map((order: any) => [String(order?.id), order]));
 
                 incomingOrders.forEach((order: any) => {
                     const existingOrder = byId.get(String(order?.id));
-                    byId.set(String(order?.id), { ...existingOrder, ...order });
+                    if (existingOrder && typeof existingOrder === 'object') {
+                        byId.set(String(order?.id), { ...existingOrder, ...order });
+                    } else {
+                        byId.set(String(order?.id), order);
+                    }
                 });
+
+                const filtered = Array.from(byId.values()).filter(
+                    (order: any) => order?.status && ACTIVE_ORDER_STATUSES.includes(order.status),
+                );
 
                 return {
                     ...(existing ?? {}),
-                    orders: Array.from(byId.values()),
+                    orders: {
+                        ...(currentConnection ?? {}),
+                        orders: filtered,
+                    },
                 };
             });
         },
     });
-    useSubscription(DRIVERS_UPDATED_SUBSCRIPTION, { onData: () => scheduleDriversRefetch() });
+    useSubscription(DRIVERS_UPDATED_SUBSCRIPTION, {
+        onData: ({ data: subscriptionData }) => {
+            const updatedDrivers = (subscriptionData.data as any)?.driversUpdated as any[] | undefined;
+            if (!updatedDrivers || updatedDrivers.length === 0) return;
+            apolloClient.cache.updateQuery({ query: GET_DRIVERS }, (existing: any) => {
+                const currentDrivers: any[] = existing?.drivers || [];
+                const byId = new Map(currentDrivers.map((d: any) => [String(d?.id), d]));
+                updatedDrivers.forEach((driver: any) => {
+                    const existing = byId.get(String(driver?.id));
+                    byId.set(String(driver?.id), existing ? { ...existing, ...driver } : driver);
+                });
+                return { ...(existing ?? {}), drivers: Array.from(byId.values()) };
+            });
+        },
+    });
 
-    const orders = ordersData?.orders || [];
+    const orders = ordersData?.orders?.orders || [];
     const drivers = driversData?.drivers || [];
 
     const activeOrders = useMemo(
-        () => orders.filter((o: any) => ['AWAITING_APPROVAL', 'PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'].includes(o.status)),
+        () => orders.filter((o: any) => ACTIVE_ORDER_STATUSES.includes(o.status)),
         [orders],
     );
 
@@ -431,11 +440,13 @@ export default function MapScreen() {
                         const bgColor = isOnline ? '#22c55e' : '#94a3b8';
 
                         return (
-                            <Mapbox.PointAnnotation
+                            <Mapbox.MarkerView
                                 key={`driver-${driver.id}`}
                                 id={`driver-${driver.id}`}
                                 coordinate={[loc.longitude, loc.latitude]}
-                                onSelected={() => {
+                                anchor={{ x: 0.5, y: 0.5 }}>
+                                <Pressable
+                                    onPress={() => {
                                     setFocusedOrderId(null);
                                     if (isTracking) {
                                         setTrackingDriverId(null);
@@ -447,14 +458,15 @@ export default function MapScreen() {
                                             animationDuration: 600,
                                         });
                                     }
-                                }}>
+                                    }}>
                                 <View style={styles.markerContainer}>
                                     {isTracking && <View style={[styles.trackingRing, { borderColor: '#3b82f6' }]} />}
                                     <View style={[styles.driverMapMarker, { backgroundColor: bgColor, borderColor: isTracking ? '#3b82f6' : '#fff' }]}>
                                         <Text style={styles.driverMapInitial}>{getInitials(`${driver.firstName} ${driver.lastName}`)}</Text>
                                     </View>
                                 </View>
-                            </Mapbox.PointAnnotation>
+                                </Pressable>
+                            </Mapbox.MarkerView>
                         );
                     })}
 
@@ -465,26 +477,28 @@ export default function MapScreen() {
                         if (!dropLoc?.latitude || !dropLoc?.longitude) return null;
 
                         return (
-                            <Mapbox.PointAnnotation
+                            <Mapbox.MarkerView
                                 key={`order-${order.id}`}
                                 id={`order-${order.id}`}
                                 coordinate={[dropLoc.longitude, dropLoc.latitude]}
-                                onSelected={() => focusOrder(order)}>
-                                <View style={styles.orderMarkerContainer}>
-                                    <View
-                                        style={[
-                                            styles.orderMarker,
-                                            {
-                                                backgroundColor: 'rgba(255,255,255,0.96)',
-                                                borderColor: statusColor,
-                                                borderWidth: isFocused ? 3 : 2,
-                                                transform: [{ scale: isFocused ? 1.15 : 1 }],
-                                            },
-                                        ]}>
-                                        <Ionicons name="cube" size={16} color={statusColor} />
+                                anchor={{ x: 0.5, y: 0.5 }}>
+                                <Pressable onPress={() => focusOrder(order)}>
+                                    <View style={styles.orderMarkerContainer}>
+                                        <View
+                                            style={[
+                                                styles.orderMarker,
+                                                {
+                                                    backgroundColor: 'rgba(255,255,255,0.96)',
+                                                    borderColor: statusColor,
+                                                    borderWidth: isFocused ? 3 : 2,
+                                                    transform: [{ scale: isFocused ? 1.15 : 1 }],
+                                                },
+                                            ]}>
+                                            <Ionicons name="cube" size={16} color={statusColor} />
+                                        </View>
                                     </View>
-                                </View>
-                            </Mapbox.PointAnnotation>
+                                </Pressable>
+                            </Mapbox.MarkerView>
                         );
                     })}
                 </Mapbox.MapView>
