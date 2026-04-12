@@ -209,6 +209,7 @@ type Business {
   activePromotion: BusinessPromotion
   avgPrepTimeMinutes: Int!
   businessType: BusinessType!
+  category: String
   commissionPercentage: Float!
   createdAt: Date!
   description: String
@@ -401,6 +402,7 @@ input CreateBannerInput {
 input CreateBusinessInput {
   avgPrepTimeMinutes: Int
   businessType: BusinessType!
+  category: String
   description: String
   imageUrl: String
   location: LocationInput!
@@ -2138,6 +2140,7 @@ input UpdateBannerInput {
 input UpdateBusinessInput {
   avgPrepTimeMinutes: Int
   businessType: BusinessType
+  category: String
   commissionPercentage: Float
   description: String
   imageUrl: String
