@@ -15,7 +15,6 @@ import {
   Users,
   UserCog,
   DollarSign,
-  Wallet,
   Activity,
   Bell,
   LayoutDashboard,
@@ -23,7 +22,6 @@ import {
   MessageSquare,
   Monitor,
   ChevronDown,
-  Settings,
   Star,
 } from "lucide-react";
 
@@ -82,14 +80,10 @@ const sections: NavSection[] = [
     items: [
       { name: "Categories", href: "/dashboard/categories", icon: Tag, businessAdminVisible: true },
       { name: "Products", href: "/dashboard/products", icon: Package, businessAdminVisible: true },
-      { name: "Settlements", href: "/dashboard/business-settlements", icon: Wallet, businessAdminVisible: true },
-      { name: "Working Hours", href: "/dashboard/business-settings", icon: Settings, businessAdminVisible: true },
       { name: "Banners", href: "/admin/banners", icon: Image, superAdminOnly: true },
       { name: "Featured", href: "/admin/featured", icon: Star, superAdminOnly: true },
       { name: "Notifications", href: "/dashboard/notifications", icon: Bell, superAdminOnly: true },
-      { name: "Push Telemetry", href: "/dashboard/notifications/telemetry", icon: Activity, superAdminOnly: true },
       { name: "Business Devices", href: "/dashboard/notifications/devices", icon: Activity, superAdminOnly: true },
-      { name: "Realtime", href: "/dashboard/realtime", icon: Activity, superAdminOnly: true },
       { name: "Ops Wall", href: "/dashboard/ops-wall", icon: Monitor, superAdminOnly: true },
       { name: "Logs", href: "/dashboard/logs", icon: Activity, superAdminOnly: true },
     ],
@@ -137,7 +131,7 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-[200px] bg-[#09090b] border-r border-[#1e1e22] flex flex-col py-4 h-screen overflow-visible">
+    <aside className="w-[250px] bg-[#09090b] border-r border-[#1e1e22] flex flex-col py-4 h-screen overflow-visible">
       {/* Logo */}
       <Link
         href="/dashboard"
@@ -162,13 +156,13 @@ export default function Sidebar() {
               {/* Section header — clickable to collapse */}
               <button
                 onClick={() => toggleSection(section.header)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-150 group ${
+                className={`w-full flex items-center justify-between gap-1 px-3 py-2.5 rounded-lg transition-all duration-150 group ${
                   sectionHasActive
                     ? 'bg-violet-500/10 text-violet-300'
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
                 }`}
               >
-                <span className="text-sm font-semibold">
+                <span className="text-sm font-semibold truncate">
                   {section.header}
                 </span>
                 <ChevronDown

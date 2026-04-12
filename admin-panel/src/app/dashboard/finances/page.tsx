@@ -12,11 +12,6 @@ export default function FinancesRedirectPage() {
         if (loading) return;
 
         const role = admin?.role;
-        if (role === 'BUSINESS_OWNER' || role === 'BUSINESS_EMPLOYEE') {
-            router.replace('/dashboard/business-settlements');
-            return;
-        }
-
         if (role === 'SUPER_ADMIN') {
             router.replace('/admin/financial/settlements');
             return;

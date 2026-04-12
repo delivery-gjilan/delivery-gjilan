@@ -11,7 +11,6 @@ const superAdminOnlyPrefixes = [
     "/dashboard/admins",
     "/dashboard/users",
     "/dashboard/notifications",
-    "/dashboard/realtime",
     "/dashboard/ops-wall",
     "/dashboard/logs",
     "/admin",
@@ -21,8 +20,6 @@ const businessUserAllowedPrefixes = [
     "/dashboard/orders",
     "/dashboard/categories",
     "/dashboard/products",
-    "/dashboard/business-settlements",
-    "/dashboard/business-settings",
 ];
 
 function pathStartsWithAny(pathname: string, prefixes: string[]): boolean {
