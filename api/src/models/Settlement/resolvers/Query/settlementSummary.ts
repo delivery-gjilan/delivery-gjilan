@@ -1,6 +1,8 @@
 import type { QueryResolvers } from './../../../../generated/types.generated';
 import { AppContext } from '@/index';
 import { SettlementRepository } from '@/repositories/SettlementRepository';
+import { drivers as driversTable } from '@/database/schema';
+import { eq } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 import { hasPermission, isPlatformAdmin } from '@/lib/utils/permissions';
 
@@ -16,6 +18,16 @@ export const settlementSummary: NonNullable<QueryResolvers['settlementSummary']>
         throw new GraphQLError('Unauthorized', {
             extensions: { code: 'UNAUTHORIZED' },
         });
+    }
+
+    // Platform admins: normalize driverId (UI sends users.id, settlements store drivers.id)
+    if (isPlatformAdmin(userData.role) && resolvedArgs.driverId) {
+        const driverRecord = await db.query.drivers.findFirst({
+            where: eq(driversTable.userId, resolvedArgs.driverId),
+        });
+        if (driverRecord) {
+            resolvedArgs = { ...resolvedArgs, driverId: driverRecord.id };
+        }
     }
 
     if (!isPlatformAdmin(userData.role)) {

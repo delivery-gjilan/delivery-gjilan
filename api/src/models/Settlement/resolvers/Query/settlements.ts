@@ -29,6 +29,16 @@ export const settlements: NonNullable<QueryResolvers['settlements']> = async (
         }
     }
 
+    // Platform admins: normalize driverId (UI sends users.id, settlements store drivers.id)
+    if (isPlatformAdmin(userData.role) && resolvedArgs.driverId) {
+        const driverRecord = await db.query.drivers.findFirst({
+            where: eq(driversTable.userId, resolvedArgs.driverId),
+        });
+        if (driverRecord) {
+            resolvedArgs = { ...resolvedArgs, driverId: driverRecord.id };
+        }
+    }
+
     if (!isPlatformAdmin(userData.role)) {
         if (userData.role === 'BUSINESS_OWNER') {
             if (!userData.businessId) {
