@@ -106,11 +106,21 @@ export class SettlementCalculationEngine {
             // Driver collected the priority surcharge cash and must remit it.
             this.addPrioritySurchargeSettlement(order, driverId, results);
 
+<<<<<<< Updated upstream
             // ── Automatic: stock item remittance (CASH_TO_DRIVER + inventory mode) ──
             // If inventory mode is on and stock was deducted for this order,
             // the driver owes the base price of items they picked up for free from
             // the operator's personal stock (they didn't buy them at market).
             await this.addStockItemSettlements(order, driverId, results);
+=======
+            // ── Automatic: driver tip passthrough ──
+            // For PREPAID_TO_PLATFORM orders the platform collected the tip from the
+            // customer and must forward it to the driver (DRIVER PAYABLE).  For
+            // CASH_TO_DRIVER orders the driver already received the tip in cash so
+            // no settlement entry is needed — the tip reduces their net remittance
+            // naturally via the amountToCollectFromCustomer calculation.
+            this.addDriverTipSettlement(order, driverId, results);
+>>>>>>> Stashed changes
 
             // ── Delivery fee rules (most-specific-wins: BP > P > B > G) ──
             // If no rules at any level, fall back to the driver's own commission %.
@@ -215,6 +225,32 @@ export class SettlementCalculationEngine {
             amount: Number(prioritySurcharge.toFixed(2)),
             ruleId: null,
             reason: `Priority surcharge remittance (€${prioritySurcharge.toFixed(2)} cash collected)`,
+        });
+    }
+
+    /**
+     * Driver tip passthrough: for PREPAID_TO_PLATFORM orders the customer paid the
+     * platform (including tip), so the platform owes the driver the tip amount.
+     * For CASH_TO_DRIVER the driver already collected the tip directly in cash —
+     * no settlement entry is required; the tip is already captured in
+     * amountToCollectFromCustomer and is effectively theirs to keep.
+     */
+    private addDriverTipSettlement(order: DbOrder, driverId: string | null, results: SettlementCalculation[]): void {
+        if (!driverId) return;
+        if (order.paymentCollection !== 'PREPAID_TO_PLATFORM') return;
+
+        const driverTip = Number((order as any).driverTip ?? 0);
+        if (driverTip <= 0) return;
+
+        results.push({
+            type: 'DRIVER',
+            direction: 'PAYABLE',
+            driverId,
+            businessId: null,
+            orderId: order.id,
+            amount: Number(driverTip.toFixed(2)),
+            ruleId: null,
+            reason: `Driver tip (€${driverTip.toFixed(2)} prepaid by customer)`,
         });
     }
 

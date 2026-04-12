@@ -93,7 +93,7 @@ export function MarketProductCard({ product, businessType, onPress }: MarketProd
 
                 <View className="flex-row items-center justify-between mt-2">
                     <View className="flex-row items-baseline" style={{ gap: 6 }}>
-                        <Text className="text-base font-bold" style={{ color: theme.colors.primary }}>
+                        <Text className="text-base font-bold" style={{ color: theme.colors.text }}>
                             €{effectivePrice.toFixed(2)}
                         </Text>
                         {preDiscountPrice != null && (
@@ -109,13 +109,13 @@ export function MarketProductCard({ product, businessType, onPress }: MarketProd
                             className="px-3 py-1.5 rounded-full"
                             style={{ 
                                 borderWidth: 1, 
-                                borderColor: isSoldOut ? theme.colors.subtext : theme.colors.primary,
+                                borderColor: isSoldOut ? theme.colors.subtext : theme.colors.border,
                                 opacity: isSoldOut ? 0.5 : 1
                             }}
                             activeOpacity={isSoldOut ? 1 : 0.8}
                             disabled={isSoldOut}
                         >
-                            <Text className="text-xs font-semibold" style={{ color: isSoldOut ? theme.colors.subtext : theme.colors.primary }}>
+                            <Text className="text-xs font-semibold" style={{ color: isSoldOut ? theme.colors.subtext : theme.colors.text }}>
                                 Shto
                             </Text>
                         </TouchableOpacity>

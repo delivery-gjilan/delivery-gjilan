@@ -20,6 +20,7 @@ export function useCreateOrder() {
         prioritySurcharge?: number,
         userContextLocation?: { latitude: number; longitude: number; address: string } | null,
         priorityRequested?: boolean,
+        driverTip?: number,
     ) => {
         // Hard block — UI layers should catch this before reaching here.
         if (hasActiveOrders) {
@@ -75,6 +76,7 @@ export function useCreateOrder() {
                         totalPrice,
                         priorityRequested: priorityRequested ?? false,
                         prioritySurcharge: prioritySurcharge ?? 0,
+                        driverTip: driverTip ?? 0,
                         promotionId: promotionId || null,
                         driverNotes: driverNotes || null,
                     },

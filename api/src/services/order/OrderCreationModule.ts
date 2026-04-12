@@ -652,7 +652,10 @@ export class OrderCreationModule {
             );
         }
 
-        const expectedTotalWithSurcharge = normalizeMoney(totalOrderPrice + prioritySurcharge);
+        // Driver tip: optional, must be non-negative, not server-validated (customer's free choice)
+        const driverTip = normalizeMoney(Math.max(0, Number(input.driverTip ?? 0)));
+
+        const expectedTotalWithSurcharge = normalizeMoney(totalOrderPrice + prioritySurcharge + driverTip);
         const clientTotal = normalizeMoney(Number(input.totalPrice));
         if (!moneyEquals(clientTotal, expectedTotalWithSurcharge)) {
             throw AppError.badInput(
@@ -722,6 +725,7 @@ export class OrderCreationModule {
             originalDeliveryPrice: expectedDeliveryPrice,
             deliveryPrice: effectiveDeliveryPrice,
             prioritySurcharge: prioritySurcharge,
+            driverTip,
             paymentCollection: input.paymentCollection ?? 'CASH_TO_DRIVER',
             originalPrice:
                 Math.abs(calculatedItemsTotal - effectiveOrderPrice) > 0.01

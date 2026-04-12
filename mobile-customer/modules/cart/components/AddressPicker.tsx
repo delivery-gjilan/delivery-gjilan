@@ -598,16 +598,18 @@ export default function AddressPicker({
                         style={StyleSheet.absoluteFill}
                         styleURL={MAPBOX_STYLE}
                         onPress={handleMapPress}
-                        onRegionWillChange={() => {
-                            // Map started moving — lift pin, cancel any in-flight geocode
+                        onRegionIsChanging={() => {
+                            // Fires every frame during movement — only run start-of-motion logic once
+                            if (mapDidMoveRef.current) return;
                             regionSettleTokenRef.current += 1;
-                            mapDidMoveRef.current = true; // Mark that map moved
+                            mapDidMoveRef.current = true;
                             setIsMapInMotion(true);
                             setPinElevated(true);
                             if (geocodeAbortRef.current) geocodeAbortRef.current.abort();
                             if (buttonEnableTimeoutRef.current) clearTimeout(buttonEnableTimeoutRef.current);
                         }}
-                        onRegionDidChange={async (feature: any) => {
+                        onMapIdle={async (state?: any) => {
+                            const feature = state;
                             // Map stopped moving. Always prefer camera center over region payload geometry,
                             // because payload coordinates can drift from the visual center pin on some devices.
                             let longitude: number | null = null;
@@ -752,7 +754,7 @@ export default function AddressPicker({
                         {/* Search Input */}
                         <View style={[styles.searchBar, {
                             backgroundColor: theme.colors.card,
-                            borderColor: showResults ? '#7C3AED' : 'transparent',
+                            borderColor: showResults ? '#7C3AED50' : 'transparent',
                             flex: 1,
                         }]}>
                             <Ionicons name="search" size={18} color={theme.colors.subtext} />
@@ -861,7 +863,7 @@ export default function AddressPicker({
                 </View>
 
                 {/* ─── Bottom Card ─────────────────────── */}
-                <View style={[styles.bottomCard, { backgroundColor: theme.colors.card }]}>
+                <View style={[styles.bottomCard, { backgroundColor: theme.colors.card, borderTopColor: theme.colors.border }]}>
                     {/* Drag handle */}
                     <View style={styles.handle}>
                         <View style={[styles.handleBar, { backgroundColor: theme.colors.border }]} />
@@ -870,7 +872,7 @@ export default function AddressPicker({
                     {/* Saved Addresses Toggle */}
                     {savedAddresses.length > 0 && !pinLocation && (
                         <TouchableOpacity
-                            style={[styles.savedToggle, { borderColor: theme.colors.border }]}
+                            style={[styles.savedToggle, { borderBottomColor: theme.colors.border }]}
                             onPress={() => {
                                 LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
                                 setShowSavedAddresses(!showSavedAddresses);
@@ -896,7 +898,7 @@ export default function AddressPicker({
 
                     {/* Saved Addresses List */}
                     {showSavedAddresses && savedAddresses.length > 0 && (
-                        <View style={{ maxHeight: 160, marginBottom: 8 }}>
+                        <View style={{ maxHeight: 180, marginTop: 4 }}>
                             <FlatList
                                 data={savedAddresses}
                                 keyExtractor={(item) => String(item.id)}
@@ -905,10 +907,7 @@ export default function AddressPicker({
                                     const isDefault = item.priority === 1;
                                     return (
                                         <TouchableOpacity
-                                            style={[styles.savedItem, {
-                                                backgroundColor: theme.colors.background,
-                                                borderColor: theme.colors.border,
-                                            }]}
+                                            style={[styles.savedItem, { borderBottomColor: theme.colors.border }]}
                                             onPress={() => handleSelectSaved(item)}
                                             activeOpacity={0.6}
                                         >
@@ -947,8 +946,10 @@ export default function AddressPicker({
                     {/* Selected Pin Details */}
                     {pinLocation ? (
                         <View>
-                            <View style={[styles.selectedContainer, { backgroundColor: theme.colors.background }]}>
-                                <View style={[styles.selectedDot, { backgroundColor: '#7C3AED' }]} />
+                            <View style={styles.selectedContainer}>
+                                <View style={[styles.selectedIconWrap, { backgroundColor: '#7C3AED20' }]}>
+                                    <Ionicons name="location" size={18} color="#7C3AED" />
+                                </View>
                                 <View style={{ flex: 1 }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                         <Text style={[styles.selectedLabel, { color: theme.colors.text }]}>
@@ -958,7 +959,7 @@ export default function AddressPicker({
                                             <ActivityIndicator size="small" color="#7C3AED" />
                                         )}
                                     </View>
-                                    <Text style={[styles.selectedAddress, { color: theme.colors.subtext, minHeight: 36 }]} numberOfLines={2}>
+                                    <Text style={[styles.selectedAddress, { color: theme.colors.subtext }]} numberOfLines={2}>
                                         {pinAddress || (t.cart.finding_address ?? "Finding address...")}
                                     </Text>
                                 </View>
@@ -967,7 +968,8 @@ export default function AddressPicker({
                             {/* Confirm Button */}
                             <TouchableOpacity
                                 style={[styles.confirmBtn, {
-                                    backgroundColor: isConfirmDisabled ? theme.colors.border : '#7C3AED',
+                                    backgroundColor: isConfirmDisabled ? '#7C3AED40' : '#7C3AED',
+                                    shadowOpacity: isConfirmDisabled ? 0 : 0.3,
                                 }]}
                                 onPress={handleConfirm}
                                 disabled={isConfirmDisabled}
@@ -981,9 +983,12 @@ export default function AddressPicker({
                                 </Text>
                             </TouchableOpacity>
                             {!isPinWithinDeliveryZone && (
-                                <Text style={[styles.outOfZoneHint, { color: '#F97316' }]}>
-                                    {t.cart.outside_zone_inline_warning}
-                                </Text>
+                                <View style={styles.outOfZoneRow}>
+                                    <Ionicons name="alert-circle" size={13} color="#F97316" />
+                                    <Text style={[styles.outOfZoneHint, { color: '#F97316' }]}>
+                                        {t.cart.outside_zone_inline_warning}
+                                    </Text>
+                                </View>
                             )}
                         </View>
                     ) : (
@@ -1015,12 +1020,12 @@ const styles = StyleSheet.create({
         zIndex: 10,
     },
     searchBar: {
-        flex: 1, height: 44, borderRadius: 22,
+        flex: 1, height: 48, borderRadius: 24,
         flexDirection: 'row', alignItems: 'center',
-        paddingHorizontal: 14, gap: 8,
+        paddingHorizontal: 16, gap: 8,
         shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.12, shadowRadius: 6, elevation: 4,
-        borderWidth: 2,
+        shadowOpacity: 0.15, shadowRadius: 8, elevation: 5,
+        borderWidth: 1,
     },
     searchInput: {
         flex: 1, fontSize: 15, paddingVertical: 0,
@@ -1063,22 +1068,25 @@ const styles = StyleSheet.create({
         fontSize: 13,
     },
     bottomCard: {
-        borderTopLeftRadius: 24, borderTopRightRadius: 24,
-        paddingHorizontal: 16, paddingBottom: 16,
-        shadowColor: '#000', shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.08, shadowRadius: 12, elevation: 12,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        paddingHorizontal: 20, paddingBottom: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -3 },
+        shadowOpacity: 0.12,
+        shadowRadius: 10,
+        elevation: 10,
     },
     handle: {
-        alignItems: 'center', paddingVertical: 10,
+        alignItems: 'center', paddingVertical: 8,
     },
     handleBar: {
         width: 36, height: 4, borderRadius: 2,
     },
     savedToggle: {
         flexDirection: 'row', alignItems: 'center',
-        paddingVertical: 12, paddingHorizontal: 12,
-        borderRadius: 12, borderWidth: 1,
-        marginBottom: 8,
+        paddingVertical: 14, paddingHorizontal: 0,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        marginBottom: 2,
     },
     savedToggleText: {
         fontSize: 14, fontWeight: '600', marginLeft: 8, flex: 1,
@@ -1092,9 +1100,9 @@ const styles = StyleSheet.create({
     },
     savedItem: {
         flexDirection: 'row', alignItems: 'center',
-        padding: 10, borderRadius: 10,
-        marginBottom: 6, gap: 10,
-        borderWidth: 1,
+        paddingVertical: 12, paddingHorizontal: 0,
+        gap: 12,
+        borderBottomWidth: StyleSheet.hairlineWidth,
     },
     savedIcon: {
         width: 36, height: 36, borderRadius: 18,
@@ -1110,13 +1118,14 @@ const styles = StyleSheet.create({
         paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4,
     },
     selectedContainer: {
-        flexDirection: 'row', alignItems: 'flex-start',
-        padding: 12, borderRadius: 12, gap: 10,
-        marginBottom: 12,
+        flexDirection: 'row', alignItems: 'center',
+        paddingVertical: 12,
+        gap: 12,
+        marginBottom: 14,
     },
-    selectedDot: {
-        width: 10, height: 10, borderRadius: 5,
-        marginTop: 4,
+    selectedIconWrap: {
+        width: 36, height: 36, borderRadius: 18,
+        alignItems: 'center', justifyContent: 'center',
     },
     selectedLabel: {
         fontSize: 15, fontWeight: '700',
@@ -1124,26 +1133,26 @@ const styles = StyleSheet.create({
     selectedAddress: {
         fontSize: 13, marginTop: 2, lineHeight: 18,
     },
-    selectedLoading: {
-        fontSize: 13,
-    },
     confirmBtn: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-        height: 52, borderRadius: 16, gap: 8,
+        height: 60, borderRadius: 18, gap: 8,
         shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
     },
     confirmText: {
         color: 'white', fontSize: 16, fontWeight: '700',
     },
+    outOfZoneRow: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+        marginTop: 8, gap: 4,
+    },
     outOfZoneHint: {
-        marginTop: 8,
         fontSize: 12,
-        textAlign: 'center',
         fontWeight: '600',
+        flexShrink: 1,
     },
     emptyPrompt: {
-        alignItems: 'center', paddingVertical: 16, gap: 4,
+        alignItems: 'center', paddingVertical: 20, gap: 6,
     },
     emptyTitle: {
         fontSize: 15, fontWeight: '600', marginTop: 4,

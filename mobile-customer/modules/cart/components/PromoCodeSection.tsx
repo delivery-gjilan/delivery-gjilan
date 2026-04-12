@@ -7,6 +7,8 @@ import { useTranslations } from '@/hooks/useTranslations';
 interface PromoCodeSectionProps {
     couponCode: string;
     onChangeCoupon: (code: string) => void;
+    /** When true, renders without the card wrapper (for use inside a section container) */
+    flat?: boolean;
     promoResult: {
         code: string;
         discountAmount: number;
@@ -21,6 +23,7 @@ interface PromoCodeSectionProps {
 export function PromoCodeSection({
     couponCode,
     onChangeCoupon,
+    flat,
     promoResult,
     promoError,
     loading,
@@ -30,16 +33,8 @@ export function PromoCodeSection({
     const theme = useTheme();
     const { t } = useTranslations();
 
-    return (
-        <View
-            style={[
-                styles.card,
-                {
-                    borderColor: promoResult ? theme.colors.income + '50' : 'transparent',
-                    backgroundColor: theme.colors.card,
-                },
-            ]}
-        >
+    const inner = (
+        <>
             {/* Header */}
             <View style={styles.header}>
                 <View style={styles.headerLeft}>
@@ -125,6 +120,24 @@ export function PromoCodeSection({
                     <Text style={[styles.errorText, { color: theme.colors.expense }]}>{promoError}</Text>
                 </View>
             )}
+        </>
+    );
+
+    if (flat) {
+        return <View>{inner}</View>;
+    }
+
+    return (
+        <View
+            style={[
+                styles.card,
+                {
+                    borderColor: promoResult ? theme.colors.income + '50' : 'transparent',
+                    backgroundColor: theme.colors.card,
+                },
+            ]}
+        >
+            {inner}
         </View>
     );
 }
@@ -143,7 +156,7 @@ const styles = StyleSheet.create({
     },
     header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
     headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    headerText: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+    headerText: { fontSize: 12, fontWeight: '600' },
     appliedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
     appliedText: { fontSize: 10, fontWeight: '700' },
 

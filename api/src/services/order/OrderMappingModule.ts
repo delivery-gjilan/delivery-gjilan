@@ -171,7 +171,7 @@ export class OrderMappingModule {
                 businessId: dbOrder.businessId,
                 deliveryPrice: Number(dbOrder.deliveryPrice),
                 totalPrice:
-                    Number(dbOrder.actualPrice) + Number(dbOrder.deliveryPrice) + Number((dbOrder as any).prioritySurcharge ?? 0),
+                    Number(dbOrder.actualPrice) + Number(dbOrder.deliveryPrice) + Number((dbOrder as any).prioritySurcharge ?? 0) + Number((dbOrder as any).driverTip ?? 0),
                 orderPrice: Number(dbOrder.actualPrice),
                 originalPrice: dbOrder.originalPrice != null ? Number(dbOrder.originalPrice) : undefined,
                 orderDate: parseDbTimestamp(dbOrder.orderDate) ?? new Date(),
@@ -230,6 +230,7 @@ export class OrderMappingModule {
                     return reasons;
                 })(),
                 prioritySurcharge: Number((dbOrder as any).prioritySurcharge ?? 0),
+                driverTip: Number((dbOrder as any).driverTip ?? 0),
                 businesses: businessOrderList,
                 orderPromotions: orderPromotions.map((promotion) => ({
                     id: promotion.id,

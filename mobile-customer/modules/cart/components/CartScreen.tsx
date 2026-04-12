@@ -74,6 +74,7 @@ export const CartScreen = () => {
     const [addressName, setAddressName] = useState('');
     const [driverNotes, setDriverNotes] = useState('');
     const [isPriority, setIsPriority] = useState(false);
+    const [driverTip, setDriverTip] = useState(0);
     const [promoError, setPromoError] = useState<string | null>(null);
     const [saveAddressError, setSaveAddressError] = useState<string | null>(null);
     
@@ -528,13 +529,13 @@ export const CartScreen = () => {
         const animation = Animated.loop(
             Animated.sequence([
                 Animated.timing(pulseAnim, {
-                    toValue: 0.55,
-                    duration: 850,
+                    toValue: 1.02,
+                    duration: 900,
                     useNativeDriver: true,
                 }),
                 Animated.timing(pulseAnim, {
                     toValue: 1,
-                    duration: 850,
+                    duration: 900,
                     useNativeDriver: true,
                 }),
             ]),
@@ -779,7 +780,7 @@ export const CartScreen = () => {
 
     const finalTotal = (manualPromoApplied
         ? promoResult?.totalPrice ?? Math.max(0, total + deliveryPrice - appliedDiscount)
-        : Math.max(0, total + deliveryPrice - appliedDiscount)) + prioritySurcharge;
+        : Math.max(0, total + deliveryPrice - appliedDiscount)) + prioritySurcharge + driverTip;
 
     const reconcileCartBeforeCheckout = useCallback(async () => {
         if (items.length === 0) {
@@ -939,6 +940,7 @@ export const CartScreen = () => {
                 prioritySurcharge,
                 userContextLocation,
                 isPriority,
+                driverTip,
             );
             const orderId = order?.id || null;
             
@@ -1124,6 +1126,8 @@ export const CartScreen = () => {
                     onChangeCoupon={setCouponCode}
                     onApplyCoupon={handleApplyCoupon}
                     onChangeDriverNotes={setDriverNotes}
+                    driverTip={driverTip}
+                    onChangeTip={setDriverTip}
                     onCheckout={handleCheckout}
                 />
             )}

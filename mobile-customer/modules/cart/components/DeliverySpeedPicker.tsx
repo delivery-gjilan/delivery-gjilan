@@ -10,18 +10,22 @@ interface DeliverySpeedPickerProps {
     prioritySurcharge: number;
     formatCurrency: (value: number) => string;
     onSelect: (priority: boolean) => void;
+    /** When true, renders without the card wrapper (for use inside a section container) */
+    flat?: boolean;
 }
 
-export function DeliverySpeedPicker({ isPriority, prioritySurcharge, formatCurrency, onSelect }: DeliverySpeedPickerProps) {
+export function DeliverySpeedPicker({ isPriority, prioritySurcharge, formatCurrency, onSelect, flat }: DeliverySpeedPickerProps) {
     const theme = useTheme();
     const { t } = useTranslations();
 
-    return (
-        <View style={[styles.card, { backgroundColor: theme.colors.card }]}>
-            <View style={styles.header}>
-                <Ionicons name="timer-outline" size={14} color={theme.colors.subtext} />
-                <Text style={[styles.headerText, { color: theme.colors.subtext }]}>{t.cart.delivery_type}</Text>
-            </View>
+    const inner = (
+        <>
+            {!flat && (
+                <View style={styles.header}>
+                    <Ionicons name="timer-outline" size={14} color={theme.colors.subtext} />
+                    <Text style={[styles.headerText, { color: theme.colors.subtext }]}>{t.cart.delivery_type}</Text>
+                </View>
+            )}
 
             <View style={styles.options}>
                 {/* Standard */}
@@ -30,21 +34,18 @@ export function DeliverySpeedPicker({ isPriority, prioritySurcharge, formatCurre
                     style={[
                         styles.option,
                         {
-                            backgroundColor: !isPriority ? theme.colors.primary + '10' : theme.colors.background,
-                            borderColor: !isPriority ? theme.colors.primary : theme.colors.border,
+                            backgroundColor: !isPriority ? theme.colors.card : theme.colors.background,
+                            borderColor: theme.colors.border,
                         },
                     ]}
                     onPress={() => onSelect(false)}
                 >
                     <View style={styles.optionTop}>
-                        <View style={[styles.iconCircle, { backgroundColor: !isPriority ? theme.colors.primary + '18' : theme.colors.border }]}>
-                            <Ionicons name="time-outline" size={14} color={!isPriority ? theme.colors.primary : theme.colors.subtext} />
-                        </View>
-                        <Text style={[styles.optionTitle, { color: !isPriority ? theme.colors.primary : theme.colors.text }]}>
+                        <Ionicons name="time-outline" size={14} color={!isPriority ? theme.colors.primary : theme.colors.subtext} />
+                        <Text style={[styles.optionTitle, { color: !isPriority ? theme.colors.text : theme.colors.subtext }]}>
                             {t.cart.standard_delivery}
                         </Text>
                     </View>
-                    <Text style={[styles.optionTime, { color: theme.colors.subtext }]}>{t.cart.estimated_time_standard}</Text>
                     <Text style={[styles.optionPrice, { color: !isPriority ? theme.colors.primary : theme.colors.subtext }]}>
                         {t.cart.included}
                     </Text>
@@ -56,8 +57,8 @@ export function DeliverySpeedPicker({ isPriority, prioritySurcharge, formatCurre
                     style={[
                         styles.option,
                         {
-                            backgroundColor: isPriority ? theme.colors.primary + '10' : theme.colors.background,
-                            borderColor: isPriority ? theme.colors.primary : theme.colors.border,
+                            backgroundColor: isPriority ? theme.colors.card : theme.colors.background,
+                            borderColor: theme.colors.border,
                         },
                     ]}
                     onPress={() => {
@@ -66,19 +67,26 @@ export function DeliverySpeedPicker({ isPriority, prioritySurcharge, formatCurre
                     }}
                 >
                     <View style={styles.optionTop}>
-                        <View style={[styles.iconCircle, { backgroundColor: isPriority ? theme.colors.primary + '18' : theme.colors.border }]}>
-                            <Ionicons name="flash" size={14} color={isPriority ? theme.colors.primary : theme.colors.subtext} />
-                        </View>
-                        <Text style={[styles.optionTitle, { color: isPriority ? theme.colors.primary : theme.colors.text }]}>
+                        <Ionicons name="flash" size={14} color={isPriority ? theme.colors.primary : theme.colors.subtext} />
+                        <Text style={[styles.optionTitle, { color: isPriority ? theme.colors.text : theme.colors.subtext }]}>
                             {t.cart.priority_delivery}
                         </Text>
                     </View>
-                    <Text style={[styles.optionTime, { color: theme.colors.subtext }]}>{t.cart.estimated_time_priority}</Text>
                     <Text style={[styles.optionPrice, { color: isPriority ? theme.colors.primary : theme.colors.subtext }]}>
                         +{formatCurrency(prioritySurcharge)}
                     </Text>
                 </TouchableOpacity>
             </View>
+        </>
+    );
+
+    if (flat) {
+        return <View>{inner}</View>;
+    }
+
+    return (
+        <View style={[styles.card, { backgroundColor: theme.colors.card }]}>
+            {inner}
         </View>
     );
 }
@@ -99,13 +107,12 @@ const styles = StyleSheet.create({
     options: { flexDirection: 'row', gap: 10 },
     option: {
         flex: 1,
-        borderRadius: 14,
-        padding: 12,
-        borderWidth: 1.5,
+        borderRadius: 12,
+        padding: 10,
+        borderWidth: StyleSheet.hairlineWidth,
     },
-    optionTop: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-    iconCircle: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-    optionTitle: { fontSize: 13, fontWeight: '700' },
+    optionTop: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+    optionTitle: { fontSize: 13, fontWeight: '600' },
     optionTime: { fontSize: 11, marginBottom: 2 },
     optionPrice: { fontSize: 11, fontWeight: '600' },
 });

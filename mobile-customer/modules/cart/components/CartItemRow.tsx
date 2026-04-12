@@ -80,7 +80,13 @@ export const CartItemRow = memo(function CartItemRow({
     const isComplex = item.selectedOptions.length > 0 || (item.childItems?.length ?? 0) > 0;
 
     return (
-        <View style={[styles.fullRow, { backgroundColor: theme.colors.card }]}>
+        <View
+            style={[
+                styles.fullRow,
+                showSeparator && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.border },
+            ]}
+        >
+            {/* Image */}
             {item.imageUrl ? (
                 <Image
                     source={{ uri: item.imageUrl }}
@@ -90,53 +96,62 @@ export const CartItemRow = memo(function CartItemRow({
                     transition={200}
                 />
             ) : (
-                <View style={[styles.fullImagePlaceholder, { backgroundColor: theme.colors.border }]}>
-                    <Ionicons name="image-outline" size={28} color={theme.colors.subtext} />
+                <View style={[styles.fullImagePlaceholder, { backgroundColor: theme.colors.card }]}>
+                    <Ionicons name="fast-food-outline" size={22} color={theme.colors.subtext} />
                 </View>
             )}
 
+            {/* Content */}
             <View style={styles.fullContent}>
-                <Text style={[styles.fullName, { color: theme.colors.text }]} numberOfLines={2}>
-                    {item.name}
-                </Text>
-                <Text style={[styles.fullPrice, { color: theme.colors.primary }]}>
-                    {formatCurrency(unitTotal)}
-                </Text>
-                {item.quantity > 1 && (
-                    <Text style={[styles.fullSubprice, { color: theme.colors.subtext }]}>
-                        {item.quantity} × {formatCurrency(unitTotal)} = {formatCurrency(unitTotal * item.quantity)}
+                <View style={styles.fullNameRow}>
+                    <Text style={[styles.fullName, { color: theme.colors.text }]} numberOfLines={2}>
+                        {item.name}
+                    </Text>
+                    <TouchableOpacity
+                        onPress={() => onRemove?.(item.cartItemId)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        style={styles.removeBtn}
+                    >
+                        <Ionicons name="close" size={15} color={theme.colors.subtext} />
+                    </TouchableOpacity>
+                </View>
+
+                {item.selectedOptions.length > 0 && (
+                    <Text style={[styles.optionText, { color: theme.colors.subtext }]} numberOfLines={2}>
+                        {item.selectedOptions.map((opt) =>
+                            opt.name + (opt.extraPrice > 0 ? ` +€${Number(opt.extraPrice).toFixed(2)}` : '')
+                        ).join(' · ')}
                     </Text>
                 )}
 
-                {item.selectedOptions.length > 0 && (
-                    <View style={{ marginTop: 4 }}>
-                        {item.selectedOptions.map((opt) => (
-                            <Text key={`${item.cartItemId}-${opt.optionId}`} style={[styles.optionText, { color: theme.colors.subtext }]}>
-                                {opt.name}
-                                {opt.extraPrice > 0 ? ` (+€${Number(opt.extraPrice).toFixed(2)})` : ''}
-                            </Text>
-                        ))}
-                    </View>
-                )}
-
                 {item.childItems && item.childItems.length > 0 && (
-                    <View style={{ marginTop: 4 }}>
-                        {item.childItems.map((child) => (
-                            <Text key={`${item.cartItemId}-${child.productId}`} style={[styles.optionText, { color: theme.colors.subtext }]}>
-                                + {child.name}
-                            </Text>
-                        ))}
-                    </View>
+                    <Text style={[styles.optionText, { color: theme.colors.subtext }]} numberOfLines={1}>
+                        {item.childItems.map((c) => `+ ${c.name}`).join(', ')}
+                    </Text>
                 )}
 
-                {/* Quantity Controls */}
-                <View style={styles.qtyContainer}>
-                    <View style={[styles.qtyPill, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                {/* Price + Qty row */}
+                <View style={styles.priceQtyRow}>
+                    <Text style={[styles.fullPrice, { color: theme.colors.text }]}>
+                        {formatCurrency(unitTotal * item.quantity)}
+                    </Text>
+                    {item.quantity > 1 && (
+                        <Text style={[styles.fullSubprice, { color: theme.colors.subtext }]}>
+                            {item.quantity} × {formatCurrency(unitTotal)}
+                        </Text>
+                    )}
+
+                    {/* Spacer */}
+                    <View style={{ flex: 1 }} />
+
+                    {/* Qty stepper */}
+                    <View style={[styles.qtyPill, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
                         <TouchableOpacity
                             onPress={() => onUpdateQuantity?.(item.cartItemId, item.quantity - 1)}
-                            style={[styles.qtyBtn, { backgroundColor: theme.colors.border }]}
+                            style={styles.qtyBtn}
+                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                         >
-                            <Ionicons name="remove" size={14} color={theme.colors.text} />
+                            <Ionicons name="remove" size={13} color={theme.colors.subtext} />
                         </TouchableOpacity>
                         <Text style={[styles.qtyText, { color: theme.colors.text }]}>{item.quantity}</Text>
                         <TouchableOpacity
@@ -147,9 +162,10 @@ export const CartItemRow = memo(function CartItemRow({
                                     onUpdateQuantity?.(item.cartItemId, item.quantity + 1);
                                 }
                             }}
-                            style={[styles.qtyBtn, { backgroundColor: theme.colors.primary }]}
+                            style={[styles.qtyBtn, styles.qtyBtnAdd, { backgroundColor: theme.colors.primary }]}
+                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                         >
-                            <Ionicons name="add" size={14} color="white" />
+                            <Ionicons name="add" size={13} color="white" />
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -159,7 +175,7 @@ export const CartItemRow = memo(function CartItemRow({
                     value={item.notes || ''}
                     onChangeText={(text) => onUpdateNotes?.(item.cartItemId, text)}
                     placeholder={t.cart.item_notes_placeholder}
-                    placeholderTextColor={theme.colors.subtext + '80'}
+                    placeholderTextColor={theme.colors.subtext + '60'}
                     style={[
                         styles.notesInput,
                         {
@@ -173,11 +189,6 @@ export const CartItemRow = memo(function CartItemRow({
                     maxLength={200}
                 />
             </View>
-
-            {/* Remove Button */}
-            <TouchableOpacity onPress={() => onRemove?.(item.cartItemId)} style={styles.removeBtn}>
-                <Ionicons name="trash-outline" size={18} color={theme.colors.subtext} />
-            </TouchableOpacity>
         </View>
     );
 });
@@ -213,60 +224,62 @@ const styles = StyleSheet.create({
 
     // ─── Full (Step 1) ───
     fullRow: {
-        borderRadius: 18,
-        padding: 14,
         flexDirection: 'row',
         alignItems: 'flex-start',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 10,
-        elevation: 2,
+        paddingHorizontal: 20,
+        paddingVertical: 14,
     },
     fullImage: {
-        width: 76,
-        height: 76,
+        width: 68,
+        height: 68,
         borderRadius: 14,
+        flexShrink: 0,
     },
     fullImagePlaceholder: {
-        width: 76,
-        height: 76,
+        width: 68,
+        height: 68,
         borderRadius: 14,
+        flexShrink: 0,
         alignItems: 'center',
         justifyContent: 'center',
     },
     fullContent: { flex: 1, marginLeft: 12 },
-    fullName: { fontSize: 15, fontWeight: '600' },
-    fullPrice: { fontSize: 15, fontWeight: '700', marginTop: 2 },
-    fullSubprice: { fontSize: 11, marginTop: 1 },
-    optionText: { fontSize: 11 },
+    fullNameRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 3 },
+    fullName: { flex: 1, fontSize: 15, fontWeight: '600', lineHeight: 20 },
+    fullPrice: { fontSize: 15, fontWeight: '700' },
+    fullSubprice: { fontSize: 11, marginLeft: 6 },
+    optionText: { fontSize: 11, lineHeight: 16, marginTop: 2 },
 
-    qtyContainer: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
+    priceQtyRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10 },
+
     qtyPill: {
         flexDirection: 'row',
         alignItems: 'center',
         borderRadius: 20,
-        paddingHorizontal: 3,
-        paddingVertical: 3,
         borderWidth: StyleSheet.hairlineWidth,
+        overflow: 'hidden',
     },
     qtyBtn: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
+        width: 28,
+        height: 28,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    qtyText: { fontSize: 14, fontWeight: '600', paddingHorizontal: 10 },
+    qtyBtnAdd: { borderRadius: 0 },
+    qtyText: { fontSize: 13, fontWeight: '600', paddingHorizontal: 10, minWidth: 28, textAlign: 'center' },
 
     notesInput: {
         fontSize: 12,
         paddingHorizontal: 10,
-        paddingVertical: 6,
+        paddingVertical: 7,
         borderRadius: 10,
         borderWidth: StyleSheet.hairlineWidth,
-        marginTop: 8,
+        marginTop: 10,
     },
 
-    removeBtn: { marginLeft: 8, padding: 6 },
+    removeBtn: {
+        padding: 2,
+        marginLeft: 2,
+        opacity: 0.5,
+    },
 });

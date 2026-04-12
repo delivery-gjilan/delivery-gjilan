@@ -13,6 +13,8 @@ import Animated, {
     withSpring,
     withSequence,
     withTiming,
+    withRepeat,
+    withDelay,
     Easing,
     interpolateColor,
 } from 'react-native-reanimated';
@@ -34,14 +36,26 @@ export const CartFloatingBar = () => {
     // Slide-up entrance / slide-down exit
     const translateY = useSharedValue(80);
     const opacity = useSharedValue(0);
+    const breatheScale = useSharedValue(1);
 
     // Color flash (0 = normal, 1 = light flash)
     const flashProgress = useSharedValue(0);
 
-    // Appear on mount
+    // Appear on mount + start breathing after entrance
     useEffect(() => {
         translateY.value = withSpring(0, { damping: 18, stiffness: 220 });
         opacity.value = withTiming(1, { duration: 220, easing: Easing.out(Easing.quad) });
+        breatheScale.value = withDelay(
+            300,
+            withRepeat(
+                withSequence(
+                    withTiming(1.02, { duration: 900, easing: Easing.inOut(Easing.quad) }),
+                    withTiming(1, { duration: 900, easing: Easing.inOut(Easing.quad) }),
+                ),
+                -1,
+                false,
+            ),
+        );
     }, []);
 
     // Color flash when items are added (not on mount)
@@ -70,7 +84,7 @@ export const CartFloatingBar = () => {
 
     const wrapperStyle = useAnimatedStyle(() => ({
         opacity: opacity.value,
-        transform: [{ translateY: translateY.value }],
+        transform: [{ translateY: translateY.value }, { scale: breatheScale.value }],
     }));
 
     const flashStyle = useAnimatedStyle(() => {

@@ -101,6 +101,8 @@ type DriverOrderFinancials {
     amountToRemitToPlatform: Float!
     # Driver net earnings after remittance = amountToCollect - amountToRemit
     driverNetEarnings: Float!
+    # Tip included in this order (driver keeps it directly for CASH_TO_DRIVER)
+    driverTip: Float!
 }
 
 type OrderSettlementLineItem {
@@ -130,6 +132,7 @@ type Order {
     deliveryPrice: Float!
     totalPrice: Float!
     prioritySurcharge: Float!
+    driverTip: Float!
     # Legacy fields kept for backward compatibility (map to new columns)
     orderPrice: Float!
     originalPrice: Float
@@ -236,5 +239,7 @@ input CreateOrderInput {
     paymentCollection: OrderPaymentCollection
     promotionId: ID
     driverNotes: String
+    # Optional tip for the driver (added on top of the totalPrice)
+    driverTip: Float
 }
 

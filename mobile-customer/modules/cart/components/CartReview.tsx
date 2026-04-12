@@ -55,7 +55,7 @@ export function CartReview({
     const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
     return (
-        <>
+        <View style={{ flex: 1 }}>
             {/* Promo threshold */}
             {applicableConditional && spendThreshold && progress > 0 && !promoResult && (
                 <PromotionProgressBar
@@ -69,46 +69,47 @@ export function CartReview({
                 />
             )}
 
-            {/* Minimum order bar */}
+            {/* Minimum order strip */}
             {minOrderAmount > 0 && !minimumMet && (
-                <View style={[styles.minimumBar, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-                    <View style={styles.minimumHeader}>
-                        <Text style={[styles.minimumLabel, { color: theme.colors.subtext }]}>{t.cart.minimum_order_label}</Text>
-                        <Text style={[styles.minimumAmount, { color: theme.colors.expense }]}>{formatCurrency(minOrderAmount)}</Text>
+                <View style={[styles.minimumStrip, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+                    <View style={styles.minimumStripTop}>
+                        <Ionicons name="alert-circle-outline" size={13} color={theme.colors.expense} />
+                        <Text style={[styles.minimumStripText, { color: theme.colors.subtext }]}>
+                            {t.cart.minimum_not_met.replace('{amount}', formatCurrency(amountUntilMinimum))}
+                        </Text>
+                        <Text style={[styles.minimumStripAmount, { color: theme.colors.expense }]}>
+                            {formatCurrency(minOrderAmount)}
+                        </Text>
                     </View>
-                    <View style={[styles.progressTrack, { backgroundColor: theme.colors.border }]}>
+                    <View style={[styles.minimumTrack, { backgroundColor: theme.colors.border }]}>
                         <View
                             style={[
-                                styles.progressFill,
+                                styles.minimumFill,
                                 {
-                                    width: `${Math.min((total / minOrderAmount) * 100, 100)}%`,
+                                    width: `${Math.min((total / minOrderAmount) * 100, 100)}%` as any,
                                     backgroundColor: theme.colors.expense,
                                 },
                             ]}
                         />
                     </View>
-                    <Text style={[styles.minimumHint, { color: theme.colors.subtext }]}>
-                        {t.cart.minimum_not_met.replace('{amount}', formatCurrency(amountUntilMinimum))}
-                    </Text>
                 </View>
             )}
 
-            {/* Items list */}
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 10 }}>
-                {/* Summary header */}
-                <View style={[styles.summaryCard, { backgroundColor: theme.colors.card }]}>
-                    <View style={styles.summaryRow}>
-                        <View style={[styles.countBadge, { backgroundColor: theme.colors.primary + '15' }]}>
-                            <Text style={[styles.countText, { color: theme.colors.primary }]}>
-                                {items.length} {items.length === 1 ? t.common.item : t.common.items}
-                            </Text>
-                        </View>
-                        <Text style={[styles.totalAmount, { color: theme.colors.primary }]}>
-                            {formatCurrency(total)}
-                        </Text>
-                    </View>
-                </View>
+            {/* Items header */}
+            <View style={[styles.listHeader, { borderBottomColor: theme.colors.border }]}>
+                <Text style={[styles.listHeaderLabel, { color: theme.colors.subtext }]}>
+                    {items.length} {items.length === 1 ? t.common.item : t.common.items}
+                </Text>
+                <Text style={[styles.listHeaderTotal, { color: theme.colors.text }]}>
+                    {formatCurrency(total)}
+                </Text>
+            </View>
 
+            <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={{ paddingBottom: 8 }}
+                showsVerticalScrollIndicator={false}
+            >
                 {items.map((item, index) => (
                     <Reanimated.View
                         key={item.cartItemId}
@@ -116,6 +117,7 @@ export function CartReview({
                     >
                         <CartItemRow
                             item={item}
+                            showSeparator={index < items.length - 1}
                             formatCurrency={formatCurrency}
                             onUpdateQuantity={onUpdateQuantity}
                             onRemove={onRemove}
@@ -127,85 +129,79 @@ export function CartReview({
             </ScrollView>
 
             {/* Footer */}
-            <View style={[styles.footer, { backgroundColor: theme.colors.card }]}>
-                <View style={styles.footerRow}>
-                    <Text style={[styles.footerLabel, { color: theme.colors.subtext }]}>{t.common.subtotal}</Text>
-                    <Text style={[styles.footerTotal, { color: theme.colors.primary }]}>{formatCurrency(total)}</Text>
-                </View>
+            <View style={[styles.footer, { borderTopColor: theme.colors.border }]}>
                 <AnimatedTouchable
                     style={[
                         styles.proceedBtn,
                         {
                             backgroundColor: minimumMet ? theme.colors.primary : theme.colors.border,
-                            opacity: minimumMet ? pulseAnim : 0.5,
+                            shadowColor: minimumMet ? theme.colors.primary : 'transparent',
+                            opacity: minimumMet ? 1 : 0.5,
+                            transform: [{ scale: minimumMet ? pulseAnim : 1 }],
                         },
                     ]}
                     activeOpacity={0.8}
                     onPress={onProceed}
                 >
-                    <Ionicons name="location-outline" size={18} color="white" />
                     <Text style={styles.proceedText}>{t.cart.choose_address}</Text>
-                    <Ionicons name="arrow-forward" size={16} color="white" />
+                    <Text style={styles.proceedTotalText}>{formatCurrency(total)}</Text>
                 </AnimatedTouchable>
             </View>
-        </>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    minimumBar: {
+    // Minimum order strip
+    minimumStrip: {
         marginHorizontal: 16,
         marginTop: 8,
-        marginBottom: 2,
-        padding: 12,
-        borderRadius: 14,
+        marginBottom: 4,
+        paddingHorizontal: 12,
+        paddingTop: 10,
+        paddingBottom: 8,
+        borderRadius: 12,
         borderWidth: StyleSheet.hairlineWidth,
     },
-    minimumHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-    minimumLabel: { fontSize: 11, fontWeight: '600' },
-    minimumAmount: { fontSize: 11, fontWeight: '700' },
-    progressTrack: { height: 4, borderRadius: 2 },
-    progressFill: { height: 4, borderRadius: 2 },
-    minimumHint: { fontSize: 11, marginTop: 4 },
+    minimumStripTop: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+    minimumStripText: { flex: 1, fontSize: 12 },
+    minimumStripAmount: { fontSize: 12, fontWeight: '700' },
+    minimumTrack: { height: 3, borderRadius: 2 },
+    minimumFill: { height: 3, borderRadius: 2 },
 
-    summaryCard: {
-        borderRadius: 16,
-        padding: 14,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 1,
-    },
-    summaryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    countBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-    countText: { fontSize: 12, fontWeight: '700' },
-    totalAmount: { fontSize: 18, fontWeight: '800' },
-
-    footer: {
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -3 },
-        shadowOpacity: 0.08,
-        shadowRadius: 6,
-        elevation: 4,
-    },
-    footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-    footerLabel: { fontSize: 13 },
-    footerTotal: { fontSize: 17, fontWeight: '700' },
-    proceedBtn: {
-        height: 54,
-        borderRadius: 16,
+    // Items section header
+    listHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-        elevation: 4,
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderBottomWidth: StyleSheet.hairlineWidth,
     },
-    proceedText: { color: 'white', fontWeight: '700', fontSize: 16 },
+    listHeaderLabel: { fontSize: 12, fontWeight: '500', letterSpacing: 0.1 },
+    listHeaderTotal: { fontSize: 15, fontWeight: '700' },
+
+    // Footer
+    footer: {
+        paddingHorizontal: 20,
+        paddingTop: 12,
+        paddingBottom: 16,
+        borderTopWidth: StyleSheet.hairlineWidth,
+    },
+    proceedBtn: {
+        height: 60,
+        borderRadius: 18,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 18,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.35,
+        shadowRadius: 12,
+        elevation: 6,
+    },
+    proceedLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    proceedText: { color: 'white', fontWeight: '600', fontSize: 16 },
+    proceedTotalPill: {},
+    proceedTotalText: { color: 'white', fontWeight: '800', fontSize: 17 },
 });

@@ -25,11 +25,12 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
             {STEPS.map(({ s, icon, iconDone }, idx) => {
                 const done = currentStep > s;
                 const active = currentStep === s;
+                // Purple spectrum: bright purple = active, muted deep purple = done, faint = future
                 const color = done
-                    ? theme.colors.income
+                    ? theme.colors.primary + 'AA'
                     : active
                         ? theme.colors.primary
-                        : theme.colors.subtext + '60';
+                        : theme.colors.subtext + '50';
 
                 return (
                     <React.Fragment key={s}>
@@ -41,9 +42,9 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
                                     marginHorizontal: 2,
                                     borderRadius: 1,
                                     backgroundColor: done
-                                        ? theme.colors.income
+                                        ? theme.colors.primary + '55'
                                         : active
-                                            ? theme.colors.primary + '40'
+                                            ? theme.colors.primary + '30'
                                             : theme.colors.border,
                                 }}
                             />
@@ -51,15 +52,15 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
                         <View style={{ alignItems: 'center', width: 48 }}>
                             <View
                                 style={{
-                                    width: 34,
-                                    height: 34,
-                                    borderRadius: 17,
+                                    width: 36,
+                                    height: 36,
+                                    borderRadius: 18,
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     backgroundColor: done
-                                        ? theme.colors.income + '18'
+                                        ? theme.colors.primary + '25'
                                         : active
-                                            ? theme.colors.primary + '15'
+                                            ? theme.colors.primary + '20'
                                             : theme.colors.border + '40',
                                 }}
                             >
@@ -71,10 +72,10 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
                             </View>
                             <Text
                                 style={{
-                                    fontSize: 10,
-                                    marginTop: 2,
+                                    fontSize: active ? 11 : 10,
+                                    marginTop: 3,
                                     color,
-                                    fontWeight: active ? '700' : done ? '600' : '400',
+                                    fontWeight: active ? '800' : done ? '600' : '400',
                                 }}
                             >
                                 {labels[idx]}

@@ -64,16 +64,19 @@ export class OrderQueryModule {
         amountToCollectFromCustomer: number;
         amountToRemitToPlatform: number;
         driverNetEarnings: number;
+        driverTip: number;
     } | null> {
         const dbOrder = await this.deps.orderRepository.findById(orderId);
         if (!dbOrder) return null;
         if (dbOrder.driverId !== driverId) return null;
 
         const paymentCollection = dbOrder.paymentCollection;
+        const driverTip = Number((dbOrder as any).driverTip ?? 0);
         const totalPrice =
             Number(dbOrder.actualPrice) +
             Number(dbOrder.deliveryPrice ?? 0) +
-            Number((dbOrder as any).prioritySurcharge ?? 0);
+            Number((dbOrder as any).prioritySurcharge ?? 0) +
+            driverTip;
 
         const amountToCollectFromCustomer =
             paymentCollection === 'CASH_TO_DRIVER' ? totalPrice : 0;
@@ -121,6 +124,7 @@ export class OrderQueryModule {
             amountToCollectFromCustomer: Number(amountToCollectFromCustomer.toFixed(2)),
             amountToRemitToPlatform: Number(amountToRemitToPlatform.toFixed(2)),
             driverNetEarnings,
+            driverTip: Number(driverTip.toFixed(2)),
         };
     }
 

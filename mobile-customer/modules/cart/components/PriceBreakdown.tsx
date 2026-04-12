@@ -15,8 +15,11 @@ interface PriceBreakdownProps {
     prioritySurcharge: number;
     deliveryPromoDiscount: number;
     appliedDiscount: number;
+    driverTip: number;
     finalTotal: number;
     formatCurrency: (value: number) => string;
+    /** When true, renders without the card wrapper (for use inside a section container) */
+    flat?: boolean;
 }
 
 export function PriceBreakdown({
@@ -30,14 +33,16 @@ export function PriceBreakdown({
     prioritySurcharge,
     deliveryPromoDiscount,
     appliedDiscount,
+    driverTip,
     finalTotal,
     formatCurrency,
+    flat,
 }: PriceBreakdownProps) {
     const theme = useTheme();
     const { t } = useTranslations();
 
-    return (
-        <View style={[styles.card, { backgroundColor: theme.colors.card }]}>
+    const inner = (
+        <>
             {/* Subtotal */}
             <View style={styles.row}>
                 <Text style={[styles.label, { color: theme.colors.subtext }]}>{t.common.subtotal}</Text>
@@ -49,7 +54,7 @@ export function PriceBreakdown({
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <Text style={[styles.label, { color: theme.colors.subtext }]}>{t.common.delivery}</Text>
                     {deliveryZoneName && (
-                        <Text style={{ fontSize: 11, color: theme.colors.primary }}>({deliveryZoneName})</Text>
+                        <Text style={{ fontSize: 11, color: theme.colors.subtext }}>({deliveryZoneName})</Text>
                     )}
                 </View>
                 {deliveryPriceLoading ? (
@@ -80,10 +85,10 @@ export function PriceBreakdown({
             {isPriority && (
                 <View style={styles.row}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                        <Ionicons name="flash" size={12} color={theme.colors.primary} />
+                        <Ionicons name="flash" size={12} color={theme.colors.subtext} />
                         <Text style={[styles.label, { color: theme.colors.subtext }]}>{t.cart.priority_fee}</Text>
                     </View>
-                    <Text style={[styles.value, { color: theme.colors.primary }]}>+{formatCurrency(prioritySurcharge)}</Text>
+                    <Text style={[styles.value, { color: theme.colors.text }]}>+{formatCurrency(prioritySurcharge)}</Text>
                 </View>
             )}
 
@@ -97,14 +102,32 @@ export function PriceBreakdown({
                 </View>
             )}
 
+            {/* Driver tip */}
+            {driverTip > 0 && (
+                <View style={styles.row}>
+                    <Text style={[styles.label, { color: theme.colors.subtext }]}>{t.cart.tip_driver}</Text>
+                    <Text style={[styles.value, { color: theme.colors.text }]}>+{formatCurrency(driverTip)}</Text>
+                </View>
+            )}
+
             {/* Divider */}
             <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
 
             {/* Total */}
             <View style={styles.row}>
                 <Text style={[styles.totalLabel, { color: theme.colors.text }]}>{t.common.total}</Text>
-                <Text style={[styles.totalValue, { color: theme.colors.primary }]}>{formatCurrency(finalTotal)}</Text>
+                <Text style={[styles.totalValue, { color: theme.colors.text }]}>{formatCurrency(finalTotal)}</Text>
             </View>
+        </>
+    );
+
+    if (flat) {
+        return <View>{inner}</View>;
+    }
+
+    return (
+        <View style={[styles.card, { backgroundColor: theme.colors.card }]}>
+            {inner}
         </View>
     );
 }

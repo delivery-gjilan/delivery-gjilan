@@ -90,6 +90,7 @@ export function OrderPoolSheet({ orders, accepting = false, onAccept, onAcceptAn
                             const dropAddress = order.dropOffLocation?.address ?? '';
                             const shortAddress = dropAddress.split(',')[0] || s.see_map;
                             const deliveryFee = Number(order.deliveryPrice ?? 0).toFixed(2);
+                            const orderTip = Number((order as any).driverTip ?? 0);
                             const isReady = order.status === 'READY';
                             const etaLabel = (() => {
                                 if (isReady) return s.ready_now;
@@ -132,7 +133,7 @@ export function OrderPoolSheet({ orders, accepting = false, onAccept, onAcceptAn
                                             {/* Earnings */}
                                             <View style={styles.earningsBadge}>
                                                 <Text style={styles.earningsLabel}>{s.earn}</Text>
-                                                <Text style={styles.earningsValue}>€{deliveryFee}</Text>
+                                                <Text style={styles.earningsValue}>€{deliveryFee}{orderTip > 0 ? ` +€${orderTip.toFixed(2)}` : ''}</Text>
                                             </View>
                                         </View>
 

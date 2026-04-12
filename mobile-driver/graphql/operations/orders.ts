@@ -14,6 +14,7 @@ export const GET_ORDERS = gql`
                 orderPrice
                 deliveryPrice
                 totalPrice
+                driverTip
                 dropOffLocation {
                     latitude
                     longitude
@@ -62,6 +63,7 @@ export const GET_ORDER = gql`
             orderPrice
             deliveryPrice
             totalPrice
+            driverTip
             dropOffLocation {
                 latitude
                 longitude
@@ -141,6 +143,7 @@ export const ALL_ORDERS_UPDATED = gql`
             orderPrice
             deliveryPrice
             totalPrice
+            driverTip
             dropOffLocation {
                 latitude
                 longitude
