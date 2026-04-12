@@ -37,9 +37,9 @@ export function TableFooter({ children, className = "" }: { children: React.Reac
   return <tfoot className={`bg-zinc-900 font-medium text-zinc-100 ${className}`}>{children}</tfoot>;
 }
 
-export function TableRow({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+export function TableRow({ children, className = "", onClick }: { children: React.ReactNode; className?: string; onClick?: React.MouseEventHandler<HTMLTableRowElement> }) {
   return (
-    <tr className={`border-b border-zinc-800 transition-colors hover:bg-zinc-900/50 ${className}`}>
+    <tr className={`border-b border-zinc-800 transition-colors hover:bg-zinc-900/50 ${className}`} onClick={onClick}>
       {children}
     </tr>
   );
