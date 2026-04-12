@@ -1916,29 +1916,29 @@ export default function MapPage() {
       {/* ════════════════ LEFT ORDER CARDS SIDEBAR ════════════════ */}
       <div className={`absolute left-0 top-0 bottom-0 z-20 bg-[#0a0a0b] border-r border-white/5 flex flex-col transition-all duration-200 ${sidebarCollapsed ? 'w-0 overflow-hidden border-r-0' : 'w-[280px]'}`}>
         {/* Header with stats */}
-        <div className="px-3 py-2 border-b border-white/8">
-          <div className="flex items-center justify-between mb-1.5">
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-semibold text-zinc-300">Orders</span>
-              <span className="text-[10px] text-zinc-500 font-medium">{filteredOrders.length}</span>
+        <div className="px-3 py-2.5 border-b border-white/10">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-white">Orders</span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-400 font-medium">{filteredOrders.length}</span>
             </div>
             {statusFilter !== "ALL" && (
               <button onClick={() => setStatusFilter("ALL")} className="text-[9px] text-zinc-500 hover:text-white flex items-center gap-1 transition">
-                <X size={9} /> Clear
+                <X size={9} /> Clear filter
               </button>
             )}
           </div>
           <div className="flex items-center gap-1 flex-wrap">
             {([
-              { key: "PENDING", count: stats.pendingOrders, dot: "bg-amber-500", active: "bg-amber-500/20 border-amber-500/50 text-amber-300", idle: "border-transparent text-zinc-600 hover:text-zinc-400" },
-              { key: "PREPARING", count: stats.preparingOrders, dot: "bg-violet-500", active: "bg-violet-500/20 border-violet-500/50 text-violet-300", idle: "border-transparent text-zinc-600 hover:text-zinc-400" },
-              { key: "READY", count: stats.readyOrders, dot: "bg-blue-500", active: "bg-blue-500/20 border-blue-500/50 text-blue-300", idle: "border-transparent text-zinc-600 hover:text-zinc-400" },
-              { key: "OUT_FOR_DELIVERY", count: stats.outOrders, dot: "bg-emerald-500", active: "bg-emerald-500/20 border-emerald-500/50 text-emerald-300", idle: "border-transparent text-zinc-600 hover:text-zinc-400" },
+              { key: "PENDING", count: stats.pendingOrders, dot: "bg-amber-500", active: "bg-amber-500/25 border-amber-500/60 text-amber-300", idle: "bg-amber-500/10 border-transparent text-amber-500" },
+              { key: "PREPARING", count: stats.preparingOrders, dot: "bg-violet-500", active: "bg-violet-500/25 border-violet-500/60 text-violet-300", idle: "bg-violet-500/10 border-transparent text-violet-400" },
+              { key: "READY", count: stats.readyOrders, dot: "bg-blue-500", active: "bg-blue-500/25 border-blue-500/60 text-blue-300", idle: "bg-blue-500/10 border-transparent text-blue-500" },
+              { key: "OUT_FOR_DELIVERY", count: stats.outOrders, dot: "bg-emerald-500", active: "bg-emerald-500/25 border-emerald-500/60 text-emerald-300", idle: "bg-emerald-500/10 border-transparent text-emerald-500" },
             ] as const).map(({ key, count, dot, active, idle }) => (
               <button
                 key={key}
                 onClick={() => setStatusFilter(statusFilter === key ? "ALL" : key)}
-                className={`flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-semibold transition ${
+                className={`flex items-center gap-1 px-2 py-1 rounded-md border text-[10px] font-bold transition ${
                   statusFilter === key ? active : idle
                 }`}>
                 <div className={`w-1.5 h-1.5 rounded-full ${dot}`} />
@@ -1964,7 +1964,7 @@ export default function MapPage() {
         
         {/* Order cards list */}
         <div className="flex-1 overflow-y-auto scrollbar-hide" style={{ maxHeight: 'calc(100vh - 60px)' }}>
-          <div className="p-1.5 space-y-px">
+          <div className="p-2 space-y-2">
             {filteredOrders.map((order: any) => {
               const statusColor = ORDER_STATUS_COLORS[order.status as keyof typeof ORDER_STATUS_COLORS] || ORDER_STATUS_COLORS.PENDING;
               const businessName = order.businesses?.[0]?.business?.name || "Unknown";
@@ -1974,6 +1974,7 @@ export default function MapPage() {
               const elapsed = now - orderDateMs;
               const pendingTooLong = isPending && elapsed > PENDING_WARNING_MS;
               const customerName = order.user ? `${order.user.firstName} ${order.user.lastName}` : "Unknown";
+              const customerPhone = order.user?.phoneNumber || "";
               const distanceData = orderDistances[order.id];
               const preview = (order as any).settlementPreview;
               const marginSeverity = preview ? getMarginSeverity(preview.netMargin) : null;
@@ -1990,69 +1991,75 @@ export default function MapPage() {
                   key={order.id}
                   ref={(el) => { orderRefs.current[order.id] = el; }}
                   onClick={() => selectOrder(order.id)}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-lg border-l-2 transition-all ${
-                    isSelected
-                      ? 'bg-white/[0.06]'
-                      : pendingTooLong
-                        ? 'bg-red-500/[0.06] animate-pulse'
-                        : 'hover:bg-white/[0.04]'
-                  }`}
-                  style={{ borderLeftColor: isSelected ? statusColor.hex : pendingTooLong ? '#ef4444' : `${statusColor.hex}44` }}>
+                  style={isSelected
+                    ? { borderLeft: `3px solid ${statusColor.hex}`, boxShadow: `inset 0 0 0 1px ${statusColor.hex}55` }
+                    : pendingTooLong
+                      ? { borderLeft: '3px solid #ef4444' }
+                      : { borderLeft: `3px solid ${statusColor.hex}33` }}
+                  className={`w-full text-left p-3 rounded-xl transition-all ${
+                    pendingTooLong ? "bg-red-500/10 animate-pulse" : "hover:bg-white/5"
+                  }`}>
                   
-                  {/* Row 1: Business + elapsed */}
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: pendingTooLong ? "#ef4444" : statusColor.hex }} />
-                      <span className="text-[13px] font-medium text-white truncate">{businessName}</span>
+                  {/* Top row: status + time */}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: pendingTooLong ? "#ef4444" : statusColor.hex }} />
+                      <span className={`text-[10px] font-semibold uppercase ${pendingTooLong ? "text-red-400" : statusColor.text}`}>
+                        {order.status.replace(/_/g, " ")}
+                      </span>
+                      {pendingTooLong && (
+                        <span className="text-[8px] px-1.5 py-0.5 rounded bg-red-500/30 text-red-300 font-bold">LATE</span>
+                      )}
                     </div>
-                    <span className={`text-[10px] font-mono flex-shrink-0 ${pendingTooLong ? "text-red-400" : "text-zinc-600"}`}>
+                    <span className={`text-[10px] font-mono ${pendingTooLong ? "text-red-400" : "text-zinc-500"}`}>
                       {formatElapsed(elapsed)}
                     </span>
                   </div>
                   
-                  {/* Row 2: Status · Customer */}
-                  <div className="flex items-center gap-1.5 mt-0.5 pl-3">
-                    <span className={`text-[9px] font-semibold uppercase flex-shrink-0 ${pendingTooLong ? "text-red-400" : statusColor.text}`}>
-                      {order.status.replace(/_/g, " ")}
-                    </span>
-                    {pendingTooLong && (
-                      <span className="text-[8px] px-1 py-px rounded bg-red-500/20 text-red-300 font-bold flex-shrink-0">LATE</span>
-                    )}
-                    <span className="text-zinc-700 text-[9px]">·</span>
-                    <span className="text-[10px] text-zinc-500 truncate">{customerName}</span>
-                  </div>
+                  {/* Business name */}
+                  <div className="text-sm font-medium text-white truncate mb-1">{businessName}</div>
 
-                  {/* Prep time alert (compact inline) */}
+                  {/* Prep time extended alert */}
                   {(() => {
                     const alert = prepTimeAlerts.find((a) => a.orderId === order.id);
                     if (!alert) return null;
                     return (
-                      <div className="flex items-center gap-1 mt-0.5 pl-3">
-                        <Clock size={9} className="text-amber-500/60 flex-shrink-0" />
-                        <span className="text-amber-500/70 text-[9px] font-medium">+{alert.addedMinutes}m → {alert.newTotalMinutes}m</span>
+                      <div className="flex items-center gap-1.5 mb-2 px-2 py-1 rounded-md bg-amber-500/15 border border-amber-500/30">
+                        <Clock size={11} className="text-amber-400 flex-shrink-0" />
+                        <span className="text-amber-400 text-[10px] font-semibold flex-1">+{alert.addedMinutes}m (now {alert.newTotalMinutes}m)</span>
                         <button
                           onClick={(e) => { e.stopPropagation(); dismissPrepAlert(alert.orderId); }}
-                          className="text-amber-500/40 hover:text-amber-400 text-[10px] leading-none ml-auto"
+                          className="text-amber-400/60 hover:text-amber-400 text-xs leading-none"
                         >×</button>
                       </div>
                     );
                   })()}
                   
-                  {/* Row 3: Driver + margin + eta + price */}
-                  <div className="flex items-center justify-between mt-1 pl-3">
-                    <div className="flex items-center gap-1 min-w-0">
+                  {/* Customer */}
+                  <div className="mb-2">
+                    <div className="text-xs text-zinc-400 truncate">
+                      <span className="text-zinc-600">{"\u2192"}</span> {customerName}
+                    </div>
+                    {customerPhone && (
+                      <div className="text-[10px] text-zinc-500 truncate mt-0.5">{customerPhone}</div>
+                    )}
+                  </div>
+                  
+                  {/* Bottom row: driver + price + eta */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
                       {order.driver ? (
-                        <div className="flex items-center gap-1">
-                          <div className={`w-3.5 h-3.5 rounded-full ${getAvatarColor(order.driver.id)} flex items-center justify-center text-[7px] font-bold text-white flex-shrink-0`}>
+                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-500/10">
+                          <div className={`w-4 h-4 rounded-full ${getAvatarColor(order.driver.id)} flex items-center justify-center text-[8px] font-bold text-white`}>
                             {getInitials(order.driver.firstName, order.driver.lastName)}
                           </div>
-                          <span className="text-[10px] text-zinc-500">{order.driver.firstName}</span>
+                          <span className="text-[10px] text-emerald-400 font-medium">{order.driver.firstName}</span>
                         </div>
                       ) : (
-                        <span className="text-[10px] text-amber-500/60">No driver</span>
+                        <span className="text-[10px] px-2 py-1 rounded-md bg-amber-500/10 text-amber-400 font-medium">Unassigned</span>
                       )}
                     </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <div className="flex items-center gap-2">
                       {preview ? (
                         <div className="group/pill relative"
                           onMouseEnter={(e) => {
@@ -2064,8 +2071,8 @@ export default function MapPage() {
                             tip.style.top = `${rect.bottom + 6}px`;
                           }}>
                           <span
-                            className={`text-[9px] font-medium cursor-default ${marginSeverity === 'healthy' ? 'text-emerald-400/60' : marginSeverity === 'thin' ? 'text-amber-400/60' : 'text-rose-400/60'}`}>
-                            {preview.netMargin >= 0 ? '+' : ''}€{preview.netMargin.toFixed(2)}
+                            className={`text-[10px] px-1.5 py-0.5 rounded font-medium cursor-default ${marginSeverity === 'healthy' ? 'bg-emerald-500/15 text-emerald-300' : marginSeverity === 'thin' ? 'bg-amber-500/15 text-amber-300' : 'bg-rose-500/15 text-rose-300'}`}>
+                            M {preview.netMargin >= 0 ? '+' : ''}€{preview.netMargin.toFixed(2)}
                           </span>
                           <div data-settlement-tip className="pointer-events-none fixed z-[9999] w-56 rounded-lg border border-zinc-700 bg-[#0a0a0d] p-2 text-[10px] text-zinc-300 opacity-0 shadow-2xl transition-opacity group-hover/pill:opacity-100">
                             <div className="font-semibold text-zinc-200 mb-1 text-[11px]">Settlement breakdown</div>
@@ -2088,11 +2095,13 @@ export default function MapPage() {
                             )}
                           </div>
                         </div>
-                      ) : null}
-                      {etaMin && (
-                        <span className="text-[10px] text-zinc-600">{etaMin}m</span>
+                      ) : (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-zinc-500/15 text-zinc-400">M —</span>
                       )}
-                      <span className="text-[11px] font-medium text-zinc-300">€{order.totalPrice?.toFixed(2) || "0"}</span>
+                      {etaMin && (
+                        <span className="text-[10px] text-zinc-500">{etaMin}m</span>
+                      )}
+                      <span className="text-xs font-medium text-white">{"\u20AC"}{order.totalPrice?.toFixed(2) || "0"}</span>
                     </div>
                   </div>
                 </button>
@@ -3005,20 +3014,20 @@ function ItemsList({ orderBusinesses }: { orderBusinesses: any[] }) {
   const hidden = allItems.length - ITEMS_PREVIEW;
 
   return (
-    <div className="px-5 py-3 border-b border-white/5">
-      <div className="text-[10px] uppercase tracking-widest text-zinc-600 font-semibold mb-2">Items</div>
-      <div className="space-y-1">
+    <div className="px-4 py-2 border-b border-white/5">
+      <div className="text-[10px] uppercase tracking-wider text-zinc-600 font-semibold mb-1">Items</div>
+      <div className="space-y-px">
         {visible.map((item: any) => (
-          <div key={item.key} className="flex justify-between text-sm">
-            <span className="text-zinc-300 truncate pr-2">{item.quantity}× {item.name || 'Item'}</span>
-            <span className="text-zinc-500 flex-shrink-0">€{((item.unitPrice || item.basePrice || 0) * item.quantity).toFixed(2)}</span>
+          <div key={item.key} className="flex justify-between text-xs py-0.5">
+            <span className="text-zinc-400 truncate pr-2">{item.quantity}× {item.name || 'Item'}</span>
+            <span className="text-zinc-600 flex-shrink-0">€{((item.unitPrice || item.basePrice || 0) * item.quantity).toFixed(2)}</span>
           </div>
         ))}
       </div>
       {hidden > 0 && (
         <button onClick={() => setExpanded((v) => !v)}
-          className="mt-2 text-xs text-zinc-500 hover:text-zinc-300 transition">
-          {expanded ? 'Show less' : `+${hidden} more item${hidden !== 1 ? 's' : ''}`}
+          className="mt-1 text-[10px] text-zinc-600 hover:text-zinc-400 transition">
+          {expanded ? 'Show less' : `+${hidden} more`}
         </button>
       )}
     </div>
@@ -3119,150 +3128,129 @@ function BottomDetailPanel({
   useEffect(() => { setConfirmPreReady(false); setPendingAssignDriverId(null); }, [order.id]);
 
   return (
-    // Right-side full-height drawer — slides in from right, sits left of the 72px icon bar
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
 
       {/* ── Header ── */}
-      <div className="flex-shrink-0 px-5 pt-4 pb-3 border-b border-white/8">
-        {/* Top row: status + close */}
-        <div className="flex items-start justify-between gap-2 mb-3">
-          <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex-shrink-0 px-4 pt-3 pb-2 border-b border-white/6">
+        {/* Top row: status + actions */}
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="flex items-center gap-1.5">
             <span
-              className={`text-xs font-bold uppercase tracking-widest px-2.5 py-1 rounded-full ${
-                slaRisk.level === 'critical' ? 'bg-red-500/20 text-red-300' :
-                slaRisk.level === 'warning' ? 'bg-amber-500/20 text-amber-300' :
-                `${statusColor.selectBg} ${statusColor.text}`
+              className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+                slaRisk.level === 'critical' ? 'text-red-400' :
+                slaRisk.level === 'warning' ? 'text-amber-400' :
+                statusColor.text
               }`}>
               {order.status.replace(/_/g, ' ')}
             </span>
             {slaRisk.level !== 'ok' && (
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                slaRisk.level === 'critical' ? 'bg-red-500/20 text-red-300 animate-pulse' : 'bg-amber-500/20 text-amber-300'
+              <span className={`text-[9px] font-semibold ${
+                slaRisk.level === 'critical' ? 'text-red-400 animate-pulse' : 'text-amber-400'
               }`}>
-                +{Math.round(slaRisk.delayMs / 60000)}m overdue
+                +{Math.round(slaRisk.delayMs / 60000)}m
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <button onClick={onFocus} title="Fit map to order" className="p-1.5 rounded-lg hover:bg-white/8 text-zinc-500 hover:text-white transition"><Crosshair size={14} /></button>
+          <div className="flex items-center gap-0.5 flex-shrink-0">
+            <button onClick={onFocus} title="Fit map" className="p-1 rounded hover:bg-white/8 text-zinc-600 hover:text-white transition"><Crosshair size={13} /></button>
             {distanceData && (
               <button onClick={onTogglePolyline} title={showPolyline ? 'Hide route' : 'Show route'}
-                className={`p-1.5 rounded-lg transition ${showPolyline ? 'bg-violet-500/20 text-violet-300' : 'hover:bg-white/8 text-zinc-500 hover:text-white'}`}>
-                <Route size={14} />
+                className={`p-1 rounded transition ${showPolyline ? 'text-violet-400' : 'text-zinc-600 hover:text-white'}`}>
+                <Route size={13} />
               </button>
             )}
-            <button onClick={onClose} title="Close" className="p-1.5 rounded-lg hover:bg-white/8 text-zinc-500 hover:text-white transition"><X size={14} /></button>
+            <button onClick={onClose} title="Close" className="p-1 rounded hover:bg-white/8 text-zinc-600 hover:text-white transition"><X size={13} /></button>
           </div>
         </div>
 
-        {/* Business → Customer */}
-        <div className="flex items-center gap-2 mb-1">
-          <PrepTimeRing size={44} stroke={3} progress={prepProgress} color={slaRisk.level === 'critical' ? '#ef4444' : slaRisk.level === 'warning' ? '#f59e0b' : statusColor.hex}>
-            <div className={`text-[11px] font-bold leading-none ${
+        {/* Business → Customer with timer ring */}
+        <div className="flex items-center gap-2">
+          <PrepTimeRing size={36} stroke={2.5} progress={prepProgress} color={slaRisk.level === 'critical' ? '#ef4444' : slaRisk.level === 'warning' ? '#f59e0b' : statusColor.hex}>
+            <div className={`text-[10px] font-bold leading-none ${
               slaRisk.level === 'critical' ? 'text-red-400' : slaRisk.level === 'warning' ? 'text-amber-400' : statusColor.text
             }`}>
               {order.status === 'PREPARING' && prepRemainingMin !== null ? `${prepRemainingMin}m` : etaMin ? `${etaMin}m` : isPending ? `${Math.floor(elapsed / 60000)}m` : '—'}
             </div>
           </PrepTimeRing>
           <div className="flex-1 min-w-0">
-            <div className="text-base font-semibold text-white truncate">{businessName}</div>
-            <div className="flex items-center gap-1.5 text-sm text-zinc-400 truncate">
-              <span className="text-zinc-600 text-xs">→</span>
-              <span className="truncate">{customerName}</span>
-            </div>
+            <div className="text-sm font-semibold text-white truncate">{businessName}</div>
+            <div className="text-xs text-zinc-500 truncate">→ {customerName}</div>
           </div>
+          <span className="text-sm font-semibold text-zinc-200 flex-shrink-0">€{order.totalPrice?.toFixed(2) || '0.00'}</span>
         </div>
 
-        {/* Timing + price row */}
-        <div className="flex items-center gap-4 mt-2 text-xs text-zinc-500">
-          <span>Age <span className={`font-mono font-semibold ${pendingTooLong ? 'text-red-400' : 'text-zinc-200'}`}>{formatElapsed(elapsed)}</span></span>
-          <span>In status <span className="font-mono font-semibold text-zinc-200">{formatElapsed(statusElapsed)}</span></span>
-          <span className="ml-auto text-base font-bold text-white">€{order.totalPrice?.toFixed(2) || '0.00'}</span>
+        {/* Timing row */}
+        <div className="flex items-center gap-3 mt-1.5 text-[10px] text-zinc-600">
+          <span>{formatElapsed(elapsed)} <span className={`${pendingTooLong ? 'text-red-400' : 'text-zinc-500'}`}>age</span></span>
+          <span>{formatElapsed(statusElapsed)} <span className="text-zinc-500">in status</span></span>
         </div>
       </div>
 
       {/* ── Scrollable body ── */}
       <div className="flex-1 overflow-y-auto scrollbar-hide">
 
-        {/* ── Contact info ── */}
-        <div className="px-5 py-3 border-b border-white/5 space-y-2">
-          <div className="text-[10px] uppercase tracking-widest text-zinc-600 font-semibold mb-1">Parties</div>
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-lg bg-violet-500/20 flex items-center justify-center flex-shrink-0">
-              <Store size={13} className="text-violet-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-white truncate">{businessName}</div>
-              {businessPhone && <div className="text-xs text-zinc-500">{businessPhone}</div>}
-            </div>
+        {/* ── Parties ── */}
+        <div className="px-4 py-2 border-b border-white/5 space-y-1.5">
+          {/* Business row */}
+          <div className="flex items-center gap-2">
+            <Store size={11} className="text-zinc-600 flex-shrink-0" />
+            <span className="text-xs text-zinc-300 truncate flex-1">{businessName}</span>
+            {businessPhone && <span className="text-[10px] text-zinc-600 flex-shrink-0">{businessPhone}</span>}
             <button onClick={() => onNotifyBusiness(order.id)} title="Notify business"
-              className="flex-shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 transition">
+              className="flex-shrink-0 px-2 py-0.5 rounded text-[10px] font-medium text-zinc-500 hover:text-amber-300 hover:bg-amber-500/10 transition">
               Notify
             </button>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-              <User size={13} className="text-blue-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-white truncate">{customerName}</div>
-              <div className="text-xs text-zinc-500">{customerTotalOrders} total orders</div>
-              {customerPhone && <div className="text-xs text-zinc-500">{customerPhone}</div>}
-            </div>
+          {/* Customer row */}
+          <div className="flex items-center gap-2">
+            <User size={11} className="text-zinc-600 flex-shrink-0" />
+            <span className="text-xs text-zinc-300 truncate flex-1">
+              {customerName}
+              <span className="text-zinc-600 ml-1">({customerTotalOrders})</span>
+            </span>
+            {customerPhone && <span className="text-[10px] text-zinc-600 flex-shrink-0">{customerPhone}</span>}
             <button
               onClick={() => onToggleTrustedCustomer(order.user, !customerTrusted)}
               disabled={!order.user?.id || trustUpdatingUserId === order.user?.id}
-              className={`flex-shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-medium border transition disabled:opacity-50 ${
+              className={`flex-shrink-0 px-2 py-0.5 rounded text-[10px] font-medium transition disabled:opacity-50 ${
                 customerTrusted
-                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25'
-                  : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'
+                  ? 'text-emerald-400'
+                  : 'text-zinc-600 hover:text-zinc-300'
               }`}
             >
-              {trustUpdatingUserId === order.user?.id
-                ? 'Saving...'
-                : customerTrusted
-                  ? 'Trusted'
-                  : 'Mark trusted'}
+              {trustUpdatingUserId === order.user?.id ? '...' : customerTrusted ? '✓ Trusted' : 'Trust'}
             </button>
           </div>
+          {/* Address */}
           {order.dropOffLocation?.address && (
-            <div className="text-xs text-zinc-600 leading-tight pl-10 truncate">{order.dropOffLocation.address}</div>
+            <div className="text-[10px] text-zinc-600 leading-tight pl-[19px] truncate">{order.dropOffLocation.address}</div>
           )}
-          {getApprovalReasons(order).includes('FIRST_ORDER') && (
-            <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-200 text-[11px] font-semibold">
-              🆕 First order
-            </div>
-          )}
-          {getApprovalReasons(order).includes('HIGH_VALUE') && (
-            <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[11px] font-semibold">
-              💰 Over €20
-            </div>
-          )}
-          {(order as any).inventoryPrice != null && Number((order as any).inventoryPrice) > 0 && (
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={(e) => { e.stopPropagation(); setInventoryModalOrder(order); fetchOrderCoverage({ variables: { orderId: order.id } }); }}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); setInventoryModalOrder(order); fetchOrderCoverage({ variables: { orderId: order.id } }); } }}
-              className="mt-2 w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/30 text-violet-300 text-xs font-semibold hover:bg-violet-500/20 transition-colors text-left cursor-pointer"
-            >
-              📦 Stock items — €{Number((order as any).inventoryPrice).toFixed(2)}
-              <span className="ml-auto text-violet-500 text-[10px]">View →</span>
-            </div>
-          )}
-          {(order as any).needsApproval && (
-            <div className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold">
-              ⚠ Awaiting approval
-            </div>
-          )}
-          {customerTrusted && (
-            <div className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
-              ✅ Trusted customer
-            </div>
-          )}
-          {getApprovalReasons(order).includes('OUT_OF_ZONE') && (
-            <div className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-semibold">
-              📍 Outside delivery zone
+          {/* Flags row — inline chips instead of separate banners */}
+          {(getApprovalReasons(order).length > 0 || (order as any).needsApproval || customerTrusted || ((order as any).inventoryPrice != null && Number((order as any).inventoryPrice) > 0)) && (
+            <div className="flex items-center gap-1.5 flex-wrap pl-[19px] mt-0.5">
+              {getApprovalReasons(order).includes('FIRST_ORDER') && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 font-medium">1st order</span>
+              )}
+              {getApprovalReasons(order).includes('HIGH_VALUE') && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 font-medium">High value</span>
+              )}
+              {getApprovalReasons(order).includes('OUT_OF_ZONE') && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-300 font-medium">Out of zone</span>
+              )}
+              {(order as any).needsApproval && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 font-medium">Needs approval</span>
+              )}
+              {customerTrusted && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 font-medium">Trusted</span>
+              )}
+              {(order as any).inventoryPrice != null && Number((order as any).inventoryPrice) > 0 && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setInventoryModalOrder(order); fetchOrderCoverage({ variables: { orderId: order.id } }); }}
+                  className="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-300 font-medium hover:bg-violet-500/20 transition cursor-pointer"
+                >
+                  Stock €{Number((order as any).inventoryPrice).toFixed(2)}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -3273,8 +3261,8 @@ function BottomDetailPanel({
         )}
 
         {/* ── Driver ── */}
-        <div className="px-5 py-3 border-b border-white/5">
-          <div className="text-[10px] uppercase tracking-widest text-zinc-600 font-semibold mb-2">Driver</div>
+        <div className="px-4 py-2 border-b border-white/5">
+          <div className="text-[10px] uppercase tracking-wider text-zinc-600 font-semibold mb-1.5">Driver</div>
           {order.driver ? (
             (() => {
               const driver = driverMap[order.driver.id];
@@ -3282,30 +3270,30 @@ function BottomDetailPanel({
               const ss = DRIVER_CONNECTION_COLORS[cs];
               const SI = ss.icon;
               return (
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-full ${getAvatarColor(order.driver.id)} flex items-center justify-center font-bold text-white text-sm border-2 ${ss.border} flex-shrink-0`}>
+                <div className="flex items-center gap-2">
+                  <div className={`w-7 h-7 rounded-full ${getAvatarColor(order.driver.id)} flex items-center justify-center font-bold text-white text-[10px] flex-shrink-0`}>
                     {getInitials(order.driver.firstName, order.driver.lastName)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-white">{order.driver.firstName} {order.driver.lastName}</div>
-                    <div className={`flex items-center gap-1 text-xs ${ss.text}`}><SI size={10} />{ss.label}</div>
+                    <div className="text-xs font-medium text-white">{order.driver.firstName} {order.driver.lastName}</div>
+                    <div className={`flex items-center gap-1 text-[10px] ${ss.text}`}><SI size={9} />{ss.label}</div>
                   </div>
                   <button onClick={() => onNotifyDriver(order.id)} title="Notify driver"
-                    className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-violet-500/15 hover:bg-violet-500/25 text-violet-300 transition">
+                    className="px-2 py-0.5 rounded text-[10px] font-medium text-zinc-500 hover:text-violet-300 hover:bg-violet-500/10 transition">
                     Notify
                   </button>
                   <button onClick={() => onAssignDriver(order.id, null)} title="Unassign"
-                    className="p-1.5 rounded-lg hover:bg-rose-500/20 text-zinc-600 hover:text-rose-400 transition">
-                    <X size={13} />
+                    className="p-1 rounded hover:bg-rose-500/15 text-zinc-600 hover:text-rose-400 transition">
+                    <X size={12} />
                   </button>
                 </div>
               );
             })()
           ) : (
-            <div className="space-y-2">
-              <div className="overflow-y-auto space-y-1" style={{ maxHeight: '180px' }}>
+            <div className="space-y-1.5">
+              <div className="overflow-y-auto space-y-0.5" style={{ maxHeight: '150px' }}>
                 {allDriversSorted.length === 0 ? (
-                  <div className="text-sm text-zinc-600 italic">No drivers found</div>
+                  <div className="text-xs text-zinc-600 italic">No drivers found</div>
                 ) : allDriversSorted.map(({ driver, distanceToPickupMeters, isAssignable, isFree }: any) => {
                   const cs = (driver.driverConnection?.connectionStatus ?? 'DISCONNECTED') as keyof typeof DRIVER_CONNECTION_COLORS;
                   const ss = DRIVER_CONNECTION_COLORS[cs];
@@ -3316,39 +3304,38 @@ function BottomDetailPanel({
                   const isUnavailable = !isAssignable;
                   return (
                     <button key={driver.id} onClick={() => setSelectedDriverId(driver.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition ${
-                        isSelected ? 'bg-blue-500/20 border border-blue-500/40' : 'bg-white/4 hover:bg-white/7 border border-white/4'
-                      } ${isUnavailable ? 'opacity-50' : ''}`}>
-                      <div className={`w-8 h-8 rounded-full ${getAvatarColor(driver.id)} flex items-center justify-center text-white text-xs font-bold flex-shrink-0 border ${ss.border}`}>
+                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition ${
+                        isSelected ? 'bg-blue-500/15 border border-blue-500/30' : 'hover:bg-white/5 border border-transparent'
+                      } ${isUnavailable ? 'opacity-40' : ''}`}>
+                      <div className={`w-6 h-6 rounded-full ${getAvatarColor(driver.id)} flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0`}>
                         {getInitials(driver.firstName, driver.lastName)}
                       </div>
-                      <span className="text-sm text-white truncate flex-1">{driver.firstName} {driver.lastName}</span>
-                      <span className="text-xs text-zinc-500 flex-shrink-0">{Number.isFinite(distanceToPickupMeters) ? `${(distanceToPickupMeters / 1000).toFixed(1)}km` : '—'}</span>
-                      {isRecommended && <span className="text-[10px] text-emerald-400 font-semibold flex-shrink-0">Best</span>}
-                      {isBusy && <span className="text-[10px] text-amber-400 font-semibold flex-shrink-0">Busy</span>}
-                      {isUnavailable && <span className="text-[10px] text-zinc-500 font-semibold flex-shrink-0">Unavailable</span>}
-                      <SI size={10} className={`${ss.text} flex-shrink-0`} />
+                      <span className="text-xs text-zinc-300 truncate flex-1">{driver.firstName} {driver.lastName}</span>
+                      <span className="text-[10px] text-zinc-600 flex-shrink-0">{Number.isFinite(distanceToPickupMeters) ? `${(distanceToPickupMeters / 1000).toFixed(1)}km` : '—'}</span>
+                      {isRecommended && <span className="text-[9px] text-emerald-400 font-medium flex-shrink-0">Best</span>}
+                      {isBusy && <span className="text-[9px] text-amber-400 font-medium flex-shrink-0">Busy</span>}
+                      <SI size={9} className={`${ss.text} flex-shrink-0`} />
                     </button>
                   );
                 })}
               </div>
               {/* Pre-ready assign warning */}
               {confirmPreReady && (
-                <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 p-3 space-y-2">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle size={14} className="text-amber-400 flex-shrink-0 mt-0.5" />
-                    <div className="text-xs text-amber-300">Order is not ready yet. Assigning now will notify the driver before the order is prepared. Are you sure?</div>
+                <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-2.5 py-2 space-y-1.5">
+                  <div className="flex items-start gap-1.5">
+                    <AlertCircle size={12} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div className="text-[10px] text-amber-300 leading-tight">Not ready yet. Assign anyway?</div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-1.5">
                     <button onClick={() => { onAssignDriver(order.id, pendingAssignDriverId!); setConfirmPreReady(false); setPendingAssignDriverId(null); }}
-                      className="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-black transition">Assign anyway</button>
+                      className="flex-1 py-1 rounded text-[10px] font-semibold bg-amber-500 hover:bg-amber-400 text-black transition">Assign</button>
                     <button onClick={() => { setConfirmPreReady(false); setPendingAssignDriverId(null); }}
-                      className="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition">Cancel</button>
+                      className="flex-1 py-1 rounded text-[10px] font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-400 transition">Cancel</button>
                   </div>
                 </div>
               )}
               {!confirmPreReady && (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-1.5">
                   <button
                     onClick={() => {
                       if (!selectedDriverId) return;
@@ -3360,14 +3347,14 @@ function BottomDetailPanel({
                       }
                     }}
                     disabled={!selectedDriverId}
-                    className={`py-2 rounded-lg text-sm font-semibold transition ${
+                    className={`py-1.5 rounded-lg text-xs font-semibold transition ${
                       selectedDriverId ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
                     }`}>
                     Assign
                   </button>
                   <button onClick={() => onAutoAssign(order.id)}
-                    className="py-2 rounded-lg text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition flex items-center justify-center gap-1.5">
-                    <Zap size={13} /> Auto-assign
+                    className="py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition flex items-center justify-center gap-1">
+                    <Zap size={11} /> Auto
                   </button>
                 </div>
               )}
@@ -3376,18 +3363,18 @@ function BottomDetailPanel({
         </div>
 
         {/* ── Status ── */}
-        <div className="px-5 py-3 border-b border-white/5">
-          <div className="text-[10px] uppercase tracking-widest text-zinc-600 font-semibold mb-2">Status</div>
+        <div className="px-4 py-2 border-b border-white/5">
+          <div className="text-[10px] uppercase tracking-wider text-zinc-600 font-semibold mb-1.5">Status</div>
           {(order as any).needsApproval && (
             <button
               onClick={() => onApproveOrder(order.id)}
-              className="w-full mb-2 px-3 py-2.5 rounded-xl text-sm font-semibold bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25 transition"
+              className="w-full mb-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition"
             >
-              Approve and Send to Business
+              Approve & Send to Business
             </button>
           )}
           <select value={order.status} onChange={(e) => onUpdateStatus(order.id, e.target.value)}
-            className={`w-full border rounded-xl px-3 py-2.5 text-sm font-semibold text-white ${statusColor.selectBg} ${statusColor.border}`}
+            className={`w-full border rounded-lg px-2.5 py-2 text-xs font-semibold text-white bg-zinc-900 ${statusColor.border}`}
             style={{ colorScheme: 'dark' }}>
             <option value="AWAITING_APPROVAL" style={{ backgroundColor: '#1f2937' }}>Awaiting Approval</option>
             <option value="PENDING" style={{ backgroundColor: '#1f2937' }}>Pending</option>
@@ -3398,46 +3385,41 @@ function BottomDetailPanel({
             <option value="CANCELLED" style={{ backgroundColor: '#1f2937' }}>Cancelled</option>
           </select>
           {!order.driver?.id && !isTerminalStatus && (
-            <div className="mt-1.5 text-xs text-amber-400/80 flex items-center gap-1"><AlertCircle size={11} /> No driver assigned — confirm before proceeding</div>
+            <div className="mt-1 text-[10px] text-amber-400/70 flex items-center gap-1"><AlertCircle size={10} /> No driver — assign first</div>
           )}
           {distanceData && order.driver && (order.status === 'READY' || order.status === 'PENDING') && (
             <button onClick={onToggleBothRoutes}
-              className={`mt-2 w-full px-3 py-2 rounded-lg text-sm font-medium transition flex items-center justify-center gap-1.5 ${
-                showBothRoutes ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-white/5 text-zinc-500 hover:text-white border border-white/8'
+              className={`mt-1.5 w-full px-2.5 py-1.5 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1 ${
+                showBothRoutes ? 'text-purple-300 bg-purple-500/10' : 'text-zinc-600 hover:text-zinc-300 hover:bg-white/5'
               }`}>
-              <Route size={13} />{showBothRoutes ? 'Hide' : 'Show'} both routes
+              <Route size={11} />{showBothRoutes ? 'Hide' : 'Show'} both routes
             </button>
           )}
         </div>
 
         {/* ── Economics ── */}
-        <div className="px-5 py-3 border-b border-white/5">
-          <div className="text-[10px] uppercase tracking-widest text-zinc-600 font-semibold mb-2">Economics</div>
+        <div className="px-4 py-2 border-b border-white/5">
+          <div className="text-[10px] uppercase tracking-wider text-zinc-600 font-semibold mb-1.5">Economics</div>
           {preview ? (
             <>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2 text-xs text-zinc-400">
-                  <span>Receivable <span className="text-emerald-300 font-semibold">€{preview.totalReceivable.toFixed(2)}</span></span>
-                  <span>Payable <span className="text-rose-300 font-semibold">€{preview.totalPayable.toFixed(2)}</span></span>
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-2 text-[10px] text-zinc-500">
+                  <span>In <span className="text-emerald-400/70 font-medium">€{preview.totalReceivable.toFixed(2)}</span></span>
+                  <span>Out <span className="text-rose-400/70 font-medium">€{preview.totalPayable.toFixed(2)}</span></span>
                 </div>
-                <div className={`rounded-lg px-2 py-1 ${
-                  previewSeverity === 'healthy' ? 'bg-emerald-500/10' :
-                  previewSeverity === 'thin' ? 'bg-amber-500/10' : 'bg-rose-500/10'
-                }`}>
-                  <span className={`text-sm font-semibold ${
-                    previewSeverity === 'healthy' ? 'text-emerald-300' :
-                    previewSeverity === 'thin' ? 'text-amber-300' : 'text-rose-300'
-                  }`}>{preview.netMargin >= 0 ? '+' : ''}€{preview.netMargin.toFixed(2)}</span>
-                </div>
+                <span className={`text-xs font-semibold ${
+                  previewSeverity === 'healthy' ? 'text-emerald-400' :
+                  previewSeverity === 'thin' ? 'text-amber-400' : 'text-rose-400'
+                }`}>{preview.netMargin >= 0 ? '+' : ''}€{preview.netMargin.toFixed(2)}</span>
               </div>
               {!preview.driverAssigned && (
-                <div className="mb-2 text-[10px] px-2 py-1 rounded bg-amber-500/15 text-amber-300 font-semibold inline-block">No driver assigned</div>
+                <div className="mb-1 text-[9px] text-amber-400/60 font-medium">No driver assigned — estimate only</div>
               )}
-              <div className="space-y-1">
+              <div className="space-y-px">
                 {preview.lineItems.map((li: any, i: number) => (
-                  <div key={i} className="flex items-center justify-between text-xs">
-                    <span className="text-zinc-500 truncate mr-2">{li.reason}</span>
-                    <span className={`font-semibold whitespace-nowrap ${li.direction === 'RECEIVABLE' ? 'text-emerald-300' : 'text-rose-300'}`}>
+                  <div key={i} className="flex items-center justify-between text-[10px] py-0.5">
+                    <span className="text-zinc-600 truncate mr-2">{li.reason}</span>
+                    <span className={`font-medium whitespace-nowrap ${li.direction === 'RECEIVABLE' ? 'text-emerald-400/70' : 'text-rose-400/70'}`}>
                       {li.direction === 'RECEIVABLE' ? '+' : '-'}€{li.amount.toFixed(2)}
                     </span>
                   </div>
@@ -3445,56 +3427,49 @@ function BottomDetailPanel({
               </div>
             </>
           ) : (
-            <div className="text-xs text-zinc-600">No settlement data</div>
+            <div className="text-[10px] text-zinc-700">No settlement data</div>
           )}
         </div>
 
         {/* ── Incident Flag (terminal orders only) ── */}
         {isTerminalStatus && (
-          <div className="px-5 py-3 border-t border-white/5">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="text-[10px] uppercase tracking-widest text-zinc-600 font-semibold">Incident Flag</div>
+          <div className="px-4 py-2 border-t border-white/5">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="text-[10px] uppercase tracking-wider text-zinc-600 font-semibold">Incident</div>
               {incident?.tag && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-semibold uppercase tracking-wide">Flagged</span>
+                <span className="text-[8px] px-1 py-px rounded bg-rose-500/15 text-rose-400 font-semibold uppercase">Flagged</span>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <div className="text-[10px] text-zinc-600 mb-1">Tag</div>
-                <select
-                  value={incident?.tag || ''}
-                  onChange={(e) => onIncidentUpdate(order.id, { tag: e.target.value })}
-                  className={`w-full px-2.5 py-2 rounded-lg text-xs border ${
-                    incident?.tag ? 'bg-rose-500/10 border-rose-500/30 text-rose-300' : 'bg-zinc-900 border-zinc-800 text-zinc-400'
-                  }`}
-                  style={{ colorScheme: 'dark' }}>
-                  <option value="">None</option>
-                  <option value="late_prep">Late Prep</option>
-                  <option value="driver_delay">Driver Delay</option>
-                  <option value="handoff_issue">Handoff Issue</option>
-                  <option value="customer_issue">Customer Issue</option>
-                  <option value="wrong_order">Wrong Order</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-              <div>
-                <div className="text-[10px] text-zinc-600 mb-1">Reason</div>
-                <input
-                  value={incident?.rootCause || ''}
-                  onChange={(e) => onIncidentUpdate(order.id, { rootCause: e.target.value })}
-                  placeholder="Describe what happened…"
-                  className="w-full px-2.5 py-2 rounded-lg text-xs bg-zinc-900 border border-zinc-800 text-zinc-200 placeholder:text-zinc-600"
-                />
-              </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              <select
+                value={incident?.tag || ''}
+                onChange={(e) => onIncidentUpdate(order.id, { tag: e.target.value })}
+                className={`w-full px-2 py-1.5 rounded text-[10px] border ${
+                  incident?.tag ? 'border-rose-500/20 text-rose-300' : 'border-zinc-800 text-zinc-500'
+                } bg-zinc-900`}
+                style={{ colorScheme: 'dark' }}>
+                <option value="">No tag</option>
+                <option value="late_prep">Late Prep</option>
+                <option value="driver_delay">Driver Delay</option>
+                <option value="handoff_issue">Handoff Issue</option>
+                <option value="customer_issue">Customer Issue</option>
+                <option value="wrong_order">Wrong Order</option>
+                <option value="other">Other</option>
+              </select>
+              <input
+                value={incident?.rootCause || ''}
+                onChange={(e) => onIncidentUpdate(order.id, { rootCause: e.target.value })}
+                placeholder="Reason…"
+                className="w-full px-2 py-1.5 rounded text-[10px] bg-zinc-900 border border-zinc-800 text-zinc-300 placeholder:text-zinc-700"
+              />
             </div>
             {incident?.tag && incident?.updatedAt > 0 && (
-              <div className="mt-1.5 text-[10px] text-zinc-600">Flagged {formatElapsed(now - incident.updatedAt)} ago</div>
+              <div className="mt-1 text-[9px] text-zinc-700">{formatElapsed(now - incident.updatedAt)} ago</div>
             )}
           </div>
         )}
 
-        {/* Bottom padding for scroll */}
-        <div className="h-4" />
+        <div className="h-2" />
       </div>
     </div>
   );
