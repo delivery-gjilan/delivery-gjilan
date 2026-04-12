@@ -14,6 +14,8 @@ export const storeStatusUpdated: NonNullable<SubscriptionResolvers['storeStatusU
       bannerMessage: payload.bannerMessage ?? null,
       bannerType: (payload.bannerType || 'INFO').toUpperCase() as any,
       dispatchModeEnabled: (payload as any).dispatchModeEnabled ?? false,
+      googleMapsNavEnabled: (payload as any).googleMapsNavEnabled ?? false,
+      inventoryModeEnabled: (payload as any).inventoryModeEnabled ?? false,
     };
   },
 };

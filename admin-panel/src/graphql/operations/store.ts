@@ -9,6 +9,8 @@ export const GET_STORE_STATUS = graphql(`
             bannerMessage
             bannerType
             dispatchModeEnabled
+            googleMapsNavEnabled
+            inventoryModeEnabled
         }
     }
 `);
@@ -22,6 +24,8 @@ export const UPDATE_STORE_STATUS = graphql(`
             bannerMessage
             bannerType
             dispatchModeEnabled
+            googleMapsNavEnabled
+            inventoryModeEnabled
         }
     }
 `);

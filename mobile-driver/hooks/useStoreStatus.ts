@@ -8,6 +8,7 @@ interface StoreStatus {
     bannerMessage?: string | null;
     bannerType: string;
     dispatchModeEnabled: boolean;
+    googleMapsNavEnabled: boolean;
 }
 
 export function useStoreStatus() {
@@ -36,6 +37,7 @@ export function useStoreStatus() {
         bannerMessage: data?.getStoreStatus?.bannerMessage ?? null,
         bannerType: data?.getStoreStatus?.bannerType ?? 'INFO',
         dispatchModeEnabled: data?.getStoreStatus?.dispatchModeEnabled ?? false,
+        googleMapsNavEnabled: data?.getStoreStatus?.googleMapsNavEnabled ?? false,
         loading,
     };
 }

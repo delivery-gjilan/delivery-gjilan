@@ -29,6 +29,7 @@ export const GET_MY_SETTLEMENTS = gql`
             amount
             status
             direction
+            reason
             paidAt
             createdAt
             order {

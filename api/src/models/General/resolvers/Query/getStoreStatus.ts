@@ -11,6 +11,8 @@ const DEFAULT_STORE_STATUS = {
   bannerMessage: null,
   bannerType: 'INFO',
   dispatchModeEnabled: false,
+  googleMapsNavEnabled: false,
+  inventoryModeEnabled: false,
 };
 
 export const getStoreStatus: NonNullable<QueryResolvers['getStoreStatus']> = async (
@@ -38,6 +40,8 @@ export const getStoreStatus: NonNullable<QueryResolvers['getStoreStatus']> = asy
       bannerMessage: settings[0].bannerMessage,
       bannerType: (settings[0].bannerType || 'info').toUpperCase(),
       dispatchModeEnabled: settings[0].dispatchModeEnabled,
+      googleMapsNavEnabled: settings[0].googleMapsNavEnabled,
+      inventoryModeEnabled: settings[0].inventoryModeEnabled,
     };
   });
 

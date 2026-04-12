@@ -49,6 +49,8 @@ type StoreStatus {
     bannerMessage: String
     bannerType: BannerType!
     dispatchModeEnabled: Boolean!
+    googleMapsNavEnabled: Boolean!
+    inventoryModeEnabled: Boolean!
 }
 
 input UpdateStoreStatusInput {
@@ -58,6 +60,8 @@ input UpdateStoreStatusInput {
     bannerMessage: String
     bannerType: BannerType
     dispatchModeEnabled: Boolean
+    googleMapsNavEnabled: Boolean
+    inventoryModeEnabled: Boolean
 }
 
 type Query {

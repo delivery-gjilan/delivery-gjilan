@@ -105,7 +105,11 @@
         "awaiting_response": "NË PRITJE TË PËRGJIGJES",
         "requested_by": "Kërkuar nga",
         "expires": "Skadon",
-        "no_requests": "Asnjë kërkesë në pritje"
+        "no_requests": "Asnjë kërkesë në pritje",
+        "stock_remittance": "Kthimi i Stoqeve",
+        "stock_remittance_sub": "Produkte nga stoku i operatorit",
+        "reject_title": "Refuzo Shlyerjen",
+        "reject_placeholder": "Arsyeja e refuzimit (opsionale)"
     },
     "messages": {
         "type_message": "Mesazh",
@@ -233,6 +237,10 @@
         "min_to_pickup": "~{{min}} min deri te marrja",
         "almost_ready": "Pothuajse gati",
         "ready_min": "Gati ~{{min}} min",
-        "status_update_failed": "Ndryshimi i statusit dështoi. Provoni përsëri."
+        "status_update_failed": "Ndryshimi i statusit dështoi. Provoni përsëri.",
+        "nav_choice_title": "Navigo me",
+        "nav_choice_inapp": "Navigim i Integruar",
+        "nav_choice_gmaps": "Google Maps",
+        "nav_choice_cancel": "Anulo"
     }
 }

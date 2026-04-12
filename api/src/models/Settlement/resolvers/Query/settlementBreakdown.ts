@@ -48,12 +48,15 @@ export const settlementBreakdown: NonNullable<QueryResolvers['settlementBreakdow
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
     // Group by ruleId + direction, then enrich with rule names
+    // For null-ruleId settlements, also group by whether it's a stock remittance
+    // (detected via the reason field) to separate stock items from markup/surcharge.
     const rows = await db
         .select({
             ruleId: settlements.ruleId,
             direction: settlements.direction,
             totalAmount: sql<number>`SUM(CAST(${settlements.amount} AS NUMERIC))::FLOAT`,
             count: sql<number>`COUNT(*)::INT`,
+            isStockRemittance: sql<boolean>`BOOL_OR(${settlements.reason} LIKE 'Stock item%')`,
             // Grab rule info via left join
             ruleName: settlementRules.name,
             ruleType: settlementRules.type,
@@ -62,16 +65,28 @@ export const settlementBreakdown: NonNullable<QueryResolvers['settlementBreakdow
         .from(settlements)
         .leftJoin(settlementRules, eq(settlements.ruleId, settlementRules.id))
         .where(whereClause)
-        .groupBy(settlements.ruleId, settlements.direction, settlementRules.name, settlementRules.type, settlementRules.promotionId);
+        .groupBy(
+            settlements.ruleId,
+            settlements.direction,
+            settlementRules.name,
+            settlementRules.type,
+            settlementRules.promotionId,
+            sql`(${settlements.reason} LIKE 'Stock item%')`,
+        );
 
     return rows.map((row) => {
         let category: string;
         let label: string;
 
         if (!row.ruleId) {
-            // Auto-remittances (markup, priority surcharge)
-            category = 'AUTO_REMITTANCE';
-            label = row.direction === 'RECEIVABLE' ? 'Markup & Surcharge' : 'Platform Payment';
+            if (row.isStockRemittance) {
+                category = 'STOCK_REMITTANCE';
+                label = 'Stock Item Remittance';
+            } else {
+                // Auto-remittances (markup, priority surcharge)
+                category = 'AUTO_REMITTANCE';
+                label = row.direction === 'RECEIVABLE' ? 'Markup & Surcharge' : 'Platform Payment';
+            }
         } else if (row.promotionId) {
             category = 'PROMOTION_COST';
             label = row.ruleName ?? 'Promotion Cost';

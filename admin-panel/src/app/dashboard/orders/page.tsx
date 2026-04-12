@@ -13,7 +13,7 @@ import { ASSIGN_DRIVER_TO_ORDER, CREATE_TEST_ORDER, START_PREPARING, UPDATE_PREP
 import { GRANT_FREE_DELIVERY } from "@/graphql/operations/promotions/mutations";
 import { UPDATE_USER_NOTE_MUTATION } from "@/graphql/operations/users/mutations";
 import { DRIVERS_QUERY } from "@/graphql/operations/users/queries";
-import { Package, Store, Search, ArrowRight, Eye, EyeOff, MapPin, User, Plus, ChefHat, Timer, Copy, Check, Phone, Hash, MessageSquare } from "lucide-react";
+import { Package, Store, Search, ArrowRight, MapPin, User, Plus, ChefHat, Timer, Copy, Check, Phone, Hash, MessageSquare } from "lucide-react";
 import { toast } from 'sonner';
 
 /* ---------------------------------------------------------
@@ -308,7 +308,8 @@ export default function OrdersPage() {
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
-    const [showCompleted, setShowCompleted] = useState(false);
+    const [debouncedSearch, setDebouncedSearch] = useState("");
+    const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
     const [completedStatusFilter, setCompletedStatusFilter] = useState<CompletedStatusFilter>("ALL");
     const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
     const [assigningDriverOrderId, setAssigningDriverOrderId] = useState<string | null>(null);
@@ -333,6 +334,12 @@ export default function OrdersPage() {
 
     const [prepTimeAlerts, setPrepTimeAlerts] = useState<PrepTimeAlert[]>([]);
     const { dismiss: dismissPrepAlert } = usePrepTimeAlerts(setPrepTimeAlerts);
+
+    // Debounce search input by 300ms
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
 
     const handleApproveConfirm = async () => {
         if (!approvalModalOrder) return;
@@ -432,22 +439,30 @@ export default function OrdersPage() {
         })) as Order[];
     }, [orders]);
 
+    const matchesSearch = useCallback((order: Order, q: string) => {
+        if (!q) return true;
+        const lower = q.toLowerCase();
+        // Exact match on displayId (case-insensitive)
+        if (order.displayId?.toLowerCase() === lower) return true;
+        // Also match if query is a number prefix of displayId for quick lookup
+        if (/^\d+$/.test(q) && order.displayId?.startsWith(q)) return true;
+        // Exact match on full UUID
+        if (order.id.toLowerCase() === lower) return true;
+        // Name / email: partial match is fine
+        if (order.user) {
+            const fullName = `${order.user.firstName} ${order.user.lastName}`.toLowerCase();
+            if (fullName.includes(lower) || order.user.email.toLowerCase().includes(lower)) return true;
+            if (order.user.phoneNumber && order.user.phoneNumber.includes(q)) return true;
+        }
+        return false;
+    }, []);
+
     const filteredOrders = useMemo(() => {
         return normalizedOrders
             .slice()
             .sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime())
-            .filter(order => {
-                if (!searchQuery) return true;
-                const q = searchQuery.toLowerCase();
-                if (order.displayId?.toLowerCase().includes(q)) return true;
-                if (order.id.toLowerCase().includes(q)) return true;
-                if (order.user) {
-                    const fullName = `${order.user.firstName} ${order.user.lastName}`.toLowerCase();
-                    if (fullName.includes(q) || order.user.email.toLowerCase().includes(q)) return true;
-                }
-                return false;
-            });
-    }, [normalizedOrders, searchQuery]);
+            .filter(order => matchesSearch(order, debouncedSearch));
+    }, [normalizedOrders, debouncedSearch, matchesSearch]);
 
     const activeOrders = useMemo(() =>
         filteredOrders
@@ -486,9 +501,15 @@ export default function OrdersPage() {
     }, [completedOrdersRaw]);
 
     const filteredCompletedOrders = useMemo(() => {
-        if (completedStatusFilter === "ALL") return completedOrders;
-        return completedOrders.filter((order) => order.status === completedStatusFilter);
-    }, [completedOrders, completedStatusFilter]);
+        let result = completedOrders;
+        if (debouncedSearch) {
+            result = result.filter(order => matchesSearch(order, debouncedSearch));
+        }
+        if (completedStatusFilter !== "ALL") {
+            result = result.filter((order) => order.status === completedStatusFilter);
+        }
+        return result;
+    }, [completedOrders, completedStatusFilter, debouncedSearch, matchesSearch]);
 
     const selectedOrderTotals = useMemo(() => {
         if (!selectedOrder) {
@@ -630,29 +651,51 @@ export default function OrdersPage() {
     /* ---- Render ---- */
 
     return (
-        <div className="text-white max-w-[1600px]">
+        <div className="text-white max-w-[1600px] min-h-[calc(100vh-4rem)] flex flex-col">
             {/* HEADER BAR */}
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-4">
+                    {/* Segmented tab control */}
+                    <div className="flex items-center bg-zinc-900 rounded-lg p-0.5 border border-zinc-800">
+                        <button
+                            onClick={() => setActiveTab('active')}
+                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                                activeTab === 'active'
+                                    ? 'bg-zinc-700 text-white shadow-sm'
+                                    : 'text-zinc-400 hover:text-zinc-300'
+                            }`}
+                        >
+                            <span className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                                Active
+                                <span className="text-xs text-zinc-500">({activeOrders.length})</span>
+                            </span>
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('completed')}
+                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                                activeTab === 'completed'
+                                    ? 'bg-zinc-700 text-white shadow-sm'
+                                    : 'text-zinc-400 hover:text-zinc-300'
+                            }`}
+                        >
+                            <span className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-green-400" />
+                                Completed
+                                <span className="text-xs text-zinc-500">({completedTotalCount})</span>
+                            </span>
+                        </button>
+                    </div>
+
                     <div className="relative w-80">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={16} />
                         <Input
                             type="text"
-                            placeholder="Search by order ID, customer..."
+                            placeholder="Search by order #, customer name, phone..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="pl-9 py-2 text-sm"
                         />
-                    </div>
-                    <div className="flex items-center gap-3 text-xs">
-                        <span className="flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-amber-400" />
-                            <span className="text-zinc-400">{activeOrders.length} active</span>
-                        </span>
-                        <span className="flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-green-400" />
-                            <span className="text-zinc-400">{completedOrders.length} completed</span>
-                        </span>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -671,26 +714,17 @@ export default function OrdersPage() {
                             {creatingTestOrder ? 'Creating...' : 'Mock Order'}
                         </Button>
                     )}
-                    <Button
-                        variant={showCompleted ? "outline" : "ghost"}
-                        size="sm"
-                        onClick={() => setShowCompleted(!showCompleted)}
-                        className="flex items-center gap-2"
-                    >
-                        {showCompleted ? <EyeOff size={14} /> : <Eye size={14} />}
-                        {showCompleted ? "Hide" : "Show"} Completed
-                    </Button>
                 </div>
             </div>
 
             {/* ════════════════ ACTIVE ORDERS ════════════════ */}
-            <div className="mb-8">
+            {activeTab === 'active' && <div className="mb-8">
                 <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-3">Active Orders</h2>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
                     {activeOrders.length === 0 ? (
                         <div className="col-span-full text-center text-zinc-600 py-12">
-                            {searchQuery ? "No active orders matching your search" : "No active orders"}
+                            {debouncedSearch ? "No active orders matching your search" : "No active orders"}
                         </div>
                     ) : (
                         activeOrders.map((order) => {
@@ -964,11 +998,11 @@ export default function OrdersPage() {
                             })
                         )}
                     </div>
-            </div>
+            </div>}
 
             {/* ════════════════ COMPLETED ORDERS ════════════════ */}
-            {showCompleted && (
-                <div className="mb-8">
+            {activeTab === 'completed' && (
+                <div className="flex-1 flex flex-col">
                     <div className="flex items-center justify-between mb-3">
                         <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Completed Orders</h2>
                         <div className="flex items-center gap-1.5">
@@ -1020,7 +1054,7 @@ export default function OrdersPage() {
                                             colSpan={isBusinessUser ? 7 : 8}
                                             className="px-3 py-12 text-center text-zinc-600"
                                         >
-                                            {searchQuery
+                                            {debouncedSearch
                                                 ? "No completed orders matching your search"
                                                 : completedStatusFilter === "ALL"
                                                     ? "No completed orders yet"
@@ -1137,7 +1171,7 @@ export default function OrdersPage() {
                     </div>
 
                     {/* Completed orders pagination */}
-                    <div className="flex items-center justify-between py-3 border-t border-zinc-800 mt-2">
+                    <div className="flex items-center justify-between py-3 border-t border-zinc-800 mt-auto">
                         <span className="text-xs text-zinc-500">
                             Page {completedPage + 1} · {completedTotalCount} completed orders total
                         </span>
@@ -1164,8 +1198,8 @@ export default function OrdersPage() {
             )}
 
             {/* ════════════════ ACTIVE ORDERS PAGINATION ════════════════ */}
-            {!searchQuery && (
-                <div className="flex items-center justify-between py-4 border-t border-zinc-800 mb-8">
+            {activeTab === 'active' && !debouncedSearch && (
+                <div className="flex items-center justify-between py-4 border-t border-zinc-800 mt-auto">
                     <span className="text-xs text-zinc-500">
                         Page {ordersPage + 1} · {totalCount} active orders total
                     </span>

@@ -1,0 +1,104 @@
+enum InventoryCoverageStatus {
+    FULLY_OWNED
+    PARTIALLY_OWNED
+    MARKET_ONLY
+}
+
+type InventoryItem {
+    id: ID!
+    productId: ID!
+    productName: String!
+    productImageUrl: String
+    productBasePrice: Float!
+    categoryName: String
+    quantity: Int!
+    lowStockThreshold: Int
+    costPrice: Float
+    isLowStock: Boolean!
+    updatedAt: DateTime
+}
+
+type InventorySummary {
+    totalTrackedProducts: Int!
+    totalStockValue: Int!
+    lowStockCount: Int!
+    outOfStockCount: Int!
+}
+
+type OrderCoverageItem {
+    productId: ID!
+    productName: String!
+    productImageUrl: String
+    orderedQty: Int!
+    fromStock: Int!
+    fromMarket: Int!
+    status: InventoryCoverageStatus!
+    deducted: Boolean!
+}
+
+type OrderCoverage {
+    orderId: ID!
+    items: [OrderCoverageItem!]!
+    totalItems: Int!
+    fullyOwnedCount: Int!
+    partiallyOwnedCount: Int!
+    marketOnlyCount: Int!
+    allFromStock: Boolean!
+    allFromMarket: Boolean!
+    deducted: Boolean!
+}
+
+input SetInventoryQuantityInput {
+    businessId: ID!
+    productId: ID!
+    quantity: Int!
+    costPrice: Float
+    lowStockThreshold: Int
+}
+
+input BulkSetInventoryItem {
+    productId: ID!
+    quantity: Int!
+    costPrice: Float
+    lowStockThreshold: Int
+}
+
+input BulkSetInventoryInput {
+    businessId: ID!
+    items: [BulkSetInventoryItem!]!
+}
+
+type InventoryEarningsProduct {
+    productId: ID!
+    productName: String!
+    productImageUrl: String
+    unitsSold: Int!
+    revenue: Float!
+    cost: Float!
+    profit: Float!
+    margin: Float!
+}
+
+type InventoryEarnings {
+    totalRevenue: Float!
+    totalCost: Float!
+    totalProfit: Float!
+    averageMargin: Float!
+    totalUnitsSold: Int!
+    orderCount: Int!
+    products: [InventoryEarningsProduct!]!
+}
+
+extend type Query {
+    myInventory(businessId: ID!): [InventoryItem!]!
+    inventorySummary(businessId: ID!): InventorySummary!
+    orderCoverage(orderId: ID!): OrderCoverage
+    inventoryEarnings(businessId: ID!, startDate: String, endDate: String): InventoryEarnings!
+}
+
+extend type Mutation {
+    setInventoryQuantity(input: SetInventoryQuantityInput!): InventoryItem!
+    bulkSetInventory(input: BulkSetInventoryInput!): [InventoryItem!]!
+    deductOrderStock(orderId: ID!): OrderCoverage!
+    removeInventoryItem(businessId: ID!, productId: ID!): Boolean!
+}

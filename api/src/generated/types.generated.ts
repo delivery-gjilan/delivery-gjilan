@@ -208,6 +208,18 @@ export type BannerType =
   | 'SUCCESS'
   | 'WARNING';
 
+export type BulkSetInventoryInput = {
+  businessId: Scalars['ID']['input'];
+  items: Array<BulkSetInventoryItem>;
+};
+
+export type BulkSetInventoryItem = {
+  costPrice?: InputMaybe<Scalars['Float']['input']>;
+  lowStockThreshold?: InputMaybe<Scalars['Int']['input']>;
+  productId: Scalars['ID']['input'];
+  quantity: Scalars['Int']['input'];
+};
+
 export type Business = {
   __typename?: 'Business';
   activePromotion?: Maybe<BusinessPromotion>;
@@ -918,6 +930,57 @@ export type InitiateSignupInput = {
   password: Scalars['String']['input'];
 };
 
+export type InventoryCoverageStatus =
+  | 'FULLY_OWNED'
+  | 'MARKET_ONLY'
+  | 'PARTIALLY_OWNED';
+
+export type InventoryEarnings = {
+  __typename?: 'InventoryEarnings';
+  averageMargin: Scalars['Float']['output'];
+  orderCount: Scalars['Int']['output'];
+  products: Array<InventoryEarningsProduct>;
+  totalCost: Scalars['Float']['output'];
+  totalProfit: Scalars['Float']['output'];
+  totalRevenue: Scalars['Float']['output'];
+  totalUnitsSold: Scalars['Int']['output'];
+};
+
+export type InventoryEarningsProduct = {
+  __typename?: 'InventoryEarningsProduct';
+  cost: Scalars['Float']['output'];
+  margin: Scalars['Float']['output'];
+  productId: Scalars['ID']['output'];
+  productImageUrl?: Maybe<Scalars['String']['output']>;
+  productName: Scalars['String']['output'];
+  profit: Scalars['Float']['output'];
+  revenue: Scalars['Float']['output'];
+  unitsSold: Scalars['Int']['output'];
+};
+
+export type InventoryItem = {
+  __typename?: 'InventoryItem';
+  categoryName?: Maybe<Scalars['String']['output']>;
+  costPrice?: Maybe<Scalars['Float']['output']>;
+  id: Scalars['ID']['output'];
+  isLowStock: Scalars['Boolean']['output'];
+  lowStockThreshold?: Maybe<Scalars['Int']['output']>;
+  productBasePrice: Scalars['Float']['output'];
+  productId: Scalars['ID']['output'];
+  productImageUrl?: Maybe<Scalars['String']['output']>;
+  productName: Scalars['String']['output'];
+  quantity: Scalars['Int']['output'];
+  updatedAt?: Maybe<Scalars['DateTime']['output']>;
+};
+
+export type InventorySummary = {
+  __typename?: 'InventorySummary';
+  lowStockCount: Scalars['Int']['output'];
+  outOfStockCount: Scalars['Int']['output'];
+  totalStockValue: Scalars['Int']['output'];
+  totalTrackedProducts: Scalars['Int']['output'];
+};
+
 export type IssueRecoveryPromotionInput = {
   discountValue?: InputMaybe<Scalars['Float']['input']>;
   expiresAt?: InputMaybe<Scalars['String']['input']>;
@@ -977,6 +1040,7 @@ export type Mutation = {
   assignDriverToOrder: Order;
   assignPromotionToUsers: Array<UserPromotion>;
   backfillSettlementsForDeliveredOrders: Scalars['Int']['output'];
+  bulkSetInventory: Array<InventoryItem>;
   businessDeviceHeartbeat: Scalars['Boolean']['output'];
   businessDeviceOrderSignal: Scalars['Boolean']['output'];
   cancelOrder: Order;
@@ -1000,6 +1064,7 @@ export type Mutation = {
   createSettlementRule: SettlementRule;
   createTestOrder: Order;
   createUser: AuthResponse;
+  deductOrderStock: OrderCoverage;
   deleteBanner: Scalars['Boolean']['output'];
   deleteBusiness: Scalars['Boolean']['output'];
   deleteCampaign: Scalars['Boolean']['output'];
@@ -1048,6 +1113,7 @@ export type Mutation = {
   refreshToken: TokenRefreshResponse;
   registerDeviceToken: Scalars['Boolean']['output'];
   registerLiveActivityToken: Scalars['Boolean']['output'];
+  removeInventoryItem: Scalars['Boolean']['output'];
   removeUserFromPromotion: Scalars['Boolean']['output'];
   /** Business user replies to admin */
   replyToBusinessMessage: BusinessMessage;
@@ -1069,6 +1135,7 @@ export type Mutation = {
   setBusinessSchedule: Array<BusinessDayHours>;
   setDefaultAddress: Scalars['Boolean']['output'];
   setDeliveryPricingTiers: Array<DeliveryPricingTier>;
+  setInventoryQuantity: InventoryItem;
   setMyEmailOptOut: User;
   setMyPreferredLanguage: User;
   setOrderAdminNote: Order;
@@ -1185,6 +1252,11 @@ export type MutationassignPromotionToUsersArgs = {
 };
 
 
+export type MutationbulkSetInventoryArgs = {
+  input: BulkSetInventoryInput;
+};
+
+
 export type MutationbusinessDeviceHeartbeatArgs = {
   input: BusinessDeviceHeartbeatInput;
 };
@@ -1293,6 +1365,11 @@ export type MutationcreateSettlementRuleArgs = {
 
 export type MutationcreateUserArgs = {
   input: CreateUserInput;
+};
+
+
+export type MutationdeductOrderStockArgs = {
+  orderId: Scalars['ID']['input'];
 };
 
 
@@ -1487,6 +1564,12 @@ export type MutationregisterLiveActivityTokenArgs = {
 };
 
 
+export type MutationremoveInventoryItemArgs = {
+  businessId: Scalars['ID']['input'];
+  productId: Scalars['ID']['input'];
+};
+
+
 export type MutationremoveUserFromPromotionArgs = {
   promotionId: Scalars['ID']['input'];
   userId: Scalars['ID']['input'];
@@ -1573,6 +1656,11 @@ export type MutationsetDefaultAddressArgs = {
 
 export type MutationsetDeliveryPricingTiersArgs = {
   input: SetDeliveryPricingTiersInput;
+};
+
+
+export type MutationsetInventoryQuantityArgs = {
+  input: SetInventoryQuantityInput;
 };
 
 
@@ -1923,6 +2011,31 @@ export type OrderConnection = {
   hasMore: Scalars['Boolean']['output'];
   orders: Array<Order>;
   totalCount: Scalars['Int']['output'];
+};
+
+export type OrderCoverage = {
+  __typename?: 'OrderCoverage';
+  allFromMarket: Scalars['Boolean']['output'];
+  allFromStock: Scalars['Boolean']['output'];
+  deducted: Scalars['Boolean']['output'];
+  fullyOwnedCount: Scalars['Int']['output'];
+  items: Array<OrderCoverageItem>;
+  marketOnlyCount: Scalars['Int']['output'];
+  orderId: Scalars['ID']['output'];
+  partiallyOwnedCount: Scalars['Int']['output'];
+  totalItems: Scalars['Int']['output'];
+};
+
+export type OrderCoverageItem = {
+  __typename?: 'OrderCoverageItem';
+  deducted: Scalars['Boolean']['output'];
+  fromMarket: Scalars['Int']['output'];
+  fromStock: Scalars['Int']['output'];
+  orderedQty: Scalars['Int']['output'];
+  productId: Scalars['ID']['output'];
+  productImageUrl?: Maybe<Scalars['String']['output']>;
+  productName: Scalars['String']['output'];
+  status: InventoryCoverageStatus;
 };
 
 export type OrderDriverLiveTracking = {
@@ -2294,6 +2407,8 @@ export type Query = {
   getStoreStatus: StoreStatus;
   getUserPromoMetadata?: Maybe<UserPromoMetadata>;
   getUserPromotions: Array<UserPromotion>;
+  inventoryEarnings: InventoryEarnings;
+  inventorySummary: InventorySummary;
   me?: Maybe<User>;
   myAddresses: Array<UserAddress>;
   myBehavior?: Maybe<UserBehavior>;
@@ -2303,11 +2418,13 @@ export type Query = {
   myDriverMessages: Array<DriverMessage>;
   /** Get live metrics for the authenticated driver */
   myDriverMetrics: DriverDailyMetrics;
+  myInventory: Array<InventoryItem>;
   notificationCampaign?: Maybe<NotificationCampaign>;
   notificationCampaigns: Array<NotificationCampaign>;
   offers: Array<Product>;
   operationalKPIs: OperationalKPIs;
   order?: Maybe<Order>;
+  orderCoverage?: Maybe<OrderCoverage>;
   orders: OrderConnection;
   ordersByStatus: Array<Order>;
   peakHourAnalysis: PeakHourAnalysis;
@@ -2516,6 +2633,18 @@ export type QuerygetUserPromotionsArgs = {
 };
 
 
+export type QueryinventoryEarningsArgs = {
+  businessId: Scalars['ID']['input'];
+  endDate?: InputMaybe<Scalars['String']['input']>;
+  startDate?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryinventorySummaryArgs = {
+  businessId: Scalars['ID']['input'];
+};
+
+
 export type QuerymyBusinessMessagesArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
@@ -2525,6 +2654,11 @@ export type QuerymyBusinessMessagesArgs = {
 export type QuerymyDriverMessagesArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
+export type QuerymyInventoryArgs = {
+  businessId: Scalars['ID']['input'];
 };
 
 
@@ -2547,6 +2681,11 @@ export type QueryoperationalKPIsArgs = {
 
 export type QueryorderArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type QueryorderCoverageArgs = {
+  orderId: Scalars['ID']['input'];
 };
 
 
@@ -2755,6 +2894,14 @@ export type SetDeliveryPricingTiersInput = {
   tiers: Array<CreateDeliveryPricingTierInput>;
 };
 
+export type SetInventoryQuantityInput = {
+  businessId: Scalars['ID']['input'];
+  costPrice?: InputMaybe<Scalars['Float']['input']>;
+  lowStockThreshold?: InputMaybe<Scalars['Int']['input']>;
+  productId: Scalars['ID']['input'];
+  quantity: Scalars['Int']['input'];
+};
+
 export type SettleResult = {
   __typename?: 'SettleResult';
   direction: SettlementPaymentDirection;
@@ -2779,6 +2926,7 @@ export type Settlement = {
   paidAt?: Maybe<Scalars['Date']['output']>;
   paymentMethod?: Maybe<Scalars['String']['output']>;
   paymentReference?: Maybe<Scalars['String']['output']>;
+  reason?: Maybe<Scalars['String']['output']>;
   rule?: Maybe<SettlementRule>;
   ruleId?: Maybe<Scalars['ID']['output']>;
   settlementPayment?: Maybe<SettlementPayment>;
@@ -2970,6 +3118,8 @@ export type StoreStatus = {
   bannerType: BannerType;
   closedMessage?: Maybe<Scalars['String']['output']>;
   dispatchModeEnabled: Scalars['Boolean']['output'];
+  googleMapsNavEnabled: Scalars['Boolean']['output'];
+  inventoryModeEnabled: Scalars['Boolean']['output'];
   isStoreClosed: Scalars['Boolean']['output'];
 };
 
@@ -3210,6 +3360,8 @@ export type UpdateStoreStatusInput = {
   bannerType?: InputMaybe<BannerType>;
   closedMessage?: InputMaybe<Scalars['String']['input']>;
   dispatchModeEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  googleMapsNavEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  inventoryModeEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   isStoreClosed: Scalars['Boolean']['input'];
 };
 
@@ -3443,6 +3595,8 @@ export type ResolversTypes = {
   BannerDisplayContext: ResolverTypeWrapper<'HOME' | 'BUSINESS' | 'CATEGORY' | 'PRODUCT' | 'CART' | 'ALL'>;
   BannerMediaType: ResolverTypeWrapper<'IMAGE' | 'GIF' | 'VIDEO'>;
   BannerType: ResolverTypeWrapper<'INFO' | 'WARNING' | 'SUCCESS'>;
+  BulkSetInventoryInput: BulkSetInventoryInput;
+  BulkSetInventoryItem: BulkSetInventoryItem;
   Business: ResolverTypeWrapper<Omit<Business, 'activePromotion' | 'businessType'> & { activePromotion?: Maybe<ResolversTypes['BusinessPromotion']>, businessType: ResolversTypes['BusinessType'] }>;
   BusinessDayHours: ResolverTypeWrapper<BusinessDayHours>;
   BusinessDayHoursInput: BusinessDayHoursInput;
@@ -3513,6 +3667,11 @@ export type ResolversTypes = {
   GetBannersFilter: GetBannersFilter;
   HourlyDistribution: ResolverTypeWrapper<HourlyDistribution>;
   InitiateSignupInput: InitiateSignupInput;
+  InventoryCoverageStatus: ResolverTypeWrapper<'FULLY_OWNED' | 'PARTIALLY_OWNED' | 'MARKET_ONLY'>;
+  InventoryEarnings: ResolverTypeWrapper<InventoryEarnings>;
+  InventoryEarningsProduct: ResolverTypeWrapper<InventoryEarningsProduct>;
+  InventoryItem: ResolverTypeWrapper<InventoryItem>;
+  InventorySummary: ResolverTypeWrapper<InventorySummary>;
   IssueRecoveryPromotionInput: IssueRecoveryPromotionInput;
   JSON: ResolverTypeWrapper<Scalars['JSON']['output']>;
   Location: ResolverTypeWrapper<Location>;
@@ -3529,6 +3688,8 @@ export type ResolversTypes = {
   Order: ResolverTypeWrapper<Omit<Order, 'approvalReasons' | 'businesses' | 'driver' | 'orderPromotions' | 'paymentCollection' | 'status' | 'user'> & { approvalReasons?: Maybe<Array<ResolversTypes['ApprovalReason']>>, businesses: Array<ResolversTypes['OrderBusiness']>, driver?: Maybe<ResolversTypes['User']>, orderPromotions?: Maybe<Array<ResolversTypes['OrderPromotion']>>, paymentCollection: ResolversTypes['OrderPaymentCollection'], status: ResolversTypes['OrderStatus'], user?: Maybe<ResolversTypes['User']> }>;
   OrderBusiness: ResolverTypeWrapper<Omit<OrderBusiness, 'business'> & { business: ResolversTypes['Business'] }>;
   OrderConnection: ResolverTypeWrapper<Omit<OrderConnection, 'orders'> & { orders: Array<ResolversTypes['Order']> }>;
+  OrderCoverage: ResolverTypeWrapper<Omit<OrderCoverage, 'items'> & { items: Array<ResolversTypes['OrderCoverageItem']> }>;
+  OrderCoverageItem: ResolverTypeWrapper<Omit<OrderCoverageItem, 'status'> & { status: ResolversTypes['InventoryCoverageStatus'] }>;
   OrderDriverLiveTracking: ResolverTypeWrapper<OrderDriverLiveTracking>;
   OrderItem: ResolverTypeWrapper<OrderItem>;
   OrderItemOption: ResolverTypeWrapper<OrderItemOption>;
@@ -3565,6 +3726,7 @@ export type ResolversTypes = {
   SendNotificationResult: ResolverTypeWrapper<SendNotificationResult>;
   SendPushNotificationInput: SendPushNotificationInput;
   SetDeliveryPricingTiersInput: SetDeliveryPricingTiersInput;
+  SetInventoryQuantityInput: SetInventoryQuantityInput;
   SettleResult: ResolverTypeWrapper<Omit<SettleResult, 'direction' | 'payment' | 'remainderSettlement'> & { direction: ResolversTypes['SettlementPaymentDirection'], payment: ResolversTypes['SettlementPayment'], remainderSettlement?: Maybe<ResolversTypes['Settlement']> }>;
   Settlement: ResolverTypeWrapper<Omit<Settlement, 'business' | 'direction' | 'driver' | 'order' | 'rule' | 'settlementPayment' | 'sourcePayment' | 'status' | 'type'> & { business?: Maybe<ResolversTypes['Business']>, direction: ResolversTypes['SettlementDirection'], driver?: Maybe<ResolversTypes['User']>, order?: Maybe<ResolversTypes['Order']>, rule?: Maybe<ResolversTypes['SettlementRule']>, settlementPayment?: Maybe<ResolversTypes['SettlementPayment']>, sourcePayment?: Maybe<ResolversTypes['SettlementPayment']>, status: ResolversTypes['SettlementStatus'], type: ResolversTypes['SettlementType'] }>;
   SettlementAmountType: ResolverTypeWrapper<'FIXED' | 'PERCENT'>;
@@ -3640,6 +3802,8 @@ export type ResolversParentTypes = {
   AuditLogConnection: Omit<AuditLogConnection, 'logs'> & { logs: Array<ResolversParentTypes['AuditLog']> };
   AuthResponse: Omit<AuthResponse, 'user'> & { user: ResolversParentTypes['User'] };
   Banner: Omit<Banner, 'business' | 'promotion'> & { business?: Maybe<ResolversParentTypes['Business']>, promotion?: Maybe<ResolversParentTypes['Promotion']> };
+  BulkSetInventoryInput: BulkSetInventoryInput;
+  BulkSetInventoryItem: BulkSetInventoryItem;
   Business: Omit<Business, 'activePromotion'> & { activePromotion?: Maybe<ResolversParentTypes['BusinessPromotion']> };
   BusinessDayHours: BusinessDayHours;
   BusinessDayHoursInput: BusinessDayHoursInput;
@@ -3701,6 +3865,10 @@ export type ResolversParentTypes = {
   GetBannersFilter: GetBannersFilter;
   HourlyDistribution: HourlyDistribution;
   InitiateSignupInput: InitiateSignupInput;
+  InventoryEarnings: InventoryEarnings;
+  InventoryEarningsProduct: InventoryEarningsProduct;
+  InventoryItem: InventoryItem;
+  InventorySummary: InventorySummary;
   IssueRecoveryPromotionInput: IssueRecoveryPromotionInput;
   JSON: Scalars['JSON']['output'];
   Location: Location;
@@ -3715,6 +3883,8 @@ export type ResolversParentTypes = {
   Order: Omit<Order, 'businesses' | 'driver' | 'orderPromotions' | 'user'> & { businesses: Array<ResolversParentTypes['OrderBusiness']>, driver?: Maybe<ResolversParentTypes['User']>, orderPromotions?: Maybe<Array<ResolversParentTypes['OrderPromotion']>>, user?: Maybe<ResolversParentTypes['User']> };
   OrderBusiness: Omit<OrderBusiness, 'business'> & { business: ResolversParentTypes['Business'] };
   OrderConnection: Omit<OrderConnection, 'orders'> & { orders: Array<ResolversParentTypes['Order']> };
+  OrderCoverage: Omit<OrderCoverage, 'items'> & { items: Array<ResolversParentTypes['OrderCoverageItem']> };
+  OrderCoverageItem: OrderCoverageItem;
   OrderDriverLiveTracking: OrderDriverLiveTracking;
   OrderItem: OrderItem;
   OrderItemOption: OrderItemOption;
@@ -3744,6 +3914,7 @@ export type ResolversParentTypes = {
   SendNotificationResult: SendNotificationResult;
   SendPushNotificationInput: SendPushNotificationInput;
   SetDeliveryPricingTiersInput: SetDeliveryPricingTiersInput;
+  SetInventoryQuantityInput: SetInventoryQuantityInput;
   SettleResult: Omit<SettleResult, 'payment' | 'remainderSettlement'> & { payment: ResolversParentTypes['SettlementPayment'], remainderSettlement?: Maybe<ResolversParentTypes['Settlement']> };
   Settlement: Omit<Settlement, 'business' | 'driver' | 'order' | 'rule' | 'settlementPayment' | 'sourcePayment'> & { business?: Maybe<ResolversParentTypes['Business']>, driver?: Maybe<ResolversParentTypes['User']>, order?: Maybe<ResolversParentTypes['Order']>, rule?: Maybe<ResolversParentTypes['SettlementRule']>, settlementPayment?: Maybe<ResolversParentTypes['SettlementPayment']>, sourcePayment?: Maybe<ResolversParentTypes['SettlementPayment']> };
   SettlementBreakdownItem: SettlementBreakdownItem;
@@ -4266,6 +4437,54 @@ export type HourlyDistributionResolvers<ContextType = GraphQLContext, ParentType
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
+export type InventoryCoverageStatusResolvers = EnumResolverSignature<{ FULLY_OWNED?: any, MARKET_ONLY?: any, PARTIALLY_OWNED?: any }, ResolversTypes['InventoryCoverageStatus']>;
+
+export type InventoryEarningsResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['InventoryEarnings'] = ResolversParentTypes['InventoryEarnings']> = {
+  averageMargin?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  orderCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  products?: Resolver<Array<ResolversTypes['InventoryEarningsProduct']>, ParentType, ContextType>;
+  totalCost?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  totalProfit?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  totalRevenue?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  totalUnitsSold?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type InventoryEarningsProductResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['InventoryEarningsProduct'] = ResolversParentTypes['InventoryEarningsProduct']> = {
+  cost?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  margin?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  productId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  productImageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  productName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  profit?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  revenue?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  unitsSold?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type InventoryItemResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['InventoryItem'] = ResolversParentTypes['InventoryItem']> = {
+  categoryName?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  costPrice?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  isLowStock?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  lowStockThreshold?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
+  productBasePrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  productId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  productImageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  productName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  quantity?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  updatedAt?: Resolver<Maybe<ResolversTypes['DateTime']>, ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type InventorySummaryResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['InventorySummary'] = ResolversParentTypes['InventorySummary']> = {
+  lowStockCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  outOfStockCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  totalStockValue?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  totalTrackedProducts?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
 export interface JSONScalarConfig extends GraphQLScalarTypeConfig<ResolversTypes['JSON'], any> {
   name: 'JSON';
 }
@@ -4292,6 +4511,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   assignDriverToOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationassignDriverToOrderArgs, 'id'>>;
   assignPromotionToUsers?: Resolver<Array<ResolversTypes['UserPromotion']>, ParentType, ContextType, RequireFields<MutationassignPromotionToUsersArgs, 'input'>>;
   backfillSettlementsForDeliveredOrders?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  bulkSetInventory?: Resolver<Array<ResolversTypes['InventoryItem']>, ParentType, ContextType, RequireFields<MutationbulkSetInventoryArgs, 'input'>>;
   businessDeviceHeartbeat?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationbusinessDeviceHeartbeatArgs, 'input'>>;
   businessDeviceOrderSignal?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationbusinessDeviceOrderSignalArgs, 'deviceId'>>;
   cancelOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationcancelOrderArgs, 'id'>>;
@@ -4314,6 +4534,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   createSettlementRule?: Resolver<ResolversTypes['SettlementRule'], ParentType, ContextType, RequireFields<MutationcreateSettlementRuleArgs, 'input'>>;
   createTestOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType>;
   createUser?: Resolver<ResolversTypes['AuthResponse'], ParentType, ContextType, RequireFields<MutationcreateUserArgs, 'input'>>;
+  deductOrderStock?: Resolver<ResolversTypes['OrderCoverage'], ParentType, ContextType, RequireFields<MutationdeductOrderStockArgs, 'orderId'>>;
   deleteBanner?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteBannerArgs, 'id'>>;
   deleteBusiness?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteBusinessArgs, 'id'>>;
   deleteCampaign?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteCampaignArgs, 'id'>>;
@@ -4351,6 +4572,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   refreshToken?: Resolver<ResolversTypes['TokenRefreshResponse'], ParentType, ContextType, RequireFields<MutationrefreshTokenArgs, 'refreshToken'>>;
   registerDeviceToken?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationregisterDeviceTokenArgs, 'input'>>;
   registerLiveActivityToken?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationregisterLiveActivityTokenArgs, 'activityId' | 'orderId' | 'token'>>;
+  removeInventoryItem?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationremoveInventoryItemArgs, 'businessId' | 'productId'>>;
   removeUserFromPromotion?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationremoveUserFromPromotionArgs, 'promotionId' | 'userId'>>;
   replyToBusinessMessage?: Resolver<ResolversTypes['BusinessMessage'], ParentType, ContextType, RequireFields<MutationreplyToBusinessMessageArgs, 'adminId' | 'body'>>;
   replyToDriverMessage?: Resolver<ResolversTypes['DriverMessage'], ParentType, ContextType, RequireFields<MutationreplyToDriverMessageArgs, 'adminId' | 'body'>>;
@@ -4367,6 +4589,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   setBusinessSchedule?: Resolver<Array<ResolversTypes['BusinessDayHours']>, ParentType, ContextType, RequireFields<MutationsetBusinessScheduleArgs, 'businessId' | 'schedule'>>;
   setDefaultAddress?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationsetDefaultAddressArgs, 'id'>>;
   setDeliveryPricingTiers?: Resolver<Array<ResolversTypes['DeliveryPricingTier']>, ParentType, ContextType, RequireFields<MutationsetDeliveryPricingTiersArgs, 'input'>>;
+  setInventoryQuantity?: Resolver<ResolversTypes['InventoryItem'], ParentType, ContextType, RequireFields<MutationsetInventoryQuantityArgs, 'input'>>;
   setMyEmailOptOut?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationsetMyEmailOptOutArgs, 'optOut'>>;
   setMyPreferredLanguage?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationsetMyPreferredLanguageArgs, 'language'>>;
   setOrderAdminNote?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationsetOrderAdminNoteArgs, 'id'>>;
@@ -4532,6 +4755,31 @@ export type OrderConnectionResolvers<ContextType = GraphQLContext, ParentType ex
   hasMore?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   orders?: Resolver<Array<ResolversTypes['Order']>, ParentType, ContextType>;
   totalCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type OrderCoverageResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['OrderCoverage'] = ResolversParentTypes['OrderCoverage']> = {
+  allFromMarket?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  allFromStock?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  deducted?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  fullyOwnedCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  items?: Resolver<Array<ResolversTypes['OrderCoverageItem']>, ParentType, ContextType>;
+  marketOnlyCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  orderId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  partiallyOwnedCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  totalItems?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type OrderCoverageItemResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['OrderCoverageItem'] = ResolversParentTypes['OrderCoverageItem']> = {
+  deducted?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  fromMarket?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  fromStock?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  orderedQty?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  productId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  productImageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  productName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  status?: Resolver<ResolversTypes['InventoryCoverageStatus'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -4853,17 +5101,21 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   getStoreStatus?: Resolver<ResolversTypes['StoreStatus'], ParentType, ContextType, Partial<QuerygetStoreStatusArgs>>;
   getUserPromoMetadata?: Resolver<Maybe<ResolversTypes['UserPromoMetadata']>, ParentType, ContextType, RequireFields<QuerygetUserPromoMetadataArgs, 'userId'>>;
   getUserPromotions?: Resolver<Array<ResolversTypes['UserPromotion']>, ParentType, ContextType, RequireFields<QuerygetUserPromotionsArgs, 'userId'>>;
+  inventoryEarnings?: Resolver<ResolversTypes['InventoryEarnings'], ParentType, ContextType, RequireFields<QueryinventoryEarningsArgs, 'businessId'>>;
+  inventorySummary?: Resolver<ResolversTypes['InventorySummary'], ParentType, ContextType, RequireFields<QueryinventorySummaryArgs, 'businessId'>>;
   me?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType>;
   myAddresses?: Resolver<Array<ResolversTypes['UserAddress']>, ParentType, ContextType>;
   myBehavior?: Resolver<Maybe<ResolversTypes['UserBehavior']>, ParentType, ContextType>;
   myBusinessMessages?: Resolver<Array<ResolversTypes['BusinessMessage']>, ParentType, ContextType, Partial<QuerymyBusinessMessagesArgs>>;
   myDriverMessages?: Resolver<Array<ResolversTypes['DriverMessage']>, ParentType, ContextType, Partial<QuerymyDriverMessagesArgs>>;
   myDriverMetrics?: Resolver<ResolversTypes['DriverDailyMetrics'], ParentType, ContextType>;
+  myInventory?: Resolver<Array<ResolversTypes['InventoryItem']>, ParentType, ContextType, RequireFields<QuerymyInventoryArgs, 'businessId'>>;
   notificationCampaign?: Resolver<Maybe<ResolversTypes['NotificationCampaign']>, ParentType, ContextType, RequireFields<QuerynotificationCampaignArgs, 'id'>>;
   notificationCampaigns?: Resolver<Array<ResolversTypes['NotificationCampaign']>, ParentType, ContextType>;
   offers?: Resolver<Array<ResolversTypes['Product']>, ParentType, ContextType, RequireFields<QueryoffersArgs, 'businessId'>>;
   operationalKPIs?: Resolver<ResolversTypes['OperationalKPIs'], ParentType, ContextType, RequireFields<QueryoperationalKPIsArgs, 'endDate' | 'startDate'>>;
   order?: Resolver<Maybe<ResolversTypes['Order']>, ParentType, ContextType, RequireFields<QueryorderArgs, 'id'>>;
+  orderCoverage?: Resolver<Maybe<ResolversTypes['OrderCoverage']>, ParentType, ContextType, RequireFields<QueryorderCoverageArgs, 'orderId'>>;
   orders?: Resolver<ResolversTypes['OrderConnection'], ParentType, ContextType, Partial<QueryordersArgs>>;
   ordersByStatus?: Resolver<Array<ResolversTypes['Order']>, ParentType, ContextType, RequireFields<QueryordersByStatusArgs, 'status'>>;
   peakHourAnalysis?: Resolver<ResolversTypes['PeakHourAnalysis'], ParentType, ContextType, RequireFields<QuerypeakHourAnalysisArgs, 'endDate' | 'startDate'>>;
@@ -4924,6 +5176,7 @@ export type SettlementResolvers<ContextType = GraphQLContext, ParentType extends
   paidAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
   paymentMethod?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   paymentReference?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  reason?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   rule?: Resolver<Maybe<ResolversTypes['SettlementRule']>, ParentType, ContextType>;
   ruleId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
   settlementPayment?: Resolver<Maybe<ResolversTypes['SettlementPayment']>, ParentType, ContextType>;
@@ -5069,6 +5322,8 @@ export type StoreStatusResolvers<ContextType = GraphQLContext, ParentType extend
   bannerType?: Resolver<ResolversTypes['BannerType'], ParentType, ContextType>;
   closedMessage?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   dispatchModeEnabled?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  googleMapsNavEnabled?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  inventoryModeEnabled?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   isStoreClosed?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
@@ -5255,6 +5510,11 @@ export type Resolvers<ContextType = GraphQLContext> = {
   DriverPttSignalAction?: DriverPttSignalActionResolvers;
   EntityType?: EntityTypeResolvers;
   HourlyDistribution?: HourlyDistributionResolvers<ContextType>;
+  InventoryCoverageStatus?: InventoryCoverageStatusResolvers;
+  InventoryEarnings?: InventoryEarningsResolvers<ContextType>;
+  InventoryEarningsProduct?: InventoryEarningsProductResolvers<ContextType>;
+  InventoryItem?: InventoryItemResolvers<ContextType>;
+  InventorySummary?: InventorySummaryResolvers<ContextType>;
   JSON?: GraphQLScalarType;
   Location?: LocationResolvers<ContextType>;
   MessageAlertType?: MessageAlertTypeResolvers;
@@ -5268,6 +5528,8 @@ export type Resolvers<ContextType = GraphQLContext> = {
   Order?: OrderResolvers<ContextType>;
   OrderBusiness?: OrderBusinessResolvers<ContextType>;
   OrderConnection?: OrderConnectionResolvers<ContextType>;
+  OrderCoverage?: OrderCoverageResolvers<ContextType>;
+  OrderCoverageItem?: OrderCoverageItemResolvers<ContextType>;
   OrderDriverLiveTracking?: OrderDriverLiveTrackingResolvers<ContextType>;
   OrderItem?: OrderItemResolvers<ContextType>;
   OrderItemOption?: OrderItemOptionResolvers<ContextType>;

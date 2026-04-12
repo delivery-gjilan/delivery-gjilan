@@ -70,6 +70,7 @@ export class FinancialService {
                                 amount: s.amount,
                                 status: 'PENDING' as const,
                                 ruleId: s.ruleId,
+                                reason: s.reason,
                             })),
                         )
                         .onConflictDoNothing()

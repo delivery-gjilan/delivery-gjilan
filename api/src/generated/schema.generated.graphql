@@ -186,6 +186,18 @@ enum BannerType {
   WARNING
 }
 
+input BulkSetInventoryInput {
+  businessId: ID!
+  items: [BulkSetInventoryItem!]!
+}
+
+input BulkSetInventoryItem {
+  costPrice: Float
+  lowStockThreshold: Int
+  productId: ID!
+  quantity: Int!
+}
+
 type Business {
   activePromotion: BusinessPromotion
   avgPrepTimeMinutes: Int!
@@ -917,6 +929,54 @@ input InitiateSignupInput {
   password: String!
 }
 
+enum InventoryCoverageStatus {
+  FULLY_OWNED
+  MARKET_ONLY
+  PARTIALLY_OWNED
+}
+
+type InventoryEarnings {
+  averageMargin: Float!
+  orderCount: Int!
+  products: [InventoryEarningsProduct!]!
+  totalCost: Float!
+  totalProfit: Float!
+  totalRevenue: Float!
+  totalUnitsSold: Int!
+}
+
+type InventoryEarningsProduct {
+  cost: Float!
+  margin: Float!
+  productId: ID!
+  productImageUrl: String
+  productName: String!
+  profit: Float!
+  revenue: Float!
+  unitsSold: Int!
+}
+
+type InventoryItem {
+  categoryName: String
+  costPrice: Float
+  id: ID!
+  isLowStock: Boolean!
+  lowStockThreshold: Int
+  productBasePrice: Float!
+  productId: ID!
+  productImageUrl: String
+  productName: String!
+  quantity: Int!
+  updatedAt: DateTime
+}
+
+type InventorySummary {
+  lowStockCount: Int!
+  outOfStockCount: Int!
+  totalStockValue: Int!
+  totalTrackedProducts: Int!
+}
+
 input IssueRecoveryPromotionInput {
   discountValue: Float
   expiresAt: String
@@ -996,6 +1056,7 @@ type Mutation {
   assignDriverToOrder(driverId: ID, id: ID!): Order!
   assignPromotionToUsers(input: AssignPromotionToUserInput!): [UserPromotion!]!
   backfillSettlementsForDeliveredOrders: Int!
+  bulkSetInventory(input: BulkSetInventoryInput!): [InventoryItem!]!
   businessDeviceHeartbeat(input: BusinessDeviceHeartbeatInput!): Boolean!
   businessDeviceOrderSignal(deviceId: String!, orderId: ID): Boolean!
   cancelOrder(id: ID!): Order!
@@ -1022,6 +1083,7 @@ type Mutation {
   createSettlementRule(input: CreateSettlementRuleInput!): SettlementRule!
   createTestOrder: Order!
   createUser(input: CreateUserInput!): AuthResponse!
+  deductOrderStock(orderId: ID!): OrderCoverage!
   deleteBanner(id: ID!): Boolean!
   deleteBusiness(id: ID!): Boolean!
   deleteCampaign(id: ID!): Boolean!
@@ -1079,6 +1141,7 @@ type Mutation {
   refreshToken(refreshToken: String!): TokenRefreshResponse!
   registerDeviceToken(input: RegisterDeviceTokenInput!): Boolean!
   registerLiveActivityToken(activityId: String!, orderId: ID!, token: String!): Boolean!
+  removeInventoryItem(businessId: ID!, productId: ID!): Boolean!
   removeUserFromPromotion(promotionId: ID!, userId: ID!): Boolean!
 
   """Business user replies to admin"""
@@ -1105,6 +1168,7 @@ type Mutation {
   setBusinessSchedule(businessId: ID!, schedule: [BusinessDayHoursInput!]!): [BusinessDayHours!]!
   setDefaultAddress(id: ID!): Boolean!
   setDeliveryPricingTiers(input: SetDeliveryPricingTiersInput!): [DeliveryPricingTier!]!
+  setInventoryQuantity(input: SetInventoryQuantityInput!): InventoryItem!
   setMyEmailOptOut(optOut: Boolean!): User!
   setMyPreferredLanguage(language: AppLanguage!): User!
   setOrderAdminNote(id: ID!, note: String): Order!
@@ -1274,6 +1338,29 @@ type OrderConnection {
   hasMore: Boolean!
   orders: [Order!]!
   totalCount: Int!
+}
+
+type OrderCoverage {
+  allFromMarket: Boolean!
+  allFromStock: Boolean!
+  deducted: Boolean!
+  fullyOwnedCount: Int!
+  items: [OrderCoverageItem!]!
+  marketOnlyCount: Int!
+  orderId: ID!
+  partiallyOwnedCount: Int!
+  totalItems: Int!
+}
+
+type OrderCoverageItem {
+  deducted: Boolean!
+  fromMarket: Int!
+  fromStock: Int!
+  orderedQty: Int!
+  productId: ID!
+  productImageUrl: String
+  productName: String!
+  status: InventoryCoverageStatus!
 }
 
 type OrderDriverLiveTracking {
@@ -1638,6 +1725,8 @@ type Query {
   getStoreStatus(url: String): StoreStatus!
   getUserPromoMetadata(userId: ID!): UserPromoMetadata
   getUserPromotions(userId: ID!): [UserPromotion!]!
+  inventoryEarnings(businessId: ID!, endDate: String, startDate: String): InventoryEarnings!
+  inventorySummary(businessId: ID!): InventorySummary!
   me: User
   myAddresses: [UserAddress!]!
   myBehavior: UserBehavior
@@ -1650,11 +1739,13 @@ type Query {
 
   """Get live metrics for the authenticated driver"""
   myDriverMetrics: DriverDailyMetrics!
+  myInventory(businessId: ID!): [InventoryItem!]!
   notificationCampaign(id: ID!): NotificationCampaign
   notificationCampaigns: [NotificationCampaign!]!
   offers(businessId: ID!): [Product!]!
   operationalKPIs(businessId: ID, endDate: String!, startDate: String!): OperationalKPIs!
   order(id: ID!): Order
+  orderCoverage(orderId: ID!): OrderCoverage
   orders(limit: Int, offset: Int, statuses: [OrderStatus!]): OrderConnection!
   ordersByStatus(limit: Int, offset: Int, status: OrderStatus!): [Order!]!
   peakHourAnalysis(businessId: ID, endDate: String!, startDate: String!): PeakHourAnalysis!
@@ -1717,6 +1808,14 @@ input SetDeliveryPricingTiersInput {
   tiers: [CreateDeliveryPricingTierInput!]!
 }
 
+input SetInventoryQuantityInput {
+  businessId: ID!
+  costPrice: Float
+  lowStockThreshold: Int
+  productId: ID!
+  quantity: Int!
+}
+
 type SettleResult {
   direction: SettlementPaymentDirection!
   netAmount: Float!
@@ -1739,6 +1838,7 @@ type Settlement {
   paidAt: Date
   paymentMethod: String
   paymentReference: String
+  reason: String
   rule: SettlementRule
   ruleId: ID
   settlementPayment: SettlementPayment
@@ -1937,6 +2037,8 @@ type StoreStatus {
   bannerType: BannerType!
   closedMessage: String
   dispatchModeEnabled: Boolean!
+  googleMapsNavEnabled: Boolean!
+  inventoryModeEnabled: Boolean!
   isStoreClosed: Boolean!
 }
 
@@ -2126,6 +2228,8 @@ input UpdateStoreStatusInput {
   bannerType: BannerType
   closedMessage: String
   dispatchModeEnabled: Boolean
+  googleMapsNavEnabled: Boolean
+  inventoryModeEnabled: Boolean
   isStoreClosed: Boolean!
 }
 

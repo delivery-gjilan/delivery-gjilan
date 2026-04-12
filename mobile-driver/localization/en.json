@@ -105,7 +105,11 @@
         "awaiting_response": "AWAITING RESPONSE",
         "requested_by": "Requested by",
         "expires": "Expires",
-        "no_requests": "No pending requests"
+        "no_requests": "No pending requests",
+        "stock_remittance": "Stock Item Remittance",
+        "stock_remittance_sub": "Items from operator inventory",
+        "reject_title": "Reject Settlement",
+        "reject_placeholder": "Reason for rejection (optional)"
     },
     "messages": {
         "type_message": "Message",
@@ -233,6 +237,10 @@
         "min_to_pickup": "~{{min}} min to pickup",
         "almost_ready": "Almost ready",
         "ready_min": "Ready ~{{min}} min",
-        "status_update_failed": "Could not update order status. Please try again."
+        "status_update_failed": "Could not update order status. Please try again.",
+        "nav_choice_title": "Navigate with",
+        "nav_choice_inapp": "In-App Navigation",
+        "nav_choice_gmaps": "Google Maps",
+        "nav_choice_cancel": "Cancel"
     }
 }

@@ -1,4 +1,4 @@
-import { pgTable, uuid, numeric, timestamp, index, boolean, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, numeric, timestamp, index, boolean, pgEnum, varchar } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 import { drivers } from './drivers';
 import { businesses } from './businesses';
@@ -38,6 +38,9 @@ export const settlements = pgTable('settlements', {
     sourcePaymentId: uuid('source_payment_id').references(() => settlementPayments.id, { onDelete: 'set null' }),
 
     amount: numeric('amount', { mode: 'number', precision: 10, scale: 2 }).notNull(),
+
+    /** Human-readable reason describing why this settlement exists */
+    reason: varchar('reason', { length: 500 }),
 
     /** Whether this settlement has been fully resolved */
     isSettled: boolean('is_settled').default(false).notNull(),

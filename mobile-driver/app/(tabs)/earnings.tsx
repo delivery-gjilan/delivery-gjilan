@@ -281,16 +281,22 @@ export default function EarningsScreen() {
                         <View style={{ gap: 8 }}>
                             {breakdownItems.map((item: any, idx: number) => {
                                 const isReceivable = item.direction === "RECEIVABLE";
-                                const color = isReceivable ? "#ef4444" : theme.colors.income;
+                                const isStock = item.category === "STOCK_REMITTANCE";
+                                const color = isStock ? "#a855f7" : isReceivable ? "#ef4444" : theme.colors.income;
+                                const icon = isStock ? "cube-outline" : isReceivable ? "arrow-up-outline" : "arrow-down-outline";
+                                const label = isStock ? ((t.earnings as any).stock_remittance ?? item.label) : item.label;
                                 return (
                                     <View key={`${item.category}-${idx}`} style={[es.rowCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
                                         <View style={[es.rowIconWrap, { backgroundColor: color + "18" }]}>
-                                            <Ionicons name={isReceivable ? "arrow-up-outline" : "arrow-down-outline"} size={16} color={color} />
+                                            <Ionicons name={icon} size={16} color={color} />
                                         </View>
                                         <View style={{ flex: 1 }}>
-                                            <Text style={[es.rowCardTitle, { color: theme.colors.text }]} numberOfLines={1}>{item.label}</Text>
+                                            <Text style={[es.rowCardTitle, { color: theme.colors.text }]} numberOfLines={1}>{label}</Text>
                                             <Text style={[es.rowCardSub, { color: theme.colors.subtext }]}>
-                                                {item.count} {item.count === 1 ? t.earnings.delivery : t.earnings.deliveries}
+                                                {isStock
+                                                    ? ((t.earnings as any).stock_remittance_sub ?? `${item.count} orders`)
+                                                    : `${item.count} ${item.count === 1 ? t.earnings.delivery : t.earnings.deliveries}`
+                                                }
                                             </Text>
                                         </View>
                                         <Text style={[es.rowCardAmount, { color }]}>
@@ -384,22 +390,34 @@ export default function EarningsScreen() {
                                 const businessNames = s.order?.businesses?.map((b: any) => b.business?.name).filter(Boolean).join(", ") ?? "—";
                                 const isPaid = s.status === "PAID";
                                 const isPayable = s.direction === "PAYABLE";
-                                const directionLabel = isPayable ? t.earnings.platform_owes_you : (s.rule?.name ?? t.earnings.commission);
-                                const directionColor = isPayable ? theme.colors.income : "#f59e0b";
+                                const isStockItem = s.reason?.startsWith("Stock item");
+                                const directionLabel = isPayable
+                                    ? t.earnings.platform_owes_you
+                                    : isStockItem
+                                        ? (t.earnings as any).stock_remittance ?? "Stock Item Remittance"
+                                        : (s.rule?.name ?? t.earnings.commission);
+                                const directionColor = isPayable ? theme.colors.income : isStockItem ? "#a855f7" : "#f59e0b";
+                                const amountColor = isPayable ? theme.colors.income : isStockItem ? "#a855f7" : "#f59e0b";
+                                const borderTint = isPaid ? theme.colors.income + "30" : isStockItem ? "#a855f730" : "#f59e0b30";
                                 return (
-                                    <View key={s.id} style={[es.settlementRow, { backgroundColor: theme.colors.card, borderColor: isPaid ? theme.colors.income + "30" : "#f59e0b30" }]}>
+                                    <View key={s.id} style={[es.settlementRow, { backgroundColor: theme.colors.card, borderColor: borderTint }]}>
                                         <View style={{ flex: 1, marginRight: 12 }}>
                                             <Text style={[es.settlBiz, { color: theme.colors.text }]} numberOfLines={1}>{businessNames}</Text>
                                             <Text style={[es.settlAddr, { color: theme.colors.subtext }]} numberOfLines={1}>
                                                 📍 {s.order?.dropOffLocation?.address ?? "—"}
                                             </Text>
+                                            {isStockItem && s.reason && (
+                                                <Text style={[es.settlAddr, { color: "#a855f7", fontSize: 11, marginTop: 2 }]} numberOfLines={2}>
+                                                    {s.reason}
+                                                </Text>
+                                            )}
                                             <Text style={[es.settlDate, { color: theme.colors.subtext }]}>{formatDate(s.createdAt)}</Text>
                                             <View style={[es.settlDirectionBadge, { backgroundColor: directionColor + "20" }]}>
                                                 <Text style={[es.settlDirectionText, { color: directionColor }]}>{directionLabel}</Text>
                                             </View>
                                         </View>
                                         <View style={{ alignItems: "flex-end" }}>
-                                            <Text style={[es.settlAmount, { color: isPayable ? theme.colors.income : "#f59e0b" }]}>
+                                            <Text style={[es.settlAmount, { color: amountColor }]}>
                                                 {isPayable ? "+" : "-"}{formatCurrency(Number(s.amount ?? 0))}
                                             </Text>
                                             <View style={[es.settlStatusBadge, { backgroundColor: isPaid ? theme.colors.income + "20" : "#f59e0b20" }]}>

@@ -32,6 +32,7 @@ type Settlement {
     ruleId: ID
     rule: SettlementRule
     amount: Float!
+    reason: String
     # Legacy fields kept for backward compatibility (derived from isSettled)
     currency: String!
     status: SettlementStatus!

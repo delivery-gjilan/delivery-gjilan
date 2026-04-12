@@ -29,6 +29,27 @@
       "when": 1775958728871,
       "tag": "0003_left_justice",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1776000736648,
+      "tag": "0004_giant_firebrand",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1776001739781,
+      "tag": "0005_slippery_masked_marvel",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1776003101039,
+      "tag": "0006_short_nova",
+      "breakpoints": true
     }
   ]
 }

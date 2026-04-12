@@ -1,5 +1,8 @@
 import { type DbType } from '@/database';
 import { DbOrder, DbOrderItem, settlementRules, orderPromotions, products, drivers } from '@/database/schema';
+import { orderCoverageLogs } from '@/database/schema/orderCoverageLogs';
+import { orderItems } from '@/database/schema/orderItems';
+import { storeSettings } from '@/database/schema/storeSettings';
 import { eq, and, or, inArray, isNull, sql } from 'drizzle-orm';
 import logger from '@/lib/logger';
 
@@ -102,6 +105,12 @@ export class SettlementCalculationEngine {
             // ── Automatic: priority surcharge remittance (CASH_TO_DRIVER only) ──
             // Driver collected the priority surcharge cash and must remit it.
             this.addPrioritySurchargeSettlement(order, driverId, results);
+
+            // ── Automatic: stock item remittance (CASH_TO_DRIVER + inventory mode) ──
+            // If inventory mode is on and stock was deducted for this order,
+            // the driver owes the base price of items they picked up for free from
+            // the operator's personal stock (they didn't buy them at market).
+            await this.addStockItemSettlements(order, driverId, results);
 
             // ── Delivery fee rules (most-specific-wins: BP > P > B > G) ──
             // If no rules at any level, fall back to the driver's own commission %.
@@ -320,5 +329,99 @@ export class SettlementCalculationEngine {
                 reason: `Driver ${dirLabel} on ${typeLabel} (${ruleLabel})`,
             });
         }
+    }
+
+    /**
+     * Stock item remittance: when inventory mode is enabled and stock has been
+     * deducted for an order, the driver collected cash for items they picked up
+     * from the operator's personal stock (i.e., didn't buy at market).
+     * The driver must remit the base price of those stock-covered items.
+     *
+     * Only applies to CASH_TO_DRIVER orders — for prepaid orders the platform
+     * already collected the full amount.
+     */
+    private async addStockItemSettlements(
+        order: DbOrder,
+        driverId: string | null,
+        results: SettlementCalculation[],
+    ): Promise<void> {
+        if (!driverId) return;
+        if (order.paymentCollection !== 'CASH_TO_DRIVER') return;
+
+        // Check if inventory mode is enabled
+        const settings = await this.db.select({ inventoryModeEnabled: storeSettings.inventoryModeEnabled })
+            .from(storeSettings)
+            .limit(1);
+        if (!settings.length || !settings[0].inventoryModeEnabled) return;
+
+        // Get coverage logs for this order (only deducted items matter)
+        const coverageLogs = await this.db
+            .select({
+                productId: orderCoverageLogs.productId,
+                fromStock: orderCoverageLogs.fromStock,
+            })
+            .from(orderCoverageLogs)
+            .where(
+                and(
+                    eq(orderCoverageLogs.orderId, order.id),
+                    eq(orderCoverageLogs.deducted, true),
+                ),
+            );
+
+        if (coverageLogs.length === 0) return;
+
+        // Get the order items' snapshotted base prices for these products
+        const stockProductIds = coverageLogs.map((l) => l.productId);
+        const itemRows = await this.db
+            .select({
+                productId: orderItems.productId,
+                quantity: orderItems.quantity,
+                basePrice: orderItems.basePrice,
+            })
+            .from(orderItems)
+            .where(
+                and(
+                    eq(orderItems.orderId, order.id),
+                    inArray(orderItems.productId, stockProductIds),
+                ),
+            );
+
+        // Build a price map: productId → per-unit price (weighted average across order items)
+        const priceMap = new Map<string, { totalValue: number; totalQty: number }>();
+        for (const item of itemRows) {
+            const existing = priceMap.get(item.productId);
+            if (existing) {
+                existing.totalValue += item.basePrice * item.quantity;
+                existing.totalQty += item.quantity;
+            } else {
+                priceMap.set(item.productId, {
+                    totalValue: item.basePrice * item.quantity,
+                    totalQty: item.quantity,
+                });
+            }
+        }
+
+        // Calculate total value of stock-covered items
+        let stockValue = 0;
+        for (const log of coverageLogs) {
+            const price = priceMap.get(log.productId);
+            if (!price || price.totalQty === 0) continue;
+            const unitPrice = price.totalValue / price.totalQty;
+            stockValue += unitPrice * log.fromStock;
+        }
+
+        stockValue = Number(stockValue.toFixed(2));
+        if (stockValue <= 0) return;
+
+        results.push({
+            type: 'DRIVER',
+            direction: 'RECEIVABLE',
+            driverId,
+            businessId: null,
+            orderId: order.id,
+            amount: stockValue,
+            ruleId: null,
+            reason: `Stock item remittance (€${stockValue.toFixed(2)} items from operator inventory)`,
+        });
     }
 }

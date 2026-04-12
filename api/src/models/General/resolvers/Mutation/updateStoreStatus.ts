@@ -45,6 +45,12 @@ export const updateStoreStatus: NonNullable<MutationResolvers['updateStoreStatus
   if (input.dispatchModeEnabled !== undefined && input.dispatchModeEnabled !== null) {
     updateData.dispatchModeEnabled = input.dispatchModeEnabled;
   }
+  if (input.googleMapsNavEnabled !== undefined && input.googleMapsNavEnabled !== null) {
+    updateData.googleMapsNavEnabled = input.googleMapsNavEnabled;
+  }
+  if (input.inventoryModeEnabled !== undefined && input.inventoryModeEnabled !== null) {
+    updateData.inventoryModeEnabled = input.inventoryModeEnabled;
+  }
 
   if (existing.length === 0) {
     // Insert new settings row
@@ -75,6 +81,8 @@ export const updateStoreStatus: NonNullable<MutationResolvers['updateStoreStatus
     bannerMessage: row.bannerMessage,
     bannerType: (row.bannerType || 'info').toUpperCase(),
     dispatchModeEnabled: row.dispatchModeEnabled,
+    googleMapsNavEnabled: row.googleMapsNavEnabled,
+    inventoryModeEnabled: row.inventoryModeEnabled,
   };
 
   // Broadcast to all subscribed clients
@@ -85,6 +93,8 @@ export const updateStoreStatus: NonNullable<MutationResolvers['updateStoreStatus
     bannerMessage: result.bannerMessage,
     bannerType: result.bannerType,
     dispatchModeEnabled: result.dispatchModeEnabled,
+    googleMapsNavEnabled: result.googleMapsNavEnabled,
+    inventoryModeEnabled: result.inventoryModeEnabled,
   } as any);
 
   await cache.invalidateStoreStatus();

@@ -11,5 +11,7 @@ export const storeSettings = pgTable('store_settings', {
     bannerMessage: text('banner_message'),
     bannerType: text('banner_type').default('info').notNull(), // 'info' | 'warning' | 'success'
     dispatchModeEnabled: boolean('dispatch_mode_enabled').default(false).notNull(),
+    googleMapsNavEnabled: boolean('google_maps_nav_enabled').default(false).notNull(),
+    inventoryModeEnabled: boolean('inventory_mode_enabled').default(false).notNull(),
     updatedAt: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
 });

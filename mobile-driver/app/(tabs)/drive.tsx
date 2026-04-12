@@ -1,5 +1,5 @@
-﻿import React, { useMemo, useCallback, useRef, useState, useEffect } from 'react';
-import { View, Text, Image, StyleSheet, ActivityIndicator, Pressable, Alert, useColorScheme, Animated, PanResponder } from 'react-native';
+import React, { useMemo, useCallback, useRef, useState, useEffect } from 'react';
+import { View, Text, Image, StyleSheet, ActivityIndicator, Pressable, Alert, ActionSheetIOS, Platform, Linking, useColorScheme, Animated, PanResponder } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Mapbox from '@rnmapbox/maps';
@@ -62,7 +62,7 @@ export default function MapScreen() {
     const [focusedOrderId, setFocusedOrderId] = useState<string | null>(null);
     const isOnline = useAuthStore((state) => state.isOnline);
     const connectionStatus = useAuthStore((state) => state.connectionStatus);
-    const { dispatchModeEnabled } = useStoreStatus();
+    const { dispatchModeEnabled, googleMapsNavEnabled } = useStoreStatus();
 
     const [markingPickedUpIds, setMarkingPickedUpIds] = useState<Set<string>>(new Set());
     const [nowTs, setNowTs] = useState(() => Date.now());
@@ -412,6 +412,63 @@ export default function MapScreen() {
         startNavigation(navOrder, orderToPhase(order.status), origin);
         router.push('/navigation' as any);
     }, [focusedOrder, location, startNavigation, router]);
+    // -- Open destination in Google Maps --
+    const openInGoogleMaps = useCallback((targetOrder?: any) => {
+        const order = targetOrder ?? focusedOrder;
+        if (!order) return;
+        const navOrder = buildNavOrder(order);
+        if (!navOrder) return;
+
+        const dest = orderToPhase(order.status) === 'to_dropoff' ? navOrder.dropoff : navOrder.pickup;
+        if (!dest) return;
+
+        const { latitude, longitude } = dest;
+        const nativeUrl = Platform.select({
+            ios: `comgooglemaps://?daddr=${latitude},${longitude}&directionsmode=driving`,
+            android: `google.navigation:q=${latitude},${longitude}`,
+        })!;
+        const webUrl = `https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=${latitude},${longitude}`;
+
+        Linking.canOpenURL(nativeUrl)
+            .then((canOpen) => Linking.openURL(canOpen ? nativeUrl : webUrl))
+            .catch(() => Linking.openURL(webUrl).catch(() => {}));
+    }, [focusedOrder]);
+
+    // -- Navigation picker (In-App vs Google Maps) --
+    const handleNavigationPress = useCallback((targetOrder?: any) => {
+        const order = targetOrder ?? focusedOrder;
+        if (!order || !location) return;
+
+        // If admin hasn't enabled the Google Maps picker, go straight to in-app nav
+        if (!googleMapsNavEnabled) {
+            handleStartNavigation(order);
+            return;
+        }
+
+        if (Platform.OS === 'ios') {
+            ActionSheetIOS.showActionSheetWithOptions(
+                {
+                    title: t.drive.nav_choice_title,
+                    options: [t.drive.nav_choice_cancel, t.drive.nav_choice_inapp, t.drive.nav_choice_gmaps],
+                    cancelButtonIndex: 0,
+                },
+                (buttonIndex) => {
+                    if (buttonIndex === 1) handleStartNavigation(order);
+                    else if (buttonIndex === 2) openInGoogleMaps(order);
+                },
+            );
+        } else {
+            Alert.alert(
+                t.drive.nav_choice_title,
+                undefined,
+                [
+                    { text: t.drive.nav_choice_inapp, onPress: () => handleStartNavigation(order) },
+                    { text: t.drive.nav_choice_gmaps, onPress: () => openInGoogleMaps(order) },
+                    { text: t.drive.nav_choice_cancel, style: 'cancel' },
+                ],
+            );
+        }
+    }, [focusedOrder, location, googleMapsNavEnabled, t, handleStartNavigation, openInGoogleMaps]);
 
     // â”€â”€ Initial camera center â”€â”€
     const initialCenter = useMemo<[number, number]>(() => {
@@ -769,7 +826,7 @@ export default function MapScreen() {
                             <View style={styles.cardCtaRow}>
                                 <Pressable
                                     style={[styles.cardCta, styles.cardCtaHalf, { backgroundColor: '#4f46e5' }]}
-                                    onPress={() => handleStartNavigation(order)}
+                                    onPress={() => handleNavigationPress(order)}
                                 >
                                     <Ionicons name="navigate" size={18} color="#fff" />
                                     <Text style={styles.cardCtaText}>{t.drive.pickup}</Text>
@@ -792,7 +849,7 @@ export default function MapScreen() {
                         ) : isOutForDelivery ? (
                             <Pressable
                                 style={[styles.cardCta, { backgroundColor: '#7c3aed' }]}
-                                onPress={() => handleStartNavigation(order)}
+                                onPress={() => handleNavigationPress(order)}
                             >
                                 <Ionicons name="navigate" size={18} color="#fff" />
                                 <Text style={styles.cardCtaText}>{t.drive.resume_navigation}</Text>
@@ -800,7 +857,7 @@ export default function MapScreen() {
                         ) : (
                             <Pressable
                                 style={[styles.cardCta, { backgroundColor: '#4f46e5' }]}
-                                onPress={() => handleStartNavigation(order)}
+                                onPress={() => handleNavigationPress(order)}
                             >
                                 <Ionicons name="navigate" size={18} color="#fff" />
                                 <Text style={styles.cardCtaText}>{t.drive.navigate_to_pickup}</Text>

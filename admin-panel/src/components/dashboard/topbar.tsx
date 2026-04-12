@@ -4,7 +4,7 @@
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import Button from "@/components/ui/Button";
-import { LogOut, Shield, Briefcase, StoreIcon, Clock, Megaphone, Truck } from "lucide-react";
+import { LogOut, Shield, Briefcase, StoreIcon, Clock, Megaphone, Truck, Map, Package } from "lucide-react";
 import { useQuery, useMutation } from "@apollo/client/react";
 import { GET_STORE_STATUS, UPDATE_STORE_STATUS } from "@/graphql/operations/store";
 import { useState } from "react";
@@ -34,6 +34,8 @@ export default function Topbar() {
   const isStoreClosed = storeStatus?.isStoreClosed ?? false;
   const bannerEnabled = storeStatus?.bannerEnabled ?? false;
   const dispatchModeEnabled = storeStatus?.dispatchModeEnabled ?? false;
+  const googleMapsNavEnabled = storeStatus?.googleMapsNavEnabled ?? false;
+  const inventoryModeEnabled = storeStatus?.inventoryModeEnabled ?? false;
   const assignmentModeLabel = dispatchModeEnabled ? 'Dispatch mode' : 'Self-assign mode';
   const isSuperAdmin = admin?.role === "SUPER_ADMIN";
 
@@ -111,6 +113,34 @@ export default function Topbar() {
     });
   };
 
+  const handleToggleGoogleMapsNav = async () => {
+    await updateStoreStatus({
+      variables: {
+        input: {
+          isStoreClosed,
+          bannerEnabled,
+          bannerMessage: storeStatus?.bannerMessage ?? null,
+          bannerType: storeStatus?.bannerType as any ?? 'INFO',
+          googleMapsNavEnabled: !googleMapsNavEnabled,
+        },
+      },
+    });
+  };
+
+  const handleToggleInventoryMode = async () => {
+    await updateStoreStatus({
+      variables: {
+        input: {
+          isStoreClosed,
+          bannerEnabled,
+          bannerMessage: storeStatus?.bannerMessage ?? null,
+          bannerType: storeStatus?.bannerType as any ?? 'INFO',
+          inventoryModeEnabled: !inventoryModeEnabled,
+        },
+      },
+    });
+  };
+
   const handleLogout = () => {
     logout();
     router.push("/login");
@@ -183,6 +213,38 @@ export default function Topbar() {
               >
                 <Truck size={12} />
                 {dispatchModeEnabled ? 'Dispatching' : 'Self-assign'}
+              </button>
+
+              <div className="w-px h-4 bg-zinc-800" />
+
+              <button
+                onClick={handleToggleGoogleMapsNav}
+                disabled={updating}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+                  googleMapsNavEnabled
+                    ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+                title={googleMapsNavEnabled ? 'Google Maps nav ON — drivers see nav picker' : 'Google Maps nav OFF — drivers go straight to in-app nav'}
+              >
+                <Map size={12} />
+                {googleMapsNavEnabled ? 'GMap picker ON' : 'GMap picker OFF'}
+              </button>
+
+              <div className="w-px h-4 bg-zinc-800" />
+
+              <button
+                onClick={handleToggleInventoryMode}
+                disabled={updating}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+                  inventoryModeEnabled
+                    ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+                title={inventoryModeEnabled ? 'Inventory mode ON — orders show stock coverage' : 'Inventory mode OFF — all orders go to market'}
+              >
+                <Package size={12} />
+                {inventoryModeEnabled ? 'Stock ON' : 'Stock OFF'}
               </button>
             </>
           )}

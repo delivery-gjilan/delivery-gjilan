@@ -23,6 +23,8 @@ import {
   Monitor,
   ChevronDown,
   Star,
+  Warehouse,
+  BarChart3,
 } from "lucide-react";
 
 interface NavItem {
@@ -50,6 +52,8 @@ const sections: NavSection[] = [
       { name: "Map", href: "/dashboard/map", icon: Map, superAdminOnly: true },
       { name: "Businesses", href: "/dashboard/businesses", icon: Store, superAdminOnly: true },
       { name: "Market", href: "/dashboard/market", icon: Store, superAdminOnly: true },
+      { name: "Inventory", href: "/dashboard/inventory", icon: Warehouse, superAdminOnly: true },
+      { name: "Inventory Earnings", href: "/dashboard/inventory/earnings", icon: BarChart3, superAdminOnly: true },
       { name: "Drivers", href: "/dashboard/drivers", icon: Truck, superAdminOnly: true },
     ],
   },

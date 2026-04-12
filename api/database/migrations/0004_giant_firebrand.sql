@@ -1,0 +1,1 @@
+ALTER TABLE "store_settings" ADD COLUMN "google_maps_nav_enabled" boolean DEFAULT false NOT NULL;
