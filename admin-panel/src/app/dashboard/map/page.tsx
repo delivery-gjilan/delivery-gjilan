@@ -23,6 +23,8 @@ import { SEND_BUSINESS_MESSAGE, MARK_BUSINESS_MESSAGES_READ } from "@/graphql/op
 import { GET_BUSINESS_MESSAGES } from "@/graphql/operations/businessMessages/queries";
 import { ADMIN_BUSINESS_MESSAGE_RECEIVED } from "@/graphql/operations/businessMessages/subscriptions";
 import { GET_BUSINESS_DEVICE_HEALTH } from "@/graphql/operations/notifications";
+import { GET_ORDER_COVERAGE } from "@/graphql/operations/inventory/queries";
+import InventoryCoverageModal from "@/components/inventory/InventoryCoverageModal";
 import { getInitials, getAvatarColor } from "@/lib/avatarUtils";
 import { useAdminPtt } from "@/lib/hooks/useAdminPtt";
 
@@ -476,6 +478,8 @@ export default function MapPage() {
       setTimeout(() => chatBizBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
     },
   });
+  const [inventoryModalOrder, setInventoryModalOrder] = useState<any | null>(null);
+  const [fetchOrderCoverage, { data: coverageData, loading: coverageLoading }] = useLazyQuery(GET_ORDER_COVERAGE, { fetchPolicy: 'network-only' });
   useSubscription(ADMIN_BUSINESS_MESSAGE_RECEIVED, {
     variables: { businessUserId: chatBizUserId ?? '' },
     skip: !chatBizUserId,
@@ -2983,6 +2987,17 @@ export default function MapPage() {
           </div>
         </div>
       )}
+
+      {/* ── Inventory Coverage Modal ── */}
+      {inventoryModalOrder && (
+        <InventoryCoverageModal
+          orderId={inventoryModalOrder.id}
+          displayId={inventoryModalOrder.displayId || inventoryModalOrder.id.slice(0, 8)}
+          coverage={(coverageData as any)?.orderCoverage}
+          loading={coverageLoading}
+          onClose={() => setInventoryModalOrder(null)}
+        />
+      )}
     </div>
   );
 }
@@ -3233,9 +3248,13 @@ function BottomDetailPanel({
             </div>
           )}
           {(order as any).inventoryPrice != null && Number((order as any).inventoryPrice) > 0 && (
-            <div className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/30 text-violet-300 text-xs font-semibold">
-              📦 Stock items — €{Number((order as any).inventoryPrice).toFixed(2)} from inventory
-            </div>
+            <button
+              onClick={() => { setInventoryModalOrder(order); fetchOrderCoverage({ variables: { orderId: order.id } }); }}
+              className="mt-2 w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/30 text-violet-300 text-xs font-semibold hover:bg-violet-500/20 transition-colors text-left cursor-pointer"
+            >
+              📦 Stock items — €{Number((order as any).inventoryPrice).toFixed(2)}
+              <span className="ml-auto text-violet-500 text-[10px]">View →</span>
+            </button>
           )}
           {(order as any).needsApproval && (
             <div className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold">

@@ -15,6 +15,7 @@ import { UPDATE_USER_NOTE_MUTATION } from "@/graphql/operations/users/mutations"
 import { DRIVERS_QUERY } from "@/graphql/operations/users/queries";
 import { GET_ORDER_COVERAGE } from "@/graphql/operations/inventory/queries";
 import { DEDUCT_ORDER_STOCK } from "@/graphql/operations/inventory/mutations";
+import InventoryCoverageModal from "@/components/inventory/InventoryCoverageModal";
 import { Package, Store, Search, ArrowRight, MapPin, User, Plus, ChefHat, Timer, Copy, Check, Phone, Hash, MessageSquare, Calendar, Clock, Truck, CreditCard, Tag, X } from "lucide-react";
 import { toast } from 'sonner';
 
@@ -350,6 +351,7 @@ export default function OrdersPage() {
 
     const [prepTimeAlerts, setPrepTimeAlerts] = useState<PrepTimeAlert[]>([]);
     const { dismiss: dismissPrepAlert } = usePrepTimeAlerts(setPrepTimeAlerts);
+    const [inventoryModalOrder, setInventoryModalOrder] = useState<Order | null>(null);
 
     // Debounce search input by 300ms
     useEffect(() => {
@@ -875,10 +877,14 @@ export default function OrdersPage() {
 
                                         {/* Inventory coverage badge */}
                                         {order.inventoryPrice != null && order.inventoryPrice > 0 && (
-                                            <div className="mb-3 flex items-center gap-2 bg-violet-500/10 border border-violet-500/30 rounded-lg px-3 py-2">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setInventoryModalOrder(order); fetchOrderCoverage({ variables: { orderId: order.id } }); }}
+                                                className="mb-3 w-full flex items-center gap-2 bg-violet-500/10 border border-violet-500/30 rounded-lg px-3 py-2 hover:bg-violet-500/20 transition-colors text-left cursor-pointer"
+                                            >
                                                 <Package size={13} className="text-violet-400 flex-shrink-0" />
                                                 <span className="text-violet-300 text-xs font-semibold">📦 Stock items — €{Number(order.inventoryPrice).toFixed(2)} from your inventory</span>
-                                            </div>
+                                                <span className="ml-auto text-violet-500 text-[10px] whitespace-nowrap">View →</span>
+                                            </button>
                                         )}
 
                                         {/* Prep time extended alert */}
@@ -1973,6 +1979,17 @@ export default function OrdersPage() {
                     );
                 })()}
             </Modal>
+
+            {/* ── Inventory Coverage Modal ── */}
+            {inventoryModalOrder && (
+                <InventoryCoverageModal
+                    orderId={inventoryModalOrder.id}
+                    displayId={inventoryModalOrder.displayId}
+                    coverage={coverageData?.orderCoverage as any}
+                    loading={coverageLoading}
+                    onClose={() => setInventoryModalOrder(null)}
+                />
+            )}
 
             {/* ── Approval Confirmation Modal ── */}
             <Modal isOpen={!!approvalModalOrder} onClose={handleDismissApprovalModal} title="Approve Order">

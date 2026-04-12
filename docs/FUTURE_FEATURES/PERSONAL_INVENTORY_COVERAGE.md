@@ -51,7 +51,22 @@ The DELIVERED-time handler reads `order_items.inventory_quantity` as the **canon
 
 ### Admin Panel
 
-**Fulfillment Guide** section on each order (visible only when `!allFromMarket`):
+**Inventory table** (`/dashboard/inventory`): 7-column grid — Product, Stock, Cost, **Base** (product base price, always visible), **Retail** (effective/markup price), Margin, Actions. Base price was previously shown only as a tooltip on the Retail cell.
+
+**`📦 Stock items` badge** on order cards in:
+- **Orders page** (`/dashboard/orders`) — clickable button; opens `InventoryCoverageModal` (standalone, separate from Order Details).
+- **Map page** (`/dashboard/map`) — same clickable badge on the side-panel order card.
+
+**`InventoryCoverageModal`** (`admin-panel/src/components/inventory/InventoryCoverageModal.tsx`):
+- Summary row: "From your stock" / "Partial coverage" / "Market only" counts.
+- "Pick from your stock" section — product image, name, `×N` in violet.
+- "Buy from market" section — same layout in neutral tones.
+- "✓ Stock already deducted" badge when `coverage.deducted` is true.
+- Triggered by clicking the badge; fetches `GET_ORDER_COVERAGE` (lazy query).
+
+**Toast notification** when new inventory orders arrive (both `useOrders` and `useMapRealtimeData` hooks): displays `📦 Stock order incoming` with item count.
+
+**Fulfillment Guide** section inside the Order Details modal (visible only when `!allFromMarket`):
 - "📦 Pick from your stock" — items with `inventoryQuantity > 0`
 - "🛒 Buy from market" — items with `quantity > inventoryQuantity`
 
