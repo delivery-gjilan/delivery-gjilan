@@ -19,10 +19,11 @@ export default function OrderReviewModalContainer() {
 
     const successModalVisible = useSuccessModalStore((state) => state.visible);
 
-    const { data, loading } = useQuery(GET_ORDER_REVIEW_CONTEXT, {
+    const { data, loading, error } = useQuery(GET_ORDER_REVIEW_CONTEXT, {
         variables: { id: activeOrderId },
         skip: !activeOrderId,
         fetchPolicy: 'network-only',
+        errorPolicy: 'all',
     });
 
     const [submitOrderReview, { loading: submitting }] = useMutation(SUBMIT_ORDER_REVIEW);
@@ -66,9 +67,16 @@ export default function OrderReviewModalContainer() {
         shouldCloseForInvalidOrder,
     ]);
 
+    useEffect(() => {
+        if (!activeOrderId) return;
+        if (error) {
+            closeAndMarkHandled();
+        }
+    }, [activeOrderId, error]);
+
     if (!activeOrderId) return null;
 
-    if (shouldCloseForHandled || shouldCloseForGlobalMute || shouldCloseForBusinessMute || shouldCloseForInvalidOrder) {
+    if (shouldCloseForHandled || shouldCloseForGlobalMute || shouldCloseForBusinessMute || shouldCloseForInvalidOrder || !!error) {
         return null;
     }
 

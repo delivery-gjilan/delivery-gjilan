@@ -414,6 +414,17 @@
         "order_history": "Order history",
         "no_past_orders": "No past orders yet",
         "no_past_orders_subtitle": "Your completed and cancelled orders will show up here.",
+        "review_modal": {
+            "title": "How was your order?",
+            "title_with_business": "How was your order from {{business}}?",
+            "subtitle_private": "Your comment is private and only visible to the business.",
+            "comment_placeholder": "Add a private comment (optional)",
+            "submit": "Submit review",
+            "submitting": "Submitting...",
+            "not_now": "Not now",
+            "hide_for_business": "Don't ask for this business",
+            "hide_all": "Don't ask again"
+        },
         "unknown_date": "Unknown date",
         "restaurant_fallback": "Restaurant",
         "details": {

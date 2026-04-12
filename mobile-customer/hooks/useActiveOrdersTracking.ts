@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useOrders } from '../modules/orders/hooks/useOrders';
 import { useOrdersSubscription } from '../modules/orders/hooks/useOrdersSubscription';
-import { useSuccessModalStore } from '@/store/useSuccessModalStore';
+import { useOrderReviewPromptStore } from '@/store/useOrderReviewPromptStore';
 import { useGlobalDriverTracking } from './useGlobalDriverTracking';
 
 /**
@@ -17,8 +17,7 @@ import { useGlobalDriverTracking } from './useGlobalDriverTracking';
 export function useActiveOrdersTracking() {
     const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
     const userId = useAuthStore((state) => state.user?.id);
-    const showSuccess = useSuccessModalStore((state) => state.showSuccess);
-    const successModalVisible = useSuccessModalStore((state) => state.visible);
+    const requestReviewPrompt = useOrderReviewPromptStore((state) => state.requestPrompt);
     const previousStatusesRef = useRef<Record<string, string>>({});
 
     // Fetch orders and subscribe to updates (this updates the store automatically)
@@ -38,7 +37,7 @@ export function useActiveOrdersTracking() {
         }
     }, [isAuthenticated, refetch]);
 
-    // Show delivered success globally (dashboard/home included), not only inside OrderDetails.
+    // Trigger post-delivery review prompt globally (dashboard/home included).
     useEffect(() => {
         if (!isAuthenticated || !userId) return;
 
@@ -52,13 +51,13 @@ export function useActiveOrdersTracking() {
             const nextStatus = order.status;
             nextStatuses[order.id] = nextStatus;
 
-            if (prevStatus && prevStatus !== 'DELIVERED' && nextStatus === 'DELIVERED' && !successModalVisible) {
-                showSuccess(order.id, 'order_delivered');
+            if (prevStatus && prevStatus !== 'DELIVERED' && nextStatus === 'DELIVERED') {
+                requestReviewPrompt(order.id);
             }
         }
 
         previousStatusesRef.current = nextStatuses;
-    }, [isAuthenticated, userId, orders, showSuccess, successModalVisible]);
+    }, [isAuthenticated, userId, orders, requestReviewPrompt]);
 
     return {
         loading,

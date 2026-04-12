@@ -79,6 +79,13 @@ export default function OrderReviewModal({
         <Modal visible={visible} animationType="slide" transparent onRequestClose={onSkipOrder}>
             <View style={styles.overlay}>
                 <View style={[styles.sheet, { backgroundColor: theme.colors.card }]}> 
+                    <View style={[styles.deliveredBanner, { backgroundColor: `${theme.colors.primary}22`, borderColor: `${theme.colors.primary}55` }]}>
+                        <Ionicons name="checkmark-circle" size={18} color={theme.colors.primary} />
+                        <Text style={[styles.deliveredBannerTitle, { color: theme.colors.text }]}>
+                            {t.orders.details.order_delivered}
+                        </Text>
+                    </View>
+
                     <View style={styles.headerRow}>
                         <Text style={[styles.title, { color: theme.colors.text }]}>{title}</Text>
                         <TouchableOpacity onPress={onSkipOrder} disabled={submitting}>
@@ -205,6 +212,20 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 12,
+    },
+    deliveredBanner: {
+        borderWidth: 1,
+        borderRadius: 12,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        marginBottom: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    deliveredBannerTitle: {
+        fontSize: 14,
+        fontWeight: '700',
     },
     title: {
         fontSize: 18,

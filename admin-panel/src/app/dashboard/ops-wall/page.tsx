@@ -260,10 +260,10 @@ function computeSlos(data: OpsWallData): Record<string, SloStatus> {
 function SloIndicator({ label, status, icon: Icon }: { label: string; status: SloStatus; icon: React.ElementType }) {
   const colorCls =
     status === "critical"
-      ? "border-red-500/40 bg-red-500/10 text-red-400"
+      ? "border-red-500/30 bg-red-500/5 text-red-400"
       : status === "degraded"
-        ? "border-amber-500/40 bg-amber-500/10 text-amber-400"
-        : "border-emerald-500/40 bg-emerald-500/10 text-emerald-400";
+        ? "border-amber-500/30 bg-amber-500/5 text-amber-400"
+        : "border-emerald-500/30 bg-emerald-500/5 text-emerald-400";
 
   const dotCls =
     status === "critical"
@@ -273,9 +273,9 @@ function SloIndicator({ label, status, icon: Icon }: { label: string; status: Sl
         : "bg-emerald-500";
 
   return (
-    <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium ${colorCls}`}>
-      <span className={`h-2 w-2 rounded-full ${dotCls}`} />
-      <Icon size={13} />
+    <div className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium ${colorCls}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${dotCls}`} />
+      <Icon size={12} />
       <span>{label}</span>
     </div>
   );
@@ -284,17 +284,17 @@ function SloIndicator({ label, status, icon: Icon }: { label: string; status: Sl
 function StatBadge({ value, label, color = "zinc" }: { value: number | string; label: string; color?: "zinc" | "emerald" | "amber" | "red" }) {
   const textCls =
     color === "emerald"
-      ? "text-emerald-300"
+      ? "text-emerald-400"
       : color === "amber"
-        ? "text-amber-300"
+        ? "text-amber-400"
         : color === "red"
-          ? "text-red-300"
-          : "text-white";
+          ? "text-red-400"
+          : "text-zinc-100";
 
   return (
     <div className="text-center">
-      <div className={`text-2xl font-bold tabular-nums ${textCls}`}>{value}</div>
-      <div className="mt-0.5 text-xs text-zinc-500">{label}</div>
+      <div className={`text-lg font-semibold tabular-nums ${textCls}`}>{value}</div>
+      <div className="mt-0.5 text-[11px] text-zinc-500">{label}</div>
     </div>
   );
 }
@@ -314,7 +314,7 @@ function ConnectionStatusBar({ byStatus, total }: { byStatus: Record<string, num
   return (
     <div className="space-y-2">
       {/* Stacked bar */}
-      <div className="flex h-3 w-full overflow-hidden rounded-full bg-zinc-800">
+      <div className="flex h-2 w-full overflow-hidden rounded-full bg-zinc-800/60">
         {segments.map((s) =>
           s.count > 0 ? (
             <div
@@ -346,14 +346,13 @@ function DriverFleetCard({ data, kiosk }: { data: OpsWallData["driverFleet"]; ki
     <Card className="flex flex-col">
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
-          <Truck size={16} className="text-violet-400" />
-          <CardTitle className={kiosk ? "text-xl text-white" : "text-base text-white"}>Driver Fleet</CardTitle>
+          <Truck size={15} className="text-violet-400" />
+          <CardTitle className={kiosk ? "text-lg text-white" : "text-sm text-white"}>Driver Fleet</CardTitle>
         </div>
-        <CardDescription>Connection status, stale locations, recent disconnects</CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-5">
+      <CardContent className="flex flex-col gap-4">
         {/* Totals row */}
-        <div className="grid grid-cols-3 gap-3 border-b border-zinc-800 pb-4">
+        <div className="grid grid-cols-3 gap-3 border-b border-zinc-800/50 pb-3">
           <StatBadge value={data.total} label="Total" />
           <StatBadge
             value={data.byConnectionStatus.CONNECTED ?? 0}
@@ -395,7 +394,7 @@ function DriverFleetCard({ data, kiosk }: { data: OpsWallData["driverFleet"]; ki
         {/* Recent disconnects */}
         {data.recentDisconnects.length > 0 && (
           <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-wider text-zinc-500">Recent Disconnects</p>
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-zinc-600">Recent Disconnects</p>
             <Table>
               <thead>
                 <tr>
@@ -443,19 +442,18 @@ function OrderPipelineCard({ data, kiosk }: { data: OpsWallData["orderPipeline"]
     <Card className="flex flex-col">
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
-          <Package size={16} className="text-violet-400" />
-          <CardTitle className={kiosk ? "text-xl text-white" : "text-base text-white"}>Order Pipeline</CardTitle>
+          <Package size={15} className="text-violet-400" />
+          <CardTitle className={kiosk ? "text-lg text-white" : "text-sm text-white"}>Order Pipeline</CardTitle>
           {stuckCount > 0 && (
             <Badge variant={stuckCount > 3 ? "destructive" : "warning"} className="ml-auto">
               {stuckCount} stuck
             </Badge>
           )}
         </div>
-        <CardDescription>Active orders, stuck orders, delivery metrics</CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-5">
+      <CardContent className="flex flex-col gap-4">
         {/* Active total */}
-        <div className="grid grid-cols-3 gap-3 border-b border-zinc-800 pb-4">
+        <div className="grid grid-cols-3 gap-3 border-b border-zinc-800/50 pb-3">
           <StatBadge value={totalActive} label="Active" />
           <StatBadge value={formatSeconds(data.avgAssignmentTimeSeconds)} label="Avg assign" />
           <StatBadge value={formatSeconds(data.avgDeliveryTimeSeconds)} label="Avg delivery" />
@@ -470,9 +468,9 @@ function OrderPipelineCard({ data, kiosk }: { data: OpsWallData["orderPipeline"]
             return (
               <div key={status} className="flex items-center gap-3 text-sm">
                 <span className="w-28 shrink-0 text-zinc-400">{STATUS_LABELS[status]}</span>
-                <div className="flex-1 overflow-hidden rounded bg-zinc-800">
+                <div className="flex-1 overflow-hidden rounded bg-zinc-800/60">
                   <div
-                    className="h-4 rounded bg-violet-600 transition-all"
+                    className="h-3 rounded bg-violet-600/80 transition-all"
                     style={{ width: widthPct }}
                   />
                 </div>
@@ -497,7 +495,7 @@ function OrderPipelineCard({ data, kiosk }: { data: OpsWallData["orderPipeline"]
         {/* Stuck orders */}
         {stuckCount > 0 && (
           <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-wider text-zinc-500">Stuck Orders</p>
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-zinc-600">Stuck Orders</p>
             <Table>
               <thead>
                 <tr>
@@ -533,19 +531,18 @@ function PushHealthCard({ data, kiosk }: { data: OpsWallData["pushHealth"]; kios
   const received = data.byEvent5m.RECEIVED ?? 0;
   const opened = data.byEvent5m.OPENED ?? 0;
   const actioned = data.byEvent5m.ACTION_TAPPED ?? 0;
-  const openRateColor = data.openRate5mPct >= 20 ? "text-emerald-300" : data.openRate5mPct >= 10 ? "text-amber-300" : "text-red-300";
+  const openRateColor = data.openRate5mPct >= 20 ? "text-emerald-400" : data.openRate5mPct >= 10 ? "text-amber-400" : "text-red-400";
 
   return (
     <Card className="flex flex-col">
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
-          <Bell size={16} className="text-violet-400" />
-          <CardTitle className={kiosk ? "text-xl text-white" : "text-base text-white"}>Push Health</CardTitle>
+          <Bell size={15} className="text-violet-400" />
+          <CardTitle className={kiosk ? "text-lg text-white" : "text-sm text-white"}>Push Health</CardTitle>
         </div>
-        <CardDescription>Push activity and engagement over the last 5 minutes</CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-5">
-        <div className="grid grid-cols-3 gap-3 border-b border-zinc-800 pb-4">
+      <CardContent className="flex flex-col gap-4">
+        <div className="grid grid-cols-3 gap-3 border-b border-zinc-800/50 pb-3">
           <StatBadge value={data.sentLast5m} label="Sent (5m)" />
           <StatBadge value={received} label="Received" color={received > 0 ? "emerald" : "zinc"} />
           <StatBadge value={opened} label="Opened" color={opened > 0 ? "emerald" : "zinc"} />
@@ -565,7 +562,7 @@ function PushHealthCard({ data, kiosk }: { data: OpsWallData["pushHealth"]; kios
 
         {data.byAppType.length > 0 && (
           <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-wider text-zinc-500">By app type (1h)</p>
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-zinc-600">By app type (1h)</p>
             <Table>
               <thead>
                 <tr>
@@ -619,14 +616,13 @@ function BusinessFleetCard({ data, kiosk }: { data: OpsWallData["businessFleet"]
     <Card className="flex flex-col">
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
-          <Smartphone size={16} className="text-violet-400" />
-          <CardTitle className={kiosk ? "text-xl text-white" : "text-base text-white"}>Business Devices</CardTitle>
+          <Smartphone size={15} className="text-violet-400" />
+          <CardTitle className={kiosk ? "text-lg text-white" : "text-sm text-white"}>Business Devices</CardTitle>
         </div>
-        <CardDescription>Tap a status to filter · one row per business (latest device)</CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-5">
+      <CardContent className="flex flex-col gap-4">
         {/* Totals row */}
-        <div className="grid grid-cols-3 gap-3 border-b border-zinc-800 pb-4">
+        <div className="grid grid-cols-3 gap-3 border-b border-zinc-800/50 pb-3">
           <StatBadge value={data.totalDevices} label="Businesses" />
           <StatBadge
             value={data.byOnlineStatus.ONLINE ?? 0}
@@ -685,7 +681,7 @@ function BusinessFleetCard({ data, kiosk }: { data: OpsWallData["businessFleet"]
         {filteredDevices.length > 0 && (
           <div>
             {statusFilter && (
-              <p className="mb-2 text-xs font-medium uppercase tracking-wider text-zinc-500">
+              <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-zinc-600">
                 {statusFilter} Devices ({filteredDevices.length})
               </p>
             )}
@@ -739,7 +735,7 @@ function BusinessFleetCard({ data, kiosk }: { data: OpsWallData["businessFleet"]
         {/* App version spread */}
         {Object.keys(data.byAppVersion).length > 0 && (
           <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-wider text-zinc-500">App Versions</p>
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-zinc-600">App Versions</p>
             <div className="flex flex-wrap gap-2">
               {Object.entries(data.byAppVersion)
                 .sort(([, a], [, b]) => b - a)
@@ -796,17 +792,16 @@ function WhoIsOnlineCard({
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
-          <Signal size={16} className="text-sky-400" />
-          <CardTitle className={kiosk ? "text-xl text-white" : "text-base text-white"}>
+          <Signal size={15} className="text-sky-400" />
+          <CardTitle className={kiosk ? "text-lg text-white" : "text-sm text-white"}>
             Who&apos;s Online
           </CardTitle>
-          <span className="ml-auto rounded-full bg-sky-900/50 px-2 py-0.5 text-xs font-bold text-sky-300">
-            {total} customers
+          <span className="ml-auto rounded-full bg-sky-900/40 px-2 py-0.5 text-xs font-medium text-sky-300">
+            {total}
           </span>
         </div>
-        <CardDescription>Active customer WebSocket connections — updates every {POLL_INTERVAL_MS / 1000}s</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3">
         {total === 0 ? (
           <p className="text-sm text-zinc-500">No active customers right now.</p>
         ) : null}
@@ -894,61 +889,55 @@ function RealtimeFeedCard({ data, kiosk }: { data: OpsWallData["realtime"]; kios
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
-          <Radio size={16} className="text-violet-400" />
-          <CardTitle className={kiosk ? "text-xl text-white" : "text-base text-white"}>
-            Realtime & Event Feed
+          <Radio size={15} className="text-violet-400" />
+          <CardTitle className={kiosk ? "text-lg text-white" : "text-sm text-white"}>
+            Realtime
           </CardTitle>
           <Badge variant={data.status === "healthy" ? "success" : "warning"} className="ml-auto">
             {data.status === "healthy" ? "Healthy" : "Attention"}
           </Badge>
         </div>
-        <CardDescription>WebSocket connections, subscriptions, pubsub, and recent events</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-5">
-        {/* Stat row */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-          <div className="rounded-lg border border-zinc-800 bg-zinc-950/60 p-3 text-center">
-            <div className="flex items-center justify-center gap-1 text-xs text-zinc-500">
-              <PlugZap size={12} /> Connections
-            </div>
-            <div className="mt-1 text-xl font-bold text-white">{data.activeConnections}</div>
+      <CardContent className="space-y-4">
+        {/* Compact stat strip */}
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+          <div className="flex items-center gap-1.5 text-zinc-400">
+            <PlugZap size={12} />
+            <span>Connections</span>
+            <span className="font-semibold text-zinc-100">{data.activeConnections}</span>
           </div>
-          <div className="rounded-lg border border-zinc-800 bg-zinc-950/60 p-3 text-center">
-            <div className="flex items-center justify-center gap-1 text-xs text-zinc-500">
-              <Radio size={12} /> Subscriptions
-            </div>
-            <div className="mt-1 text-xl font-bold text-white">{data.activeSubscriptions}</div>
+          <div className="flex items-center gap-1.5 text-zinc-400">
+            <Radio size={12} />
+            <span>Subs</span>
+            <span className="font-semibold text-zinc-100">{data.activeSubscriptions}</span>
           </div>
-          <div className="rounded-lg border border-zinc-800 bg-zinc-950/60 p-3 text-center">
-            <div className="flex items-center justify-center gap-1 text-xs text-zinc-500">
-              <Signal size={12} /> Rejected
-            </div>
-            <div className={`mt-1 text-xl font-bold ${data.totalRejectedSubscriptions > 0 ? "text-amber-300" : "text-white"}`}>
+          <div className="flex items-center gap-1.5 text-zinc-400">
+            <Signal size={12} />
+            <span>Rejected</span>
+            <span className={`font-semibold ${data.totalRejectedSubscriptions > 0 ? "text-amber-400" : "text-zinc-500"}`}>
               {data.totalRejectedSubscriptions}
-            </div>
+            </span>
           </div>
-          <div className="rounded-lg border border-zinc-800 bg-zinc-950/60 p-3 text-center">
-            <div className="flex items-center justify-center gap-1 text-xs text-zinc-500">
-              <AlertTriangle size={12} /> Sub Errors
-            </div>
-            <div className={`mt-1 text-xl font-bold ${data.totalSubscriptionErrors > 0 ? "text-red-300" : "text-white"}`}>
+          <div className="flex items-center gap-1.5 text-zinc-400">
+            <AlertTriangle size={12} />
+            <span>Errors</span>
+            <span className={`font-semibold ${data.totalSubscriptionErrors > 0 ? "text-red-400" : "text-zinc-500"}`}>
               {data.totalSubscriptionErrors}
-            </div>
+            </span>
           </div>
-          <div className="rounded-lg border border-zinc-800 bg-zinc-950/60 p-3 text-center">
-            <div className="flex items-center justify-center gap-1 text-xs text-zinc-500">
-              <Activity size={12} /> Pubsub Fail
-            </div>
-            <div className={`mt-1 text-xl font-bold ${data.totalPubsubFailures > 0 ? "text-red-300" : "text-white"}`}>
+          <div className="flex items-center gap-1.5 text-zinc-400">
+            <Activity size={12} />
+            <span>Pubsub fail</span>
+            <span className={`font-semibold ${data.totalPubsubFailures > 0 ? "text-red-400" : "text-zinc-500"}`}>
               {data.totalPubsubFailures}
-            </div>
+            </span>
           </div>
         </div>
 
         {/* Recent events */}
         <div>
-          <p className="mb-2 text-xs font-medium uppercase tracking-wider text-zinc-500">Recent Events</p>
-          <div className="max-h-48 overflow-y-auto rounded-lg border border-zinc-800">
+          <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-zinc-600">Recent Events</p>
+          <div className="max-h-44 overflow-y-auto rounded-lg border border-zinc-800/60">
             {data.recentEvents.length === 0 ? (
               <div className="px-4 py-3 text-sm text-zinc-500">No events yet.</div>
             ) : (
@@ -1064,8 +1053,8 @@ export default function OpsWallPage() {
     data?.sloStatus === "critical" ? "destructive" : data?.sloStatus === "degraded" ? "warning" : "success";
 
   const wrapperCls = kioskMode
-    ? "fixed inset-0 z-50 overflow-auto bg-[#09090b] p-5 flex flex-col gap-4"
-    : "space-y-4";
+    ? "fixed inset-0 z-50 overflow-auto bg-[#09090b] p-6 flex flex-col gap-5"
+    : "space-y-5";
 
   return (
     <div className={wrapperCls}>
@@ -1075,16 +1064,13 @@ export default function OpsWallPage() {
           <Monitor size={18} className="text-violet-400" />
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-sm font-medium uppercase tracking-wider text-zinc-400">Ops Wall</h1>
+              <h1 className={`font-semibold text-white ${kioskMode ? "text-xl" : "text-lg"}`}>Ops Wall</h1>
               {data && (
                 <Badge variant={overallBadgeVariant}>
                   {data.sloStatus === "ok" ? "All good" : data.sloStatus === "degraded" ? "Degraded" : "Critical"}
                 </Badge>
               )}
             </div>
-            {!kioskMode && (
-              <h2 className="text-2xl font-semibold text-white">Unified monitoring wall</h2>
-            )}
           </div>
           {kioskMode && (
             <div className="ml-4 font-mono text-2xl font-light text-zinc-300">{formatClock(clock)}</div>
@@ -1150,14 +1136,14 @@ export default function OpsWallPage() {
       {data && (
         <>
           {/* Row 1: Driver Fleet | Who's Online | Business Devices */}
-          <div className={`grid gap-4 ${kioskMode ? "grid-cols-3" : "grid-cols-1 xl:grid-cols-3"}`}>
+          <div className={`grid gap-5 ${kioskMode ? "grid-cols-3" : "grid-cols-1 xl:grid-cols-3"}`}>
             <DriverFleetCard data={data.driverFleet} kiosk={kioskMode} />
             <WhoIsOnlineCard liveUsers={data.liveUsers ?? []} kiosk={kioskMode} />
             <BusinessFleetCard data={data.businessFleet} kiosk={kioskMode} />
           </div>
 
           {/* Row 2: Order Pipeline | Push Health */}
-          <div className={`grid gap-4 ${kioskMode ? "grid-cols-2" : "grid-cols-1 xl:grid-cols-2"}`}>
+          <div className={`grid gap-5 ${kioskMode ? "grid-cols-2" : "grid-cols-1 xl:grid-cols-2"}`}>
             <OrderPipelineCard data={data.orderPipeline} kiosk={kioskMode} />
             <PushHealthCard data={data.pushHealth} kiosk={kioskMode} />
           </div>
