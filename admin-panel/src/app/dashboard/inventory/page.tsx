@@ -976,8 +976,20 @@ function AddProductsModal({
                                         )}
                                         <div className="flex-1 min-w-0">
                                             <div className="text-sm text-zinc-200 truncate">{product.name}</div>
-                                            <div className="text-xs text-zinc-500">
-                                                €{Number(product.price).toFixed(2)}
+                                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                                <span className="text-xs text-zinc-400">
+                                                    Base <span className="text-zinc-200">€{Number(product.price).toFixed(2)}</span>
+                                                </span>
+                                                {product.markupPrice != null && (
+                                                    <span className="text-xs text-amber-500/80">
+                                                        +markup €{Number(product.markupPrice).toFixed(2)}
+                                                    </span>
+                                                )}
+                                                {product.nightMarkedupPrice != null && (
+                                                    <span className="text-xs text-indigo-400/80">
+                                                        🌙 €{Number(product.nightMarkedupPrice).toFixed(2)}
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                         <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${

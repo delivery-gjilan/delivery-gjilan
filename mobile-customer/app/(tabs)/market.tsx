@@ -416,11 +416,10 @@ export default function Market() {
     const searchResults = useMemo(() => {
         if (!searchQuery.trim()) return [];
         const q = searchQuery.toLowerCase().trim();
-        const source = isDiscover ? allProducts : activeCategoryProducts;
-        return source.filter(
+        return allProducts.filter(
             (p: any) => p.name?.toLowerCase().includes(q) || (p.product?.description ?? '').toLowerCase().includes(q),
         );
-    }, [allProducts, activeCategoryProducts, searchQuery, isDiscover]);
+    }, [allProducts, searchQuery]);
 
     const isSearching = searchQuery.trim().length > 0;
 
