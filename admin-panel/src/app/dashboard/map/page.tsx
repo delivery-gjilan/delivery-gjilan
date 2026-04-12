@@ -3232,6 +3232,11 @@ function BottomDetailPanel({
               💰 Over €20
             </div>
           )}
+          {(order as any).inventoryPrice != null && Number((order as any).inventoryPrice) > 0 && (
+            <div className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/30 text-violet-300 text-xs font-semibold">
+              📦 Stock items — €{Number((order as any).inventoryPrice).toFixed(2)} from inventory
+            </div>
+          )}
           {(order as any).needsApproval && (
             <div className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold">
               ⚠ Awaiting approval

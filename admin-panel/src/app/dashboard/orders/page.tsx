@@ -91,6 +91,7 @@ interface Order {
     adminNote?: string | null;
     needsApproval?: boolean | null;
     locationFlagged?: boolean | null;
+    inventoryPrice?: number | null;
     approvalReasons?: ApprovalReason[] | null;
     orderPromotions?: {
         id: string;
@@ -869,6 +870,14 @@ export default function OrdersPage() {
                                             <div className="mb-3 flex items-center gap-2 bg-orange-500/10 border border-orange-500/30 rounded-lg px-3 py-2">
                                                 <MapPin size={13} className="text-orange-400 flex-shrink-0" />
                                                 <span className="text-orange-400 text-xs font-semibold">Outside delivery zone</span>
+                                            </div>
+                                        )}
+
+                                        {/* Inventory coverage badge */}
+                                        {order.inventoryPrice != null && order.inventoryPrice > 0 && (
+                                            <div className="mb-3 flex items-center gap-2 bg-violet-500/10 border border-violet-500/30 rounded-lg px-3 py-2">
+                                                <Package size={13} className="text-violet-400 flex-shrink-0" />
+                                                <span className="text-violet-300 text-xs font-semibold">📦 Stock items — €{Number(order.inventoryPrice).toFixed(2)} from your inventory</span>
                                             </div>
                                         )}
 

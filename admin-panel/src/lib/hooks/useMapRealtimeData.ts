@@ -10,6 +10,7 @@ import {
     GetOrdersDocument,
 } from '@/gql/graphql';
 import { playNewOrderAlert } from '@/lib/audio/orderAlert';
+import { toast } from 'sonner';
 
 const SUBSCRIPTION_REFETCH_COOLDOWN_MS = 1500;
 const DRIVER_POLL_MS = 30000; // polling is a fallback only; subscription is primary
@@ -145,6 +146,15 @@ export function useMapRealtimeData() {
 
                 if (shouldAlert) {
                     void playNewOrderAlert();
+                    const inventoryOrders = newActiveOrders.filter((o: any) =>
+                        o.inventoryPrice != null && Number(o.inventoryPrice) > 0
+                    );
+                    if (inventoryOrders.length > 0) {
+                        toast('📦 Stock order incoming', {
+                            description: `${inventoryOrders.length} order${inventoryOrders.length > 1 ? 's' : ''} use${inventoryOrders.length > 1 ? '' : 's'} your inventory — check Fulfillment Guide`,
+                            duration: 8000,
+                        });
+                    }
                 }
 
                 setRealtimeHealth((prev) => ({ ...prev, orderLastSubAtMs: Date.now() }));

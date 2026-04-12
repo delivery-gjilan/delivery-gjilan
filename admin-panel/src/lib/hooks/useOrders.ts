@@ -11,6 +11,7 @@ import {
 } from '@/graphql/operations/orders';
 import { ALL_ORDERS_SUBSCRIPTION } from '@/graphql/operations/orders/subscriptions';
 import { playNewOrderAlert } from '@/lib/audio/orderAlert';
+import { toast } from 'sonner';
 
 export interface UseOrdersResult {
     orders: any[];
@@ -170,6 +171,15 @@ export function useOrders(options: UseOrdersOptions = {}): UseOrdersResult {
 
             if (shouldAlert) {
                 void playNewOrderAlert();
+                const inventoryOrders = newActiveOrders.filter((o: any) =>
+                    o.inventoryPrice != null && Number(o.inventoryPrice) > 0
+                );
+                if (inventoryOrders.length > 0) {
+                    toast('📦 Stock order incoming', {
+                        description: `${inventoryOrders.length} order${inventoryOrders.length > 1 ? 's' : ''} use${inventoryOrders.length > 1 ? '' : 's'} your inventory — check Fulfillment Guide`,
+                        duration: 8000,
+                    });
+                }
             }
 
             apolloClient.cache.updateQuery({ query: GET_ORDERS, variables }, (existing: any) => {

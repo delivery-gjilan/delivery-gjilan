@@ -981,9 +981,15 @@ function AddProductsModal({
                                                     Base <span className="text-zinc-200">€{Number(product.price).toFixed(2)}</span>
                                                 </span>
                                                 {product.markupPrice != null && (
-                                                    <span className="text-xs text-amber-500/80">
-                                                        +markup €{Number(product.markupPrice).toFixed(2)}
-                                                    </span>
+                                                    <>
+                                                        <span className="text-zinc-700">·</span>
+                                                        <span className="text-xs text-zinc-500">
+                                                            Biz <span className="text-zinc-300">€{(Number(product.price) - Number(product.markupPrice)).toFixed(2)}</span>
+                                                        </span>
+                                                        <span className="text-xs text-amber-500/80">
+                                                            +markup €{Number(product.markupPrice).toFixed(2)}
+                                                        </span>
+                                                    </>
                                                 )}
                                                 {product.nightMarkedupPrice != null && (
                                                     <span className="text-xs text-indigo-400/80">
