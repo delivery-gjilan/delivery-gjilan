@@ -171,6 +171,28 @@ extend type Query {
         startDate: Date
         endDate: Date
     ): [SettlementBreakdownItem!]!
+    """Daily receivable earnings trend for the platform."""
+    earningsTrend(
+        type: SettlementType
+        businessId: ID
+        driverId: ID
+        startDate: Date!
+        endDate: Date!
+    ): [EarningsTrendPoint!]!
+}
+
+"""Single data point in the platform earnings trend."""
+type EarningsTrendPoint {
+    """Date bucket (YYYY-MM-DD)."""
+    date: String!
+    """Total receivable amount on this date."""
+    receivable: Float!
+    """Total payable amount on this date."""
+    payable: Float!
+    """Net earnings (receivable - payable)."""
+    net: Float!
+    """Number of settlements on this date."""
+    count: Int!
 }
 
 type Mutation {

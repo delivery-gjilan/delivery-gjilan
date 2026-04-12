@@ -31,6 +31,7 @@
 | BL3 | [BUSINESS_LOGIC/CART_ACTIVE_ORDER_FLOW_RECOMMENDATIONS.md](BUSINESS_LOGIC/CART_ACTIVE_ORDER_FLOW_RECOMMENDATIONS.md) | Business Logic | Cart store, subscription lifecycle, race conditions |
 | BL4 | [BUSINESS_LOGIC/PERSONAL_INVENTORY_COVERAGE.md](BUSINESS_LOGIC/PERSONAL_INVENTORY_COVERAGE.md) | Business Logic | ⚠️ **Superseded by FF1** — see FUTURE_FEATURES/PERSONAL_INVENTORY_COVERAGE.md |
 | BL5 | [BANNER_MANAGEMENT.md](BANNER_MANAGEMENT.md) | Business Logic | Banner system: multi-media support, business/product/promotion targeting, scheduling, display contexts, admin panel UI |
+| BL6 | [SETTLEMENT_KINDS.md](SETTLEMENT_KINDS.md) | Business Logic | All 8 settlement categories, rule scoping/priority, payment method impact, when settlements are created |
 | FF1 | [FUTURE_FEATURES/PERSONAL_INVENTORY_COVERAGE.md](FUTURE_FEATURES/PERSONAL_INVENTORY_COVERAGE.md) | Future Feature | Personal stock tracking, order coverage split, margin optimisation |
 | FF2 | [FUTURE_FEATURES/BUSINESS_DISPATCH.md](FUTURE_FEATURES/BUSINESS_DISPATCH.md) | Future Feature | Business-initiated driver dispatch, internal delivery runs |
 | FF3 | [FUTURE_FEATURES/CUSTOM_NAVIGATION.md](FUTURE_FEATURES/CUSTOM_NAVIGATION.md) | Future Feature | Migrating from `@badatgil/expo-mapbox-navigation` SDK to custom `@rnmapbox/maps` navigation — cost driver, unused hook inventory, step-by-step migration plan |

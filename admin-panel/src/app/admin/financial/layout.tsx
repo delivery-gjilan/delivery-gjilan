@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { DollarSign, Scale } from 'lucide-react';
+import { DollarSign, Scale, BarChart3 } from 'lucide-react';
 
 const tabs = [
   { name: 'Settlements', href: '/admin/financial/settlements', icon: DollarSign },
   { name: 'Settlement Rules', href: '/admin/financial/rules', icon: Scale },
+  { name: 'Platform Earnings', href: '/admin/financial/earnings', icon: BarChart3 },
 ];
 
 export default function FinancialLayout({

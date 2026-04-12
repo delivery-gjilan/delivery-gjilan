@@ -905,6 +905,24 @@ input DriverRegisterInput {
   phoneNumber: String
 }
 
+"""Single data point in the platform earnings trend."""
+type EarningsTrendPoint {
+  """Number of settlements on this date."""
+  count: Int!
+
+  """Date bucket (YYYY-MM-DD)."""
+  date: String!
+
+  """Net earnings (receivable - payable)."""
+  net: Float!
+
+  """Total payable amount on this date."""
+  payable: Float!
+
+  """Total receivable amount on this date."""
+  receivable: Float!
+}
+
 enum EntityType {
   BUSINESS
   CATEGORY
@@ -1735,6 +1753,9 @@ type Query {
   driverMessages(driverId: ID!, limit: Int, offset: Int): [DriverMessage!]!
   driverOrderFinancials(orderId: ID!): DriverOrderFinancials
   drivers: [User!]!
+
+  """Daily receivable earnings trend for the platform."""
+  earningsTrend(businessId: ID, driverId: ID, endDate: Date!, startDate: Date!, type: SettlementType): [EarningsTrendPoint!]!
   featuredBusinesses: [Business!]!
   getActiveBanners(displayContext: BannerDisplayContext): [Banner!]!
   getActiveGlobalPromotions: [Promotion!]!

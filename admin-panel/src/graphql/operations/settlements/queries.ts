@@ -364,3 +364,53 @@ export const GET_SETTLEMENT_PAYMENTS = graphql(`
         }
     }
 `);
+
+export const GET_SETTLEMENT_BREAKDOWN = graphql(`
+    query GetSettlementBreakdown(
+        $type: SettlementType
+        $businessId: ID
+        $driverId: ID
+        $isSettled: Boolean
+        $startDate: Date
+        $endDate: Date
+    ) {
+        settlementBreakdown(
+            type: $type
+            businessId: $businessId
+            driverId: $driverId
+            isSettled: $isSettled
+            startDate: $startDate
+            endDate: $endDate
+        ) {
+            category
+            label
+            totalAmount
+            count
+            direction
+        }
+    }
+`);
+
+export const GET_EARNINGS_TREND = graphql(`
+    query GetEarningsTrend(
+        $type: SettlementType
+        $businessId: ID
+        $driverId: ID
+        $startDate: Date!
+        $endDate: Date!
+    ) {
+        earningsTrend(
+            type: $type
+            businessId: $businessId
+            driverId: $driverId
+            startDate: $startDate
+            endDate: $endDate
+        ) {
+            date
+            receivable
+            payable
+            net
+            count
+        }
+    }
+`);

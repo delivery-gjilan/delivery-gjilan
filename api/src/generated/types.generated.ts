@@ -906,6 +906,21 @@ export type DriverRegisterInput = {
   phoneNumber?: InputMaybe<Scalars['String']['input']>;
 };
 
+/** Single data point in the platform earnings trend. */
+export type EarningsTrendPoint = {
+  __typename?: 'EarningsTrendPoint';
+  /** Number of settlements on this date. */
+  count: Scalars['Int']['output'];
+  /** Date bucket (YYYY-MM-DD). */
+  date: Scalars['String']['output'];
+  /** Net earnings (receivable - payable). */
+  net: Scalars['Float']['output'];
+  /** Total payable amount on this date. */
+  payable: Scalars['Float']['output'];
+  /** Total receivable amount on this date. */
+  receivable: Scalars['Float']['output'];
+};
+
 export type EntityType =
   | 'BUSINESS'
   | 'CATEGORY'
@@ -2422,6 +2437,8 @@ export type Query = {
   driverMessages: Array<DriverMessage>;
   driverOrderFinancials?: Maybe<DriverOrderFinancials>;
   drivers: Array<User>;
+  /** Daily receivable earnings trend for the platform. */
+  earningsTrend: Array<EarningsTrendPoint>;
   featuredBusinesses: Array<Business>;
   getActiveBanners: Array<Banner>;
   getActiveGlobalPromotions: Array<Promotion>;
@@ -2592,6 +2609,15 @@ export type QuerydriverMessagesArgs = {
 
 export type QuerydriverOrderFinancialsArgs = {
   orderId: Scalars['ID']['input'];
+};
+
+
+export type QueryearningsTrendArgs = {
+  businessId?: InputMaybe<Scalars['ID']['input']>;
+  driverId?: InputMaybe<Scalars['ID']['input']>;
+  endDate: Scalars['Date']['input'];
+  startDate: Scalars['Date']['input'];
+  type?: InputMaybe<SettlementType>;
 };
 
 
@@ -3699,6 +3725,7 @@ export type ResolversTypes = {
   DriverPttSignal: ResolverTypeWrapper<Omit<DriverPttSignal, 'action'> & { action: ResolversTypes['DriverPttSignalAction'] }>;
   DriverPttSignalAction: ResolverTypeWrapper<'STARTED' | 'STOPPED' | 'MUTE' | 'UNMUTE'>;
   DriverRegisterInput: DriverRegisterInput;
+  EarningsTrendPoint: ResolverTypeWrapper<EarningsTrendPoint>;
   EntityType: ResolverTypeWrapper<'USER' | 'BUSINESS' | 'PRODUCT' | 'ORDER' | 'SETTLEMENT' | 'DRIVER' | 'CATEGORY' | 'SUBCATEGORY' | 'DELIVERY_ZONE'>;
   GetBannersFilter: GetBannersFilter;
   HourlyDistribution: ResolverTypeWrapper<HourlyDistribution>;
@@ -3899,6 +3926,7 @@ export type ResolversParentTypes = {
   DriverOrderFinancials: DriverOrderFinancials;
   DriverPttSignal: DriverPttSignal;
   DriverRegisterInput: DriverRegisterInput;
+  EarningsTrendPoint: EarningsTrendPoint;
   GetBannersFilter: GetBannersFilter;
   HourlyDistribution: HourlyDistribution;
   InitiateSignupInput: InitiateSignupInput;
@@ -4465,6 +4493,15 @@ export type DriverPttSignalResolvers<ContextType = GraphQLContext, ParentType ex
 };
 
 export type DriverPttSignalActionResolvers = EnumResolverSignature<{ MUTE?: any, STARTED?: any, STOPPED?: any, UNMUTE?: any }, ResolversTypes['DriverPttSignalAction']>;
+
+export type EarningsTrendPointResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['EarningsTrendPoint'] = ResolversParentTypes['EarningsTrendPoint']> = {
+  count?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  date?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  net?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  payable?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  receivable?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
 
 export type EntityTypeResolvers = EnumResolverSignature<{ BUSINESS?: any, CATEGORY?: any, DELIVERY_ZONE?: any, DRIVER?: any, ORDER?: any, PRODUCT?: any, SETTLEMENT?: any, SUBCATEGORY?: any, USER?: any }, ResolversTypes['EntityType']>;
 
@@ -5133,6 +5170,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   driverMessages?: Resolver<Array<ResolversTypes['DriverMessage']>, ParentType, ContextType, RequireFields<QuerydriverMessagesArgs, 'driverId'>>;
   driverOrderFinancials?: Resolver<Maybe<ResolversTypes['DriverOrderFinancials']>, ParentType, ContextType, RequireFields<QuerydriverOrderFinancialsArgs, 'orderId'>>;
   drivers?: Resolver<Array<ResolversTypes['User']>, ParentType, ContextType>;
+  earningsTrend?: Resolver<Array<ResolversTypes['EarningsTrendPoint']>, ParentType, ContextType, RequireFields<QueryearningsTrendArgs, 'endDate' | 'startDate'>>;
   featuredBusinesses?: Resolver<Array<ResolversTypes['Business']>, ParentType, ContextType>;
   getActiveBanners?: Resolver<Array<ResolversTypes['Banner']>, ParentType, ContextType, Partial<QuerygetActiveBannersArgs>>;
   getActiveGlobalPromotions?: Resolver<Array<ResolversTypes['Promotion']>, ParentType, ContextType>;
@@ -5556,6 +5594,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   DriverOrderFinancials?: DriverOrderFinancialsResolvers<ContextType>;
   DriverPttSignal?: DriverPttSignalResolvers<ContextType>;
   DriverPttSignalAction?: DriverPttSignalActionResolvers;
+  EarningsTrendPoint?: EarningsTrendPointResolvers<ContextType>;
   EntityType?: EntityTypeResolvers;
   HourlyDistribution?: HourlyDistributionResolvers<ContextType>;
   InventoryCoverageStatus?: InventoryCoverageStatusResolvers;
