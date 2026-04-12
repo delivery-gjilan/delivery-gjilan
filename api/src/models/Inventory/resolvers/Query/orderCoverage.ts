@@ -6,7 +6,7 @@ import { orders } from '@/database/schema/orders';
 import { products } from '@/database/schema/products';
 import { storeSettings } from '@/database/schema/storeSettings';
 import { orderCoverageLogs } from '@/database/schema/orderCoverageLogs';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 
 export const orderCoverage: NonNullable<QueryResolvers['orderCoverage']> = async (
@@ -51,6 +51,82 @@ export const orderCoverage: NonNullable<QueryResolvers['orderCoverage']> = async
         .select()
         .from(orderCoverageLogs)
         .where(eq(orderCoverageLogs.orderId, orderId));
+
+    // If we already have logs, use them as the source of truth (don't re-derive from current inventory)
+    if (existingLogs.length > 0) {
+        // Get product info for items in this order
+        const itemRows = await db
+            .select({
+                productId: orderItems.productId,
+                productName: products.name,
+                productImageUrl: products.imageUrl,
+            })
+            .from(orderItems)
+            .innerJoin(products, eq(orderItems.productId, products.id))
+            .where(eq(orderItems.orderId, orderId));
+
+        const productInfoMap = new Map<string, { productName: string; productImageUrl: string | null }>();
+        for (const row of itemRows) {
+            if (!productInfoMap.has(row.productId)) {
+                productInfoMap.set(row.productId, { productName: row.productName, productImageUrl: row.productImageUrl });
+            }
+        }
+
+        const coverageItems: any[] = [];
+        let fullyOwnedCount = 0;
+        let partiallyOwnedCount = 0;
+        let marketOnlyCount = 0;
+
+        // Aggregate logs by productId (same product can appear multiple times for different options)
+        const logAgg = new Map<string, { fromStock: number; fromMarket: number; deducted: boolean }>();
+        for (const log of existingLogs) {
+            const existing = logAgg.get(log.productId);
+            if (existing) {
+                existing.fromStock += log.fromStock;
+                existing.fromMarket += log.fromMarket;
+                existing.deducted = existing.deducted && log.deducted;
+            } else {
+                logAgg.set(log.productId, { fromStock: log.fromStock, fromMarket: log.fromMarket, deducted: log.deducted });
+            }
+        }
+
+        for (const [productId, agg] of logAgg) {
+            const { fromStock, fromMarket, deducted } = agg;
+            const orderedQty = fromStock + fromMarket;
+            let status: string;
+            if (fromStock > 0 && fromMarket === 0) { status = 'FULLY_OWNED'; fullyOwnedCount++; }
+            else if (fromStock > 0 && fromMarket > 0) { status = 'PARTIALLY_OWNED'; partiallyOwnedCount++; }
+            else { status = 'MARKET_ONLY'; marketOnlyCount++; }
+
+            const info = productInfoMap.get(productId);
+            coverageItems.push({
+                productId,
+                productName: info?.productName ?? productId,
+                productImageUrl: info?.productImageUrl ?? null,
+                orderedQty,
+                fromStock,
+                fromMarket,
+                status,
+                deducted,
+            });
+        }
+
+        const allDeducted = existingLogs.every((l) => l.deducted);
+
+        return {
+            orderId,
+            items: coverageItems,
+            totalItems: coverageItems.length,
+            fullyOwnedCount,
+            partiallyOwnedCount,
+            marketOnlyCount,
+            allFromStock: marketOnlyCount === 0 && partiallyOwnedCount === 0,
+            allFromMarket: fullyOwnedCount === 0 && partiallyOwnedCount === 0,
+            deducted: allDeducted,
+        };
+    }
+
+    // No logs yet — fall back to computing from current inventory
 
     // Get order items with product info
     const items = await db

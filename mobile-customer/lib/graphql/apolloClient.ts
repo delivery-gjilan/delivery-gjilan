@@ -144,6 +144,7 @@ const wsUrl = httpUrl ? httpUrl.replace(/^http/, 'ws') : '';
 // Exponential backoff for reconnection: 1s -> 2s -> 5s -> 10s
 const RECONNECT_DELAYS = [1000, 2000, 5000, 10000];
 let reconnectAttempts = 0;
+let hasConnectedBefore = false;
 const wsReconnectListeners = new Set<() => void>();
 let activeWsSocket: { close: (code?: number, reason?: string) => void } | null = null;
 
@@ -187,8 +188,8 @@ const wsLink = wsUrl
                   connected: (socket) => {
                       activeWsSocket = socket as typeof activeWsSocket;
                       console.log('[WS] Connected');
-                      if (reconnectAttempts > 0) {
-                          console.log(`[WS] Reconnected after ${reconnectAttempts} attempts`);
+                      if (hasConnectedBefore) {
+                          console.log(`[WS] Reconnected after ${reconnectAttempts} attempt(s)`);
                           toast.success('Connected', 'Real-time updates restored.');
                           wsReconnectListeners.forEach((listener) => {
                               try {
@@ -198,6 +199,7 @@ const wsLink = wsUrl
                               }
                           });
                       }
+                      hasConnectedBefore = true;
                       reconnectAttempts = 0;
                   },
                   closed: (event) => {

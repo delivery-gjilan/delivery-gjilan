@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import { useAuthStore } from '@/store/authStore';
 import { useOrders } from '../modules/orders/hooks/useOrders';
 import { useOrdersSubscription } from '../modules/orders/hooks/useOrdersSubscription';
@@ -35,6 +36,24 @@ export function useActiveOrdersTracking() {
         if (isAuthenticated) {
             refetch();
         }
+    }, [isAuthenticated, refetch]);
+
+    // Refetch orders when app returns to foreground (covers network-drop scenarios
+    // where the subscription missed a DELIVERED/CANCELLED transition).
+    const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+    useEffect(() => {
+        if (!isAuthenticated) return;
+
+        const subscription = AppState.addEventListener('change', (nextState) => {
+            const previous = appStateRef.current;
+            appStateRef.current = nextState;
+
+            if (previous.match(/inactive|background/) && nextState === 'active') {
+                refetch();
+            }
+        });
+
+        return () => subscription.remove();
     }, [isAuthenticated, refetch]);
 
     // Trigger post-delivery review prompt globally (dashboard/home included).
