@@ -23,6 +23,7 @@ type Business {
     minOrderAmount: Float!
     isFeatured: Boolean!
     featuredSortOrder: Int!
+    category: String
     isOpen: Boolean!
     ratingAverage: Float!
     ratingCount: Int!
@@ -64,6 +65,7 @@ input CreateBusinessInput {
     phoneNumber: String
     imageUrl: String
     businessType: BusinessType!
+    category: String
     location: LocationInput!
     workingHours: WorkingHoursInput!
     avgPrepTimeMinutes: Int
@@ -94,6 +96,7 @@ input UpdateBusinessInput {
     phoneNumber: String
     imageUrl: String
     businessType: BusinessType
+    category: String
     location: LocationInput
     workingHours: WorkingHoursInput
     isActive: Boolean

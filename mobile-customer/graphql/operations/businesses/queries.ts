@@ -31,6 +31,7 @@ export const GET_BUSINESSES = gql`
             isOpen
             ratingAverage
             ratingCount
+            category
             activePromotion {
                 id
                 name

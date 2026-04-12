@@ -109,13 +109,14 @@ export function MarketProductCard({ product, businessType, onPress }: MarketProd
                             className="px-3 py-1.5 rounded-full"
                             style={{ 
                                 borderWidth: 1, 
-                                borderColor: isSoldOut ? theme.colors.subtext : theme.colors.border,
+                                borderColor: isSoldOut ? theme.colors.subtext : '#7C3AED60',
+                                backgroundColor: isSoldOut ? 'transparent' : '#7C3AED18',
                                 opacity: isSoldOut ? 0.5 : 1
                             }}
                             activeOpacity={isSoldOut ? 1 : 0.8}
                             disabled={isSoldOut}
                         >
-                            <Text className="text-xs font-semibold" style={{ color: isSoldOut ? theme.colors.subtext : theme.colors.text }}>
+                            <Text className="text-xs font-semibold" style={{ color: isSoldOut ? theme.colors.subtext : '#A78BFA' }}>
                                 Shto
                             </Text>
                         </TouchableOpacity>

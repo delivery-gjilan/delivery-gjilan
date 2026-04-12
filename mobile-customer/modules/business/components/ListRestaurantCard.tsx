@@ -49,6 +49,7 @@ interface ListRestaurantCardProps {
     priceRange?: string;
     distance?: number; // in km
     isSponsored?: boolean;
+    category?: string | null;
     activePromotion?: {
         id: string;
         name: string;
@@ -73,6 +74,7 @@ export const ListRestaurantCard = React.memo(function ListRestaurantCard({
     priceRange = '€€',
     distance = 1.3,
     isSponsored,
+    category,
     activePromotion,
 }: ListRestaurantCardProps) {
     const theme = useTheme();
@@ -308,6 +310,21 @@ export const ListRestaurantCard = React.memo(function ListRestaurantCard({
                     <Text style={{ color: theme.colors.subtext, fontSize: 12, fontWeight: '500', marginLeft: 2 }}>
                         {priceRange}
                     </Text>
+
+                    {category && (
+                        <View
+                            style={{
+                                backgroundColor: theme.colors.primary + '18',
+                                paddingHorizontal: 9,
+                                paddingVertical: 5,
+                                borderRadius: 10,
+                            }}
+                        >
+                            <Text style={{ color: theme.colors.primary, fontSize: 12, fontWeight: '600' }}>
+                                {category}
+                            </Text>
+                        </View>
+                    )}
                 </View>
             </View>
         </TouchableOpacity>
