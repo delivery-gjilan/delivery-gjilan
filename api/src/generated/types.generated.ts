@@ -2690,8 +2690,10 @@ export type QueryorderCoverageArgs = {
 
 
 export type QueryordersArgs = {
+  endDate?: InputMaybe<Scalars['String']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
+  startDate?: InputMaybe<Scalars['String']['input']>;
   statuses?: InputMaybe<Array<OrderStatus>>;
 };
 

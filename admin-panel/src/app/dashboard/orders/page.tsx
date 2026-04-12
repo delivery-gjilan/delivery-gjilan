@@ -13,7 +13,7 @@ import { ASSIGN_DRIVER_TO_ORDER, CREATE_TEST_ORDER, START_PREPARING, UPDATE_PREP
 import { GRANT_FREE_DELIVERY } from "@/graphql/operations/promotions/mutations";
 import { UPDATE_USER_NOTE_MUTATION } from "@/graphql/operations/users/mutations";
 import { DRIVERS_QUERY } from "@/graphql/operations/users/queries";
-import { Package, Store, Search, ArrowRight, MapPin, User, Plus, ChefHat, Timer, Copy, Check, Phone, Hash, MessageSquare } from "lucide-react";
+import { Package, Store, Search, ArrowRight, MapPin, User, Plus, ChefHat, Timer, Copy, Check, Phone, Hash, MessageSquare, Calendar, Clock, Truck, CreditCard, Tag, X } from "lucide-react";
 import { toast } from 'sonner';
 
 /* ---------------------------------------------------------
@@ -90,6 +90,13 @@ interface Order {
     needsApproval?: boolean | null;
     locationFlagged?: boolean | null;
     approvalReasons?: ApprovalReason[] | null;
+    orderPromotions?: {
+        id: string;
+        promotionId: string;
+        appliesTo: string;
+        discountAmount: number;
+        promoCode?: string | null;
+    }[] | null;
 }
 
 const TRUSTED_CUSTOMER_MARKER = "[TRUSTED_CUSTOMER]";
@@ -287,11 +294,15 @@ const COMPLETED_PAGE_SIZE = 50;
 export default function OrdersPage() {
     const [ordersPage, setOrdersPage] = useState(0);
     const [completedPage, setCompletedPage] = useState(0);
+    const [completedStartDate, setCompletedStartDate] = useState<string>("");
+    const [completedEndDate, setCompletedEndDate] = useState<string>("");
     const { orders, totalCount, hasMore, loading } = useOrders({ limit: ORDERS_PAGE_SIZE, offset: ordersPage * ORDERS_PAGE_SIZE });
     const { orders: completedOrdersRaw, totalCount: completedTotalCount, hasMore: completedHasMore, loading: completedLoading } = useOrders({
         limit: COMPLETED_PAGE_SIZE,
         offset: completedPage * COMPLETED_PAGE_SIZE,
         statuses: ['DELIVERED', 'CANCELLED'],
+        startDate: completedStartDate ? new Date(completedStartDate + "T00:00:00").toISOString() : undefined,
+        endDate: completedEndDate ? new Date(completedEndDate + "T23:59:59.999").toISOString() : undefined,
     });
     const { update: updateStatus, loading: updateLoading } = useUpdateOrderStatus();
     const { admin } = useAuth();
@@ -1033,6 +1044,56 @@ export default function OrdersPage() {
                         </div>
                     </div>
 
+                    {/* Date range filters */}
+                    <div className="flex items-center gap-3 mb-4 bg-[#0d0d0f] border border-zinc-800 rounded-xl px-4 py-3">
+                        <Calendar size={14} className="text-zinc-500 flex-shrink-0" />
+                        <div className="flex items-center gap-2">
+                            <label className="text-xs text-zinc-500">From</label>
+                            <input
+                                type="date"
+                                value={completedStartDate}
+                                onChange={(e) => { setCompletedStartDate(e.target.value); setCompletedPage(0); }}
+                                className="bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-violet-500/50 [color-scheme:dark]"
+                            />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <label className="text-xs text-zinc-500">To</label>
+                            <input
+                                type="date"
+                                value={completedEndDate}
+                                onChange={(e) => { setCompletedEndDate(e.target.value); setCompletedPage(0); }}
+                                className="bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-violet-500/50 [color-scheme:dark]"
+                            />
+                        </div>
+
+                        {/* Quick presets */}
+                        <div className="h-5 w-px bg-zinc-700" />
+                        {[
+                            { label: "Today", fn: () => { const d = new Date().toISOString().split("T")[0]; setCompletedStartDate(d); setCompletedEndDate(d); setCompletedPage(0); } },
+                            { label: "Yesterday", fn: () => { const d = new Date(Date.now() - 86400000).toISOString().split("T")[0]; setCompletedStartDate(d); setCompletedEndDate(d); setCompletedPage(0); } },
+                            { label: "Last 7d", fn: () => { setCompletedStartDate(new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0]); setCompletedEndDate(new Date().toISOString().split("T")[0]); setCompletedPage(0); } },
+                            { label: "This Month", fn: () => { const n = new Date(); setCompletedStartDate(new Date(n.getFullYear(), n.getMonth(), 1).toISOString().split("T")[0]); setCompletedEndDate(n.toISOString().split("T")[0]); setCompletedPage(0); } },
+                        ].map((preset) => (
+                            <button
+                                key={preset.label}
+                                onClick={preset.fn}
+                                className="px-2.5 py-1 rounded-md text-xs text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors border border-transparent hover:border-zinc-700"
+                            >
+                                {preset.label}
+                            </button>
+                        ))}
+
+                        {(completedStartDate || completedEndDate) && (
+                            <button
+                                onClick={() => { setCompletedStartDate(""); setCompletedEndDate(""); setCompletedPage(0); }}
+                                className="ml-auto flex items-center gap-1 px-2 py-1 rounded-md text-xs text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                            >
+                                <X size={12} />
+                                Clear
+                            </button>
+                        )}
+                    </div>
+
                     <div className="overflow-x-auto rounded-xl border border-zinc-800 bg-[#0d0d0f]">
                         <table className="w-full text-sm">
                             <thead className="bg-zinc-900/70 border-b border-zinc-800">
@@ -1226,293 +1287,346 @@ export default function OrdersPage() {
 
             {/* ════════════════ ORDER DETAILS MODAL ════════════════ */}
             <Modal isOpen={detailsOpen} onClose={() => setDetailsOpen(false)} title="Order Details">
-                {selectedOrder && (
-                    <div className="space-y-5">
-                        {/* Header */}
-                        <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-2">
-                                    <span className="font-mono text-lg font-bold text-white">{selectedOrder.displayId}</span>
-                                </div>
-                                <div className="text-xs text-zinc-500">
-                                    {new Date(selectedOrder.orderDate).toLocaleString()}
+                {selectedOrder && (() => {
+                    const isCompleted = selectedOrder.status === 'DELIVERED' || selectedOrder.status === 'CANCELLED';
+                    const businessList = getOrderBusinessesSafe(selectedOrder);
+                    const totalItems = businessList.reduce((s, biz) => s + getBusinessItemsSafe(biz).reduce((ss, item) => ss + (item.quantity || 1), 0), 0);
+                    const preview = !isBusinessUser ? (selectedOrder as any).settlementPreview : null;
+                    const marginSeverity = preview ? getMarginSeverity(preview.netMargin) : null;
+
+                    return (
+                        <div className="space-y-5">
+                            {/* ── Header: ID + status + time ── */}
+                            <div className="flex items-start justify-between pb-4 border-b border-zinc-800">
+                                <div className="space-y-1.5">
+                                    <div className="flex items-center gap-3">
+                                        <span className="font-mono text-lg font-bold text-white">{selectedOrder.displayId}</span>
+                                        <StatusBadge status={selectedOrder.status} />
+                                    </div>
+                                    <div className="flex items-center gap-3 text-xs text-zinc-500">
+                                        <span className="flex items-center gap-1">
+                                            <Calendar size={11} />
+                                            {new Date(selectedOrder.orderDate).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}
+                                        </span>
+                                        <span className="flex items-center gap-1">
+                                            <Clock size={11} />
+                                            {new Date(selectedOrder.orderDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                        </span>
+                                        <span className="text-zinc-700">·</span>
+                                        <span>{totalItems} item{totalItems !== 1 ? "s" : ""}</span>
+                                    </div>
                                 </div>
                             </div>
-                            <StatusBadge status={selectedOrder.status} />
-                        </div>
 
-                        {/* Customer + Driver grid */}
-                        <div className="grid grid-cols-2 gap-3">
-                            {selectedOrder.user && (
-                                <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-3">
-                                    <div className="text-[10px] text-zinc-600 uppercase tracking-wider mb-1.5">Customer</div>
-                                    <div className="text-white text-sm font-medium">
-                                        {selectedOrder.user.firstName} {selectedOrder.user.lastName}
-                                    </div>
-                                    <div className="text-zinc-500 text-xs mt-0.5">{selectedOrder.user.email}</div>
-                                    {typeof selectedOrder.user.totalOrders === 'number' && (
-                                        <div className="text-zinc-500 text-xs mt-0.5">{selectedOrder.user.totalOrders} total orders</div>
-                                    )}
-                                    {selectedOrder.user.phoneNumber && (
-                                        <div className="flex items-center gap-1.5 mt-1.5">
-                                            <Phone size={11} className="text-zinc-600" />
-                                            <span className="text-zinc-400 text-xs">{selectedOrder.user.phoneNumber}</span>
+                            {/* ── Customer + Driver row ── */}
+                            <div className="grid grid-cols-2 gap-3">
+                                {selectedOrder.user && (
+                                    <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-3">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <User size={13} className="text-zinc-500" />
+                                            <span className="text-[10px] text-zinc-600 uppercase tracking-wider font-medium">Customer</span>
                                         </div>
-                                    )}
-                                    <div className="mt-2 flex items-center gap-2">
-                                        {isTrustedCustomer(selectedOrder.user) && (
-                                            <span className="inline-flex items-center rounded-full bg-emerald-500/15 border border-emerald-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
-                                                Trusted customer
-                                            </span>
-                                        )}
-                                        {isAdmin && (
-                                            <button
-                                                type="button"
-                                                disabled={trustUpdatingUserId === selectedOrder.user.id}
-                                                onClick={() => handleToggleTrustedCustomer(selectedOrder.user!, !isTrustedCustomer(selectedOrder.user))}
-                                                className="text-[11px] px-2 py-1 rounded-md border border-zinc-700 text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
-                                            >
-                                                {trustUpdatingUserId === selectedOrder.user.id
-                                                    ? 'Saving...'
-                                                    : isTrustedCustomer(selectedOrder.user)
-                                                        ? 'Untrust'
-                                                        : 'Mark trusted'}
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                            <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-3">
-                                <div className="text-[10px] text-zinc-600 uppercase tracking-wider mb-1.5">Driver</div>
-                                {selectedOrder.driver ? (
-                                    <>
                                         <div className="text-white text-sm font-medium">
-                                            {selectedOrder.driver.firstName} {selectedOrder.driver.lastName}
+                                            {selectedOrder.user.firstName} {selectedOrder.user.lastName}
                                         </div>
-                                        <div className="text-zinc-500 text-xs mt-0.5">{selectedOrder.driver.email}</div>
-                                    </>
-                                ) : (
-                                    <div className="text-zinc-600 text-sm">Not assigned</div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Cancellation info */}
-                        {selectedOrder.status === 'CANCELLED' && (selectedOrder.cancellationReason || selectedOrder.cancelledAt) && (
-                            <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3">
-                                <div className="text-[10px] text-red-400 uppercase tracking-wider mb-1.5 font-semibold">Cancellation</div>
-                                {selectedOrder.cancelledAt && (
-                                    <div className="text-xs text-zinc-500 mb-1">
-                                        {new Date(selectedOrder.cancelledAt).toLocaleString()}
-                                    </div>
-                                )}
-                                {selectedOrder.cancellationReason && (
-                                    <div className="text-sm text-red-200">{selectedOrder.cancellationReason}</div>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Delivery address */}
-                        <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-3">
-                            <div className="text-[10px] text-zinc-600 uppercase tracking-wider mb-1.5">Delivery Address</div>
-                            <div className="flex items-start gap-2">
-                                <MapPin size={14} className="text-zinc-500 mt-0.5 flex-shrink-0" />
-                                <span className="text-white text-sm">{selectedOrder.dropOffLocation.address}</span>
-                            </div>
-                        </div>
-
-                        {/* Driver Notes */}
-                        {selectedOrder.driverNotes && (
-                            <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-3">
-                                <div className="text-[10px] text-blue-400 uppercase tracking-wider mb-1.5 font-semibold">Delivery Instructions</div>
-                                <div className="flex items-start gap-2">
-                                    <MessageSquare size={14} className="text-blue-400 mt-0.5 flex-shrink-0" />
-                                    <span className="text-blue-200 text-sm">{selectedOrder.driverNotes}</span>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Needs approval */}
-                        {selectedOrder.needsApproval && (
-                            <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3">
-                                <div className="text-[10px] text-rose-400 uppercase tracking-wider mb-1.5 font-semibold">Awaiting Approval</div>
-                                <p className="text-rose-200 text-sm">This order requires manual approval. Call the customer to verify, then click Approve.</p>
-                                {deriveApprovalReasons(selectedOrder).length > 0 && (
-                                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                                        {deriveApprovalReasons(selectedOrder).includes('FIRST_ORDER') && (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-500/10 border border-blue-500/30 text-blue-200">First order</span>
+                                        <div className="text-zinc-500 text-xs mt-0.5">{selectedOrder.user.email}</div>
+                                        {typeof selectedOrder.user.totalOrders === 'number' && (
+                                            <div className="text-zinc-500 text-xs mt-0.5">{selectedOrder.user.totalOrders} total orders</div>
                                         )}
-                                        {deriveApprovalReasons(selectedOrder).includes('HIGH_VALUE') && (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 border border-amber-500/30 text-amber-200">Over €20</span>
+                                        {selectedOrder.user.phoneNumber && (
+                                            <div className="flex items-center gap-1.5 mt-1.5">
+                                                <Phone size={11} className="text-zinc-600" />
+                                                <span className="text-zinc-400 text-xs">{selectedOrder.user.phoneNumber}</span>
+                                            </div>
                                         )}
-                                        {deriveApprovalReasons(selectedOrder).includes('OUT_OF_ZONE') && (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-orange-500/10 border border-orange-500/30 text-orange-200">Outside delivery zone</span>
-                                        )}
-                                    </div>
-                                )}
-                                {isAdmin && (
-                                    <button
-                                        onClick={() => openApprovalModalForOrder(selectedOrder)}
-                                        className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border bg-green-500/10 text-green-400 border-green-500/30 hover:brightness-125 disabled:opacity-50"
-                                    >
-                                        ✓ Approve Order
-                                    </button>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Location flagged */}
-                        {selectedOrder.locationFlagged && (
-                            <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-3">
-                                <div className="text-[10px] text-orange-400 uppercase tracking-wider mb-1.5 font-semibold">Outside Delivery Zone</div>
-                                <p className="text-orange-200 text-sm">The drop-off location is outside all active delivery zones. Confirm with the customer before dispatching.</p>
-                            </div>
-                        )}
-
-                        {/* Items by business */}
-                        <div className="space-y-4">
-                            {getOrderBusinessesSafe(selectedOrder).map((biz, idx) => (
-                                <div key={idx} className="space-y-2">
-                                    <div className="flex items-center gap-2 px-1">
-                                        <Store size={14} className="text-violet-500" />
-                                        <span className="font-medium text-white text-sm">{biz.business.name}</span>
-                                        <span className="text-[10px] text-zinc-600 uppercase">{biz.business.businessType}</span>
-                                    </div>
-
-                                    <div className="overflow-hidden border border-zinc-800 rounded-lg">
-                                        <table className="w-full">
-                                            <thead>
-                                                <tr className="bg-[#09090b] border-b border-zinc-800">
-                                                    <th className="px-3 py-2 text-left text-[10px] font-medium text-zinc-500 uppercase tracking-wider">Product</th>
-                                                    <th className="px-3 py-2 text-right text-[10px] font-medium text-zinc-500 uppercase tracking-wider">Price</th>
-                                                    <th className="px-3 py-2 text-right text-[10px] font-medium text-zinc-500 uppercase tracking-wider">Total</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {getBusinessItemsSafe(biz).map((item, itemIdx) => {
-                                                    const displayUnitPrice = Number(item.unitPrice ?? item.basePrice ?? 0);
-                                                    const displayLineTotal = Number(item.quantity || 0) * displayUnitPrice;
-                                                    return (
-                                                        <tr key={itemIdx} className="border-b border-zinc-800/60 hover:bg-zinc-900/30">
-                                                            <td className="px-3 py-2.5">
-                                                                <div className="flex items-center gap-2">
-                                                                    {item.imageUrl && (
-                                                                        <img src={item.imageUrl} alt={item.name} className="w-7 h-7 rounded object-cover" />
-                                                                    )}
-                                                                    <div className="min-w-0 flex-1">
-                                                                        <div className="text-white text-sm truncate">{item.name}</div>
-                                                                        <div className="text-zinc-600 text-xs">×{item.quantity}</div>
-                                                                        {item.notes && (
-                                                                            <div className="text-blue-400 text-xs italic mt-1">
-                                                                                Note: {item.notes}
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            </td>
-                                                            <td className="px-3 py-2.5 text-right text-sm text-zinc-300">${displayUnitPrice.toFixed(2)}</td>
-                                                            <td className="px-3 py-2.5 text-right text-sm font-medium text-white">
-                                                                ${displayLineTotal.toFixed(2)}
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Totals */}
-                        <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-3 space-y-1.5">
-                            <div className="flex justify-between text-sm">
-                                <span className="text-zinc-500">Subtotal</span>
-                                <span className="text-zinc-300">${Number(selectedOrderTotals?.itemsSubtotal ?? selectedOrder.orderPrice).toFixed(2)}</span>
-                            </div>
-                            {(selectedOrderTotals?.itemsDiscount ?? 0) > 0 && (
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-zinc-500">Promotions</span>
-                                    <span className="text-emerald-300">-${Number(selectedOrderTotals?.itemsDiscount ?? 0).toFixed(2)}</span>
-                                </div>
-                            )}
-                            <div className="flex justify-between text-sm">
-                                <span className="text-amber-300">Delivery</span>
-                                <span className="text-amber-300">${Number(selectedOrderTotals?.deliveryBase ?? selectedOrder.deliveryPrice).toFixed(2)}</span>
-                            </div>
-                            {(selectedOrderTotals?.deliveryDiscount ?? 0) > 0 && (
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-zinc-500">Delivery Promotion</span>
-                                    <span className="text-emerald-300">-${Number(selectedOrderTotals?.deliveryDiscount ?? 0).toFixed(2)}</span>
-                                </div>
-                            )}
-                            <div className="flex justify-between text-base font-bold pt-1.5 border-t border-zinc-800">
-                                <span className="text-emerald-300">Total</span>
-                                <span className="text-emerald-300">${selectedOrder.totalPrice.toFixed(2)}</span>
-                            </div>
-                        </div>
-
-                        {!isBusinessUser && (selectedOrder as any).settlementPreview && (() => {
-                            const sp = (selectedOrder as any).settlementPreview;
-                            const severity = getMarginSeverity(sp.netMargin);
-                            return (
-                                <div className={`border rounded-xl p-3 space-y-2 ${severity === 'healthy' ? 'bg-emerald-500/10 border-emerald-500/30' : severity === 'negative' ? 'bg-rose-500/10 border-rose-500/30' : 'bg-zinc-500/10 border-zinc-500/30'}`}>
-                                    <div className="flex items-center justify-between">
-                                        <span className={`text-[10px] uppercase tracking-wider ${severity === 'healthy' ? 'text-emerald-300' : severity === 'negative' ? 'text-rose-300' : 'text-zinc-400'}`}>Platform Margin</span>
-                                        <div className="flex items-center gap-2">
-                                            {!sp.driverAssigned && (
-                                                <span className="inline-flex items-center rounded-full bg-amber-500/15 border border-amber-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300">
-                                                    No driver
+                                        <div className="mt-2 flex items-center gap-2">
+                                            {isTrustedCustomer(selectedOrder.user) && (
+                                                <span className="inline-flex items-center rounded-full bg-emerald-500/15 border border-emerald-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
+                                                    Trusted customer
                                                 </span>
                                             )}
-                                            <span className={`text-lg font-bold ${severity === 'healthy' ? 'text-emerald-300' : severity === 'negative' ? 'text-rose-300' : 'text-zinc-400'}`}>
-                                                {sp.netMargin >= 0 ? '+' : ''}€{sp.netMargin.toFixed(2)}
-                                            </span>
+                                            {isAdmin && (
+                                                <button
+                                                    type="button"
+                                                    disabled={trustUpdatingUserId === selectedOrder.user.id}
+                                                    onClick={() => handleToggleTrustedCustomer(selectedOrder.user!, !isTrustedCustomer(selectedOrder.user))}
+                                                    className="text-[11px] px-2 py-1 rounded-md border border-zinc-700 text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+                                                >
+                                                    {trustUpdatingUserId === selectedOrder.user.id
+                                                        ? 'Saving...'
+                                                        : isTrustedCustomer(selectedOrder.user)
+                                                            ? 'Untrust'
+                                                            : 'Mark trusted'}
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
-
-                                    <div className="flex items-center gap-3 text-xs text-zinc-400">
-                                        <span>Receivable <span className="text-emerald-300 font-semibold">€{sp.totalReceivable.toFixed(2)}</span></span>
-                                        <span>Payable <span className="text-rose-300 font-semibold">€{sp.totalPayable.toFixed(2)}</span></span>
+                                )}
+                                <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-3">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <Truck size={13} className="text-zinc-500" />
+                                        <span className="text-[10px] text-zinc-600 uppercase tracking-wider font-medium">Driver</span>
                                     </div>
+                                    {selectedOrder.driver ? (
+                                        <>
+                                            <div className="text-white text-sm font-medium">
+                                                {selectedOrder.driver.firstName} {selectedOrder.driver.lastName}
+                                            </div>
+                                            <div className="text-zinc-500 text-xs mt-0.5">{selectedOrder.driver.email}</div>
+                                        </>
+                                    ) : (
+                                        <div className="text-zinc-600 text-sm">Not assigned</div>
+                                    )}
+                                </div>
+                            </div>
 
-                                    <div className="grid grid-cols-1 gap-1.5 text-xs">
-                                        {sp.lineItems.map((li: any, i: number) => (
-                                            <div key={i} className="flex items-center justify-between rounded-lg border border-emerald-500/20 bg-[#09090b]/70 px-2 py-1.5">
-                                                <span className="text-zinc-500 truncate mr-2">{li.reason}</span>
-                                                <span className={`font-semibold whitespace-nowrap ${li.direction === 'RECEIVABLE' ? 'text-emerald-200' : 'text-rose-300'}`}>
-                                                    {li.direction === 'RECEIVABLE' ? '+' : '-'}€{li.amount.toFixed(2)}
+                            {/* ── Cancellation info ── */}
+                            {selectedOrder.status === 'CANCELLED' && (selectedOrder.cancellationReason || selectedOrder.cancelledAt) && (
+                                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3">
+                                    <div className="text-[10px] text-red-400 uppercase tracking-wider mb-1.5 font-semibold">Cancellation</div>
+                                    {selectedOrder.cancelledAt && (
+                                        <div className="text-xs text-zinc-500 mb-1">
+                                            {new Date(selectedOrder.cancelledAt).toLocaleString()}
+                                        </div>
+                                    )}
+                                    {selectedOrder.cancellationReason && (
+                                        <div className="text-sm text-red-200">{selectedOrder.cancellationReason}</div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* ── Delivery address ── */}
+                            <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-3">
+                                <div className="flex items-center gap-2 mb-1.5">
+                                    <MapPin size={13} className="text-zinc-500" />
+                                    <span className="text-[10px] text-zinc-600 uppercase tracking-wider font-medium">Delivery Address</span>
+                                </div>
+                                <span className="text-white text-sm">{selectedOrder.dropOffLocation.address}</span>
+                            </div>
+
+                            {/* ── Driver Notes ── */}
+                            {selectedOrder.driverNotes && (
+                                <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-3">
+                                    <div className="flex items-center gap-2 mb-1.5">
+                                        <MessageSquare size={13} className="text-blue-400" />
+                                        <span className="text-[10px] text-blue-400 uppercase tracking-wider font-semibold">Delivery Instructions</span>
+                                    </div>
+                                    <span className="text-blue-200 text-sm">{selectedOrder.driverNotes}</span>
+                                </div>
+                            )}
+
+                            {/* ── Needs approval ── */}
+                            {selectedOrder.needsApproval && (
+                                <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3">
+                                    <div className="text-[10px] text-rose-400 uppercase tracking-wider mb-1.5 font-semibold">Awaiting Approval</div>
+                                    <p className="text-rose-200 text-sm">This order requires manual approval. Call the customer to verify, then click Approve.</p>
+                                    {deriveApprovalReasons(selectedOrder).length > 0 && (
+                                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                            {deriveApprovalReasons(selectedOrder).includes('FIRST_ORDER') && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-500/10 border border-blue-500/30 text-blue-200">First order</span>
+                                            )}
+                                            {deriveApprovalReasons(selectedOrder).includes('HIGH_VALUE') && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 border border-amber-500/30 text-amber-200">Over €20</span>
+                                            )}
+                                            {deriveApprovalReasons(selectedOrder).includes('OUT_OF_ZONE') && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-orange-500/10 border border-orange-500/30 text-orange-200">Outside delivery zone</span>
+                                            )}
+                                        </div>
+                                    )}
+                                    {isAdmin && (
+                                        <button
+                                            onClick={() => openApprovalModalForOrder(selectedOrder)}
+                                            className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border bg-green-500/10 text-green-400 border-green-500/30 hover:brightness-125 disabled:opacity-50"
+                                        >
+                                            ✓ Approve Order
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* ── Location flagged ── */}
+                            {selectedOrder.locationFlagged && (
+                                <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-3">
+                                    <div className="text-[10px] text-orange-400 uppercase tracking-wider mb-1.5 font-semibold">Outside Delivery Zone</div>
+                                    <p className="text-orange-200 text-sm">The drop-off location is outside all active delivery zones. Confirm with the customer before dispatching.</p>
+                                </div>
+                            )}
+
+                            {/* ── Items grouped by business ── */}
+                            <div className="space-y-4">
+                                {businessList.map((biz, idx) => (
+                                    <div key={idx} className="space-y-2">
+                                        <div className="flex items-center gap-2 px-1">
+                                            <Store size={14} className="text-violet-500" />
+                                            <span className="font-medium text-white text-sm">{biz.business.name}</span>
+                                            <span className="text-[10px] text-zinc-600 uppercase">{biz.business.businessType}</span>
+                                        </div>
+
+                                        <div className="overflow-hidden border border-zinc-800 rounded-lg">
+                                            <table className="w-full">
+                                                <thead>
+                                                    <tr className="bg-[#09090b] border-b border-zinc-800">
+                                                        <th className="px-3 py-2 text-left text-[10px] font-medium text-zinc-500 uppercase tracking-wider">Product</th>
+                                                        <th className="px-3 py-2 text-right text-[10px] font-medium text-zinc-500 uppercase tracking-wider">Price</th>
+                                                        <th className="px-3 py-2 text-right text-[10px] font-medium text-zinc-500 uppercase tracking-wider">Total</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {getBusinessItemsSafe(biz).map((item, itemIdx) => {
+                                                        const displayUnitPrice = Number(item.unitPrice ?? item.basePrice ?? 0);
+                                                        const displayLineTotal = Number(item.quantity || 0) * displayUnitPrice;
+                                                        return (
+                                                            <tr key={itemIdx} className="border-b border-zinc-800/60 hover:bg-zinc-900/30">
+                                                                <td className="px-3 py-2.5">
+                                                                    <div className="flex items-center gap-2">
+                                                                        {item.imageUrl && (
+                                                                            <img src={item.imageUrl} alt={item.name} className="w-7 h-7 rounded object-cover" />
+                                                                        )}
+                                                                        <div className="min-w-0 flex-1">
+                                                                            <div className="text-white text-sm truncate">{item.name}</div>
+                                                                            <div className="text-zinc-600 text-xs">×{item.quantity}</div>
+                                                                            {item.notes && (
+                                                                                <div className="text-blue-400 text-xs italic mt-1">
+                                                                                    Note: {item.notes}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-3 py-2.5 text-right text-sm text-zinc-300">€{displayUnitPrice.toFixed(2)}</td>
+                                                                <td className="px-3 py-2.5 text-right text-sm font-medium text-white">
+                                                                    €{displayLineTotal.toFixed(2)}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* ── Price breakdown ── */}
+                            <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-4 space-y-2">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <CreditCard size={13} className="text-zinc-500" />
+                                    <span className="text-[10px] text-zinc-600 uppercase tracking-wider font-medium">Price Breakdown</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-zinc-500">Subtotal</span>
+                                    <span className="text-zinc-300">€{Number(selectedOrderTotals?.itemsSubtotal ?? selectedOrder.orderPrice).toFixed(2)}</span>
+                                </div>
+                                {(selectedOrderTotals?.itemsDiscount ?? 0) > 0 && (
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-zinc-500 flex items-center gap-1"><Tag size={11} /> Promotions</span>
+                                        <span className="text-emerald-300">-€{Number(selectedOrderTotals?.itemsDiscount ?? 0).toFixed(2)}</span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-zinc-500 flex items-center gap-1"><Truck size={11} /> Delivery</span>
+                                    <span className="text-amber-300">€{Number(selectedOrderTotals?.deliveryBase ?? selectedOrder.deliveryPrice).toFixed(2)}</span>
+                                </div>
+                                {(selectedOrderTotals?.deliveryDiscount ?? 0) > 0 && (
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-zinc-500">Delivery Promotion</span>
+                                        <span className="text-emerald-300">-€{Number(selectedOrderTotals?.deliveryDiscount ?? 0).toFixed(2)}</span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between text-base font-bold pt-2 border-t border-zinc-800">
+                                    <span className="text-emerald-300">Total</span>
+                                    <span className="text-emerald-300">€{selectedOrder.totalPrice.toFixed(2)}</span>
+                                </div>
+                            </div>
+
+                            {/* ── Applied Promotions ── */}
+                            {(selectedOrder.orderPromotions?.length ?? 0) > 0 && (
+                                <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3 space-y-2">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <Tag size={13} className="text-emerald-400" />
+                                        <span className="text-[10px] text-emerald-400 uppercase tracking-wider font-semibold">Applied Promotions</span>
+                                    </div>
+                                    {selectedOrder.orderPromotions!.map((promo) => (
+                                        <div key={promo.id} className="flex items-center justify-between text-sm">
+                                            <div className="flex items-center gap-2">
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
+                                                    {promo.appliesTo === 'DELIVERY' ? 'Delivery' : 'Order'}
+                                                </span>
+                                                {promo.promoCode && (
+                                                    <span className="font-mono text-xs text-zinc-400">{promo.promoCode}</span>
+                                                )}
+                                            </div>
+                                            <span className="text-emerald-300 font-semibold">-€{promo.discountAmount.toFixed(2)}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* ── Settlement / Platform margin (admin only) ── */}
+                            {!isBusinessUser && preview && (() => {
+                                const severity = getMarginSeverity(preview.netMargin);
+                                const borderClass = severity === 'healthy' ? 'border-emerald-500/30' : severity === 'negative' ? 'border-rose-500/30' : 'border-zinc-500/30';
+                                const bgClass = severity === 'healthy' ? 'bg-emerald-500/10' : severity === 'negative' ? 'bg-rose-500/10' : 'bg-zinc-500/10';
+                                const textClass = severity === 'healthy' ? 'text-emerald-300' : severity === 'negative' ? 'text-rose-300' : 'text-zinc-400';
+                                return (
+                                    <div className={`border rounded-xl p-4 space-y-3 ${bgClass} ${borderClass}`}>
+                                        <div className="flex items-center justify-between">
+                                            <span className={`text-[10px] uppercase tracking-wider font-medium ${textClass}`}>Platform Margin</span>
+                                            <div className="flex items-center gap-2">
+                                                {!preview.driverAssigned && (
+                                                    <span className="inline-flex items-center rounded-full bg-amber-500/15 border border-amber-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300">
+                                                        No driver
+                                                    </span>
+                                                )}
+                                                <span className={`text-lg font-bold ${textClass}`}>
+                                                    {preview.netMargin >= 0 ? '+' : ''}€{preview.netMargin.toFixed(2)}
                                                 </span>
                                             </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            );
-                        })()}
+                                        </div>
 
-                        {/* Comp delivery action — only available for non-cancelled/delivered orders where there is a user */}
-                        {isAdmin && selectedOrder.user && selectedOrder.status !== 'DELIVERED' && selectedOrder.status !== 'CANCELLED' && (
-                            <div className="pt-2 border-t border-zinc-800">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={grantingFreeDelivery}
-                                    onClick={async () => {
-                                        try {
-                                            await grantFreeDeliveryMut({ variables: { userId: selectedOrder.user!.id, orderId: selectedOrder.id } });
-                                            toast.success(`Free delivery granted for ${selectedOrder.user!.firstName}'s next order.`);
-                                        } catch (err: any) {
-                                            toast.error(err.message || 'Failed to grant free delivery.');
-                                        }
-                                    }}
-                                    className="w-full border-sky-500/30 text-sky-400 hover:bg-sky-500/10"
-                                >
-                                    {grantingFreeDelivery ? 'Granting...' : '🎁 Comp next delivery (free delivery on next order)'}
-                                </Button>
-                            </div>
-                        )}
-                    </div>
-                )}
+                                        <div className="flex items-center gap-4 text-xs text-zinc-400">
+                                            <span>Receivable <span className="text-emerald-300 font-semibold">€{preview.totalReceivable.toFixed(2)}</span></span>
+                                            <span>Payable <span className="text-rose-300 font-semibold">€{preview.totalPayable.toFixed(2)}</span></span>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 gap-1.5 text-xs">
+                                            {preview.lineItems.map((li: any, i: number) => (
+                                                <div key={i} className="flex items-center justify-between rounded-lg border border-zinc-700/40 bg-[#09090b]/70 px-2.5 py-1.5">
+                                                    <span className="text-zinc-500 truncate mr-2">{li.reason}</span>
+                                                    <span className={`font-semibold whitespace-nowrap ${li.direction === 'RECEIVABLE' ? 'text-emerald-200' : 'text-rose-300'}`}>
+                                                        {li.direction === 'RECEIVABLE' ? '+' : '-'}€{li.amount.toFixed(2)}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
+                            {/* ── Comp delivery action (active orders only) ── */}
+                            {isAdmin && selectedOrder.user && !isCompleted && (
+                                <div className="pt-2 border-t border-zinc-800">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={grantingFreeDelivery}
+                                        onClick={async () => {
+                                            try {
+                                                await grantFreeDeliveryMut({ variables: { userId: selectedOrder.user!.id, orderId: selectedOrder.id } });
+                                                toast.success(`Free delivery granted for ${selectedOrder.user!.firstName}'s next order.`);
+                                            } catch (err: any) {
+                                                toast.error(err.message || 'Failed to grant free delivery.');
+                                            }
+                                        }}
+                                        className="w-full border-sky-500/30 text-sky-400 hover:bg-sky-500/10"
+                                    >
+                                        {grantingFreeDelivery ? 'Granting...' : '🎁 Comp next delivery (free delivery on next order)'}
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })()}
             </Modal>
 
             {/* ════════════════ PREP TIME MODAL ════════════════ */}

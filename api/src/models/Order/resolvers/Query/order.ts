@@ -4,6 +4,7 @@ import logger from '@/lib/logger';
 import { settlements } from '@/database/schema';
 import { businesses, orderItems, products } from '@/database/schema';
 import { and, eq, inArray } from 'drizzle-orm';
+import { adjustBusinessInventoryQuantities } from '@/services/order/adjustBusinessInventoryQuantities';
 
 const log = logger.child({ resolver: 'orderQuery' });
 
@@ -95,7 +96,8 @@ export const order: NonNullable<QueryResolvers['order']> = async (_parent, { id 
 
         if (scopedBusinesses.length > 0) {
             mappedOrder.businesses = scopedBusinesses;
-            return mappedOrder;
+            const [adjusted] = await adjustBusinessInventoryQuantities(db, [mappedOrder], userData.businessId!);
+            return adjusted;
         }
 
         // Historical edge-case: product-to-business ownership changed after settlement generation.
@@ -168,7 +170,8 @@ export const order: NonNullable<QueryResolvers['order']> = async (_parent, { id 
                         items: fallbackItems,
                     },
                 ];
-                return mappedOrder;
+                const [adjusted] = await adjustBusinessInventoryQuantities(db, [mappedOrder], userData.businessId!);
+                return adjusted;
             }
         }
 

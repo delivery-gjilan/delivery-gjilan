@@ -166,6 +166,69 @@ export default function EarningsScreen() {
 
     const isLoading = cashLoading || breakdownLoading;
 
+    // ── Derived data for the flow explanation ──
+    const flowData = useMemo(() => {
+        if (!cash) return null;
+        // Split breakdown into "you owe" and "you receive"
+        const youOweItems = breakdownItems.filter((b: any) => b.direction === "RECEIVABLE");
+        const youReceiveItems = breakdownItems.filter((b: any) => b.direction === "PAYABLE");
+        return { youOweItems, youReceiveItems };
+    }, [cash, breakdownItems]);
+
+    // Category config for icons, colors, and explainers
+    const getCategoryConfig = (category: string, direction: string) => {
+        const configs: Record<string, { icon: string; color: string; explain: string }> = {
+            AUTO_REMITTANCE: {
+                icon: "swap-horizontal-outline",
+                color: "#ef4444",
+                explain: (t.earnings as any).explain_markup ?? "Platform markup on product prices that you collected in cash",
+            },
+            STOCK_REMITTANCE: {
+                icon: "cube-outline",
+                color: "#a855f7",
+                explain: (t.earnings as any).explain_stock ?? "Products picked up from operator's stock — you didn't buy these",
+            },
+            DELIVERY_COMMISSION: {
+                icon: "bicycle-outline",
+                color: direction === "PAYABLE" ? "#22c55e" : "#f59e0b",
+                explain: (t.earnings as any).explain_delivery ?? "Commission on delivery fee",
+            },
+            PLATFORM_COMMISSION: {
+                icon: "business-outline",
+                color: "#f59e0b",
+                explain: (t.earnings as any).explain_platform ?? "Platform commission on order value",
+            },
+            PROMOTION_COST: {
+                icon: "pricetag-outline",
+                color: "#f59e0b",
+                explain: (t.earnings as any).explain_promo ?? "Promotional adjustment",
+            },
+        };
+        return configs[category] ?? { icon: "help-circle-outline", color: "#6b7280", explain: "" };
+    };
+
+    // Get settlement reason label
+    const getSettlementLabel = (s: any) => {
+        if (s.direction === "PAYABLE") return (t.earnings as any).platform_owes_you ?? "Platform owes you";
+        if (s.reason) {
+            // Extract the parenthetical detail: "Stock item remittance (€8.50 items from operator inventory)"
+            const match = s.reason.match(/\((.+)\)/);
+            if (match) return match[1]; // "€8.50 items from operator inventory"
+            return s.reason;
+        }
+        return s.rule?.name ?? t.earnings.commission;
+    };
+
+    // Get settlement type tag
+    const getSettlementTag = (s: any) => {
+        if (s.direction === "PAYABLE") return { label: (t.earnings as any).you_receive ?? "You receive", color: "#22c55e" };
+        if (s.reason?.startsWith("Stock item")) return { label: (t.earnings as any).stock_remittance ?? "Stock Items", color: "#a855f7" };
+        if (s.reason?.startsWith("Markup")) return { label: (t.earnings as any).markup ?? "Markup", color: "#ef4444" };
+        if (s.reason?.startsWith("Priority")) return { label: (t.earnings as any).priority ?? "Priority Fee", color: "#ef4444" };
+        if (s.rule?.type === "DELIVERY_PRICE") return { label: (t.earnings as any).delivery_fee ?? "Delivery Fee", color: "#f59e0b" };
+        return { label: t.earnings.commission, color: "#f59e0b" };
+    };
+
     return (
         <SafeAreaView style={[es.safe, { backgroundColor: theme.colors.background }]}>
             <ScrollView
@@ -211,7 +274,7 @@ export default function EarningsScreen() {
                     })}
                 </ScrollView>
 
-                {/* ── Cash summary ── */}
+                {/* ── Main content ── */}
                 <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
                     {isLoading ? (
                         <View style={[es.loadCard, { backgroundColor: theme.colors.card }]}>
@@ -219,102 +282,209 @@ export default function EarningsScreen() {
                         </View>
                     ) : cash ? (
                         <>
-                            {/* Take home hero */}
-                            <View style={[es.heroCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-                                <View style={es.heroCardHeader}>
-                                    <Text style={[es.heroLabel, { color: theme.colors.subtext }]}>{t.earnings.take_home}</Text>
-                                    <Ionicons name="wallet-outline" size={18} color={theme.colors.income} />
-                                </View>
-                                <Text style={[es.heroAmount, { color: theme.colors.text }]}>{formatCurrency(cash.takeHome)}</Text>
-                                <Text style={[es.heroSub, { color: theme.colors.subtext }]}>{t.earnings.take_home_sub}</Text>
-                            </View>
-
-                            {/* Stat row: cash collected / deliveries */}
-                            <View style={es.statRow}>
-                                <View style={[es.statCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-                                    <Text style={[es.statValue, { color: theme.colors.text }]}>{formatCurrency(cash.cashCollected)}</Text>
-                                    <Text style={[es.statLabel, { color: theme.colors.subtext }]}>{t.earnings.cash_in_hand}</Text>
-                                    <Text style={[es.statHint, { color: theme.colors.subtext }]}>
-                                        {cash.totalDeliveries} {cash.totalDeliveries === 1 ? t.earnings.delivery : t.earnings.deliveries}
-                                    </Text>
-                                </View>
-
-                                <View style={es.statDividerCol}>
-                                    <View style={[es.statCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border, marginBottom: 10 }]}>
-                                        <Text style={[es.statValue, { color: "#ef4444" }]}>{formatCurrency(cash.youOwePlatform)}</Text>
-                                        <Text style={[es.statLabel, { color: theme.colors.subtext }]}>{t.earnings.you_owe}</Text>
+                            {/* ═══════ STEP 1: CASH COLLECTED ═══════ */}
+                            <View style={[es.flowCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+                                <View style={es.flowCardHeader}>
+                                    <View style={[es.flowIconWrap, { backgroundColor: "#3b82f620" }]}>
+                                        <Ionicons name="cash-outline" size={18} color="#3b82f6" />
                                     </View>
-                                    <View style={[es.statCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-                                        <Text style={[es.statValue, { color: theme.colors.income }]}>{formatCurrency(cash.platformOwesYou)}</Text>
-                                        <Text style={[es.statLabel, { color: theme.colors.subtext }]}>{t.earnings.platform_owes}</Text>
-                                    </View>
-                                </View>
-                            </View>
-
-                            {/* Net settlement pill */}
-                            <View style={[es.netRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-                                <View style={es.netLeft}>
-                                    <Ionicons
-                                        name={cash.netSettlement >= 0 ? "arrow-down-circle" : "arrow-up-circle"}
-                                        size={20}
-                                        color={cash.netSettlement >= 0 ? theme.colors.income : "#ef4444"}
-                                    />
-                                    <View>
-                                        <Text style={[es.netLabel, { color: theme.colors.subtext }]}>{t.earnings.net_settlement}</Text>
-                                        <Text style={[es.netHint, { color: theme.colors.subtext }]}>
-                                            {cash.netSettlement >= 0 ? t.earnings.platform_gives_you : t.earnings.you_should_give}
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={[es.flowStepLabel, { color: theme.colors.subtext }]}>
+                                            {(t.earnings as any).step_collected ?? "CASH COLLECTED"}
+                                        </Text>
+                                        <Text style={[es.flowStepHint, { color: theme.colors.subtext }]}>
+                                            {(t.earnings as any).step_collected_hint ?? "Total cash received from customers"}
                                         </Text>
                                     </View>
                                 </View>
-                                <Text style={[es.netAmount, { color: cash.netSettlement >= 0 ? theme.colors.income : "#ef4444" }]}>
-                                    {formatCurrency(Math.abs(cash.netSettlement))}
+                                <Text style={[es.flowAmount, { color: theme.colors.text }]}>
+                                    {formatCurrency(cash.cashCollected)}
                                 </Text>
+                                <Text style={[es.flowMeta, { color: theme.colors.subtext }]}>
+                                    {cash.totalDeliveries} {cash.totalDeliveries === 1 ? t.earnings.delivery : t.earnings.deliveries}
+                                </Text>
+                            </View>
+
+                            {/* Flow connector */}
+                            <View style={es.flowConnector}>
+                                <View style={[es.flowLine, { backgroundColor: theme.colors.border }]} />
+                                <Ionicons name="arrow-down" size={16} color={theme.colors.subtext} />
+                                <View style={[es.flowLine, { backgroundColor: theme.colors.border }]} />
+                            </View>
+
+                            {/* ═══════ STEP 2: DEDUCTIONS (What you owe) ═══════ */}
+                            {flowData && flowData.youOweItems.length > 0 && (
+                                <>
+                                    <View style={[es.flowCard, { backgroundColor: theme.colors.card, borderColor: "#ef444430" }]}>
+                                        <View style={es.flowCardHeader}>
+                                            <View style={[es.flowIconWrap, { backgroundColor: "#ef444418" }]}>
+                                                <Ionicons name="remove-circle-outline" size={18} color="#ef4444" />
+                                            </View>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={[es.flowStepLabel, { color: "#ef4444" }]}>
+                                                    {(t.earnings as any).step_deductions ?? "DEDUCTIONS"}
+                                                </Text>
+                                                <Text style={[es.flowStepHint, { color: theme.colors.subtext }]}>
+                                                    {(t.earnings as any).step_deductions_hint ?? "Amounts owed back to the platform"}
+                                                </Text>
+                                            </View>
+                                            <Text style={[es.flowSideAmount, { color: "#ef4444" }]}>
+                                                -{formatCurrency(cash.youOwePlatform)}
+                                            </Text>
+                                        </View>
+
+                                        {/* Individual deduction items with explainers */}
+                                        <View style={es.deductionList}>
+                                            {flowData.youOweItems.map((item: any, idx: number) => {
+                                                const cfg = getCategoryConfig(item.category, item.direction);
+                                                return (
+                                                    <View key={`${item.category}-${idx}`}>
+                                                        <View style={es.deductionRow}>
+                                                            <View style={[es.deductionIcon, { backgroundColor: cfg.color + "15" }]}>
+                                                                <Ionicons name={cfg.icon as any} size={14} color={cfg.color} />
+                                                            </View>
+                                                            <View style={{ flex: 1 }}>
+                                                                <Text style={[es.deductionTitle, { color: theme.colors.text }]}>
+                                                                    {item.label}
+                                                                </Text>
+                                                                {cfg.explain ? (
+                                                                    <Text style={[es.deductionExplain, { color: theme.colors.subtext }]}>
+                                                                        {cfg.explain}
+                                                                    </Text>
+                                                                ) : null}
+                                                                <Text style={[es.deductionMeta, { color: theme.colors.subtext }]}>
+                                                                    {item.count} {item.count === 1 ? t.earnings.delivery : t.earnings.deliveries}
+                                                                </Text>
+                                                            </View>
+                                                            <Text style={[es.deductionAmount, { color: cfg.color }]}>
+                                                                -{formatCurrency(item.totalAmount)}
+                                                            </Text>
+                                                        </View>
+                                                        {idx < flowData.youOweItems.length - 1 && (
+                                                            <View style={[es.deductionSep, { backgroundColor: theme.colors.border }]} />
+                                                        )}
+                                                    </View>
+                                                );
+                                            })}
+                                        </View>
+                                    </View>
+
+                                    {/* Flow connector */}
+                                    <View style={es.flowConnector}>
+                                        <View style={[es.flowLine, { backgroundColor: theme.colors.border }]} />
+                                        <Ionicons name="arrow-down" size={16} color={theme.colors.subtext} />
+                                        <View style={[es.flowLine, { backgroundColor: theme.colors.border }]} />
+                                    </View>
+                                </>
+                            )}
+
+                            {/* ═══════ STEP 2B: ADDITIONS (Platform owes you) ═══════ */}
+                            {flowData && flowData.youReceiveItems.length > 0 && (
+                                <>
+                                    <View style={[es.flowCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.income + "30" }]}>
+                                        <View style={es.flowCardHeader}>
+                                            <View style={[es.flowIconWrap, { backgroundColor: theme.colors.income + "18" }]}>
+                                                <Ionicons name="add-circle-outline" size={18} color={theme.colors.income} />
+                                            </View>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={[es.flowStepLabel, { color: theme.colors.income }]}>
+                                                    {(t.earnings as any).step_additions ?? "ADDITIONS"}
+                                                </Text>
+                                                <Text style={[es.flowStepHint, { color: theme.colors.subtext }]}>
+                                                    {(t.earnings as any).step_additions_hint ?? "Amounts the platform owes you"}
+                                                </Text>
+                                            </View>
+                                            <Text style={[es.flowSideAmount, { color: theme.colors.income }]}>
+                                                +{formatCurrency(cash.platformOwesYou)}
+                                            </Text>
+                                        </View>
+
+                                        <View style={es.deductionList}>
+                                            {flowData.youReceiveItems.map((item: any, idx: number) => {
+                                                const cfg = getCategoryConfig(item.category, item.direction);
+                                                return (
+                                                    <View key={`${item.category}-${idx}`}>
+                                                        <View style={es.deductionRow}>
+                                                            <View style={[es.deductionIcon, { backgroundColor: theme.colors.income + "15" }]}>
+                                                                <Ionicons name={cfg.icon as any} size={14} color={theme.colors.income} />
+                                                            </View>
+                                                            <View style={{ flex: 1 }}>
+                                                                <Text style={[es.deductionTitle, { color: theme.colors.text }]}>
+                                                                    {item.label}
+                                                                </Text>
+                                                                <Text style={[es.deductionMeta, { color: theme.colors.subtext }]}>
+                                                                    {item.count} {item.count === 1 ? t.earnings.delivery : t.earnings.deliveries}
+                                                                </Text>
+                                                            </View>
+                                                            <Text style={[es.deductionAmount, { color: theme.colors.income }]}>
+                                                                +{formatCurrency(item.totalAmount)}
+                                                            </Text>
+                                                        </View>
+                                                        {idx < flowData.youReceiveItems.length - 1 && (
+                                                            <View style={[es.deductionSep, { backgroundColor: theme.colors.border }]} />
+                                                        )}
+                                                    </View>
+                                                );
+                                            })}
+                                        </View>
+                                    </View>
+
+                                    {/* Flow connector */}
+                                    <View style={es.flowConnector}>
+                                        <View style={[es.flowLine, { backgroundColor: theme.colors.border }]} />
+                                        <Ionicons name="arrow-down" size={16} color={theme.colors.subtext} />
+                                        <View style={[es.flowLine, { backgroundColor: theme.colors.border }]} />
+                                    </View>
+                                </>
+                            )}
+
+                            {/* ═══════ STEP 3: TAKE HOME (Result) ═══════ */}
+                            <View style={[es.takeHomeCard, {
+                                backgroundColor: theme.colors.income + "10",
+                                borderColor: theme.colors.income + "40",
+                            }]}>
+                                <View style={es.flowCardHeader}>
+                                    <View style={[es.flowIconWrap, { backgroundColor: theme.colors.income + "25" }]}>
+                                        <Ionicons name="wallet" size={18} color={theme.colors.income} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={[es.flowStepLabel, { color: theme.colors.income }]}>
+                                            {(t.earnings as any).take_home ?? "YOUR TAKE-HOME"}
+                                        </Text>
+                                        <Text style={[es.flowStepHint, { color: theme.colors.subtext }]}>
+                                            {(t.earnings as any).take_home_formula ?? "Cash collected minus deductions plus additions"}
+                                        </Text>
+                                    </View>
+                                </View>
+                                <Text style={[es.takeHomeAmount, { color: theme.colors.income }]}>
+                                    {formatCurrency(cash.takeHome)}
+                                </Text>
+
+                                {/* Simple formula line */}
+                                <View style={[es.formulaRow, { backgroundColor: theme.colors.background + "80" }]}>
+                                    <Text style={[es.formulaText, { color: theme.colors.subtext }]}>
+                                        {formatCurrency(cash.cashCollected)}
+                                        {cash.youOwePlatform > 0 ? ` − ${formatCurrency(cash.youOwePlatform)}` : ""}
+                                        {cash.platformOwesYou > 0 ? ` + ${formatCurrency(cash.platformOwesYou)}` : ""}
+                                        {" = "}
+                                    </Text>
+                                    <Text style={[es.formulaResult, { color: theme.colors.income }]}>
+                                        {formatCurrency(cash.takeHome)}
+                                    </Text>
+                                </View>
                             </View>
                         </>
                     ) : null}
                 </View>
 
-                {/* ── Settlement breakdown ── */}
-                {breakdownItems.length > 0 && (
-                    <View style={{ paddingHorizontal: 16, marginTop: 24 }}>
-                        <Text style={[es.listTitle, { color: theme.colors.text }]}>{t.earnings.settlement_breakdown}</Text>
-                        <View style={{ gap: 8 }}>
-                            {breakdownItems.map((item: any, idx: number) => {
-                                const isReceivable = item.direction === "RECEIVABLE";
-                                const isStock = item.category === "STOCK_REMITTANCE";
-                                const color = isStock ? "#a855f7" : isReceivable ? "#ef4444" : theme.colors.income;
-                                const icon = isStock ? "cube-outline" : isReceivable ? "arrow-up-outline" : "arrow-down-outline";
-                                const label = isStock ? ((t.earnings as any).stock_remittance ?? item.label) : item.label;
-                                return (
-                                    <View key={`${item.category}-${idx}`} style={[es.rowCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-                                        <View style={[es.rowIconWrap, { backgroundColor: color + "18" }]}>
-                                            <Ionicons name={icon} size={16} color={color} />
-                                        </View>
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={[es.rowCardTitle, { color: theme.colors.text }]} numberOfLines={1}>{label}</Text>
-                                            <Text style={[es.rowCardSub, { color: theme.colors.subtext }]}>
-                                                {isStock
-                                                    ? ((t.earnings as any).stock_remittance_sub ?? `${item.count} orders`)
-                                                    : `${item.count} ${item.count === 1 ? t.earnings.delivery : t.earnings.deliveries}`
-                                                }
-                                            </Text>
-                                        </View>
-                                        <Text style={[es.rowCardAmount, { color }]}>
-                                            {isReceivable ? "-" : "+"}{formatCurrency(item.totalAmount)}
-                                        </Text>
-                                    </View>
-                                );
-                            })}
-                        </View>
-                    </View>
-                )}
-
                 {/* ── Pending settlement requests ── */}
                 {(requestsLoading || pendingRequests.length > 0) && (
-                    <View style={{ paddingHorizontal: 16, marginTop: 24 }}>
-                        <View style={es.listTitleRow}>
-                            <View style={[es.listTitleDot, { backgroundColor: "#f59e0b" }]} />
-                            <Text style={[es.listTitle, { color: theme.colors.text, marginBottom: 0 }]}>{t.earnings.settlement_requests}</Text>
+                    <View style={{ paddingHorizontal: 16, marginTop: 28 }}>
+                        <View style={es.sectionHeader}>
+                            <View style={[es.sectionDot, { backgroundColor: "#f59e0b" }]} />
+                            <Text style={[es.sectionTitle, { color: theme.colors.text }]}>
+                                {(t.earnings as any).settlement_requests ?? "Settlement Requests"}
+                            </Text>
                             {pendingRequests.length > 0 && (
                                 <View style={es.pendingBadge}>
                                     <Text style={es.pendingBadgeText}>{pendingRequests.length}</Text>
@@ -332,11 +502,15 @@ export default function EarningsScreen() {
                                         <View key={req.id} style={es.requestCard}>
                                             <View style={es.requestCardHeader}>
                                                 <View>
-                                                    <Text style={es.requestAmountLabel}>{t.earnings.settlement_requests}</Text>
+                                                    <Text style={es.requestAmountLabel}>
+                                                        {(t.earnings as any).settlement_requests ?? "Settlement Request"}
+                                                    </Text>
                                                     <Text style={es.requestAmount}>{formatCurrency(Number(req.amount ?? 0))}</Text>
                                                 </View>
                                                 <View style={es.awaitBadge}>
-                                                    <Text style={es.awaitBadgeText}>{t.earnings.awaiting_response}</Text>
+                                                    <Text style={es.awaitBadgeText}>
+                                                        {(t.earnings as any).awaiting_response ?? "AWAITING RESPONSE"}
+                                                    </Text>
                                                 </View>
                                             </View>
 
@@ -354,14 +528,18 @@ export default function EarningsScreen() {
                                                     style={[es.reqActionBtn, { backgroundColor: "#166534", borderColor: "#22c55e40" }]}
                                                 >
                                                     {isResponding ? <ActivityIndicator size="small" color="#22c55e" /> : (
-                                                        <Text style={[es.reqActionText, { color: "#22c55e" }]}>{t.earnings.accept}</Text>
+                                                        <Text style={[es.reqActionText, { color: "#22c55e" }]}>
+                                                            {(t.earnings as any).accept ?? "Accept"}
+                                                        </Text>
                                                     )}
                                                 </Pressable>
                                                 <Pressable
                                                     onPress={() => { setRejectReason(""); setDisputeModalRequestId(req.id); }}
                                                     style={[es.reqActionBtn, { backgroundColor: "#3b0000", borderColor: "#ef444440", opacity: isResponding ? 0.5 : 1 }]}
                                                 >
-                                                    <Text style={[es.reqActionText, { color: "#ef4444" }]}>{t.earnings.reject ?? t.earnings.dispute}</Text>
+                                                    <Text style={[es.reqActionText, { color: "#ef4444" }]}>
+                                                        {(t.earnings as any).reject ?? (t.earnings as any).dispute ?? "Reject"}
+                                                    </Text>
                                                 </Pressable>
                                             </View>
                                         </View>
@@ -372,9 +550,19 @@ export default function EarningsScreen() {
                     </View>
                 )}
 
-                {/* ── Settlements list ── */}
-                <View style={{ paddingHorizontal: 16, marginTop: 24 }}>
-                    <Text style={[es.listTitle, { color: theme.colors.text }]}>{t.earnings.deliveries_list}</Text>
+                {/* ── Settlement history ── */}
+                <View style={{ paddingHorizontal: 16, marginTop: 28 }}>
+                    <View style={es.sectionHeader}>
+                        <View style={[es.sectionDot, { backgroundColor: theme.colors.primary }]} />
+                        <Text style={[es.sectionTitle, { color: theme.colors.text }]}>
+                            {t.earnings.deliveries_list}
+                        </Text>
+                        {settlements.length > 0 && (
+                            <Text style={[es.sectionCount, { color: theme.colors.subtext }]}>
+                                {settlements.length}
+                            </Text>
+                        )}
+                    </View>
 
                     {settlementsLoading ? (
                         <ActivityIndicator color={theme.colors.primary} style={{ marginTop: 16 }} />
@@ -385,51 +573,69 @@ export default function EarningsScreen() {
                             <Text style={[es.emptySub, { color: theme.colors.subtext }]}>{t.earnings.no_earnings_sub}</Text>
                         </View>
                     ) : (
-                        <View style={{ gap: 8 }}>
+                        <View style={{ gap: 10, marginTop: 12 }}>
                             {settlements.map((s: any) => {
                                 const businessNames = s.order?.businesses?.map((b: any) => b.business?.name).filter(Boolean).join(", ") ?? "—";
                                 const isPaid = s.status === "PAID";
                                 const isPayable = s.direction === "PAYABLE";
-                                const isStockItem = s.reason?.startsWith("Stock item");
-                                const directionLabel = isPayable
-                                    ? t.earnings.platform_owes_you
-                                    : isStockItem
-                                        ? (t.earnings as any).stock_remittance ?? "Stock Item Remittance"
-                                        : (s.rule?.name ?? t.earnings.commission);
-                                const directionColor = isPayable ? theme.colors.income : isStockItem ? "#a855f7" : "#f59e0b";
-                                const amountColor = isPayable ? theme.colors.income : isStockItem ? "#a855f7" : "#f59e0b";
-                                const borderTint = isPaid ? theme.colors.income + "30" : isStockItem ? "#a855f730" : "#f59e0b30";
+                                const tag = getSettlementTag(s);
+                                const reasonText = getSettlementLabel(s);
+                                const amountColor = isPayable ? theme.colors.income : tag.color;
+
                                 return (
-                                    <View key={s.id} style={[es.settlementRow, { backgroundColor: theme.colors.card, borderColor: borderTint }]}>
-                                        <View style={{ flex: 1, marginRight: 12 }}>
-                                            <Text style={[es.settlBiz, { color: theme.colors.text }]} numberOfLines={1}>{businessNames}</Text>
-                                            <Text style={[es.settlAddr, { color: theme.colors.subtext }]} numberOfLines={1}>
-                                                📍 {s.order?.dropOffLocation?.address ?? "—"}
-                                            </Text>
-                                            {isStockItem && s.reason && (
-                                                <Text style={[es.settlAddr, { color: "#a855f7", fontSize: 11, marginTop: 2 }]} numberOfLines={2}>
-                                                    {s.reason}
-                                                </Text>
-                                            )}
-                                            <Text style={[es.settlDate, { color: theme.colors.subtext }]}>{formatDate(s.createdAt)}</Text>
-                                            <View style={[es.settlDirectionBadge, { backgroundColor: directionColor + "20" }]}>
-                                                <Text style={[es.settlDirectionText, { color: directionColor }]}>{directionLabel}</Text>
+                                    <View key={s.id} style={[es.historyCard, {
+                                        backgroundColor: theme.colors.card,
+                                        borderColor: isPaid ? theme.colors.income + "25" : theme.colors.border,
+                                    }]}>
+                                        {/* Top row: tag + amount */}
+                                        <View style={es.historyTopRow}>
+                                            <View style={[es.historyTag, { backgroundColor: tag.color + "18" }]}>
+                                                <View style={[es.historyTagDot, { backgroundColor: tag.color }]} />
+                                                <Text style={[es.historyTagText, { color: tag.color }]}>{tag.label}</Text>
                                             </View>
-                                        </View>
-                                        <View style={{ alignItems: "flex-end" }}>
-                                            <Text style={[es.settlAmount, { color: amountColor }]}>
+                                            <Text style={[es.historyAmount, { color: amountColor }]}>
                                                 {isPayable ? "+" : "-"}{formatCurrency(Number(s.amount ?? 0))}
                                             </Text>
-                                            <View style={[es.settlStatusBadge, { backgroundColor: isPaid ? theme.colors.income + "20" : "#f59e0b20" }]}>
-                                                <Text style={[es.settlStatusText, { color: isPaid ? theme.colors.income : "#f59e0b" }]}>
+                                        </View>
+
+                                        {/* Reason / explanation */}
+                                        <Text style={[es.historyReason, { color: theme.colors.text }]} numberOfLines={2}>
+                                            {reasonText}
+                                        </Text>
+
+                                        {/* Business & address */}
+                                        <View style={es.historyMeta}>
+                                            <View style={es.historyMetaRow}>
+                                                <Ionicons name="storefront-outline" size={12} color={theme.colors.subtext} />
+                                                <Text style={[es.historyMetaText, { color: theme.colors.subtext }]} numberOfLines={1}>
+                                                    {businessNames}
+                                                </Text>
+                                            </View>
+                                            <View style={es.historyMetaRow}>
+                                                <Ionicons name="location-outline" size={12} color={theme.colors.subtext} />
+                                                <Text style={[es.historyMetaText, { color: theme.colors.subtext }]} numberOfLines={1}>
+                                                    {s.order?.dropOffLocation?.address ?? "—"}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        {/* Footer: date + status */}
+                                        <View style={es.historyFooter}>
+                                            <Text style={[es.historyDate, { color: theme.colors.subtext }]}>
+                                                {formatDateTime(s.createdAt)}
+                                            </Text>
+                                            <View style={[es.historyStatus, {
+                                                backgroundColor: isPaid ? theme.colors.income + "18" : "#f59e0b18",
+                                            }]}>
+                                                <View style={[es.historyStatusDot, {
+                                                    backgroundColor: isPaid ? theme.colors.income : "#f59e0b",
+                                                }]} />
+                                                <Text style={[es.historyStatusText, {
+                                                    color: isPaid ? theme.colors.income : "#f59e0b",
+                                                }]}>
                                                     {isPaid ? t.earnings.paid : t.earnings.pending}
                                                 </Text>
                                             </View>
-                                            {isPaid && s.paidAt && (
-                                                <Text style={[es.settlPaidOn, { color: theme.colors.subtext }]}>
-                                                    {t.earnings.paid_on} {formatDate(s.paidAt)}
-                                                </Text>
-                                            )}
                                         </View>
                                     </View>
                                 );
@@ -452,11 +658,13 @@ export default function EarningsScreen() {
                 >
                     <Pressable style={es.modalBackdrop} onPress={() => setDisputeModalRequestId(null)} />
                     <View style={[es.modalSheet, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-                        <Text style={[es.modalTitle, { color: theme.colors.text }]}>{t.earnings.reject_title ?? t.earnings.dispute_title}</Text>
+                        <Text style={[es.modalTitle, { color: theme.colors.text }]}>
+                            {(t.earnings as any).reject_title ?? (t.earnings as any).dispute_title ?? "Reject Settlement"}
+                        </Text>
                         <TextInput
                             value={rejectReason}
                             onChangeText={setRejectReason}
-                            placeholder={t.earnings.reject_placeholder ?? t.earnings.dispute_placeholder}
+                            placeholder={(t.earnings as any).reject_placeholder ?? (t.earnings as any).dispute_placeholder ?? "Reason (optional)"}
                             placeholderTextColor={theme.colors.subtext}
                             multiline
                             numberOfLines={3}
@@ -481,7 +689,9 @@ export default function EarningsScreen() {
                                 {respondingId ? (
                                     <ActivityIndicator size="small" color="#fff" />
                                 ) : (
-                                    <Text style={es.modalSubmitText}>{t.earnings.reject_submit ?? t.earnings.dispute_submit}</Text>
+                                    <Text style={es.modalSubmitText}>
+                                        {(t.earnings as any).reject_submit ?? (t.earnings as any).dispute_submit ?? "Submit"}
+                                    </Text>
                                 )}
                             </Pressable>
                         </View>
@@ -512,53 +722,62 @@ const es = StyleSheet.create({
     /* loading card */
     loadCard: { borderRadius: 20, padding: 40, alignItems: "center" },
 
-    /* hero card */
-    heroCard: { borderRadius: 24, padding: 22, marginBottom: 12, borderWidth: 1 },
-    heroCardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
-    heroLabel: { fontSize: 10, fontWeight: "700", textTransform: "uppercase", letterSpacing: 1.2 },
-    heroAmount: { fontSize: 44, fontWeight: "900", letterSpacing: -1.5, marginBottom: 4 },
-    heroSub: { fontSize: 12 },
-
-    /* stat row */
-    statRow: { flexDirection: "row", gap: 10, marginBottom: 10 },
-    statCard: {
-        flex: 1,
-        borderRadius: 18, padding: 16, borderWidth: 1,
+    /* ═══ FLOW CARDS ═══ */
+    flowCard: {
+        borderRadius: 20, padding: 18, borderWidth: 1,
     },
-    statDividerCol: { flex: 1, gap: 0 },
-    statValue: { fontSize: 20, fontWeight: "800", letterSpacing: -0.3, marginBottom: 2 },
-    statLabel: { fontSize: 10, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.8 },
-    statHint: { fontSize: 11, marginTop: 4 },
-
-    /* net settlement */
-    netRow: {
-        flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-        borderRadius: 16, padding: 16, borderWidth: 1, marginBottom: 4,
+    flowCardHeader: {
+        flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 6,
     },
-    netLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
-    netLabel: { fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
-    netHint: { fontSize: 11, marginTop: 1 },
-    netAmount: { fontSize: 22, fontWeight: "800" },
+    flowIconWrap: {
+        width: 34, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center",
+    },
+    flowStepLabel: {
+        fontSize: 10, fontWeight: "800", letterSpacing: 1.2, textTransform: "uppercase",
+    },
+    flowStepHint: { fontSize: 11, marginTop: 1 },
+    flowAmount: { fontSize: 36, fontWeight: "900", letterSpacing: -1.2, marginTop: 4 },
+    flowMeta: { fontSize: 12, marginTop: 2 },
+    flowSideAmount: { fontSize: 18, fontWeight: "800" },
 
-    /* list section */
-    listTitle: { fontSize: 15, fontWeight: "700", marginBottom: 12 },
-    listTitleRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 0 },
-    listTitleDot: { width: 8, height: 8, borderRadius: 4 },
+    /* flow connector (arrow between cards) */
+    flowConnector: { alignItems: "center", paddingVertical: 4 },
+    flowLine: { width: 1, height: 8 },
+
+    /* deduction list inside flow card */
+    deductionList: { marginTop: 14, gap: 0 },
+    deductionRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 10 },
+    deductionIcon: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center", marginTop: 1 },
+    deductionTitle: { fontSize: 13, fontWeight: "600" },
+    deductionExplain: { fontSize: 11, marginTop: 2, lineHeight: 15 },
+    deductionMeta: { fontSize: 11, marginTop: 3 },
+    deductionAmount: { fontSize: 14, fontWeight: "700", marginTop: 1 },
+    deductionSep: { height: 1, marginLeft: 38 },
+
+    /* take-home card */
+    takeHomeCard: { borderRadius: 20, padding: 18, borderWidth: 1.5 },
+    takeHomeAmount: { fontSize: 44, fontWeight: "900", letterSpacing: -1.5, marginTop: 4, marginBottom: 4 },
+
+    /* formula row */
+    formulaRow: {
+        flexDirection: "row", alignItems: "center", justifyContent: "center",
+        borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, marginTop: 8,
+    },
+    formulaText: { fontSize: 12, fontWeight: "500" },
+    formulaResult: { fontSize: 13, fontWeight: "800" },
+
+    /* section header */
+    sectionHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 0 },
+    sectionDot: { width: 8, height: 8, borderRadius: 4 },
+    sectionTitle: { fontSize: 15, fontWeight: "700", flex: 1 },
+    sectionCount: { fontSize: 12, fontWeight: "600" },
+
+    /* pending badge */
     pendingBadge: {
         backgroundColor: "#f59e0b20", borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2,
         borderWidth: 1, borderColor: "#f59e0b40",
     },
     pendingBadgeText: { fontSize: 11, fontWeight: "700", color: "#f59e0b" },
-
-    /* row card (breakdown) */
-    rowCard: {
-        flexDirection: "row", alignItems: "center", gap: 10,
-        borderRadius: 16, padding: 14, borderWidth: 1,
-    },
-    rowIconWrap: { width: 34, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-    rowCardTitle: { fontSize: 13, fontWeight: "600" },
-    rowCardSub: { fontSize: 11, marginTop: 2 },
-    rowCardAmount: { fontSize: 15, fontWeight: "700" },
 
     /* settlement request card */
     requestCard: {
@@ -571,24 +790,28 @@ const es = StyleSheet.create({
     requestAmount: { fontSize: 30, fontWeight: "900", color: "#f59e0b" },
     awaitBadge: { backgroundColor: "#f59e0b22", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: "#f59e0b40" },
     awaitBadgeText: { fontSize: 10, fontWeight: "700", color: "#f59e0b" },
-    requestMeta: { fontSize: 12, color: "#9ca3af" },
     requestNote: { fontSize: 12, color: "#9ca3af", fontStyle: "italic" },
     requestFooter: { fontSize: 11, color: "#6b7280" },
     requestActions: { flexDirection: "row", gap: 10 },
     reqActionBtn: { flex: 1, borderRadius: 12, paddingVertical: 12, alignItems: "center", borderWidth: 1 },
     reqActionText: { fontSize: 13, fontWeight: "700" },
 
-    /* settlement list rows */
-    settlementRow: { flexDirection: "row", alignItems: "flex-start", borderRadius: 16, padding: 14, borderWidth: 1 },
-    settlBiz: { fontSize: 13, fontWeight: "600", marginBottom: 2 },
-    settlAddr: { fontSize: 11, marginBottom: 2 },
-    settlDate: { fontSize: 11, marginBottom: 6 },
-    settlDirectionBadge: { alignSelf: "flex-start", borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 },
-    settlDirectionText: { fontSize: 10, fontWeight: "700" },
-    settlAmount: { fontSize: 17, fontWeight: "800", marginBottom: 4 },
-    settlStatusBadge: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2, marginBottom: 2 },
-    settlStatusText: { fontSize: 11, fontWeight: "700" },
-    settlPaidOn: { fontSize: 10, marginTop: 2 },
+    /* ═══ HISTORY CARDS ═══ */
+    historyCard: { borderRadius: 16, padding: 14, borderWidth: 1 },
+    historyTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 },
+    historyTag: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+    historyTagDot: { width: 6, height: 6, borderRadius: 3 },
+    historyTagText: { fontSize: 10, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
+    historyAmount: { fontSize: 17, fontWeight: "800" },
+    historyReason: { fontSize: 13, fontWeight: "500", marginBottom: 8 },
+    historyMeta: { gap: 3, marginBottom: 8 },
+    historyMetaRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+    historyMetaText: { fontSize: 11, flex: 1 },
+    historyFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+    historyDate: { fontSize: 11 },
+    historyStatus: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+    historyStatusDot: { width: 5, height: 5, borderRadius: 2.5 },
+    historyStatusText: { fontSize: 11, fontWeight: "700" },
 
     /* empty state */
     emptyState: { alignItems: "center", paddingVertical: 48 },

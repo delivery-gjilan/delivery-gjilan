@@ -1,10 +1,11 @@
 import type { QueryResolvers } from './../../../../generated/types.generated';
 import { GraphQLError } from 'graphql';
+import { adjustBusinessInventoryQuantities } from '@/services/order/adjustBusinessInventoryQuantities';
 
 export const uncompletedOrders: NonNullable<QueryResolvers['uncompletedOrders']> = async (
     _parent,
     _arg,
-    { orderService, userData },
+    { orderService, userData, db },
 ) => {
     // Check authentication
     if (!userData.userId) {
@@ -33,7 +34,8 @@ export const uncompletedOrders: NonNullable<QueryResolvers['uncompletedOrders']>
                 });
             }
             const businessOrders = await orderService.getOrdersByBusinessId(userData.businessId);
-            return businessOrders.filter(order => order.status !== 'DELIVERED' && order.status !== 'CANCELLED');
+            const uncompleted = businessOrders.filter(order => order.status !== 'DELIVERED' && order.status !== 'CANCELLED');
+            return adjustBusinessInventoryQuantities(db, uncompleted, userData.businessId);
 
         default:
             throw new GraphQLError('Invalid user role', {

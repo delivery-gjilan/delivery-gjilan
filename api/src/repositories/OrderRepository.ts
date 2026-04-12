@@ -48,23 +48,29 @@ export class OrderRepository {
         return row?.count ?? 0;
     }
 
-    async findByStatuses(statuses: OrderStatus[], limit = 100, offset = 0): Promise<DbOrder[]> {
+    async findByStatuses(statuses: OrderStatus[], limit = 100, offset = 0, startDate?: string, endDate?: string): Promise<DbOrder[]> {
         const db = await getDB();
+        const conditions = [inArray(ordersTable.status, statuses)];
+        if (startDate) conditions.push(sql`${ordersTable.orderDate} >= ${startDate}`);
+        if (endDate) conditions.push(sql`${ordersTable.orderDate} <= ${endDate}`);
         return await db
             .select()
             .from(ordersTable)
-            .where(inArray(ordersTable.status, statuses))
+            .where(and(...conditions))
             .orderBy(desc(ordersTable.orderDate))
             .limit(limit)
             .offset(offset);
     }
 
-    async countByStatuses(statuses: OrderStatus[]): Promise<number> {
+    async countByStatuses(statuses: OrderStatus[], startDate?: string, endDate?: string): Promise<number> {
         const db = await getDB();
+        const conditions = [inArray(ordersTable.status, statuses)];
+        if (startDate) conditions.push(sql`${ordersTable.orderDate} >= ${startDate}`);
+        if (endDate) conditions.push(sql`${ordersTable.orderDate} <= ${endDate}`);
         const [row] = await db
             .select({ count: sql<number>`count(*)::int` })
             .from(ordersTable)
-            .where(inArray(ordersTable.status, statuses));
+            .where(and(...conditions));
         return row?.count ?? 0;
     }
 

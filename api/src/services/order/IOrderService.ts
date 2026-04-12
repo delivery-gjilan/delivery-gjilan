@@ -21,7 +21,7 @@ export interface IOrderService {
     createOrderWithSideEffects(userId: string, input: CreateOrderInput, context: GraphQLContext): Promise<Order>;
 
     // ── Queries ──
-    getOrdersPaginated(limit: number, offset: number, statuses?: OrderStatus[] | null): Promise<{ orders: Order[]; totalCount: number; hasMore: boolean }>;
+    getOrdersPaginated(limit: number, offset: number, statuses?: OrderStatus[] | null, startDate?: string, endDate?: string): Promise<{ orders: Order[]; totalCount: number; hasMore: boolean }>;
     getAllOrders(limit?: number, offset?: number): Promise<Order[]>;
     getUncompletedOrders(): Promise<Order[]>;
     getOrderById(id: string): Promise<Order | null>;

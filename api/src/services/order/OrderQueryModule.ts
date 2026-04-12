@@ -27,11 +27,13 @@ export class OrderQueryModule {
         limit: number,
         offset: number,
         statuses?: OrderStatus[] | null,
+        startDate?: string,
+        endDate?: string,
     ): Promise<{ orders: Order[]; totalCount: number; hasMore: boolean }> {
         const effectiveStatuses = statuses ?? OrderQueryModule.ACTIVE_STATUSES;
         const [dbOrders, totalCount] = await Promise.all([
-            this.deps.orderRepository.findByStatuses(effectiveStatuses, limit, offset),
-            this.deps.orderRepository.countByStatuses(effectiveStatuses),
+            this.deps.orderRepository.findByStatuses(effectiveStatuses, limit, offset, startDate, endDate),
+            this.deps.orderRepository.countByStatuses(effectiveStatuses, startDate, endDate),
         ]);
         const orders = await this.mapping.mapOrders(dbOrders);
         return { orders, totalCount, hasMore: offset + orders.length < totalCount };

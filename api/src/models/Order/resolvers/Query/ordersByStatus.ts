@@ -1,10 +1,11 @@
 import type { QueryResolvers } from './../../../../generated/types.generated';
 import { GraphQLError } from 'graphql';
+import { adjustBusinessInventoryQuantities } from '@/services/order/adjustBusinessInventoryQuantities';
 
 export const ordersByStatus: NonNullable<QueryResolvers['ordersByStatus']> = async (
     _parent,
     { status, limit, offset },
-    { orderService, userData },
+    { orderService, userData, db },
 ) => {
     if (!userData.userId) {
         throw new GraphQLError('Unauthorized: You must be logged in to view orders', {
@@ -30,7 +31,8 @@ export const ordersByStatus: NonNullable<QueryResolvers['ordersByStatus']> = asy
                     extensions: { code: 'FORBIDDEN' },
                 });
             }
-            return orderService.getOrdersByBusinessIdAndStatus(userData.businessId, status);
+            const orders = await orderService.getOrdersByBusinessIdAndStatus(userData.businessId, status);
+            return adjustBusinessInventoryQuantities(db, orders, userData.businessId);
 
         default:
             throw new GraphQLError('Invalid user role', {

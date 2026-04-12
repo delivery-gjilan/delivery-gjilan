@@ -1746,7 +1746,7 @@ type Query {
   operationalKPIs(businessId: ID, endDate: String!, startDate: String!): OperationalKPIs!
   order(id: ID!): Order
   orderCoverage(orderId: ID!): OrderCoverage
-  orders(limit: Int, offset: Int, statuses: [OrderStatus!]): OrderConnection!
+  orders(endDate: String, limit: Int, offset: Int, startDate: String, statuses: [OrderStatus!]): OrderConnection!
   ordersByStatus(limit: Int, offset: Int, status: OrderStatus!): [Order!]!
   peakHourAnalysis(businessId: ID, endDate: String!, startDate: String!): PeakHourAnalysis!
   previewCampaignAudience(query: JSON!): AudiencePreview!

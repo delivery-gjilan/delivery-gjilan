@@ -169,7 +169,7 @@ type OrderConnection {
 }
 
 type Query {
-    orders(limit: Int, offset: Int, statuses: [OrderStatus!]): OrderConnection!
+    orders(limit: Int, offset: Int, statuses: [OrderStatus!], startDate: String, endDate: String): OrderConnection!
     order(id: ID!): Order
     ordersByStatus(status: OrderStatus!, limit: Int, offset: Int): [Order!]!
     cancelledOrders(limit: Int, offset: Int): [Order!]!

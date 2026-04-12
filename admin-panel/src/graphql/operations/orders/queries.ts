@@ -1,8 +1,8 @@
 import { graphql } from '@/gql';
 
 export const GET_ORDERS = graphql(`
-    query GetOrders($limit: Int, $offset: Int, $statuses: [OrderStatus!]) {
-        orders(limit: $limit, offset: $offset, statuses: $statuses) {
+    query GetOrders($limit: Int, $offset: Int, $statuses: [OrderStatus!], $startDate: String, $endDate: String) {
+        orders(limit: $limit, offset: $offset, statuses: $statuses, startDate: $startDate, endDate: $endDate) {
             totalCount
             hasMore
             orders {
@@ -85,6 +85,13 @@ export const GET_ORDERS = graphql(`
                     netMargin
                     driverAssigned
                 }
+                orderPromotions {
+                    id
+                    promotionId
+                    appliesTo
+                    discountAmount
+                    promoCode
+                }
             }
         }
     }
@@ -166,6 +173,13 @@ export const GET_ORDER = graphql(`
                 totalPayable
                 netMargin
                 driverAssigned
+            }
+            orderPromotions {
+                id
+                promotionId
+                appliesTo
+                discountAmount
+                promoCode
             }
         }
     }

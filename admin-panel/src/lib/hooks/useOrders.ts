@@ -57,13 +57,17 @@ export interface UseOrdersOptions {
     limit?: number;
     offset?: number;
     statuses?: string[];
+    startDate?: string;
+    endDate?: string;
 }
 
 export function useOrders(options: UseOrdersOptions = {}): UseOrdersResult {
-    const { limit = 100, offset = 0, statuses } = options;
+    const { limit = 100, offset = 0, statuses, startDate, endDate } = options;
     const apolloClient = useApolloClient();
     const variables: any = { limit, offset };
     if (statuses) variables.statuses = statuses;
+    if (startDate) variables.startDate = startDate;
+    if (endDate) variables.endDate = endDate;
 
     // Initial query to load data - use network-only to avoid stale cache
     const { data, loading, error, refetch } = useQuery(GET_ORDERS, {

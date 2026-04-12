@@ -2,6 +2,7 @@ import type { SubscriptionResolvers } from './../../../../generated/types.genera
 import { AppError } from '@/lib/errors';
 import { cache } from '@/lib/cache';
 import { SHIFT_DRIVERS_CACHE_KEY } from '@/models/Driver/resolvers/Mutation/adminSetShiftDrivers';
+import { adjustBusinessInventoryQuantities } from '@/services/order/adjustBusinessInventoryQuantities';
 
 export const allOrdersUpdated: NonNullable<SubscriptionResolvers['allOrdersUpdated']> = {
     subscribe: async (_parent, _args, { orderService, userData }) => {
@@ -11,7 +12,7 @@ export const allOrdersUpdated: NonNullable<SubscriptionResolvers['allOrdersUpdat
 
         return orderService.subscribeToAllOrders();
     },
-    resolve: async (payload: any, _args, { userData, orderService }) => {
+    resolve: async (payload: any, _args, { userData, orderService, db }) => {
         const allOrders = payload.orders || [];
 
         switch (userData.role) {
@@ -40,7 +41,7 @@ export const allOrdersUpdated: NonNullable<SubscriptionResolvers['allOrdersUpdat
                     }
                 }
                 
-                return filteredOrders;
+                return adjustBusinessInventoryQuantities(db, filteredOrders, userData.businessId);
 
             default:
                 return [];

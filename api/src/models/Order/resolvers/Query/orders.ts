@@ -1,7 +1,8 @@
 import type { QueryResolvers } from './../../../../generated/types.generated';
 import { GraphQLError } from 'graphql';
+import { adjustBusinessInventoryQuantities } from '@/services/order/adjustBusinessInventoryQuantities';
 
-export const orders: NonNullable<QueryResolvers['orders']> = async (_parent, { limit, offset, statuses }, { orderService, userData }) => {
+export const orders: NonNullable<QueryResolvers['orders']> = async (_parent, { limit, offset, statuses, startDate, endDate }, { orderService, userData, db }) => {
     if (!userData.userId) {
         throw new GraphQLError('Unauthorized: You must be logged in to view orders', {
             extensions: { code: 'UNAUTHORIZED' },
@@ -14,7 +15,7 @@ export const orders: NonNullable<QueryResolvers['orders']> = async (_parent, { l
     switch (userData.role) {
         case 'SUPER_ADMIN':
         case 'ADMIN':
-            return orderService.getOrdersPaginated(effectiveLimit, effectiveOffset, statuses ?? undefined);
+            return orderService.getOrdersPaginated(effectiveLimit, effectiveOffset, statuses ?? undefined, startDate ?? undefined, endDate ?? undefined);
 
         case 'DRIVER': {
             const orders = await orderService.getOrdersForDriver(userData.userId, effectiveLimit);
@@ -34,7 +35,8 @@ export const orders: NonNullable<QueryResolvers['orders']> = async (_parent, { l
                 });
             }
             const orders = await orderService.getOrdersByBusinessId(userData.businessId);
-            return { orders, totalCount: orders.length, hasMore: false };
+            const adjusted = await adjustBusinessInventoryQuantities(db, orders, userData.businessId);
+            return { orders: adjusted, totalCount: adjusted.length, hasMore: false };
         }
 
         default:
