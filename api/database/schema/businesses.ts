@@ -26,6 +26,7 @@ export const businesses = pgTable('businesses', {
     prepTimeOverrideMinutes: integer('prep_time_override_minutes'),
     isTemporarilyClosed: boolean('is_temporarily_closed').notNull().default(false),
     temporaryClosureReason: varchar('temporary_closure_reason', { length: 500 }),
+    category: varchar('category', { length: 100 }),
     commissionPercentage: numeric('commission_percentage', { precision: 5, scale: 2 }).default('0').notNull(),
     minOrderAmount: numeric('min_order_amount', { precision: 10, scale: 2 }).default('0').notNull(),
     isFeatured: boolean('is_featured').notNull().default(false),

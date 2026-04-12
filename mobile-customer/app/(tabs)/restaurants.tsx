@@ -1,17 +1,10 @@
-import React, { useMemo, useState, useRef, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, FlatList } from 'react-native';
+import React, { useMemo, useState, useRef } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Animated, {
     FadeInDown,
-    useSharedValue,
-    useAnimatedStyle,
     useAnimatedRef,
-    useScrollViewOffset,
-    interpolate,
-    Extrapolation,
-    withTiming,
-    interpolateColor,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -46,26 +39,30 @@ function selectFeaturedRestaurant(restaurants: any[], excludedBusinessIds: Set<s
     return openCandidate ?? candidates[0];
 }
 
-function FilterPill({ label, isActive, onPress, primaryColor, cardColor, borderColor, textColor }: {
+function FilterTab({ label, isActive, onPress, primaryColor, textColor, subtextColor }: {
     label: string; isActive: boolean; onPress: () => void;
-    primaryColor: string; cardColor: string; borderColor: string; textColor: string;
+    primaryColor: string; textColor: string; subtextColor: string;
 }) {
-    const progress = useSharedValue(isActive ? 1 : 0);
-    useEffect(() => {
-        progress.value = withTiming(isActive ? 1 : 0, { duration: 200 });
-    }, [isActive]);
-    const pillStyle = useAnimatedStyle(() => ({
-        backgroundColor: interpolateColor(progress.value, [0, 1], [cardColor, primaryColor]),
-        borderColor: interpolateColor(progress.value, [0, 1], [borderColor, primaryColor]),
-    }));
-    const txtStyle = useAnimatedStyle(() => ({
-        color: interpolateColor(progress.value, [0, 1], [textColor, '#ffffff']),
-    }));
     return (
-        <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
-            <Animated.View style={[{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 }, pillStyle]}>
-                <Animated.Text style={[{ fontSize: 13, fontWeight: '600' }, txtStyle]}>{label}</Animated.Text>
-            </Animated.View>
+        <TouchableOpacity
+            onPress={onPress}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+            style={{
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                marginRight: 4,
+                borderBottomWidth: 2.5,
+                borderBottomColor: isActive ? primaryColor : 'transparent',
+            }}
+        >
+            <Text style={{
+                fontSize: 13,
+                fontWeight: isActive ? '800' : '600',
+                color: isActive ? textColor : subtextColor,
+                textTransform: 'uppercase',
+                letterSpacing: 0.5,
+            }}>{label}</Text>
         </TouchableOpacity>
     );
 }
@@ -76,20 +73,13 @@ export default function Restaurants() {
     const { businesses, loading, error, refetch } = useBusinesses();
     const hasBusinesses = businesses.length > 0;
     const [activeFilter, setActiveFilter] = useState<FilterOption>('all');
+    const [activeCategory, setActiveCategory] = useState<string | null>(null);
     const hasAnimated = useRef(false);
     const { t } = useTranslations();
     const { bannerEnabled, bannerMessage, bannerType } = useStoreStatus();
     const showBanner = bannerEnabled && !!bannerMessage;
 
-    const HEADER_H = 70;
     const flatListRef = useAnimatedRef<FlatList>();
-    const scrollOffset = useScrollViewOffset(flatListRef);
-
-    const headerStyle = useAnimatedStyle(() => ({
-        height: interpolate(scrollOffset.value, [0, HEADER_H], [HEADER_H, 0], Extrapolation.CLAMP),
-        opacity: interpolate(scrollOffset.value, [0, HEADER_H * 0.55], [1, 0], Extrapolation.CLAMP),
-        overflow: 'hidden',
-    }));
 
     const BANNER_ICON: Record<InfoBannerType, { name: React.ComponentProps<typeof Ionicons>['name']; color: string }> = {
         INFO:    { name: 'information-circle', color: '#7C3AED' },
@@ -109,10 +99,23 @@ export default function Restaurants() {
         [businesses],
     );
 
+    const availableCategories = useMemo(() => {
+        const cats = new Set<string>();
+        for (const r of restaurants) {
+            if (r.category) cats.add(r.category);
+        }
+        return Array.from(cats).sort();
+    }, [restaurants]);
+
     const filteredRestaurants = useMemo(() => {
         let result = restaurants;
 
-        // Apply filter
+        // Apply category filter
+        if (activeCategory) {
+            result = result.filter((r) => r.category === activeCategory);
+        }
+
+        // Apply status filter
         if (activeFilter === 'open') {
             result = result.filter((r) => r.isOpen);
         } else if (activeFilter === 'promo') {
@@ -120,7 +123,7 @@ export default function Restaurants() {
         }
 
         return result;
-    }, [restaurants, activeFilter]);
+    }, [restaurants, activeFilter, activeCategory]);
 
     const promoRestaurant = useMemo(() => selectPromoRestaurant(filteredRestaurants), [filteredRestaurants]);
     const featuredRestaurant = useMemo(() => {
@@ -203,132 +206,60 @@ export default function Restaurants() {
         router.push(`/business/${businessId}`);
     };
 
-    const filters: { key: FilterOption; label: string }[] = [
-        { key: 'all', label: t.restaurants.filters.all },
+    const statusFilters: { key: FilterOption; label: string }[] = [
         { key: 'open', label: t.restaurants.filters.open_now },
         { key: 'promo', label: t.restaurants.filters.with_discounts },
     ];
 
     return (
-        <SafeAreaView className="flex-1" style={{ backgroundColor: theme.colors.background }} edges={['top']}>
-            <View className="flex-1">
-                {/* ── Collapsing header ── */}
-                <Animated.View style={headerStyle}>
-                    <View
-                        style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            paddingHorizontal: 16,
-                            paddingVertical: 12,
-                        }}
-                    >
-                    <TouchableOpacity onPress={() => router.back()}>
-                        <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
-                    </TouchableOpacity>
-                    <View style={{ flex: 1, alignItems: 'center' }}>
-                        <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700' }}>
-                            {t.restaurants.title}
+        <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
+            <View style={{ flex: 1 }}>
+                {/* ── Header ── */}
+                {showBanner && (
+                    <View style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4, flexDirection: 'row', alignItems: 'center' }}>
+                        <Ionicons name={bannerIconCfg.name} size={13} color={bannerIconCfg.color} />
+                        <Text style={{ color: bannerIconCfg.color, fontSize: 12, fontWeight: '600', marginLeft: 4 }} numberOfLines={1}>
+                            {bannerMessage}
                         </Text>
-                        {showBanner ? (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
-                                <Ionicons name={bannerIconCfg.name} size={13} color={bannerIconCfg.color} />
-                                <Text style={{ color: bannerIconCfg.color, fontSize: 12, fontWeight: '600', flexShrink: 1 }} numberOfLines={1}>
-                                    {bannerMessage}
-                                </Text>
-                            </View>
-                        ) : (
-                            <TouchableOpacity
-                                style={{
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    gap: 4,
-                                    marginTop: 2,
-                                }}
-                            >
-                                <Text style={{ color: theme.colors.subtext, fontSize: 13 }}>{t.restaurants.city}</Text>
-                                <Ionicons name="chevron-down" size={14} color={theme.colors.subtext} />
-                            </TouchableOpacity>
-                        )}
                     </View>
-                    <TouchableOpacity>
-                        <Ionicons name="map-outline" size={24} color={theme.colors.text} />
-                    </TouchableOpacity>
-                </View>
-                </Animated.View>
+                )}
 
-                {/* ── Filter Pills (always visible) ── */}
-                <View style={{ paddingHorizontal: 16, marginBottom: 10 }}>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                        <TouchableOpacity
-                            style={{
-                                paddingHorizontal: 14,
-                                paddingVertical: 8,
-                                borderRadius: 20,
-                                backgroundColor: theme.colors.card,
-                                borderWidth: 1,
-                                borderColor: theme.colors.border,
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 4,
-                            }}
-                        >
-                            <Ionicons name="options-outline" size={16} color={theme.colors.text} />
-                            <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.text }}>
-                                {t.restaurants.category}
-                            </Text>
-                            <Ionicons name="chevron-down" size={14} color={theme.colors.subtext} />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={{
-                                paddingHorizontal: 14,
-                                paddingVertical: 8,
-                                borderRadius: 20,
-                                backgroundColor: theme.colors.card,
-                                borderWidth: 1,
-                                borderColor: theme.colors.border,
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 4,
-                            }}
-                        >
-                            <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.text }}>
-                                {t.restaurants.sort_by}
-                            </Text>
-                            <Ionicons name="chevron-down" size={14} color={theme.colors.subtext} />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={{
-                                paddingHorizontal: 14,
-                                paddingVertical: 8,
-                                borderRadius: 20,
-                                backgroundColor: theme.colors.card,
-                                borderWidth: 1,
-                                borderColor: theme.colors.border,
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 4,
-                            }}
-                        >
-                            <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.primary }}>
-                                Wolt+
-                            </Text>
-                        </TouchableOpacity>
-                        {filters.map((filter) => {
-                            const isActive = activeFilter === filter.key;
-                            return (
-                                <FilterPill
-                                    key={filter.key}
-                                    label={filter.label}
-                                    isActive={isActive}
-                                    onPress={() => setActiveFilter(filter.key)}
-                                    primaryColor={theme.colors.primary}
-                                    cardColor={theme.colors.card}
-                                    borderColor={theme.colors.border}
-                                    textColor={theme.colors.text}
-                                />
-                            );
-                        })}
+                {/* ── Category tabs (sticky) ── */}
+                <View style={{ backgroundColor: theme.colors.background, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.border }}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
+                        <FilterTab
+                            label={t.restaurants.filters.all}
+                            isActive={activeCategory === null && activeFilter === 'all'}
+                            onPress={() => { setActiveCategory(null); setActiveFilter('all'); }}
+                            primaryColor={theme.colors.primary}
+                            textColor={theme.colors.text}
+                            subtextColor={theme.colors.subtext}
+                        />
+                        {availableCategories.map((cat) => (
+                            <FilterTab
+                                key={cat}
+                                label={cat}
+                                isActive={activeCategory === cat}
+                                onPress={() => setActiveCategory(activeCategory === cat ? null : cat)}
+                                primaryColor={theme.colors.primary}
+                                textColor={theme.colors.text}
+                                subtextColor={theme.colors.subtext}
+                            />
+                        ))}
+                        {availableCategories.length > 0 && (
+                            <View style={{ width: StyleSheet.hairlineWidth, backgroundColor: theme.colors.border, marginHorizontal: 8, alignSelf: 'stretch' }} />
+                        )}
+                        {statusFilters.map((filter) => (
+                            <FilterTab
+                                key={filter.key}
+                                label={filter.label}
+                                isActive={activeFilter === filter.key}
+                                onPress={() => setActiveFilter(activeFilter === filter.key ? 'all' : filter.key)}
+                                primaryColor={theme.colors.primary}
+                                textColor={theme.colors.text}
+                                subtextColor={theme.colors.subtext}
+                            />
+                        ))}
                     </ScrollView>
                 </View>
 
@@ -450,6 +381,7 @@ export default function Restaurants() {
                                         avgPrepTimeMinutes={(restaurant as any).avgPrepTimeMinutes}
                                         prepTimeOverrideMinutes={(restaurant as any).prepTimeOverrideMinutes}
                                         rating={(restaurant as any).ratingAverage ?? undefined}
+                                        category={(restaurant as any).category ?? null}
                                         activePromotion={(restaurant as any).activePromotion}
                                         isSponsored={restaurant.id === promoRestaurant?.id}
                                     />

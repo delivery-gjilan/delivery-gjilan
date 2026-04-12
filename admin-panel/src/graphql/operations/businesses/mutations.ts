@@ -85,26 +85,8 @@ export const UPDATE_BUSINESS = graphql(`
             avgPrepTimeMinutes
             prepTimeOverrideMinutes
             minOrderAmount
-            location {
-                latitude
-                longitude
-                address
-            }
-            workingHours {
-                opensAt
-                closesAt
-            }
-            schedule {
-                id
-                dayOfWeek
-                opensAt
-                closesAt
-            }
-        }
-    }
-`);
-
-export const DELETE_BUSINESS = graphql(`
+            category
+            location { = graphql(`
     mutation DeleteBusiness($id: ID!) {
         deleteBusiness(id: $id)
     }

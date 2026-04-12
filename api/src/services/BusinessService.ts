@@ -54,6 +54,7 @@ export class BusinessService {
             isActive: business.isActive ?? true,
             commissionPercentage: Number(business.commissionPercentage ?? 0),
             minOrderAmount: Number(business.minOrderAmount ?? 0),
+            category: business.category ?? null,
             createdAt: new Date(business.createdAt),
             updatedAt: new Date(business.updatedAt),
             isOpen: true, // computed by field resolver

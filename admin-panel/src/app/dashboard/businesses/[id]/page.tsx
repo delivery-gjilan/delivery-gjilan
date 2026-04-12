@@ -26,6 +26,7 @@ interface Business {
     phoneNumber?: string | null;
     imageUrl?: string | null;
     businessType: string;
+    category?: string | null;
     isActive: boolean;
     createdAt: string;
     minOrderAmount?: number | null;
@@ -59,12 +60,14 @@ export default function BusinessDetailsPage() {
         name: string;
         phoneNumber: string;
         businessType: BusinessType;
+        category: string;
         imageUrl: string;
         minOrderAmount: number;
     }>({
         name: '',
         phoneNumber: '',
         businessType: BusinessType.Restaurant,
+        category: '',
         imageUrl: '',
         minOrderAmount: 0,
     });
@@ -74,6 +77,7 @@ export default function BusinessDetailsPage() {
             name: b.name,
             phoneNumber: b.phoneNumber || '',
             businessType: BusinessType.Restaurant,
+            category: b.category || '',
             imageUrl: b.imageUrl || '',
             minOrderAmount: b.minOrderAmount ?? 0,
         });
@@ -90,6 +94,7 @@ export default function BusinessDetailsPage() {
                         name: editForm.name,
                         phoneNumber: editForm.phoneNumber.trim() || null,
                         businessType: editForm.businessType,
+                        category: editForm.category.trim() || null,
                         imageUrl: editForm.imageUrl || null,
                         minOrderAmount: editForm.minOrderAmount,
                     },
@@ -226,6 +231,16 @@ export default function BusinessDetailsPage() {
                             value={editForm.phoneNumber}
                             onChange={(e) => setEditForm({ ...editForm, phoneNumber: e.target.value })}
                         />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-zinc-400 mb-1">Category</label>
+                        <Input
+                            placeholder="e.g., Restorant, Kafene, Fast Food, Pizza"
+                            value={editForm.category}
+                            onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                        />
+                        <p className="text-xs text-zinc-600 mt-1">Used for filtering in the customer app</p>
                     </div>
 
                     <div>
