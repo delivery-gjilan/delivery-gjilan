@@ -906,38 +906,39 @@ export class OrderCreationModule {
         if (inventoryCoverageEntries.length > 0) {
             const invNow = new Date().toISOString();
             try {
-                // Write coverage logs
-                await db.insert(orderCoverageLogs).values(
-                    inventoryCoverageEntries.map((entry) => ({
-                        orderId: createdOrder.id,
-                        productId: entry.productId,
-                        orderedQty: entry.orderedQty,
-                        fromStock: entry.fromStock,
-                        fromMarket: entry.fromMarket,
-                        deducted: true,
-                        deductedAt: invNow,
-                    })),
-                );
+                await db.transaction(async (tx) => {
+                    // Write coverage logs (batch insert)
+                    await tx.insert(orderCoverageLogs).values(
+                        inventoryCoverageEntries.map((entry) => ({
+                            orderId: createdOrder.id,
+                            productId: entry.productId,
+                            orderedQty: entry.orderedQty,
+                            fromStock: entry.fromStock,
+                            fromMarket: entry.fromMarket,
+                            deducted: true,
+                            deductedAt: invNow,
+                        })),
+                    );
 
-                // Deduct personal_inventory quantities
-                for (const entry of inventoryCoverageEntries) {
-                    await db
-                        .update(personalInventory)
-                        .set({
-                            quantity: sql`GREATEST(0, ${personalInventory.quantity} - ${entry.fromStock})`,
-                            updatedAt: invNow,
-                        })
-                        .where(
-                            and(
-                                eq(personalInventory.businessId, entry.inventoryBusinessId),
-                                eq(personalInventory.productId, entry.productId),
-                            ),
-                        );
-                }
+                    // Batch UPDATE personal_inventory — single round-trip for all items
+                    const valuesList = inventoryCoverageEntries.map(
+                        (e) => sql`(${e.inventoryBusinessId}::uuid, ${e.productId}::uuid, ${e.fromStock}::int)`,
+                    );
+                    await tx.execute(sql`
+                        UPDATE personal_inventory AS pi
+                        SET quantity = GREATEST(0, pi.quantity - v.from_stock),
+                            updated_at = ${invNow}
+                        FROM (VALUES ${sql.join(valuesList, sql`, `)}) AS v(business_id, product_id, from_stock)
+                        WHERE pi.business_id = v.business_id
+                          AND pi.product_id = v.product_id
+                    `);
+                });
 
                 log.info({ orderId: createdOrder.id, entries: inventoryCoverageEntries.length }, 'order:inventory:deducted');
             } catch (invError) {
-                // Non-fatal: the DELIVERED handler's deductOrderStockCore is a safety net
+                // Non-fatal: the DELIVERED handler's deductOrderStockCore is a safety net.
+                // order_items.inventory_quantity is already set (in the order transaction), so
+                // the fallback will use the canonical allocation — not re-derive from current stock.
                 log.error({ orderId: createdOrder.id, error: invError }, 'order:inventory:deduction-failed');
             }
         }

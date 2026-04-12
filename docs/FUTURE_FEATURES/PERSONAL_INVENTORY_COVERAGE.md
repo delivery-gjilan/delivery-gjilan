@@ -33,16 +33,16 @@ The platform operator maintains personal stock of market items (bought at wholes
 3. Per item: `fromStock = min(ownedQty, item.quantity)`, `fromMarket = item.quantity - fromStock`.
 4. Sum all `fromStock × unitBaseCost` → `orderInventoryPrice`.
 5. Deduct `orderInventoryPrice` from `orderBasePrice` and `businessPrice`.
-6. Store `inventoryQuantity` per order item and `inventoryPrice` on the order.
-7. After order insert: write `orderCoverageLogs` + deduct `personal_inventory` quantities (non-fatal).
+6. Store `inventoryQuantity` per order item and `inventoryPrice` on the order (inside the order transaction).
+7. After order insert: run a **single nested transaction** that batch-inserts `orderCoverageLogs` and batch-updates `personal_inventory` via a `UPDATE ... FROM (VALUES ...)` — both are atomic together. Non-fatal: failure logs the error and the DELIVERED handler acts as safety net using `order_items.inventory_quantity` as canonical allocation.
 
 ### Cancellation Rollback (OrderLifecycleModule)
 
-`cancelOrder()` and `adminCancelOrder()` call `restoreInventoryStock()` which reads coverage logs with `deducted=true`, adds stock back, and marks logs as not deducted.
+`cancelOrder()` and `adminCancelOrder()` call `restoreInventoryStock()` which reads coverage logs with `deducted=true`, batch-adds stock back via a single `UPDATE ... FROM (VALUES ...)`, and marks all logs as not deducted in one UPDATE.
 
 ### Deduction Idempotency (deductOrderStockCore)
 
-The DELIVERED-time handler skips items already deducted at creation (checks `deducted=true` in coverage logs). Creation-time logs are canonical.
+The DELIVERED-time handler reads `order_items.inventory_quantity` as the **canonical** `fromStock` allocation (set inside the order transaction, always reliable). It never re-derives coverage from current inventory levels. Items already deducted (present in logs with `deducted=true`) are skipped. All DB writes are batched: one `UPDATE personal_inventory ... FROM (VALUES ...)` and one bulk `INSERT ... ON CONFLICT DO UPDATE` for logs.
 
 ### GraphQL Schema
 

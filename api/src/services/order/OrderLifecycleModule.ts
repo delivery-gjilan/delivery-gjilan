@@ -770,49 +770,26 @@ export class OrderLifecycleModule {
      */
     private async restoreInventoryStock(orderId: string, db: typeof this.deps.db): Promise<void> {
         try {
-            const coverageLogs = await db
-                .select({
-                    productId: orderCoverageLogs.productId,
-                    fromStock: orderCoverageLogs.fromStock,
-                })
-                .from(orderCoverageLogs)
-                .where(
-                    and(
-                        eq(orderCoverageLogs.orderId, orderId),
-                        eq(orderCoverageLogs.deducted, true),
-                    ),
-                );
-
-            if (coverageLogs.length === 0) return;
-
-            // Get the order's businessId to find the right inventory rows
-            const orderRow = await db
-                .select({ businessId: ordersTable.businessId })
-                .from(ordersTable)
-                .where(eq(ordersTable.id, orderId))
-                .limit(1);
-            const businessId = orderRow[0]?.businessId;
-            if (!businessId) return;
-
             const now = new Date().toISOString();
 
-            for (const log of coverageLogs) {
-                if (log.fromStock <= 0) continue;
+            // Restore inventory directly from coverage logs — no prior SELECT needed.
+            // JOIN against orders to get business_id; filter deducted=true and from_stock>0
+            // in the same statement.
+            const result = await db.execute(sql`
+                UPDATE personal_inventory AS pi
+                SET quantity = pi.quantity + ocl.from_stock,
+                    updated_at = ${now}
+                FROM order_coverage_logs AS ocl
+                JOIN orders AS o ON o.id = ocl.order_id
+                WHERE ocl.order_id = ${orderId}
+                  AND ocl.deducted = true
+                  AND ocl.from_stock > 0
+                  AND pi.product_id = ocl.product_id
+                  AND pi.business_id = o.business_id
+            `);
 
-                // Add stock back to personal_inventory
-                await db
-                    .update(personalInventory)
-                    .set({
-                        quantity: sql`${personalInventory.quantity} + ${log.fromStock}`,
-                        updatedAt: now,
-                    })
-                    .where(
-                        and(
-                            eq(personalInventory.productId, log.productId),
-                            eq(personalInventory.businessId, businessId),
-                        ),
-                    );
-            }
+            const restoredCount = (result as any).rowCount ?? 0;
+            if (restoredCount === 0) return;
 
             // Mark coverage logs as not deducted
             await db
@@ -820,7 +797,7 @@ export class OrderLifecycleModule {
                 .set({ deducted: false, deductedAt: null })
                 .where(eq(orderCoverageLogs.orderId, orderId));
 
-            logger.info({ orderId, restoredProducts: coverageLogs.length }, 'order:inventory:restored');
+            logger.info({ orderId, restoredProducts: restoredCount }, 'order:inventory:restored');
         } catch (error) {
             logger.error({ orderId, error }, 'order:inventory:restore-failed');
         }

@@ -1,10 +1,12 @@
 /**
  * Core stock-deduction logic for a delivered order.
  *
- * Calculates per-item coverage (fromStock / fromMarket), decrements
- * personal_inventory quantities, and writes/updates order_coverage_logs.
+ * Uses order_items.inventory_quantity as the CANONICAL allocation decided at
+ * order-creation time. This prevents re-deriving coverage from current inventory
+ * (which may have changed since creation) in the case the post-creation deduction
+ * step failed to write coverage logs.
  *
- * Idempotent: already-deducted items are skipped via onConflictDoUpdate.
+ * Idempotent: already-deducted items are skipped.
  * Can be called automatically (on DELIVERED) or manually (admin override).
  */
 
@@ -14,7 +16,7 @@ import { orderItems } from '@/database/schema/orderItems';
 import { orders } from '@/database/schema/orders';
 import { products } from '@/database/schema/products';
 import { orderCoverageLogs } from '@/database/schema/orderCoverageLogs';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, sql } from 'drizzle-orm';
 
 export interface CoverageItem {
     productId: string;
@@ -53,11 +55,14 @@ export async function deductOrderStockCore(orderId: string, db: DbType): Promise
 
     const businessId = orderRows[0].businessId;
 
-    // Get order items with source product resolution (for adopted products)
+    // Get order items with canonical inventory_quantity (set at creation time).
+    // This is the authoritative allocation — we never re-derive fromStock from
+    // current inventory levels, which may have changed since the order was placed.
     const items = await db
         .select({
             productId: orderItems.productId,
             quantity: orderItems.quantity,
+            inventoryQuantity: orderItems.inventoryQuantity,
             productName: products.name,
             productImageUrl: products.imageUrl,
             sourceProductId: products.sourceProductId,
@@ -90,27 +95,30 @@ export async function deductOrderStockCore(orderId: string, db: DbType): Promise
         }
     }
 
-    // Aggregate quantities keyed by inventory product ID
+    // Aggregate per inventory product ID, summing quantities and inventory allocations
     const aggregated = new Map<string, {
         productName: string;
         productImageUrl: string | null;
         totalQty: number;
+        totalFromStock: number; // canonical: from order_items.inventory_quantity
     }>();
     for (const item of items) {
         const invId = inventoryProductMap.get(item.productId)!;
         const existing = aggregated.get(invId);
         if (existing) {
             existing.totalQty += item.quantity;
+            existing.totalFromStock += item.inventoryQuantity ?? 0;
         } else {
             aggregated.set(invId, {
                 productName: item.productName,
                 productImageUrl: item.productImageUrl,
                 totalQty: item.quantity,
+                totalFromStock: item.inventoryQuantity ?? 0,
             });
         }
     }
 
-    // Load inventory for all relevant businesses
+    // Load inventory for all relevant businesses (only needed to locate the row to decrement)
     const inventoryRows = await db
         .select({
             productId: personalInventory.productId,
@@ -132,76 +140,57 @@ export async function deductOrderStockCore(orderId: string, db: DbType): Promise
         .where(and(eq(orderCoverageLogs.orderId, orderId), eq(orderCoverageLogs.deducted, true)));
     const alreadyDeductedSet = new Set(alreadyDeducted.map((r) => r.productId));
 
-    // Calculate coverage, deduct, and log
+    // Calculate coverage for all items first, then batch writes.
+    // fromStock comes from order_items.inventory_quantity (canonical creation-time allocation),
+    // NOT from current inventory levels. This ensures DELIVERED-time deduction always mirrors
+    // what was originally promised even if stock changed in the interim.
     const coverageItems: CoverageItem[] = [];
     let fullyOwnedCount = 0;
     let partiallyOwnedCount = 0;
     let marketOnlyCount = 0;
     const now = new Date().toISOString();
 
+    // Collect items that need deduction and log upsert in a single pass
+    const itemsToDeduct: Array<{ businessId: string; productId: string; fromStock: number }> = [];
+    const logsToUpsert: Array<{
+        orderId: string; productId: string; orderedQty: number;
+        fromStock: number; fromMarket: number; deducted: boolean; deductedAt: string | null;
+    }> = [];
+
     for (const [productId, agg] of aggregated) {
         const inv = inventoryMap.get(productId);
-        const ownedQty = inv?.quantity ?? 0;
         const qty = agg.totalQty;
-        let fromStock: number;
-        let fromMarket: number;
+        const fromStock = agg.totalFromStock;
+        const fromMarket = qty - fromStock;
         let status: CoverageItem['status'];
 
-        if (ownedQty >= qty) {
-            fromStock = qty;
-            fromMarket = 0;
+        if (fromStock >= qty) {
             status = 'FULLY_OWNED';
             fullyOwnedCount++;
-        } else if (ownedQty > 0) {
-            fromStock = ownedQty;
-            fromMarket = qty - ownedQty;
+        } else if (fromStock > 0) {
             status = 'PARTIALLY_OWNED';
             partiallyOwnedCount++;
         } else {
-            fromStock = 0;
-            fromMarket = qty;
             status = 'MARKET_ONLY';
             marketOnlyCount++;
         }
 
-        // Only deduct if not already deducted for this item
-        const shouldDeduct = fromStock > 0 && inv && !alreadyDeductedSet.has(productId);
-        if (shouldDeduct) {
-            const newQty = Math.max(0, ownedQty - fromStock);
-            await db
-                .update(personalInventory)
-                .set({ quantity: newQty, updatedAt: now })
-                .where(
-                    and(
-                        eq(personalInventory.businessId, inv!.businessId),
-                        eq(personalInventory.productId, productId),
-                    ),
-                );
+        const alreadyDone = alreadyDeductedSet.has(productId);
+
+        if (!alreadyDone && fromStock > 0 && inv) {
+            itemsToDeduct.push({ businessId: inv.businessId, productId, fromStock });
         }
 
-        // Upsert coverage log — skip if already deducted (creation-time log is canonical)
-        if (!alreadyDeductedSet.has(productId)) {
-            await db
-                .insert(orderCoverageLogs)
-                .values({
-                    orderId,
-                    productId,
-                    orderedQty: qty,
-                    fromStock,
-                    fromMarket,
-                    deducted: fromStock > 0,
-                    deductedAt: fromStock > 0 ? now : null,
-                    createdAt: now,
-                })
-                .onConflictDoUpdate({
-                    target: [orderCoverageLogs.orderId, orderCoverageLogs.productId],
-                    set: {
-                        fromStock,
-                        fromMarket,
-                        deducted: fromStock > 0,
-                        deductedAt: fromStock > 0 ? now : null,
-                    },
-                });
+        if (!alreadyDone) {
+            logsToUpsert.push({
+                orderId,
+                productId,
+                orderedQty: qty,
+                fromStock,
+                fromMarket,
+                deducted: fromStock > 0,
+                deductedAt: fromStock > 0 ? now : null,
+            });
         }
 
         coverageItems.push({
@@ -214,6 +203,37 @@ export async function deductOrderStockCore(orderId: string, db: DbType): Promise
             status,
             deducted: fromStock > 0,
         });
+    }
+
+    // Batch UPDATE personal_inventory — single round-trip for all items
+    if (itemsToDeduct.length > 0) {
+        const valuesList = itemsToDeduct.map(
+            (e) => sql`(${e.businessId}::uuid, ${e.productId}::uuid, ${e.fromStock}::int)`,
+        );
+        await db.execute(sql`
+            UPDATE personal_inventory AS pi
+            SET quantity = GREATEST(0, pi.quantity - v.from_stock),
+                updated_at = ${now}
+            FROM (VALUES ${sql.join(valuesList, sql`, `)}) AS v(business_id, product_id, from_stock)
+            WHERE pi.business_id = v.business_id
+              AND pi.product_id = v.product_id
+        `);
+    }
+
+    // Batch upsert coverage logs — single round-trip for all items
+    if (logsToUpsert.length > 0) {
+        await db
+            .insert(orderCoverageLogs)
+            .values(logsToUpsert.map((l) => ({ ...l, createdAt: now })))
+            .onConflictDoUpdate({
+                target: [orderCoverageLogs.orderId, orderCoverageLogs.productId],
+                set: {
+                    fromStock: sql`excluded.from_stock`,
+                    fromMarket: sql`excluded.from_market`,
+                    deducted: sql`excluded.deducted`,
+                    deductedAt: sql`excluded.deducted_at`,
+                },
+            });
     }
 
     return {
