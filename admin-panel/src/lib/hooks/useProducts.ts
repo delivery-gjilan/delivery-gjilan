@@ -109,6 +109,7 @@ export function useProducts(businessId: string): UseProductsResult {
                     isAvailable: v.isAvailable ?? true,
                     sortOrder: v.sortOrder ?? 0,
                     hasOptionGroups: card.hasOptionGroups ?? false,
+                    sourceProductId: v.sourceProductId ?? null,
                 }));
             }
 
@@ -132,6 +133,7 @@ export function useProducts(businessId: string): UseProductsResult {
                 isAvailable: product?.isAvailable ?? true,
                 sortOrder: product?.sortOrder ?? 0,
                 hasOptionGroups: card?.hasOptionGroups ?? false,
+                sourceProductId: product?.sourceProductId ?? null,
             }];
         })
         .filter((p: any) => Boolean(p.categoryId));

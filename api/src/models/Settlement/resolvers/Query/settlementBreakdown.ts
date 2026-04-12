@@ -57,6 +57,8 @@ export const settlementBreakdown: NonNullable<QueryResolvers['settlementBreakdow
             totalAmount: sql<number>`SUM(CAST(${settlements.amount} AS NUMERIC))::FLOAT`,
             count: sql<number>`COUNT(*)::INT`,
             isStockRemittance: sql<boolean>`BOOL_OR(${settlements.reason} LIKE 'Stock item%')`,
+            isDriverTip: sql<boolean>`BOOL_OR(${settlements.reason} LIKE 'Driver tip%')`,
+            isCatalogRevenue: sql<boolean>`BOOL_OR(${settlements.reason} LIKE 'Catalog product%')`,
             // Grab rule info via left join
             ruleName: settlementRules.name,
             ruleType: settlementRules.type,
@@ -72,6 +74,8 @@ export const settlementBreakdown: NonNullable<QueryResolvers['settlementBreakdow
             settlementRules.type,
             settlementRules.promotionId,
             sql`(${settlements.reason} LIKE 'Stock item%')`,
+            sql`(${settlements.reason} LIKE 'Driver tip%')`,
+            sql`(${settlements.reason} LIKE 'Catalog product%')`,
         );
 
     return rows.map((row) => {
@@ -82,6 +86,12 @@ export const settlementBreakdown: NonNullable<QueryResolvers['settlementBreakdow
             if (row.isStockRemittance) {
                 category = 'STOCK_REMITTANCE';
                 label = 'Stock Item Remittance';
+            } else if (row.isDriverTip) {
+                category = 'DRIVER_TIP';
+                label = 'Driver Tip';
+            } else if (row.isCatalogRevenue) {
+                category = 'CATALOG_REVENUE';
+                label = 'Catalog Product Revenue';
             } else {
                 // Auto-remittances (markup, priority surcharge)
                 category = 'AUTO_REMITTANCE';

@@ -203,6 +203,16 @@ export default function EarningsScreen() {
                 color: "#f59e0b",
                 explain: (t.earnings as any).explain_promo ?? "Promotional adjustment",
             },
+            DRIVER_TIP: {
+                icon: "heart-outline",
+                color: "#22c55e",
+                explain: (t.earnings as any).explain_tip ?? "Tips from customers — forwarded to you by the platform",
+            },
+            CATALOG_REVENUE: {
+                icon: "storefront-outline",
+                color: "#ef4444",
+                explain: (t.earnings as any).explain_catalog ?? "Revenue from catalog products that you collected in cash",
+            },
         };
         return configs[category] ?? { icon: "help-circle-outline", color: "#6b7280", explain: "" };
     };
@@ -225,6 +235,8 @@ export default function EarningsScreen() {
         if (s.reason?.startsWith("Stock item")) return { label: (t.earnings as any).stock_remittance ?? "Stock Items", color: "#a855f7" };
         if (s.reason?.startsWith("Markup")) return { label: (t.earnings as any).markup ?? "Markup", color: "#ef4444" };
         if (s.reason?.startsWith("Priority")) return { label: (t.earnings as any).priority ?? "Priority Fee", color: "#ef4444" };
+        if (s.reason?.startsWith("Driver tip")) return { label: (t.earnings as any).tip_label ?? "Tip", color: "#22c55e" };
+        if (s.reason?.startsWith("Catalog product")) return { label: (t.earnings as any).catalog_label ?? "Catalog", color: "#ef4444" };
         if (s.rule?.type === "DELIVERY_PRICE") return { label: (t.earnings as any).delivery_fee ?? "Delivery Fee", color: "#f59e0b" };
         return { label: t.earnings.commission, color: "#f59e0b" };
     };

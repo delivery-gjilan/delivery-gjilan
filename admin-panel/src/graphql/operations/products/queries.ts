@@ -29,6 +29,7 @@ export const GET_BUSINESS_PRODUCTS_AND_CATEGORIES = graphql(`
                 saleDiscountPercentage
                 isAvailable
                 sortOrder
+                sourceProductId
                 createdAt
                 updatedAt
             }
@@ -48,6 +49,7 @@ export const GET_BUSINESS_PRODUCTS_AND_CATEGORIES = graphql(`
                 saleDiscountPercentage
                 isAvailable
                 sortOrder
+                sourceProductId
                 variantGroup {
                     id
                     name
@@ -79,6 +81,19 @@ export const GET_PRODUCT_WITH_OPTIONS = graphql(`
                     displayOrder
                 }
             }
+        }
+    }
+`);
+
+export const GET_CATALOG_PRODUCTS = graphql(`
+    query CatalogProducts {
+        catalogProducts {
+            id
+            businessId
+            name
+            description
+            imageUrl
+            price
         }
     }
 `);

@@ -71,11 +71,11 @@ export class OrderQueryModule {
         if (dbOrder.driverId !== driverId) return null;
 
         const paymentCollection = dbOrder.paymentCollection;
-        const driverTip = Number((dbOrder as any).driverTip ?? 0);
+        const driverTip = Number(dbOrder.driverTip ?? 0);
         const totalPrice =
             Number(dbOrder.actualPrice) +
             Number(dbOrder.deliveryPrice ?? 0) +
-            Number((dbOrder as any).prioritySurcharge ?? 0) +
+            Number(dbOrder.prioritySurcharge ?? 0) +
             driverTip;
 
         const amountToCollectFromCustomer =
@@ -109,8 +109,8 @@ export class OrderQueryModule {
         } else {
             if (paymentCollection === 'CASH_TO_DRIVER') {
                 amountToRemitToPlatform =
-                    Number((dbOrder as any).markupPrice ?? 0) +
-                    Number((dbOrder as any).prioritySurcharge ?? 0);
+                    Number(dbOrder.markupPrice ?? 0) +
+                    Number(dbOrder.prioritySurcharge ?? 0);
             } else {
                 amountToRemitToPlatform = 0;
             }

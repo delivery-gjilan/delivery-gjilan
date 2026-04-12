@@ -89,6 +89,13 @@ export type AdminPttSignal = {
   timestamp: Scalars['DateTime']['output'];
 };
 
+export type AdoptCatalogProductInput = {
+  businessId: Scalars['ID']['input'];
+  categoryId: Scalars['ID']['input'];
+  price: Scalars['Float']['input'];
+  sourceProductId: Scalars['ID']['input'];
+};
+
 export type AgoraRtcCredentials = {
   __typename?: 'AgoraRtcCredentials';
   appId: Scalars['String']['output'];
@@ -500,6 +507,7 @@ export type CreateOrderChildItemInput = {
 export type CreateOrderInput = {
   deliveryPrice: Scalars['Float']['input'];
   driverNotes?: InputMaybe<Scalars['String']['input']>;
+  driverTip?: InputMaybe<Scalars['Float']['input']>;
   dropOffLocation: LocationInput;
   items: Array<CreateOrderItemInput>;
   paymentCollection?: InputMaybe<OrderPaymentCollection>;
@@ -867,6 +875,7 @@ export type DriverOrderFinancials = {
   amountToCollectFromCustomer: Scalars['Float']['output'];
   amountToRemitToPlatform: Scalars['Float']['output'];
   driverNetEarnings: Scalars['Float']['output'];
+  driverTip: Scalars['Float']['output'];
   orderId: Scalars['ID']['output'];
   paymentCollection: OrderPaymentCollection;
 };
@@ -1036,6 +1045,7 @@ export type Mutation = {
   adminUpdateDriverLocation: User;
   /** Admin mutation to update per-driver settings (commission %, max active orders, vehicle ownership) */
   adminUpdateDriverSettings: User;
+  adoptCatalogProduct: Product;
   approveOrder: Order;
   assignDriverToOrder: Order;
   assignPromotionToUsers: Array<UserPromotion>;
@@ -1148,6 +1158,7 @@ export type Mutation = {
   submitOrderReview: OrderReview;
   submitPhoneNumber: SignupStepResponse;
   trackPushTelemetry: Scalars['Boolean']['output'];
+  unadoptCatalogProduct: Scalars['Boolean']['output'];
   unregisterDeviceToken: Scalars['Boolean']['output'];
   unsettleSettlement: Settlement;
   updateBanner: Banner;
@@ -1233,6 +1244,11 @@ export type MutationadminUpdateDriverSettingsArgs = {
   driverId: Scalars['ID']['input'];
   hasOwnVehicle?: InputMaybe<Scalars['Boolean']['input']>;
   maxActiveOrders?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
+export type MutationadoptCatalogProductArgs = {
+  input: AdoptCatalogProductInput;
 };
 
 
@@ -1728,6 +1744,11 @@ export type MutationtrackPushTelemetryArgs = {
 };
 
 
+export type MutationunadoptCatalogProductArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
 export type MutationunregisterDeviceTokenArgs = {
   token: Scalars['String']['input'];
 };
@@ -1975,6 +1996,7 @@ export type Order = {
   driverArrivedAtPickup?: Maybe<Scalars['Date']['output']>;
   driverAssignedAt?: Maybe<Scalars['Date']['output']>;
   driverNotes?: Maybe<Scalars['String']['output']>;
+  driverTip: Scalars['Float']['output'];
   dropOffLocation: Location;
   estimatedReadyAt?: Maybe<Scalars['Date']['output']>;
   id: Scalars['ID']['output'];
@@ -2166,6 +2188,7 @@ export type Product = {
   price: Scalars['Float']['output'];
   saleDiscountPercentage?: Maybe<Scalars['Float']['output']>;
   sortOrder: Scalars['Int']['output'];
+  sourceProductId?: Maybe<Scalars['ID']['output']>;
   subcategoryId?: Maybe<Scalars['ID']['output']>;
   updatedAt: Scalars['String']['output'];
   variantGroup?: Maybe<ProductVariantGroup>;
@@ -2376,6 +2399,7 @@ export type Query = {
   businesses: Array<Business>;
   calculateDeliveryPrice: DeliveryPriceResult;
   cancelledOrders: Array<Order>;
+  catalogProducts: Array<Product>;
   deliveryPricingConfig: DeliveryPricingConfig;
   deliveryPricingTiers: Array<DeliveryPricingTier>;
   deliveryZones: Array<DeliveryZone>;
@@ -3582,6 +3606,7 @@ export type ResolversTypes = {
   Int: ResolverTypeWrapper<Scalars['Int']['output']>;
   AdminPttSignal: ResolverTypeWrapper<Omit<AdminPttSignal, 'action'> & { action: ResolversTypes['DriverPttSignalAction'] }>;
   ID: ResolverTypeWrapper<Scalars['ID']['output']>;
+  AdoptCatalogProductInput: AdoptCatalogProductInput;
   AgoraRtcCredentials: ResolverTypeWrapper<AgoraRtcCredentials>;
   AgoraRtcRole: ResolverTypeWrapper<'PUBLISHER' | 'SUBSCRIBER'>;
   AppLanguage: ResolverTypeWrapper<'EN' | 'AL'>;
@@ -3795,6 +3820,7 @@ export type ResolversParentTypes = {
   Int: Scalars['Int']['output'];
   AdminPttSignal: AdminPttSignal;
   ID: Scalars['ID']['output'];
+  AdoptCatalogProductInput: AdoptCatalogProductInput;
   AgoraRtcCredentials: AgoraRtcCredentials;
   ApplicablePromotion: ApplicablePromotion;
   Boolean: Scalars['Boolean']['output'];
@@ -4412,6 +4438,7 @@ export type DriverOrderFinancialsResolvers<ContextType = GraphQLContext, ParentT
   amountToCollectFromCustomer?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   amountToRemitToPlatform?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   driverNetEarnings?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  driverTip?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   orderId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   paymentCollection?: Resolver<ResolversTypes['OrderPaymentCollection'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
@@ -4509,6 +4536,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   adminSimulateDriverHeartbeat?: Resolver<ResolversTypes['DriverHeartbeatResult'], ParentType, ContextType, RequireFields<MutationadminSimulateDriverHeartbeatArgs, 'driverId' | 'latitude' | 'longitude'>>;
   adminUpdateDriverLocation?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationadminUpdateDriverLocationArgs, 'driverId' | 'latitude' | 'longitude'>>;
   adminUpdateDriverSettings?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationadminUpdateDriverSettingsArgs, 'driverId'>>;
+  adoptCatalogProduct?: Resolver<ResolversTypes['Product'], ParentType, ContextType, RequireFields<MutationadoptCatalogProductArgs, 'input'>>;
   approveOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationapproveOrderArgs, 'id'>>;
   assignDriverToOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationassignDriverToOrderArgs, 'id'>>;
   assignPromotionToUsers?: Resolver<Array<ResolversTypes['UserPromotion']>, ParentType, ContextType, RequireFields<MutationassignPromotionToUsersArgs, 'input'>>;
@@ -4602,6 +4630,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   submitOrderReview?: Resolver<ResolversTypes['OrderReview'], ParentType, ContextType, RequireFields<MutationsubmitOrderReviewArgs, 'orderId' | 'rating'>>;
   submitPhoneNumber?: Resolver<ResolversTypes['SignupStepResponse'], ParentType, ContextType, RequireFields<MutationsubmitPhoneNumberArgs, 'input'>>;
   trackPushTelemetry?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationtrackPushTelemetryArgs, 'input'>>;
+  unadoptCatalogProduct?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationunadoptCatalogProductArgs, 'id'>>;
   unregisterDeviceToken?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationunregisterDeviceTokenArgs, 'token'>>;
   unsettleSettlement?: Resolver<ResolversTypes['Settlement'], ParentType, ContextType, RequireFields<MutationunsettleSettlementArgs, 'settlementId'>>;
   updateBanner?: Resolver<ResolversTypes['Banner'], ParentType, ContextType, RequireFields<MutationupdateBannerArgs, 'id' | 'input'>>;
@@ -4721,6 +4750,7 @@ export type OrderResolvers<ContextType = GraphQLContext, ParentType extends Reso
   driverArrivedAtPickup?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
   driverAssignedAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
   driverNotes?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  driverTip?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   dropOffLocation?: Resolver<ResolversTypes['Location'], ParentType, ContextType>;
   estimatedReadyAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
@@ -4898,6 +4928,7 @@ export type ProductResolvers<ContextType = GraphQLContext, ParentType extends Re
   price?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   saleDiscountPercentage?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   sortOrder?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  sourceProductId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
   subcategoryId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
   updatedAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   variantGroup?: Resolver<Maybe<ResolversTypes['ProductVariantGroup']>, ParentType, ContextType>;
@@ -5076,6 +5107,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   businesses?: Resolver<Array<ResolversTypes['Business']>, ParentType, ContextType>;
   calculateDeliveryPrice?: Resolver<ResolversTypes['DeliveryPriceResult'], ParentType, ContextType, RequireFields<QuerycalculateDeliveryPriceArgs, 'businessId' | 'dropoffLat' | 'dropoffLng'>>;
   cancelledOrders?: Resolver<Array<ResolversTypes['Order']>, ParentType, ContextType, Partial<QuerycancelledOrdersArgs>>;
+  catalogProducts?: Resolver<Array<ResolversTypes['Product']>, ParentType, ContextType>;
   deliveryPricingConfig?: Resolver<ResolversTypes['DeliveryPricingConfig'], ParentType, ContextType>;
   deliveryPricingTiers?: Resolver<Array<ResolversTypes['DeliveryPricingTier']>, ParentType, ContextType>;
   deliveryZones?: Resolver<Array<ResolversTypes['DeliveryZone']>, ParentType, ContextType>;

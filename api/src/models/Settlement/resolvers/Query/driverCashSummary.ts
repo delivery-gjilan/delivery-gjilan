@@ -42,6 +42,7 @@ export const driverCashSummary: NonNullable<QueryResolvers['driverCashSummary']>
                     CAST(${ordersTable.actualPrice} AS NUMERIC)
                     + CAST(${ordersTable.deliveryPrice} AS NUMERIC)
                     + CAST(${ordersTable.prioritySurcharge} AS NUMERIC)
+                    + CAST(${ordersTable.driverTip} AS NUMERIC)
                     - COALESCE(CAST(${ordersTable.businessPrice} AS NUMERIC), CAST(${ordersTable.basePrice} AS NUMERIC))
                 ), 0)::FLOAT
             `,

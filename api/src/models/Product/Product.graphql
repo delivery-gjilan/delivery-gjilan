@@ -47,6 +47,9 @@ type Product {
     markupPrice: Float
     nightMarkedupPrice: Float
     optionGroups: [OptionGroup!]!
+    # When set, this product is adopted from another business's catalog.
+    # The sourceProductId points to the original product used for inventory/cost lookups.
+    sourceProductId: ID
     createdAt: String!
     updatedAt: String!
 }
@@ -71,6 +74,8 @@ type Query {
     products(businessId: ID!): [ProductCard!]! @skipAuth
     product(id: ID!): Product @skipAuth
     offers(businessId: ID!): [Product!]! @skipAuth
+    # Returns all products eligible for catalog adoption (from the platform market business)
+    catalogProducts: [Product!]!
 }
 
 input CreateOptionGroupInput {
@@ -147,6 +152,13 @@ input ProductOrderInput {
     sortOrder: Int!
 }
 
+input AdoptCatalogProductInput {
+    businessId: ID!
+    sourceProductId: ID!
+    categoryId: ID!
+    price: Float!
+}
+
 type Mutation {
     createProduct(input: CreateProductInput!): Product!
     updateProduct(id: ID!, input: UpdateProductInput!): Product!
@@ -163,4 +175,7 @@ type Mutation {
     createOption(optionGroupId: ID!, input: CreateOptionInput!): Option!
     updateOption(id: ID!, input: UpdateOptionInput!): Option!
     deleteOption(id: ID!): Boolean!
+
+    adoptCatalogProduct(input: AdoptCatalogProductInput!): Product!
+    unadoptCatalogProduct(id: ID!): Boolean!
 }

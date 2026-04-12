@@ -100,3 +100,17 @@ export const DELETE_OPTION = graphql(`
         deleteOption(id: $id)
     }
 `);
+
+export const ADOPT_CATALOG_PRODUCT = graphql(`
+    mutation AdoptCatalogProduct($input: AdoptCatalogProductInput!) {
+        adoptCatalogProduct(input: $input) {
+            id
+        }
+    }
+`);
+
+export const UNADOPT_CATALOG_PRODUCT = graphql(`
+    mutation UnadoptCatalogProduct($id: ID!) {
+        unadoptCatalogProduct(id: $id)
+    }
+`);

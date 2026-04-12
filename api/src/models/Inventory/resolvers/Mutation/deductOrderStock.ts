@@ -5,7 +5,7 @@ import { orderItems } from '@/database/schema/orderItems';
 import { orders } from '@/database/schema/orders';
 import { products } from '@/database/schema/products';
 import { orderCoverageLogs } from '@/database/schema/orderCoverageLogs';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, inArray } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 
 export const deductOrderStock: NonNullable<MutationResolvers['deductOrderStock']> = async (
@@ -46,45 +46,74 @@ export const deductOrderStock: NonNullable<MutationResolvers['deductOrderStock']
 
     const businessId = orderRows[0].businessId;
 
-    // Get order items
+    // Get order items with source product resolution
     const items = await db
         .select({
             productId: orderItems.productId,
             quantity: orderItems.quantity,
             productName: products.name,
             productImageUrl: products.imageUrl,
+            sourceProductId: products.sourceProductId,
         })
         .from(orderItems)
         .innerJoin(products, eq(orderItems.productId, products.id))
         .where(eq(orderItems.orderId, orderId));
 
-    // Aggregate quantities
-    const aggregated = new Map<string, { productName: string; productImageUrl: string | null; totalQty: number }>();
+    // For adopted products, resolve the inventory product ID (sourceProductId)
+    // and collect the source business IDs for inventory lookups
+    const sourceProductIds = new Set<string>();
+    const inventoryProductMap = new Map<string, string>(); // productId → inventory lookup ID
     for (const item of items) {
-        const existing = aggregated.get(item.productId);
+        const invId = item.sourceProductId ?? item.productId;
+        inventoryProductMap.set(item.productId, invId);
+        sourceProductIds.add(invId);
+    }
+
+    // If any adopted products exist, fetch source product business IDs
+    const sourceBusinessIds = new Set<string>([businessId]);
+    const adoptedSourceIds = [...sourceProductIds].filter((sid) =>
+        items.some((i) => i.sourceProductId && (i.sourceProductId === sid)),
+    );
+    if (adoptedSourceIds.length > 0) {
+        const sourceProducts = await db
+            .select({ id: products.id, businessId: products.businessId })
+            .from(products)
+            .where(inArray(products.id, adoptedSourceIds));
+        for (const sp of sourceProducts) {
+            sourceBusinessIds.add(sp.businessId);
+        }
+    }
+
+    // Aggregate quantities — keyed by INVENTORY product ID
+    const aggregated = new Map<string, { productName: string; productImageUrl: string | null; totalQty: number; orderProductId: string }>();
+    for (const item of items) {
+        const invId = inventoryProductMap.get(item.productId)!;
+        const existing = aggregated.get(invId);
         if (existing) {
             existing.totalQty += item.quantity;
         } else {
-            aggregated.set(item.productId, {
+            aggregated.set(invId, {
                 productName: item.productName,
                 productImageUrl: item.productImageUrl,
                 totalQty: item.quantity,
+                orderProductId: item.productId,
             });
         }
     }
 
-    // Get inventory
+    // Get inventory across all relevant businesses
     const inventoryRows = await db
         .select({
             productId: personalInventory.productId,
             quantity: personalInventory.quantity,
+            businessId: personalInventory.businessId,
         })
         .from(personalInventory)
-        .where(eq(personalInventory.businessId, businessId));
+        .where(inArray(personalInventory.businessId, [...sourceBusinessIds]));
 
-    const inventoryMap = new Map<string, number>();
+    const inventoryMap = new Map<string, { quantity: number; businessId: string }>();
     for (const inv of inventoryRows) {
-        inventoryMap.set(inv.productId, inv.quantity);
+        inventoryMap.set(inv.productId, { quantity: inv.quantity, businessId: inv.businessId });
     }
 
     // Calculate coverage and deduct
@@ -95,7 +124,8 @@ export const deductOrderStock: NonNullable<MutationResolvers['deductOrderStock']
     const now = new Date().toISOString();
 
     for (const [productId, agg] of aggregated) {
-        const ownedQty = inventoryMap.get(productId) ?? 0;
+        const inv = inventoryMap.get(productId);
+        const ownedQty = inv?.quantity ?? 0;
         const qty = agg.totalQty;
         let fromStock: number;
         let fromMarket: number;
@@ -119,14 +149,14 @@ export const deductOrderStock: NonNullable<MutationResolvers['deductOrderStock']
         }
 
         // Deduct from inventory if there's stock to deduct
-        if (fromStock > 0) {
+        if (fromStock > 0 && inv) {
             const newQty = Math.max(0, ownedQty - fromStock);
             await db
                 .update(personalInventory)
                 .set({ quantity: newQty, updatedAt: now })
                 .where(
                     and(
-                        eq(personalInventory.businessId, businessId),
+                        eq(personalInventory.businessId, inv.businessId),
                         eq(personalInventory.productId, productId),
                     ),
                 );

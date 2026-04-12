@@ -118,7 +118,7 @@ export function OrderDetailSheet({
     const items: any[] = order.businesses?.flatMap((b: any) => b.items ?? []) ?? [];
     const totalItems = items.reduce((s: number, i: any) => s + (i.quantity || 1), 0);
     const deliveryPrice = Number(order.deliveryPrice ?? 0).toFixed(2);
-    const driverTip = Number((order as any).driverTip ?? 0);
+    const driverTip = Number(order.driverTip ?? 0);
     const isDelivering = order.status === 'OUT_FOR_DELIVERY';
     const isPreparing = order.status === 'PREPARING';
     const isReady = order.status === 'READY';

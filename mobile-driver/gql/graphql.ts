@@ -87,6 +87,13 @@ export type AdminPttSignal = {
   timestamp: Scalars['DateTime']['output'];
 };
 
+export type AdoptCatalogProductInput = {
+  businessId: Scalars['ID']['input'];
+  categoryId: Scalars['ID']['input'];
+  price: Scalars['Float']['input'];
+  sourceProductId: Scalars['ID']['input'];
+};
+
 export type AgoraRtcCredentials = {
   __typename?: 'AgoraRtcCredentials';
   appId: Scalars['String']['output'];
@@ -507,6 +514,7 @@ export type CreateOrderChildItemInput = {
 export type CreateOrderInput = {
   deliveryPrice: Scalars['Float']['input'];
   driverNotes?: InputMaybe<Scalars['String']['input']>;
+  driverTip?: InputMaybe<Scalars['Float']['input']>;
   dropOffLocation: LocationInput;
   items: Array<CreateOrderItemInput>;
   paymentCollection?: InputMaybe<OrderPaymentCollection>;
@@ -878,6 +886,7 @@ export type DriverOrderFinancials = {
   amountToCollectFromCustomer: Scalars['Float']['output'];
   amountToRemitToPlatform: Scalars['Float']['output'];
   driverNetEarnings: Scalars['Float']['output'];
+  driverTip: Scalars['Float']['output'];
   orderId: Scalars['ID']['output'];
   paymentCollection: OrderPaymentCollection;
 };
@@ -1051,6 +1060,7 @@ export type Mutation = {
   adminUpdateDriverLocation: User;
   /** Admin mutation to update per-driver settings (commission %, max active orders, vehicle ownership) */
   adminUpdateDriverSettings: User;
+  adoptCatalogProduct: Product;
   approveOrder: Order;
   assignDriverToOrder: Order;
   assignPromotionToUsers: Array<UserPromotion>;
@@ -1163,6 +1173,7 @@ export type Mutation = {
   submitOrderReview: OrderReview;
   submitPhoneNumber: SignupStepResponse;
   trackPushTelemetry: Scalars['Boolean']['output'];
+  unadoptCatalogProduct: Scalars['Boolean']['output'];
   unregisterDeviceToken: Scalars['Boolean']['output'];
   unsettleSettlement: Settlement;
   updateBanner: Banner;
@@ -1248,6 +1259,11 @@ export type MutationAdminUpdateDriverSettingsArgs = {
   driverId: Scalars['ID']['input'];
   hasOwnVehicle?: InputMaybe<Scalars['Boolean']['input']>;
   maxActiveOrders?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
+export type MutationAdoptCatalogProductArgs = {
+  input: AdoptCatalogProductInput;
 };
 
 
@@ -1743,6 +1759,11 @@ export type MutationTrackPushTelemetryArgs = {
 };
 
 
+export type MutationUnadoptCatalogProductArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
 export type MutationUnregisterDeviceTokenArgs = {
   token: Scalars['String']['input'];
 };
@@ -1991,6 +2012,7 @@ export type Order = {
   driverArrivedAtPickup?: Maybe<Scalars['Date']['output']>;
   driverAssignedAt?: Maybe<Scalars['Date']['output']>;
   driverNotes?: Maybe<Scalars['String']['output']>;
+  driverTip: Scalars['Float']['output'];
   dropOffLocation: Location;
   estimatedReadyAt?: Maybe<Scalars['Date']['output']>;
   id: Scalars['ID']['output'];
@@ -2184,6 +2206,7 @@ export type Product = {
   price: Scalars['Float']['output'];
   saleDiscountPercentage?: Maybe<Scalars['Float']['output']>;
   sortOrder: Scalars['Int']['output'];
+  sourceProductId?: Maybe<Scalars['ID']['output']>;
   subcategoryId?: Maybe<Scalars['ID']['output']>;
   updatedAt: Scalars['String']['output'];
   variantGroup?: Maybe<ProductVariantGroup>;
@@ -2399,6 +2422,7 @@ export type Query = {
   businesses: Array<Business>;
   calculateDeliveryPrice: DeliveryPriceResult;
   cancelledOrders: Array<Order>;
+  catalogProducts: Array<Product>;
   deliveryPricingConfig: DeliveryPricingConfig;
   deliveryPricingTiers: Array<DeliveryPricingTier>;
   deliveryZones: Array<DeliveryZone>;
@@ -2713,8 +2737,10 @@ export type QueryOrderCoverageArgs = {
 
 
 export type QueryOrdersArgs = {
+  endDate?: InputMaybe<Scalars['String']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
+  startDate?: InputMaybe<Scalars['String']['input']>;
   statuses?: InputMaybe<Array<OrderStatus>>;
 };
 

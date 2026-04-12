@@ -38,6 +38,10 @@ export const products = pgTable(
         isDeleted: boolean('is_deleted').default(false).notNull(),
         sortOrder: integer('sort_order').default(0).notNull(),
         orderCount: integer('order_count').default(0).notNull(),
+        // When set, this product is an "adopted" catalog product — a copy of another
+        // business's product listed at a custom price.  Inventory deduction and
+        // settlement use the source product for cost/stock lookups.
+        sourceProductId: uuid('source_product_id'),
         createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
             .default(sql`CURRENT_TIMESTAMP`)
             .notNull(),
@@ -67,6 +71,11 @@ export const productsRelations = relations(products, ({ one, many }) => ({
         references: [productVariantGroups.id],
     }),
     optionGroups: many(optionGroups),
+    sourceProduct: one(products, {
+        fields: [products.sourceProductId],
+        references: [products.id],
+        relationName: 'sourceProduct',
+    }),
 }));
 
 export type DbProduct = typeof products.$inferSelect;

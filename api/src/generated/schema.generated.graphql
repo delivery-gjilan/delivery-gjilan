@@ -68,6 +68,13 @@ type AdminPttSignal {
   timestamp: DateTime!
 }
 
+input AdoptCatalogProductInput {
+  businessId: ID!
+  categoryId: ID!
+  price: Float!
+  sourceProductId: ID!
+}
+
 type AgoraRtcCredentials {
   appId: String!
   channelName: String!
@@ -475,6 +482,7 @@ input CreateOrderChildItemInput {
 input CreateOrderInput {
   deliveryPrice: Float!
   driverNotes: String
+  driverTip: Float
   dropOffLocation: LocationInput!
   items: [CreateOrderItemInput!]!
   paymentCollection: OrderPaymentCollection
@@ -866,6 +874,7 @@ type DriverOrderFinancials {
   amountToCollectFromCustomer: Float!
   amountToRemitToPlatform: Float!
   driverNetEarnings: Float!
+  driverTip: Float!
   orderId: ID!
   paymentCollection: OrderPaymentCollection!
 }
@@ -1052,6 +1061,7 @@ type Mutation {
   Admin mutation to update per-driver settings (commission %, max active orders, vehicle ownership)
   """
   adminUpdateDriverSettings(commissionPercentage: Float, driverId: ID!, hasOwnVehicle: Boolean, maxActiveOrders: Int): User!
+  adoptCatalogProduct(input: AdoptCatalogProductInput!): Product!
   approveOrder(id: ID!): Order!
   assignDriverToOrder(driverId: ID, id: ID!): Order!
   assignPromotionToUsers(input: AssignPromotionToUserInput!): [UserPromotion!]!
@@ -1185,6 +1195,7 @@ type Mutation {
   submitOrderReview(comment: String, orderId: ID!, quickFeedback: [String!], rating: Int!): OrderReview!
   submitPhoneNumber(input: SubmitPhoneNumberInput!): SignupStepResponse!
   trackPushTelemetry(input: TrackPushTelemetryInput!): Boolean!
+  unadoptCatalogProduct(id: ID!): Boolean!
   unregisterDeviceToken(token: String!): Boolean!
   unsettleSettlement(settlementId: ID!): Settlement!
   updateBanner(id: ID!, input: UpdateBannerInput!): Banner!
@@ -1304,6 +1315,7 @@ type Order {
   driverArrivedAtPickup: Date
   driverAssignedAt: Date
   driverNotes: String
+  driverTip: Float!
   dropOffLocation: Location!
   estimatedReadyAt: Date
   id: ID!
@@ -1483,6 +1495,7 @@ type Product {
   price: Float!
   saleDiscountPercentage: Float
   sortOrder: Int!
+  sourceProductId: ID
   subcategoryId: ID
   updatedAt: String!
   variantGroup: ProductVariantGroup
@@ -1688,6 +1701,7 @@ type Query {
   businesses: [Business!]!
   calculateDeliveryPrice(businessId: ID!, dropoffLat: Float!, dropoffLng: Float!): DeliveryPriceResult!
   cancelledOrders(limit: Int, offset: Int): [Order!]!
+  catalogProducts: [Product!]!
   deliveryPricingConfig: DeliveryPricingConfig!
   deliveryPricingTiers: [DeliveryPricingTier!]!
   deliveryZones: [DeliveryZone!]!

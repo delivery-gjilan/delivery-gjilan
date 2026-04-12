@@ -45,6 +45,9 @@ import {
     GET_PRODUCT_WITH_OPTIONS,
     UPDATE_OPTION_GROUP,
     UPDATE_OPTION,
+    GET_CATALOG_PRODUCTS,
+    ADOPT_CATALOG_PRODUCT,
+    UNADOPT_CATALOG_PRODUCT,
 } from "@/graphql/operations/products";
 import { useAuth } from "@/lib/auth-context";
 
@@ -73,6 +76,7 @@ interface Product {
     isAvailable: boolean;
     sortOrder: number;
     hasOptionGroups?: boolean;
+    sourceProductId?: string | null;
 }
 
 /* ===============================================
@@ -180,6 +184,8 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
     const [createOption] = useMutation(CREATE_OPTION);
     const [updateOption] = useMutation(UPDATE_OPTION);
     const [deleteOption] = useMutation(DELETE_OPTION);
+    const [adoptCatalogProduct] = useMutation(ADOPT_CATALOG_PRODUCT);
+    const [unadoptCatalogProduct] = useMutation(UNADOPT_CATALOG_PRODUCT);
 
     /* ===============================================
      UI STATE
@@ -187,6 +193,15 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
 
     const [createOpen, setCreateOpen] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
+    const [catalogOpen, setCatalogOpen] = useState(false);
+    const [catalogSearch, setCatalogSearch] = useState("");
+    const [catalogAdopting, setCatalogAdopting] = useState(false);
+    const [catalogForm, setCatalogForm] = useState<{
+        sourceProductId: string;
+        sourceProductName: string;
+        categoryId: string;
+        price: number;
+    } | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<{
         id: string;
         name: string;
@@ -273,6 +288,11 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
     const { data: productOptionsData, refetch: refetchProductOptions } = useQuery(GET_PRODUCT_WITH_OPTIONS, {
         variables: { id: optionsModal.productId },
         skip: !optionsModal.open || !optionsModal.productId,
+        fetchPolicy: "network-only",
+    });
+
+    const { data: catalogData, loading: catalogLoading } = useQuery(GET_CATALOG_PRODUCTS, {
+        skip: !catalogOpen,
         fetchPolicy: "network-only",
     });
 
@@ -962,6 +982,14 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                     >
                         {createLoading ? "Adding..." : "+ Add Product"}
                     </Button>
+                    {isPlatformAdminRole && (
+                        <Button
+                            variant="outline"
+                            onClick={() => setCatalogOpen(true)}
+                        >
+                            + Add from Catalog
+                        </Button>
+                    )}
                 </div>
             </div>
 
@@ -1067,6 +1095,11 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                         {p.hasOptionGroups && (
                                                             <span className="inline-flex items-center rounded-full bg-zinc-500/20 border border-zinc-500/40 px-2 py-0.5 text-[10px] font-medium text-zinc-300">
                                                                 Has Options
+                                                            </span>
+                                                        )}
+                                                        {p.sourceProductId && (
+                                                            <span className="inline-flex items-center rounded-full bg-cyan-500/20 border border-cyan-500/40 px-2 py-0.5 text-[10px] font-medium text-cyan-300">
+                                                                Catalog
                                                             </span>
                                                         )}
                                                     </div>
@@ -2262,6 +2295,179 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                         {optionsLoading ? "Deleting..." : "Delete"}
                     </Button>
                 </div>
+            </Modal>
+
+            {/* ===============================================
+             CATALOG MODAL
+            =============================================== */}
+
+            <Modal
+                isOpen={catalogOpen}
+                onClose={() => {
+                    setCatalogOpen(false);
+                    setCatalogForm(null);
+                    setCatalogSearch("");
+                }}
+                title={catalogForm ? `Adopt: ${catalogForm.sourceProductName}` : "Add from Catalog"}
+            >
+                {!catalogForm ? (
+                    <div className="space-y-4">
+                        <Input
+                            placeholder="Search catalog products..."
+                            value={catalogSearch}
+                            onChange={(e) => setCatalogSearch(e.target.value)}
+                        />
+
+                        {catalogLoading ? (
+                            <p className="text-sm text-zinc-500">Loading catalog...</p>
+                        ) : (
+                            <div className="max-h-96 overflow-y-auto space-y-1">
+                                {(() => {
+                                    const alreadyAdoptedSourceIds = new Set(
+                                        products
+                                            .filter((p) => p.sourceProductId)
+                                            .map((p) => p.sourceProductId),
+                                    );
+                                    const filtered = (catalogData?.catalogProducts ?? []).filter(
+                                        (cp) =>
+                                            !alreadyAdoptedSourceIds.has(cp.id) &&
+                                            cp.name.toLowerCase().includes(catalogSearch.toLowerCase()),
+                                    );
+
+                                    if (filtered.length === 0) {
+                                        return (
+                                            <p className="text-sm text-zinc-500 py-4 text-center">
+                                                {catalogSearch ? "No matching products." : "No catalog products available."}
+                                            </p>
+                                        );
+                                    }
+
+                                    return filtered.map((cp) => (
+                                        <button
+                                            key={cp.id}
+                                            type="button"
+                                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-zinc-800 transition-colors text-left"
+                                            onClick={() =>
+                                                setCatalogForm({
+                                                    sourceProductId: cp.id,
+                                                    sourceProductName: cp.name,
+                                                    categoryId: "",
+                                                    price: cp.price,
+                                                })
+                                            }
+                                        >
+                                            {cp.imageUrl ? (
+                                                <img
+                                                    src={cp.imageUrl}
+                                                    alt={cp.name}
+                                                    className="h-10 w-10 rounded object-cover flex-shrink-0"
+                                                />
+                                            ) : (
+                                                <div className="h-10 w-10 rounded bg-zinc-800 flex-shrink-0" />
+                                            )}
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm text-zinc-200 truncate">{cp.name}</p>
+                                                {cp.description && (
+                                                    <p className="text-xs text-zinc-500 truncate">{cp.description}</p>
+                                                )}
+                                            </div>
+                                            <span className="text-sm text-zinc-400 flex-shrink-0">
+                                                €{cp.price.toFixed(2)}
+                                            </span>
+                                        </button>
+                                    ));
+                                })()}
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-400 mb-1">
+                                Category *
+                            </label>
+                            <Select
+                                value={catalogForm.categoryId}
+                                onChange={(e) =>
+                                    setCatalogForm({ ...catalogForm, categoryId: e.target.value })
+                                }
+                            >
+                                <option value="">Select category</option>
+                                {categories.map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                        {c.name}
+                                    </option>
+                                ))}
+                            </Select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-400 mb-1">
+                                Retail Price (€) *
+                            </label>
+                            <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={catalogForm.price}
+                                onChange={(e) =>
+                                    setCatalogForm({
+                                        ...catalogForm,
+                                        price: Number(e.target.value) || 0,
+                                    })
+                                }
+                            />
+                            <p className="text-[11px] text-zinc-500 mt-1">
+                                The price customers will pay. Set higher than the market cost to earn a margin.
+                            </p>
+                        </div>
+
+                        <div className="flex gap-2 justify-end pt-2">
+                            <Button
+                                variant="outline"
+                                onClick={() => setCatalogForm(null)}
+                            >
+                                Back
+                            </Button>
+                            <Button
+                                variant="primary"
+                                disabled={
+                                    !catalogForm.categoryId ||
+                                    catalogForm.price <= 0 ||
+                                    catalogAdopting
+                                }
+                                onClick={async () => {
+                                    setCatalogAdopting(true);
+                                    try {
+                                        await adoptCatalogProduct({
+                                            variables: {
+                                                input: {
+                                                    businessId,
+                                                    sourceProductId: catalogForm.sourceProductId,
+                                                    categoryId: catalogForm.categoryId,
+                                                    price: catalogForm.price,
+                                                },
+                                            },
+                                        });
+                                        toast.success(`Adopted "${catalogForm.sourceProductName}"`);
+                                        refetch();
+                                        setCatalogForm(null);
+                                        setCatalogOpen(false);
+                                        setCatalogSearch("");
+                                    } catch (err: any) {
+                                        toast.error(
+                                            err?.message ?? "Failed to adopt product",
+                                        );
+                                    } finally {
+                                        setCatalogAdopting(false);
+                                    }
+                                }}
+                            >
+                                {catalogAdopting ? "Adopting..." : "Adopt Product"}
+                            </Button>
+                        </div>
+                    </div>
+                )}
             </Modal>
         </div>
     );

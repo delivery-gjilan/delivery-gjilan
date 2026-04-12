@@ -31,6 +31,7 @@ export interface IOrderService {
         amountToCollectFromCustomer: number;
         amountToRemitToPlatform: number;
         driverNetEarnings: number;
+        driverTip: number;
     } | null>;
     getOrdersByStatus(status: OrderStatus, limit?: number, offset?: number): Promise<Order[]>;
     getOrdersByUserId(userId: string, limit?: number, offset?: number): Promise<Order[]>;

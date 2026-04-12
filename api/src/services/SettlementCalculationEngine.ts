@@ -106,13 +106,12 @@ export class SettlementCalculationEngine {
             // Driver collected the priority surcharge cash and must remit it.
             this.addPrioritySurchargeSettlement(order, driverId, results);
 
-<<<<<<< Updated upstream
             // ── Automatic: stock item remittance (CASH_TO_DRIVER + inventory mode) ──
             // If inventory mode is on and stock was deducted for this order,
             // the driver owes the base price of items they picked up for free from
             // the operator's personal stock (they didn't buy them at market).
             await this.addStockItemSettlements(order, driverId, results);
-=======
+
             // ── Automatic: driver tip passthrough ──
             // For PREPAID_TO_PLATFORM orders the platform collected the tip from the
             // customer and must forward it to the driver (DRIVER PAYABLE).  For
@@ -120,7 +119,11 @@ export class SettlementCalculationEngine {
             // no settlement entry is needed — the tip reduces their net remittance
             // naturally via the amountToCollectFromCustomer calculation.
             this.addDriverTipSettlement(order, driverId, results);
->>>>>>> Stashed changes
+
+            // ── Automatic: catalog product revenue remittance (CASH_TO_DRIVER) ──
+            // For adopted catalog products, the driver collected cash for items the
+            // platform owns.  The driver must remit the full retail price.
+            await this.addCatalogProductSettlements(order, orderItems, driverId, results);
 
             // ── Delivery fee rules (most-specific-wins: BP > P > B > G) ──
             // If no rules at any level, fall back to the driver's own commission %.
@@ -239,7 +242,7 @@ export class SettlementCalculationEngine {
         if (!driverId) return;
         if (order.paymentCollection !== 'PREPAID_TO_PLATFORM') return;
 
-        const driverTip = Number((order as any).driverTip ?? 0);
+        const driverTip = Number(order.driverTip ?? 0);
         if (driverTip <= 0) return;
 
         results.push({
@@ -458,6 +461,59 @@ export class SettlementCalculationEngine {
             amount: stockValue,
             ruleId: null,
             reason: `Stock item remittance (€${stockValue.toFixed(2)} items from operator inventory)`,
+        });
+    }
+
+    /**
+     * Catalog product revenue remittance: for adopted products (with sourceProductId),
+     * the driver collected the full retail price in cash for items that the platform
+     * owns/sources.  The driver must remit that amount to the platform.
+     *
+     * Only applies to CASH_TO_DRIVER orders that contain adopted products.
+     */
+    private async addCatalogProductSettlements(
+        order: DbOrder,
+        dbOrderItems: DbOrderItem[],
+        driverId: string | null,
+        results: SettlementCalculation[],
+    ): Promise<void> {
+        if (!driverId) return;
+        if (order.paymentCollection !== 'CASH_TO_DRIVER') return;
+
+        // Get product IDs from order items and check which ones are adopted
+        const productIds = [...new Set(dbOrderItems.map((i) => i.productId))];
+        if (productIds.length === 0) return;
+
+        const productRows = await this.db
+            .select({ id: products.id, sourceProductId: products.sourceProductId })
+            .from(products)
+            .where(inArray(products.id, productIds));
+
+        const adoptedProductIds = new Set(
+            productRows.filter((p) => p.sourceProductId != null).map((p) => p.id),
+        );
+
+        if (adoptedProductIds.size === 0) return;
+
+        // Sum up the revenue from adopted items (finalAppliedPrice × quantity)
+        let catalogRevenue = 0;
+        for (const item of dbOrderItems) {
+            if (!adoptedProductIds.has(item.productId)) continue;
+            catalogRevenue += Number(item.finalAppliedPrice) * item.quantity;
+        }
+
+        catalogRevenue = Number(catalogRevenue.toFixed(2));
+        if (catalogRevenue <= 0) return;
+
+        results.push({
+            type: 'DRIVER',
+            direction: 'RECEIVABLE',
+            driverId,
+            businessId: null,
+            orderId: order.id,
+            amount: catalogRevenue,
+            ruleId: null,
+            reason: `Catalog product revenue (€${catalogRevenue.toFixed(2)} adopted items)`,
         });
     }
 }
