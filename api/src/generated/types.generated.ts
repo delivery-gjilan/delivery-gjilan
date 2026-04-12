@@ -232,6 +232,7 @@ export type Business = {
   activePromotion?: Maybe<BusinessPromotion>;
   avgPrepTimeMinutes: Scalars['Int']['output'];
   businessType: BusinessType;
+  category?: Maybe<Scalars['String']['output']>;
   commissionPercentage: Scalars['Float']['output'];
   createdAt: Scalars['Date']['output'];
   description?: Maybe<Scalars['String']['output']>;
@@ -425,6 +426,7 @@ export type CreateBannerInput = {
 export type CreateBusinessInput = {
   avgPrepTimeMinutes?: InputMaybe<Scalars['Int']['input']>;
   businessType: BusinessType;
+  category?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   location: LocationInput;
@@ -3282,6 +3284,7 @@ export type UpdateBannerInput = {
 export type UpdateBusinessInput = {
   avgPrepTimeMinutes?: InputMaybe<Scalars['Int']['input']>;
   businessType?: InputMaybe<BusinessType>;
+  category?: InputMaybe<Scalars['String']['input']>;
   commissionPercentage?: InputMaybe<Scalars['Float']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
@@ -4102,6 +4105,7 @@ export type BusinessResolvers<ContextType = GraphQLContext, ParentType extends R
   activePromotion?: Resolver<Maybe<ResolversTypes['BusinessPromotion']>, ParentType, ContextType>;
   avgPrepTimeMinutes?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   businessType?: Resolver<ResolversTypes['BusinessType'], ParentType, ContextType>;
+  category?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   commissionPercentage?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   createdAt?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
   description?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
