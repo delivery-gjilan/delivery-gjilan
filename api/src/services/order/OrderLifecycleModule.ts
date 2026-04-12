@@ -1,10 +1,13 @@
 import {
     orderItems as orderItemsTable,
+    orders as ordersTable,
     users as usersTable,
     businesses as businessesTable,
     products as productsTable,
     orderPromotions as orderPromotionsTable,
     promotions as promotionsTable,
+    personalInventory,
+    orderCoverageLogs,
 } from '@/database/schema';
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Order, OrderStatus } from '@/generated/types.generated';
@@ -28,6 +31,7 @@ import { emitOrderEvent } from '@/repositories/OrderEventRepository';
 import { createAuditLogger } from '@/services/AuditLogger';
 import type { OrderServiceDeps } from './types';
 import type { OrderMappingModule } from './OrderMappingModule';
+import { deductOrderStockCore } from '@/models/Inventory/lib/deductOrderStockCore';
 import type { OrderPublishingModule } from './OrderPublishingModule';
 import type { OrderQueryModule } from './OrderQueryModule';
 import type { OrderUserBehaviorModule } from './OrderUserBehaviorModule';
@@ -236,6 +240,11 @@ export class OrderLifecycleModule {
         if (status === 'DELIVERED' && currentStatus !== 'DELIVERED') {
             const items = await this.deps.db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, id));
             await financialService.createOrderSettlements(dbOrder, items, dbOrder.driverId);
+
+            // Fire-and-forget: auto-deduct inventory stock for this order
+            deductOrderStockCore(id, this.deps.db).catch((err) =>
+                log.error({ err, orderId: id }, 'inventory:deductOrderStock:auto_failed'),
+            );
 
             // Fire-and-forget: send order receipt email
             this.sendReceiptEmail(id, dbOrder, items, context).catch((err) =>
@@ -695,6 +704,9 @@ export class OrderLifecycleModule {
         const financialService = new FinancialService(db);
         await financialService.cancelOrderSettlements(id);
 
+        // Restore inventory stock that was deducted at order creation
+        await this.restoreInventoryStock(id, db);
+
         await this.userBehavior.updateUserBehaviorOnStatusChange(
             dbOrder.userId,
             dbOrder.status as OrderStatus,
@@ -738,6 +750,9 @@ export class OrderLifecycleModule {
             await financialService.cancelOrderSettlements(id);
         }
 
+        // Restore inventory stock that was deducted at order creation
+        await this.restoreInventoryStock(id, db);
+
         await this.userBehavior.updateUserBehaviorOnStatusChange(
             dbOrder.userId,
             dbOrder.status as OrderStatus,
@@ -747,5 +762,67 @@ export class OrderLifecycleModule {
         );
 
         return this.mapping.mapToOrder(updated);
+    }
+
+    /**
+     * Restore personal_inventory quantities for stock that was deducted at order creation.
+     * Reads orderCoverageLogs, adds fromStock back to personal_inventory, and marks logs as not deducted.
+     */
+    private async restoreInventoryStock(orderId: string, db: typeof this.deps.db): Promise<void> {
+        try {
+            const coverageLogs = await db
+                .select({
+                    productId: orderCoverageLogs.productId,
+                    fromStock: orderCoverageLogs.fromStock,
+                })
+                .from(orderCoverageLogs)
+                .where(
+                    and(
+                        eq(orderCoverageLogs.orderId, orderId),
+                        eq(orderCoverageLogs.deducted, true),
+                    ),
+                );
+
+            if (coverageLogs.length === 0) return;
+
+            // Get the order's businessId to find the right inventory rows
+            const orderRow = await db
+                .select({ businessId: ordersTable.businessId })
+                .from(ordersTable)
+                .where(eq(ordersTable.id, orderId))
+                .limit(1);
+            const businessId = orderRow[0]?.businessId;
+            if (!businessId) return;
+
+            const now = new Date().toISOString();
+
+            for (const log of coverageLogs) {
+                if (log.fromStock <= 0) continue;
+
+                // Add stock back to personal_inventory
+                await db
+                    .update(personalInventory)
+                    .set({
+                        quantity: sql`${personalInventory.quantity} + ${log.fromStock}`,
+                        updatedAt: now,
+                    })
+                    .where(
+                        and(
+                            eq(personalInventory.productId, log.productId),
+                            eq(personalInventory.businessId, businessId),
+                        ),
+                    );
+            }
+
+            // Mark coverage logs as not deducted
+            await db
+                .update(orderCoverageLogs)
+                .set({ deducted: false, deductedAt: null })
+                .where(eq(orderCoverageLogs.orderId, orderId));
+
+            logger.info({ orderId, restoredProducts: coverageLogs.length }, 'order:inventory:restored');
+        } catch (error) {
+            logger.error({ orderId, error }, 'order:inventory:restore-failed');
+        }
     }
 }

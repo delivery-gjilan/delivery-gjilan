@@ -54,6 +54,8 @@ type OrderItem {
     selectedOptions: [OrderItemOption!]!
     childItems: [OrderItem!]!
     parentOrderItemId: ID
+    """How many units of this item came from operator's personal inventory (0 = all from market)."""
+    inventoryQuantity: Int!
 }
 
 type OrderPromotion {
@@ -163,6 +165,8 @@ type Order {
     orderPromotions: [OrderPromotion!]
     review: OrderReview
     settlementPreview: OrderSettlementPreview
+    """Total base price of items fulfilled from operator inventory. Null when inventory mode is off or no stock was used."""
+    inventoryPrice: Float
 }
 
 type OrderConnection {

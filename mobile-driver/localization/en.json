@@ -259,6 +259,8 @@
         "nav_choice_title": "Navigate with",
         "nav_choice_inapp": "In-App Navigation",
         "nav_choice_gmaps": "Google Maps",
-        "nav_choice_cancel": "Cancel"
+        "nav_choice_cancel": "Cancel",
+        "from_stock_label": "Collect from operator stock",
+        "from_market_label": "Buy from market"
     }
 }

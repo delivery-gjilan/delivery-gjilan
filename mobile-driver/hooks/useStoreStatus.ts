@@ -9,6 +9,7 @@ interface StoreStatus {
     bannerType: string;
     dispatchModeEnabled: boolean;
     googleMapsNavEnabled: boolean;
+    inventoryModeEnabled: boolean;
 }
 
 export function useStoreStatus() {
@@ -38,6 +39,7 @@ export function useStoreStatus() {
         bannerType: data?.getStoreStatus?.bannerType ?? 'INFO',
         dispatchModeEnabled: data?.getStoreStatus?.dispatchModeEnabled ?? false,
         googleMapsNavEnabled: data?.getStoreStatus?.googleMapsNavEnabled ?? false,
+        inventoryModeEnabled: data?.getStoreStatus?.inventoryModeEnabled ?? false,
         loading,
     };
 }

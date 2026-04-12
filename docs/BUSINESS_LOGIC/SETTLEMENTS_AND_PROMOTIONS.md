@@ -171,7 +171,11 @@ When an order is delivered, the `FinancialService.createOrderSettlements()` meth
    e. If a driver is assigned, order payment collection is CASH_TO_DRIVER, and markup earnings are positive:
       - Create automatic `DRIVER / RECEIVABLE` settlement for markup remittance
       - Set `rule_id` to null (system-generated entry)
-   f. Return SettlementCalculation[]
+   f. If the order has `order_coverage_logs` with `fromStock > 0` (written at order creation):
+      - Create `DRIVER / RECEIVABLE` stock remittance settlements — driver owes platform for items collected from operator stock
+      - Category: `STOCK_REMITTANCE`; `rule_id` = null (system-generated)
+      - Driver earnings screen shows this as a separate "Stock Item Remittance" line (purple cube icon)
+   g. Return SettlementCalculation[]
 3. For each calculation, persist a settlement record (status = PENDING) in the same transaction
 ```
 

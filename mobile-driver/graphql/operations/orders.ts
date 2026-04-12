@@ -35,6 +35,7 @@ export const GET_ORDERS = gql`
                         name
                         quantity
                         notes
+                        inventoryQuantity
                     }
                 }
                 user {
@@ -84,6 +85,7 @@ export const GET_ORDER = gql`
                     name
                     quantity
                     notes
+                    inventoryQuantity
                 }
             }
             user {
@@ -164,6 +166,7 @@ export const ALL_ORDERS_UPDATED = gql`
                     name
                     quantity
                     notes
+                    inventoryQuantity
                 }
             }
             user {

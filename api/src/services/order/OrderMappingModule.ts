@@ -101,6 +101,7 @@ export class OrderMappingModule {
                 selectedOptions,
                 childItems: children,
                 parentOrderItemId: item.parentOrderItemId || undefined,
+                inventoryQuantity: (item as any).inventoryQuantity ?? 0,
             };
         };
 
@@ -231,6 +232,7 @@ export class OrderMappingModule {
                 })(),
                 prioritySurcharge: Number((dbOrder as any).prioritySurcharge ?? 0),
                 driverTip: Number(dbOrder.driverTip ?? 0),
+                inventoryPrice: dbOrder.inventoryPrice != null ? Number(dbOrder.inventoryPrice) : null,
                 businesses: businessOrderList,
                 orderPromotions: orderPromotions.map((promotion) => ({
                     id: promotion.id,

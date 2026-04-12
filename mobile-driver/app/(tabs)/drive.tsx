@@ -62,7 +62,7 @@ export default function MapScreen() {
     const [focusedOrderId, setFocusedOrderId] = useState<string | null>(null);
     const isOnline = useAuthStore((state) => state.isOnline);
     const connectionStatus = useAuthStore((state) => state.connectionStatus);
-    const { dispatchModeEnabled, googleMapsNavEnabled } = useStoreStatus();
+    const { dispatchModeEnabled, googleMapsNavEnabled, inventoryModeEnabled } = useStoreStatus();
 
     const [markingPickedUpIds, setMarkingPickedUpIds] = useState<Set<string>>(new Set());
     const [nowTs, setNowTs] = useState(() => Date.now());
@@ -821,6 +821,38 @@ export default function MapScreen() {
                             )}
                         </View>
 
+                        {/* Fulfillment guide — visible when order has stock items (i.e. was created during inventory mode) */}
+                        {(() => {
+                            const allItems = order.businesses?.flatMap((b: any) => b.items ?? []) ?? [];
+                            const stockItems = allItems.filter((it: any) => (it.inventoryQuantity ?? 0) > 0);
+                            const marketItems = allItems.filter((it: any) => (it.quantity ?? 0) - (it.inventoryQuantity ?? 0) > 0);
+                            if (stockItems.length === 0) return null;
+                            return (
+                                <View style={styles.fulfillmentGuide}>
+                                    {stockItems.length > 0 && (
+                                        <View style={styles.fulfillmentSection}>
+                                            <Text style={styles.fulfillmentHeader}>{t.drive.from_stock_label}</Text>
+                                            {stockItems.map((it: any, i: number) => (
+                                                <Text key={i} style={styles.fulfillmentItem}>
+                                                    {'📦 '}{it.inventoryQuantity}× {it.name}
+                                                </Text>
+                                            ))}
+                                        </View>
+                                    )}
+                                    {marketItems.length > 0 && (
+                                        <View style={[styles.fulfillmentSection, { marginTop: 6 }]}>
+                                            <Text style={[styles.fulfillmentHeader, { color: '#6B7280' }]}>{t.drive.from_market_label}</Text>
+                                            {marketItems.map((it: any, i: number) => (
+                                                <Text key={i} style={[styles.fulfillmentItem, { color: '#6B7280' }]}>
+                                                    {'🛒 '}{it.quantity - (it.inventoryQuantity ?? 0)}× {it.name}
+                                                </Text>
+                                            ))}
+                                        </View>
+                                    )}
+                                </View>
+                            );
+                        })()}
+
                         {/* Primary CTA */}
                         {isReady ? (
                             <View style={styles.cardCtaRow}>
@@ -1242,6 +1274,32 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 14,
         fontWeight: '700',
+    },
+
+    /* -- Fulfillment guide -- */
+    fulfillmentGuide: {
+        marginTop: 10,
+        marginBottom: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        backgroundColor: '#f5f3ff',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#ddd6fe',
+    },
+    fulfillmentSection: {},
+    fulfillmentHeader: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#7c3aed',
+        textTransform: 'uppercase',
+        marginBottom: 3,
+        letterSpacing: 0.4,
+    },
+    fulfillmentItem: {
+        fontSize: 13,
+        color: '#374151',
+        marginBottom: 1,
     },
 
     /* â”€â”€ Loading â”€â”€ */

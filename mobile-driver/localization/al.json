@@ -259,6 +259,8 @@
         "nav_choice_title": "Navigo me",
         "nav_choice_inapp": "Navigim i Integruar",
         "nav_choice_gmaps": "Google Maps",
-        "nav_choice_cancel": "Anulo"
+        "nav_choice_cancel": "Anulo",
+        "from_stock_label": "Merr nga stoku",
+        "from_market_label": "Bli nga tregu"
     }
 }

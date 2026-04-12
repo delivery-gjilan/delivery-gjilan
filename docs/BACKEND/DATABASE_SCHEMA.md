@@ -84,8 +84,8 @@ npm run db:studio     # open Drizzle Studio at https://local.drizzle.studio
 
 | Table | File | Notes |
 |-------|------|-------|
-| `orders` | `orders.ts` | Master order record. `payment_collection`: CASH_TO_DRIVER \| PREPAID_TO_PLATFORM. |
-| `order_items` | `orderItems.ts` | Line items. `base_price` at time of order, `final_applied_price` after promo. |
+| `orders` | `orders.ts` | Master order record. `payment_collection`: CASH_TO_DRIVER \| PREPAID_TO_PLATFORM. `inventory_price` NUMERIC(10,2) nullable — cost portion for operator stock items (deducted from base_price). |
+| `order_items` | `orderItems.ts` | Line items. `base_price` at time of order, `final_applied_price` after promo. `inventory_quantity` INTEGER default 0 — units fulfilled from operator stock. |
 | `order_item_options` | `orderItemOptions.ts` | Selected option per line item (FK to optionGroups + options). |
 | `order_promotions` | `orderPromotions.ts` | Promotions applied to an order. `applies_to`: PRICE \| DELIVERY. |
 

@@ -10,6 +10,7 @@ export const GET_STORE_STATUS = gql`
             bannerType
             dispatchModeEnabled
             googleMapsNavEnabled
+            inventoryModeEnabled
         }
     }
 `;
@@ -24,6 +25,7 @@ export const STORE_STATUS_UPDATED = gql`
             bannerType
             dispatchModeEnabled
             googleMapsNavEnabled
+            inventoryModeEnabled
         }
     }
 `;

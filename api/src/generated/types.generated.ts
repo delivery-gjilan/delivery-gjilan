@@ -2004,6 +2004,8 @@ export type Order = {
   dropOffLocation: Location;
   estimatedReadyAt?: Maybe<Scalars['Date']['output']>;
   id: Scalars['ID']['output'];
+  /** Total base price of items fulfilled from operator inventory. Null when inventory mode is off or no stock was used. */
+  inventoryPrice?: Maybe<Scalars['Float']['output']>;
   locationFlagged: Scalars['Boolean']['output'];
   needsApproval: Scalars['Boolean']['output'];
   orderDate: Scalars['Date']['output'];
@@ -2080,6 +2082,8 @@ export type OrderItem = {
   childItems: Array<OrderItem>;
   id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
+  /** How many units of this item came from operator's personal inventory (0 = all from market). */
+  inventoryQuantity: Scalars['Int']['output'];
   name: Scalars['String']['output'];
   notes?: Maybe<Scalars['String']['output']>;
   parentOrderItemId?: Maybe<Scalars['ID']['output']>;
@@ -4762,6 +4766,7 @@ export type OrderResolvers<ContextType = GraphQLContext, ParentType extends Reso
   dropOffLocation?: Resolver<ResolversTypes['Location'], ParentType, ContextType>;
   estimatedReadyAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  inventoryPrice?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   locationFlagged?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   needsApproval?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   orderDate?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
@@ -4838,6 +4843,7 @@ export type OrderItemResolvers<ContextType = GraphQLContext, ParentType extends 
   childItems?: Resolver<Array<ResolversTypes['OrderItem']>, ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  inventoryQuantity?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   notes?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   parentOrderItemId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;

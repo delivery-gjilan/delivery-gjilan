@@ -13,9 +13,12 @@ import {
     options as optionsDbTable,
     users as usersTable,
     promotions as promotionsTable,
+    personalInventory,
+    orderCoverageLogs,
+    storeSettings,
 } from '@/database/schema';
 import { userPromoMetadata } from '@/database/schema';
-import { and, asc, eq, inArray, isNull, notInArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, notInArray, sql } from 'drizzle-orm';
 import type { Order, CreateOrderInput } from '@/generated/types.generated';
 import { AppError } from '@/lib/errors';
 import { PromotionEngine } from '@/services/PromotionEngine';
@@ -224,6 +227,8 @@ export class OrderCreationModule {
             markupPrice: number | null;
             nightMarkedupPrice: number | null;
             notes: string | null;
+            /** Per-unit base cost (discountedBasePrice + optionsExtra) for inventory price computation. */
+            _unitBaseCost: number;
             selectedOptions?: Array<{ optionGroupId: string; optionId: string; price?: number | null }>;
             childItems?: Array<{
                 productId: string;
@@ -492,6 +497,7 @@ export class OrderCreationModule {
                 markupPrice,
                 nightMarkedupPrice,
                 notes: itemInput.notes || null,
+                _unitBaseCost: normalizeMoney(discountedBasePrice + optionsExtra),
                 selectedOptions: itemInput.selectedOptions ?? [],
                 childItems: itemInput.childItems ?? undefined,
             });
@@ -518,6 +524,125 @@ export class OrderCreationModule {
         const orderBusinessId = businessIdList[0];
         if (!orderBusinessId) {
             throw AppError.badInput('Order must contain at least one item');
+        }
+
+        // ── Inventory coverage check at order creation ──────────────────────
+        let orderInventoryPrice = 0;
+        const inventoryCoverageEntries: Array<{
+            productId: string;
+            orderedQty: number;
+            fromStock: number;
+            fromMarket: number;
+            inventoryBusinessId: string;
+        }> = [];
+        const itemInventoryQuantities = new Map<number, number>(); // itemsToCreate index → fromStock
+
+        const storeSettingsRow = await db
+            .select({ inventoryModeEnabled: storeSettings.inventoryModeEnabled })
+            .from(storeSettings)
+            .where(eq(storeSettings.id, 'default'))
+            .limit(1);
+        const inventoryModeEnabled = storeSettingsRow[0]?.inventoryModeEnabled ?? false;
+
+        if (inventoryModeEnabled) {
+            // Resolve inventory product IDs (sourceProductId for adopted products)
+            const invProductIdByProductId = new Map<string, string>();
+            const sourceProductIdsToFetch = new Set<string>();
+            for (const item of itemsToCreate) {
+                const product = productMap.get(item.productId)!;
+                const invId = product.sourceProductId ?? item.productId;
+                invProductIdByProductId.set(item.productId, invId);
+                if (product.sourceProductId) {
+                    sourceProductIdsToFetch.add(product.sourceProductId);
+                }
+            }
+
+            // Resolve source business IDs for adopted products
+            const sourceBusinessIds = new Set<string>([orderBusinessId]);
+            if (sourceProductIdsToFetch.size > 0) {
+                const sourceProducts = await db
+                    .select({ id: productsTable.id, businessId: productsTable.businessId })
+                    .from(productsTable)
+                    .where(inArray(productsTable.id, [...sourceProductIdsToFetch]));
+                for (const sp of sourceProducts) {
+                    sourceBusinessIds.add(sp.businessId);
+                }
+            }
+
+            // Query personal_inventory for all relevant businesses
+            const inventoryRows = await db
+                .select({
+                    productId: personalInventory.productId,
+                    quantity: personalInventory.quantity,
+                    businessId: personalInventory.businessId,
+                })
+                .from(personalInventory)
+                .where(inArray(personalInventory.businessId, [...sourceBusinessIds]));
+
+            const inventoryMap = new Map<string, { quantity: number; businessId: string }>();
+            for (const inv of inventoryRows) {
+                inventoryMap.set(inv.productId, { quantity: inv.quantity, businessId: inv.businessId });
+            }
+
+            // Aggregate ordered quantities by inventory product ID
+            const orderedQtyByInvProduct = new Map<string, number>();
+            for (const item of itemsToCreate) {
+                const invId = invProductIdByProductId.get(item.productId)!;
+                orderedQtyByInvProduct.set(invId, (orderedQtyByInvProduct.get(invId) ?? 0) + item.quantity);
+            }
+
+            // Compute coverage per inventory product
+            const coverageByInvProduct = new Map<string, { fromStock: number; fromMarket: number; remaining: number; businessId: string }>();
+            for (const [invId, totalQty] of orderedQtyByInvProduct) {
+                const inv = inventoryMap.get(invId);
+                const available = inv?.quantity ?? 0;
+                const fromStock = Math.min(available, totalQty);
+                const fromMarket = totalQty - fromStock;
+                coverageByInvProduct.set(invId, {
+                    fromStock,
+                    fromMarket,
+                    remaining: fromStock,
+                    businessId: inv?.businessId ?? orderBusinessId,
+                });
+            }
+
+            // Distribute inventory across individual items (greedy, first-come-first-served)
+            for (let i = 0; i < itemsToCreate.length; i++) {
+                const item = itemsToCreate[i];
+                const invId = invProductIdByProductId.get(item.productId)!;
+                const coverage = coverageByInvProduct.get(invId);
+                if (!coverage || coverage.remaining <= 0) continue;
+
+                const fromStock = Math.min(coverage.remaining, item.quantity);
+                coverage.remaining -= fromStock;
+
+                itemInventoryQuantities.set(i, fromStock);
+                orderInventoryPrice = normalizeMoney(
+                    orderInventoryPrice + normalizeMoney(item._unitBaseCost * fromStock),
+                );
+            }
+
+            // Build coverage log entries (aggregated by inventory product)
+            for (const [invId, totalQty] of orderedQtyByInvProduct) {
+                const coverage = coverageByInvProduct.get(invId)!;
+                if (coverage.fromStock > 0) {
+                    inventoryCoverageEntries.push({
+                        productId: invId,
+                        orderedQty: totalQty,
+                        fromStock: coverage.fromStock,
+                        fromMarket: coverage.fromMarket,
+                        inventoryBusinessId: coverage.businessId,
+                    });
+                }
+            }
+
+            // Adjust orderBasePrice to exclude inventory-covered portion
+            orderBasePrice = normalizeMoney(orderBasePrice - orderInventoryPrice);
+
+            log.info(
+                { orderInventoryPrice, adjustedBasePrice: orderBasePrice, coverageEntries: inventoryCoverageEntries.length },
+                'order:inventory:coverage',
+            );
         }
 
         // 2b. Check that all businesses are currently open
@@ -736,6 +861,7 @@ export class OrderCreationModule {
             basePrice: Number(orderBasePrice.toFixed(2)),
             markupPrice: Number(orderMarkupPrice.toFixed(2)),
             businessPrice: computedBusinessPrice,
+            inventoryPrice: orderInventoryPrice > 0 ? Number(orderInventoryPrice.toFixed(2)) : null,
             actualPrice: effectiveOrderPrice,
             originalDeliveryPrice: expectedDeliveryPrice,
             deliveryPrice: effectiveDeliveryPrice,
@@ -754,7 +880,7 @@ export class OrderCreationModule {
             driverNotes: input.driverNotes || null,
         };
 
-        const flatItems = itemsToCreate.map((item) => ({
+        const flatItems = itemsToCreate.map((item, idx) => ({
             productId: item.productId,
             quantity: item.quantity,
             finalAppliedPrice: item.finalAppliedPrice,
@@ -763,6 +889,7 @@ export class OrderCreationModule {
             markupPrice: item.markupPrice,
             nightMarkedupPrice: item.nightMarkedupPrice,
             notes: item.notes,
+            inventoryQuantity: itemInventoryQuantities.get(idx) ?? 0,
         }));
 
         const createdOrder = await this.deps.orderRepository.create(orderData, flatItems);
@@ -773,6 +900,46 @@ export class OrderCreationModule {
             throw AppError.businessRule(
                 'Failed to create order: no items were associated or the database insert failed',
             );
+        }
+
+        // ── Write inventory coverage logs and deduct stock ──────────────────
+        if (inventoryCoverageEntries.length > 0) {
+            const invNow = new Date().toISOString();
+            try {
+                // Write coverage logs
+                await db.insert(orderCoverageLogs).values(
+                    inventoryCoverageEntries.map((entry) => ({
+                        orderId: createdOrder.id,
+                        productId: entry.productId,
+                        orderedQty: entry.orderedQty,
+                        fromStock: entry.fromStock,
+                        fromMarket: entry.fromMarket,
+                        deducted: true,
+                        deductedAt: invNow,
+                    })),
+                );
+
+                // Deduct personal_inventory quantities
+                for (const entry of inventoryCoverageEntries) {
+                    await db
+                        .update(personalInventory)
+                        .set({
+                            quantity: sql`GREATEST(0, ${personalInventory.quantity} - ${entry.fromStock})`,
+                            updatedAt: invNow,
+                        })
+                        .where(
+                            and(
+                                eq(personalInventory.businessId, entry.inventoryBusinessId),
+                                eq(personalInventory.productId, entry.productId),
+                            ),
+                        );
+                }
+
+                log.info({ orderId: createdOrder.id, entries: inventoryCoverageEntries.length }, 'order:inventory:deducted');
+            } catch (invError) {
+                // Non-fatal: the DELIVERED handler's deductOrderStockCore is a safety net
+                log.error({ orderId: createdOrder.id, error: invError }, 'order:inventory:deduction-failed');
+            }
         }
 
         // Insert child items and order_item_options

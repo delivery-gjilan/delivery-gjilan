@@ -42,10 +42,12 @@ A re-export shim at `api/src/services/OrderService.ts` preserves all existing im
 8. Apply promotions server-side (`PromotionEngine`).
 9. Validate provided `totalPrice` against effective/allowed totals.
 10. **Determine approval requirement** (see below).
-11. Persist order + top-level items in transaction.
+10a. **Inventory coverage** (when `inventoryModeEnabled`): query `personal_inventory` for `orderBusinessId`, compute `fromStock`/`fromMarket` per item, deduct `orderInventoryPrice` from `orderBasePrice`/`businessPrice`, populate `inventoryQuantity` per item and `inventoryPrice` on the order.
+11. Persist order + top-level items in transaction (with `inventory_quantity` and `inventory_price` columns).
 12. Persist item options + child offer items.
 13. Persist promotion usage and `order_promotions` rows.
-14. Return mapped GraphQL `Order` including `paymentCollection`.
+14. **Post-transaction** (non-fatal): write `order_coverage_logs` + deduct `personal_inventory` quantities. Failure here never blocks order creation; the DELIVERED-time handler acts as a safety net.
+15. Return mapped GraphQL `Order` including `paymentCollection`.
 
 ## Read-Path Mapping
 

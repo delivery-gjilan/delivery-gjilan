@@ -1323,6 +1323,11 @@ type Order {
   dropOffLocation: Location!
   estimatedReadyAt: Date
   id: ID!
+
+  """
+  Total base price of items fulfilled from operator inventory. Null when inventory mode is off or no stock was used.
+  """
+  inventoryPrice: Float
   locationFlagged: Boolean!
   needsApproval: Boolean!
   orderDate: Date!
@@ -1393,6 +1398,11 @@ type OrderItem {
   childItems: [OrderItem!]!
   id: ID!
   imageUrl: String
+
+  """
+  How many units of this item came from operator's personal inventory (0 = all from market).
+  """
+  inventoryQuantity: Int!
   name: String!
   notes: String
   parentOrderItemId: ID

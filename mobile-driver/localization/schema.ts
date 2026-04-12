@@ -265,6 +265,8 @@ export const translationSchema = z.object(
                 nav_choice_inapp: z.string(),
                 nav_choice_gmaps: z.string(),
                 nav_choice_cancel: z.string(),
+                from_stock_label: z.string(),
+                from_market_label: z.string(),
             },
             { message: 'Drive translations must be an object' },
         ),

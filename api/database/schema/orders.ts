@@ -50,6 +50,13 @@ export const orders = pgTable(
          * business settlement rules.
          */
         businessPrice: numeric('business_price', { mode: 'number', precision: 10, scale: 2 }),
+        /**
+         * inventoryPrice — total base price of items covered by the operator's
+         * personal inventory for this order. Excluded from basePrice and
+         * businessPrice so the business is only paid for market-sourced items.
+         * Used as the settlement amount the driver owes the platform for stock items.
+         */
+        inventoryPrice: numeric('inventory_price', { mode: 'number', precision: 10, scale: 2 }),
         originalDeliveryPrice: numeric('original_delivery_price', { mode: 'number', precision: 10, scale: 2 }),
         deliveryPrice: numeric('delivery_price', { mode: 'number', precision: 10, scale: 2 }).notNull(),
         prioritySurcharge: numeric('priority_surcharge', { mode: 'number', precision: 10, scale: 2 }).notNull().default(0),

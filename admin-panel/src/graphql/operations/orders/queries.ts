@@ -68,6 +68,7 @@ export const GET_ORDERS = graphql(`
                         imageUrl
                         quantity
                         unitPrice
+                        inventoryQuantity
                     }
                 }
                 settlementPreview {
@@ -92,6 +93,7 @@ export const GET_ORDERS = graphql(`
                     discountAmount
                     promoCode
                 }
+                inventoryPrice
             }
         }
     }

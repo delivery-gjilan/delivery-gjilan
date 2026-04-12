@@ -26,6 +26,8 @@ export const orderItems = pgTable(
         markupPrice: numeric('markup_price', { mode: 'number', precision: 10, scale: 2 }),
         nightMarkedupPrice: numeric('night_marked_up_price', { mode: 'number', precision: 10, scale: 2 }),
         finalAppliedPrice: numeric('final_applied_price', { mode: 'number', precision: 10, scale: 2 }).notNull(),
+        /** How many of this item's quantity came from operator's personal inventory (0 = all from market). */
+        inventoryQuantity: integer('inventory_quantity').default(0).notNull(),
         notes: varchar('notes', { length: 500 }),
         createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
             .default(sql`CURRENT_TIMESTAMP`)

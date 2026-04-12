@@ -53,6 +53,7 @@ export const ORDERS_SUBSCRIPTION = gql(`
                     imageUrl
                     quantity
                     unitPrice
+                    inventoryQuantity
                 }
             }
         }
@@ -114,6 +115,7 @@ export const ALL_ORDERS_SUBSCRIPTION = gql(`
                     imageUrl
                     quantity
                     unitPrice
+                    inventoryQuantity
                 }
             }
         }

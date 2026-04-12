@@ -1,6 +1,108 @@
 # FF1 — Personal Inventory & Order Coverage
 
-> **Status: Future Feature — Not yet implemented**
+> **Status: IMPLEMENTED — 2026-04-12**
+> Discussed: 2026-03-22 · Implemented: 2026-04-12
+> Supersedes: `docs/BUSINESS_LOGIC/PERSONAL_INVENTORY_COVERAGE.md` (BL4, now deprecated in favour of this file)
+
+---
+
+## What Is It
+
+The platform operator maintains personal stock of market items (bought at wholesale). When an order arrives, the system automatically checks inventory, deducts stock items at order creation, adjusts the operator's `basePrice` to exclude the inventory portion, and records coverage in `order_coverage_logs`. The driver sees a **Fulfillment Guide** on the order card showing which items to collect from operator stock vs. buy from the market.
+
+---
+
+## Implemented Architecture
+
+### Database
+
+**`personal_inventory`** — `(businessId, productId, quantity, costPrice?)` — operator stock levels.
+
+**`order_coverage_logs`** (**`order_id`, `product_id`**) — per-item split recorded at order creation: `fromStock`, `fromMarket`, `fromStockUnitCost`, `deducted` (bool), `deductedAt`.
+
+**`orders.inventory_price`** — `NUMERIC(10,2)` nullable — total inventory cost portion of the order (deducted from `base_price`/`business_price`).
+
+**`order_items.inventory_quantity`** — `INTEGER DEFAULT 0 NOT NULL` — how many units of this item came from operator stock.
+
+**`store_settings.inventory_mode_enabled`** — BOOLEAN toggle (alongside `dispatchModeEnabled`, `isStoreClosed`).
+
+### Coverage Flow (OrderCreationModule)
+
+1. If `inventoryModeEnabled` is false → skip all coverage logic.
+2. Query `personal_inventory` for the `orderBusinessId` to get current stock levels.
+3. Per item: `fromStock = min(ownedQty, item.quantity)`, `fromMarket = item.quantity - fromStock`.
+4. Sum all `fromStock × unitBaseCost` → `orderInventoryPrice`.
+5. Deduct `orderInventoryPrice` from `orderBasePrice` and `businessPrice`.
+6. Store `inventoryQuantity` per order item and `inventoryPrice` on the order.
+7. After order insert: write `orderCoverageLogs` + deduct `personal_inventory` quantities (non-fatal).
+
+### Cancellation Rollback (OrderLifecycleModule)
+
+`cancelOrder()` and `adminCancelOrder()` call `restoreInventoryStock()` which reads coverage logs with `deducted=true`, adds stock back, and marks logs as not deducted.
+
+### Deduction Idempotency (deductOrderStockCore)
+
+The DELIVERED-time handler skips items already deducted at creation (checks `deducted=true` in coverage logs). Creation-time logs are canonical.
+
+### GraphQL Schema
+
+- `Order.inventoryPrice: Float` (nullable)
+- `OrderItem.inventoryQuantity: Int!`
+
+### Admin Panel
+
+**Fulfillment Guide** section on each order (visible only when `!allFromMarket`):
+- "📦 Pick from your stock" — items with `inventoryQuantity > 0`
+- "🛒 Buy from market" — items with `quantity > inventoryQuantity`
+
+Per-item badges inline in the items table.
+
+### Driver App
+
+**Fulfillment Guide** card section in `drive.tsx` active order card (visible only when order has stocked items):
+- "COLLECT FROM OPERATOR STOCK" (purple header) — `📦 N× ItemName` per stocked item
+- "BUY FROM MARKET" (gray header) — `🛒 N× ItemName` for remainder
+
+`inventoryQuantity` is fetched in all driver order GQL fragments (`GET_ORDERS`, `GET_ORDER`, `ALL_ORDERS_UPDATED`).
+
+### Settlements
+
+`addStockItemSettlements` in `SettlementCalculationEngine` reads `orderCoverageLogs` written at creation time to compute `STOCK_REMITTANCE` (driver receivable for stock items). Driver earnings screen already shows `STOCK_REMITTANCE` category (purple cube icon).
+
+---
+
+## Coverage Categories
+
+| State | Meaning |
+|-------|---------|
+| `FULLY_OWNED` | All quantity from operator stock |
+| `PARTIALLY_OWNED` | Some from stock, remainder from market |
+| `MARKET_ONLY` | Nothing from stock |
+
+---
+
+## Design Decisions
+
+- **Deduction at order creation** (not delivery) — immediate stock reservation prevents overselling.
+- **Non-fatal deduction** — outside the order transaction, so a stock error never blocks order creation. DELIVERED handler serves as safety net.
+- **Price split** — `orderBasePrice -= orderInventoryPrice` so the market business isn't overpaid for items the operator self-fulfilled.
+- **Toggle is platform-level** — `store_settings.inventory_mode_enabled` since only one operator exists. If multi-business ever needed, move to per-business flag.
+- **Private sourcing** — no customer-facing changes. Orders look like normal market orders.
+
+---
+
+## Profit Margin Tracking (Future Add-On)
+
+Once `cost_price` is populated per inventory item, a savings summary is possible:
+
+```
+Revenue from stocked items = sum(finalAppliedPrice × fromStock)
+Cost of stocked items      = sum(costPrice × fromStock)
+Gross margin               = Revenue − Cost
+```
+
+Could power a "Savings this month" widget in the admin panel.
+
 > Discussed: 2026-03-22 · Revised: 2026-04-12
 > Supersedes: `docs/BUSINESS_LOGIC/PERSONAL_INVENTORY_COVERAGE.md` (BL4, now deprecated in favour of this file)
 
