@@ -8,6 +8,8 @@ export const SET_INVENTORY_QUANTITY = graphql(`
             productName
             productImageUrl
             productBasePrice
+            productMarkupPrice
+            productNightPrice
             categoryName
             quantity
             lowStockThreshold
@@ -24,6 +26,8 @@ export const BULK_SET_INVENTORY = graphql(`
             id
             productId
             productName
+            productMarkupPrice
+            productNightPrice
             quantity
             costPrice
             isLowStock

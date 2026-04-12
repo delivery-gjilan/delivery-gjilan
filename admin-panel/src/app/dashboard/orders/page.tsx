@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useMutation, useQuery, useLazyQuery } from "@apollo/client/react";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Dropdown from "@/components/ui/Dropdown";
@@ -13,6 +13,8 @@ import { ASSIGN_DRIVER_TO_ORDER, CREATE_TEST_ORDER, START_PREPARING, UPDATE_PREP
 import { GRANT_FREE_DELIVERY } from "@/graphql/operations/promotions/mutations";
 import { UPDATE_USER_NOTE_MUTATION } from "@/graphql/operations/users/mutations";
 import { DRIVERS_QUERY } from "@/graphql/operations/users/queries";
+import { GET_ORDER_COVERAGE } from "@/graphql/operations/inventory/queries";
+import { DEDUCT_ORDER_STOCK } from "@/graphql/operations/inventory/mutations";
 import { Package, Store, Search, ArrowRight, MapPin, User, Plus, ChefHat, Timer, Copy, Check, Phone, Hash, MessageSquare, Calendar, Clock, Truck, CreditCard, Tag, X } from "lucide-react";
 import { toast } from 'sonner';
 
@@ -315,6 +317,8 @@ export default function OrdersPage() {
     const [approveOrderMut, { loading: approvingOrder }] = useMutation(APPROVE_ORDER, { refetchQueries: ['GetOrders'] });
     const [grantFreeDeliveryMut, { loading: grantingFreeDelivery }] = useMutation(GRANT_FREE_DELIVERY);
     const [updateUserNoteMut] = useMutation(UPDATE_USER_NOTE_MUTATION, { refetchQueries: ['GetOrders'] });
+    const [fetchOrderCoverage, { data: coverageData, loading: coverageLoading }] = useLazyQuery(GET_ORDER_COVERAGE, { fetchPolicy: 'network-only' });
+    const [deductOrderStockMut, { loading: deductingStock }] = useMutation(DEDUCT_ORDER_STOCK);
 
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [detailsOpen, setDetailsOpen] = useState(false);
@@ -623,6 +627,9 @@ export default function OrdersPage() {
         handleOrderCardFocus(order);
         setSelectedOrder(order);
         setDetailsOpen(true);
+        if (isAdmin) {
+            fetchOrderCoverage({ variables: { orderId: order.id } });
+        }
     };
 
     const handleAdminCancel = async () => {
@@ -1596,6 +1603,68 @@ export default function OrdersPage() {
                                                     <span className={`font-semibold whitespace-nowrap ${li.direction === 'RECEIVABLE' ? 'text-emerald-200' : 'text-rose-300'}`}>
                                                         {li.direction === 'RECEIVABLE' ? '+' : '-'}€{li.amount.toFixed(2)}
                                                     </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
+                            {/* ── Inventory Coverage (admin only) ── */}
+                            {isAdmin && (() => {
+                                const coverage = coverageData?.orderCoverage;
+                                if (coverageLoading) {
+                                    return (
+                                        <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-3">
+                                            <div className="text-[10px] text-zinc-600 uppercase tracking-wider font-medium mb-2">Inventory Coverage</div>
+                                            <div className="text-xs text-zinc-600">Loading coverage...</div>
+                                        </div>
+                                    );
+                                }
+                                if (!coverage || coverage.orderId !== selectedOrder.id) return null;
+                                const statusColor = (s: string) => {
+                                    if (s === 'FULLY_OWNED') return 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30';
+                                    if (s === 'PARTIALLY_OWNED') return 'text-amber-300 bg-amber-500/10 border-amber-500/30';
+                                    return 'text-zinc-400 bg-zinc-700/30 border-zinc-600/30';
+                                };
+                                return (
+                                    <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-3 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <Package size={13} className="text-zinc-500" />
+                                                <span className="text-[10px] text-zinc-600 uppercase tracking-wider font-medium">Inventory Coverage</span>
+                                            </div>
+                                            {coverage.deducted ? (
+                                                <span className="inline-flex items-center rounded-full bg-emerald-500/15 border border-emerald-500/40 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">Deducted</span>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    disabled={deductingStock}
+                                                    onClick={async () => {
+                                                        try {
+                                                            await deductOrderStockMut({ variables: { orderId: selectedOrder.id } });
+                                                            fetchOrderCoverage({ variables: { orderId: selectedOrder.id } });
+                                                            toast.success('Stock deducted successfully.');
+                                                        } catch (err: any) {
+                                                            toast.error(err.message || 'Failed to deduct stock.');
+                                                        }
+                                                    }}
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium border border-violet-500/30 bg-violet-500/10 text-violet-300 hover:brightness-125 disabled:opacity-50"
+                                                >
+                                                    {deductingStock ? 'Deducting...' : '− Deduct from Stock'}
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            {coverage.items.map((item) => (
+                                                <div key={item.productId} className="flex items-center justify-between text-xs">
+                                                    <span className="text-zinc-400 truncate mr-2">{item.productName}</span>
+                                                    <div className="flex items-center gap-2 shrink-0">
+                                                        <span className="text-zinc-600">{item.fromStock} stock / {item.fromMarket} market</span>
+                                                        <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold border ${statusColor(item.status)}`}>
+                                                            {item.status === 'FULLY_OWNED' ? 'Owned' : item.status === 'PARTIALLY_OWNED' ? 'Partial' : 'Market'}
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>

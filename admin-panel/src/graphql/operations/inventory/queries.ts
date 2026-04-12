@@ -8,6 +8,8 @@ export const GET_MY_INVENTORY = graphql(`
             productName
             productImageUrl
             productBasePrice
+            productMarkupPrice
+            productNightPrice
             categoryName
             quantity
             lowStockThreshold

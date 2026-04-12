@@ -81,6 +81,8 @@ export const setInventoryQuantity: NonNullable<MutationResolvers['setInventoryQu
             productName: products.name,
             productImageUrl: products.imageUrl,
             productBasePrice: products.basePrice,
+            productMarkupPrice: products.markupPrice,
+            productNightPrice: products.nightMarkedupPrice,
             categoryName: productCategories.name,
         })
         .from(personalInventory)
@@ -101,6 +103,8 @@ export const setInventoryQuantity: NonNullable<MutationResolvers['setInventoryQu
         productName: row.productName,
         productImageUrl: row.productImageUrl,
         productBasePrice: Number(row.productBasePrice),
+        productMarkupPrice: row.productMarkupPrice != null ? Number(row.productMarkupPrice) : null,
+        productNightPrice: row.productNightPrice != null ? Number(row.productNightPrice) : null,
         categoryName: row.categoryName,
         quantity: row.quantity,
         lowStockThreshold: row.lowStockThreshold,

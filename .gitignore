@@ -15,3 +15,6 @@ package/
 # Observability — Docker volume data (never commit)
 observability/loki-data/
 observability/grafana-data/
+
+# Drizzle Studio project (local tooling, never commit)
+drizzle-studio/

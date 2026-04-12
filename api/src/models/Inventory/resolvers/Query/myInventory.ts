@@ -30,6 +30,8 @@ export const myInventory: NonNullable<QueryResolvers['myInventory']> = async (
             productName: products.name,
             productImageUrl: products.imageUrl,
             productBasePrice: products.basePrice,
+            productMarkupPrice: products.markupPrice,
+            productNightPrice: products.nightMarkedupPrice,
             categoryName: productCategories.name,
         })
         .from(personalInventory)
@@ -47,8 +49,8 @@ export const myInventory: NonNullable<QueryResolvers['myInventory']> = async (
         productId: row.productId,
         productName: row.productName,
         productImageUrl: row.productImageUrl,
-        productBasePrice: Number(row.productBasePrice),
-        categoryName: row.categoryName,
+        productBasePrice: Number(row.productBasePrice),            productMarkupPrice: row.productMarkupPrice != null ? Number(row.productMarkupPrice) : null,
+            productNightPrice: row.productNightPrice != null ? Number(row.productNightPrice) : null,        categoryName: row.categoryName,
         quantity: row.quantity,
         lowStockThreshold: row.lowStockThreshold,
         costPrice: row.costPrice ? Number(row.costPrice) : null,

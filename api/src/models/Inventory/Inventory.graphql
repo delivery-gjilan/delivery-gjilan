@@ -10,6 +10,8 @@ type InventoryItem {
     productName: String!
     productImageUrl: String
     productBasePrice: Float!
+    productMarkupPrice: Float
+    productNightPrice: Float
     categoryName: String
     quantity: Int!
     lowStockThreshold: Int

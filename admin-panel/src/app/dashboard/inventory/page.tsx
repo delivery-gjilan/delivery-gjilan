@@ -47,6 +47,8 @@ interface InventoryItem {
     productName: string;
     productImageUrl?: string | null;
     productBasePrice: number;
+    productMarkupPrice?: number | null;
+    productNightPrice?: number | null;
     categoryName?: string | null;
     quantity: number;
     lowStockThreshold?: number | null;
@@ -214,8 +216,8 @@ function InventoryContent({ businessId, businessName }: { businessId: string; bu
                     cmp = (a.costPrice ?? 0) - (b.costPrice ?? 0);
                     break;
                 case "margin":
-                    const marginA = a.costPrice ? a.productBasePrice - a.costPrice : 0;
-                    const marginB = b.costPrice ? b.productBasePrice - b.costPrice : 0;
+                    const marginA = a.costPrice ? (a.productMarkupPrice ?? a.productBasePrice) - a.costPrice : 0;
+                    const marginB = b.costPrice ? (b.productMarkupPrice ?? b.productBasePrice) - b.costPrice : 0;
                     cmp = marginA - marginB;
                     break;
             }
@@ -584,7 +586,8 @@ function InventoryRow({
     onDelete: () => void;
     adjusting: boolean;
 }) {
-    const margin = item.costPrice ? item.productBasePrice - item.costPrice : null;
+    const effectivePrice = item.productMarkupPrice ?? item.productBasePrice;
+    const margin = item.costPrice ? effectivePrice - item.costPrice : null;
     const marginPct = item.costPrice && item.costPrice > 0
         ? ((margin! / item.costPrice) * 100).toFixed(0)
         : null;
@@ -656,7 +659,10 @@ function InventoryRow({
 
             {/* Retail Price */}
             <div className="text-sm text-zinc-300">
-                €{item.productBasePrice.toFixed(2)}
+                <span title={`Base: €${item.productBasePrice.toFixed(2)}`}>€{effectivePrice.toFixed(2)}</span>
+                {item.productNightPrice != null && (
+                    <span className="ml-1 text-[10px] text-indigo-400" title="Night price">🌙€{item.productNightPrice.toFixed(2)}</span>
+                )}
             </div>
 
             {/* Margin */}

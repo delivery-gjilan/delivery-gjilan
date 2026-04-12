@@ -979,7 +979,9 @@ export type InventoryItem = {
   productBasePrice: Scalars['Float']['output'];
   productId: Scalars['ID']['output'];
   productImageUrl?: Maybe<Scalars['String']['output']>;
+  productMarkupPrice?: Maybe<Scalars['Float']['output']>;
   productName: Scalars['String']['output'];
+  productNightPrice?: Maybe<Scalars['Float']['output']>;
   quantity: Scalars['Int']['output'];
   updatedAt?: Maybe<Scalars['DateTime']['output']>;
 };
@@ -4504,7 +4506,9 @@ export type InventoryItemResolvers<ContextType = GraphQLContext, ParentType exte
   productBasePrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   productId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   productImageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  productMarkupPrice?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   productName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  productNightPrice?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   quantity?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   updatedAt?: Resolver<Maybe<ResolversTypes['DateTime']>, ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
