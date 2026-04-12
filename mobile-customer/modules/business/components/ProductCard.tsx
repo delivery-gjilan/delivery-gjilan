@@ -10,14 +10,13 @@ import { getEffectiveProductPrice, getPreDiscountProductPrice } from '@/modules/
 
 type ProductCardItem = GetProductsQuery['products'][number];
 
-const POPULAR_THRESHOLD = 5;
-
 interface ProductCardProps {
     productCard: ProductCardItem;
     businessType?: BusinessType;
+    isPopular?: boolean;
 }
 
-export function ProductCard({ productCard, businessType }: ProductCardProps) {
+export function ProductCard({ productCard, businessType, isPopular = false }: ProductCardProps) {
     const theme = useTheme();
     const { t } = useTranslations();
 
@@ -37,8 +36,6 @@ export function ProductCard({ productCard, businessType }: ProductCardProps) {
     const discountPercent = hasDiscount && product?.saleDiscountPercentage
         ? Math.round(Number(product.saleDiscountPercentage))
         : 0;
-
-    const isPopular = (productCard.orderCount ?? 0) >= POPULAR_THRESHOLD;
 
     return (
         <TouchableOpacity

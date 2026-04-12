@@ -16,12 +16,22 @@ export const adminSetShiftDrivers: NonNullable<MutationResolvers['adminSetShiftD
             throw new GraphQLError('Admin access required', { extensions: { code: 'FORBIDDEN' } });
         }
 
+        // Shift data MUST be written reliably — use the raw Redis client so that
+        // a failed write surfaces as an error rather than being silently swallowed
+        // by the cache wrapper (which falls through on errors to avoid DB impact).
+        const redis = await cache.getClient();
+        if (!redis) {
+            throw new GraphQLError('Shift service is temporarily unavailable — please try again', {
+                extensions: { code: 'SERVICE_UNAVAILABLE' },
+            });
+        }
+
         if (driverIds.length === 0) {
             // Empty list = clear the restriction (all eligible drivers get notifications)
-            await cache.del(SHIFT_DRIVERS_CACHE_KEY);
+            await redis.del(SHIFT_DRIVERS_CACHE_KEY);
             logger.info({ adminId: userData.userId }, 'adminSetShiftDrivers: shift restriction cleared');
         } else {
-            await cache.set(SHIFT_DRIVERS_CACHE_KEY, driverIds, SHIFT_TTL_S);
+            await redis.set(SHIFT_DRIVERS_CACHE_KEY, JSON.stringify(driverIds), { EX: SHIFT_TTL_S });
             logger.info(
                 { adminId: userData.userId, count: driverIds.length, driverIds },
                 'adminSetShiftDrivers: shift set',

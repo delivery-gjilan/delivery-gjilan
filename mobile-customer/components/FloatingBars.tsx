@@ -47,14 +47,16 @@ export const FloatingBars = () => {
         return () => clearTimeout(timeoutId);
     }, [suppressCartBarUntil]);
 
-    const shouldHideForModalTransition =
+    const hideForOrderCreatedTransition =
         (successModalVisible && successModalType === 'order_created') ||
-        isPostSuccessCooldownActive ||
         awaitingApprovalVisible;
+
+    const shouldHideOrdersBar = hideForOrderCreatedTransition;
+    const shouldHideCartBar = hideForOrderCreatedTransition || isPostSuccessCooldownActive;
 
     // Deterministic hide/show avoids rare stuck low-opacity states observed
     // after rapid modal + navigation transitions.
-    if (shouldHide || shouldHideForModalTransition) {
+    if (shouldHide || (shouldHideOrdersBar && shouldHideCartBar)) {
         return null;
     }
 
@@ -64,8 +66,8 @@ export const FloatingBars = () => {
             style={{ bottom: bottomPosition, zIndex: 50 }}
             pointerEvents="box-none"
         >
-            <OrdersFloatingBar />
-            <CartFloatingBar />
+            {!shouldHideOrdersBar && <OrdersFloatingBar />}
+            {!shouldHideCartBar && <CartFloatingBar />}
         </View>
     );
 };

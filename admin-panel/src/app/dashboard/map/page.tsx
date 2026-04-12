@@ -508,14 +508,22 @@ export default function MapPage() {
       return stored ? new Set<string>(JSON.parse(stored)) : new Set<string>();
     } catch { return new Set<string>(); }
   });
-  const toggleWorkingDriver = (driverId: string) => {
-    setWorkingDriverIds(prev => {
-      const next = new Set(prev);
-      if (next.has(driverId)) { next.delete(driverId); } else { next.add(driverId); }
-      try { localStorage.setItem(WORKING_DRIVERS_KEY, JSON.stringify([...next])); } catch {}
-      setShiftDrivers({ variables: { driverIds: [...next] } }).catch(() => {});
-      return next;
-    });
+  const toggleWorkingDriver = async (driverId: string) => {
+    const prev = new Set(workingDriverIds);
+    const next = new Set(prev);
+    if (next.has(driverId)) { next.delete(driverId); } else { next.add(driverId); }
+    const nextArr = [...next];
+    // Optimistic update
+    setWorkingDriverIds(next);
+    try { localStorage.setItem(WORKING_DRIVERS_KEY, JSON.stringify(nextArr)); } catch {}
+    try {
+      await setShiftDrivers({ variables: { driverIds: nextArr } });
+    } catch {
+      // Revert on failure so UI stays in sync with server
+      setWorkingDriverIds(prev);
+      try { localStorage.setItem(WORKING_DRIVERS_KEY, JSON.stringify([...prev])); } catch {}
+      toast.error('Failed to update shift — driver list not saved');
+    }
   };
   // A driver is considered "on shift" if workingDriverIds is empty (backward compat) OR they are explicitly marked working
   const isOnShift = (driverId: string) => workingDriverIds.size === 0 || workingDriverIds.has(driverId);
@@ -2688,21 +2696,36 @@ export default function MapPage() {
             {/* Footer actions */}
             <div className="flex items-center justify-between px-5 py-3 border-t border-zinc-800 bg-zinc-900/60">
               <button
-                onClick={() => {
+                onClick={async () => {
+                  const prev = new Set(workingDriverIds);
                   const allIds = new Set<string>(drivers.map((d: any) => d.id));
+                  const allArr = [...allIds];
                   setWorkingDriverIds(allIds);
-                  try { localStorage.setItem(WORKING_DRIVERS_KEY, JSON.stringify([...allIds])); } catch {}
-                  setShiftDrivers({ variables: { driverIds: [...allIds] } }).catch(() => {});
+                  try { localStorage.setItem(WORKING_DRIVERS_KEY, JSON.stringify(allArr)); } catch {}
+                  try {
+                    await setShiftDrivers({ variables: { driverIds: allArr } });
+                  } catch {
+                    setWorkingDriverIds(prev);
+                    try { localStorage.setItem(WORKING_DRIVERS_KEY, JSON.stringify([...prev])); } catch {}
+                    toast.error('Failed to update shift — driver list not saved');
+                  }
                 }}
                 className="text-[11px] text-zinc-400 hover:text-white transition">
                 Select all
               </button>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => {
+                  onClick={async () => {
+                    const prev = new Set(workingDriverIds);
                     setWorkingDriverIds(new Set());
                     try { localStorage.removeItem(WORKING_DRIVERS_KEY); } catch {}
-                    setShiftDrivers({ variables: { driverIds: [] } }).catch(() => {});
+                    try {
+                      await setShiftDrivers({ variables: { driverIds: [] } });
+                    } catch {
+                      setWorkingDriverIds(prev);
+                      try { localStorage.setItem(WORKING_DRIVERS_KEY, JSON.stringify([...prev])); } catch {}
+                      toast.error('Failed to clear shift — driver list not saved');
+                    }
                   }}
                   className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-zinc-400 hover:text-white border border-zinc-700 hover:border-zinc-500 transition">
                   Clear shift

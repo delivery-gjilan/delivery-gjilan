@@ -1,18 +1,28 @@
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useMutation } from '@apollo/client/react';
 import { useTranslations } from '@/hooks/useTranslations';
-import { useTheme } from '@/hooks/useTheme';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { RESET_PASSWORD_MUTATION } from '@/graphql/operations/auth';
 
+const C = {
+    bg: '#09090B',
+    card: 'rgba(255,255,255,0.06)',
+    border: 'rgba(255,255,255,0.10)',
+    text: '#FAFAFA',
+    sub: '#A1A1AA',
+    primary: '#7C3AED',
+    error: '#EF4444',
+    errorBg: 'rgba(239,68,68,0.12)',
+    errorBorder: 'rgba(239,68,68,0.25)',
+};
+
 export default function ResetPasswordScreen() {
     const router = useRouter();
     const { t } = useTranslations();
-    const theme = useTheme();
     const { token } = useLocalSearchParams<{ token: string }>();
 
     const [newPassword, setNewPassword] = useState('');
@@ -51,25 +61,26 @@ export default function ResetPasswordScreen() {
     };
 
     return (
-        <SafeAreaView className="flex-1 bg-background">
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
+        <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+            <StatusBar barStyle="light-content" />
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
                 {/* Back button */}
                 <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
                     <TouchableOpacity
                         onPress={() => router.back()}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         style={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: 12,
-                            backgroundColor: theme.colors.card,
+                            width: 44,
+                            height: 44,
+                            borderRadius: 14,
+                            backgroundColor: C.card,
                             borderWidth: 1,
-                            borderColor: theme.colors.border,
+                            borderColor: C.border,
                             alignItems: 'center',
                             justifyContent: 'center',
                         }}
                     >
-                        <Ionicons name="arrow-back" size={20} color={theme.colors.text} />
+                        <Ionicons name="arrow-back" size={20} color={C.text} />
                     </TouchableOpacity>
                 </View>
 
@@ -82,7 +93,7 @@ export default function ResetPasswordScreen() {
                                     width: 72,
                                     height: 72,
                                     borderRadius: 36,
-                                    backgroundColor: '#22c55e15',
+                                    backgroundColor: 'rgba(34,197,94,0.08)',
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     marginBottom: 20,
@@ -92,7 +103,7 @@ export default function ResetPasswordScreen() {
                             </View>
                             <Text
                                 style={{
-                                    color: theme.colors.text,
+                                    color: C.text,
                                     fontSize: 24,
                                     fontWeight: '700',
                                     textAlign: 'center',
@@ -103,7 +114,7 @@ export default function ResetPasswordScreen() {
                             </Text>
                             <Text
                                 style={{
-                                    color: theme.colors.subtext,
+                                    color: C.sub,
                                     fontSize: 15,
                                     textAlign: 'center',
                                     lineHeight: 22,
@@ -115,10 +126,15 @@ export default function ResetPasswordScreen() {
                             <TouchableOpacity
                                 onPress={() => router.replace('/login')}
                                 style={{
-                                    backgroundColor: theme.colors.primary,
+                                    backgroundColor: C.primary,
                                     paddingVertical: 16,
                                     paddingHorizontal: 32,
                                     borderRadius: 16,
+                                    shadowColor: C.primary,
+                                    shadowOffset: { width: 0, height: 6 },
+                                    shadowOpacity: 0.4,
+                                    shadowRadius: 16,
+                                    elevation: 10,
                                 }}
                             >
                                 <Text style={{ color: 'white', fontWeight: '700', fontSize: 16 }}>
@@ -129,12 +145,12 @@ export default function ResetPasswordScreen() {
                     ) : (
                         /* ── Form state ── */
                         <Animated.View entering={FadeIn.duration(400)}>
-                            <Text style={{ color: theme.colors.text, fontSize: 28, fontWeight: '700', marginBottom: 8 }}>
+                            <Text style={{ color: C.text, fontSize: 28, fontWeight: '800', marginBottom: 8, letterSpacing: -0.5 }}>
                                 {t.auth.reset_password.title}
                             </Text>
                             <Text
                                 style={{
-                                    color: theme.colors.subtext,
+                                    color: C.sub,
                                     fontSize: 15,
                                     lineHeight: 22,
                                     marginBottom: 32,
@@ -147,9 +163,9 @@ export default function ResetPasswordScreen() {
                                 <Animated.View entering={FadeInDown.duration(300)} style={{ marginBottom: 16 }}>
                                     <View
                                         style={{
-                                            backgroundColor: theme.colors.expense + '15',
+                                            backgroundColor: C.errorBg,
                                             borderWidth: 1,
-                                            borderColor: theme.colors.expense + '30',
+                                            borderColor: C.errorBorder,
                                             borderRadius: 16,
                                             paddingHorizontal: 16,
                                             paddingVertical: 12,
@@ -157,10 +173,10 @@ export default function ResetPasswordScreen() {
                                             alignItems: 'center',
                                         }}
                                     >
-                                        <Ionicons name="alert-circle" size={20} color={theme.colors.expense} />
+                                        <Ionicons name="alert-circle" size={20} color={C.error} />
                                         <Text
                                             style={{
-                                                color: theme.colors.expense,
+                                                color: C.error,
                                                 marginLeft: 8,
                                                 fontSize: 14,
                                                 fontWeight: '500',
@@ -178,26 +194,26 @@ export default function ResetPasswordScreen() {
                                 style={{
                                     flexDirection: 'row',
                                     alignItems: 'center',
-                                    backgroundColor: theme.colors.card,
+                                    backgroundColor: C.card,
                                     borderWidth: 1.5,
-                                    borderColor: theme.colors.border,
+                                    borderColor: C.border,
                                     borderRadius: 16,
                                     paddingHorizontal: 16,
                                     marginBottom: 12,
                                 }}
                             >
-                                <Ionicons name="lock-closed-outline" size={20} color={theme.colors.subtext} />
+                                <Ionicons name="lock-closed-outline" size={20} color={C.sub} />
                                 <TextInput
                                     style={{
                                         flex: 1,
                                         paddingVertical: 16,
                                         marginLeft: 12,
                                         fontSize: 16,
-                                        color: theme.colors.text,
+                                        color: C.text,
                                         backgroundColor: 'transparent',
                                     }}
                                     placeholder={t.auth.reset_password.new_password_placeholder}
-                                    placeholderTextColor={theme.colors.subtext}
+                                    placeholderTextColor={C.sub}
                                     value={newPassword}
                                     onChangeText={setNewPassword}
                                     editable={!loading}
@@ -212,7 +228,7 @@ export default function ResetPasswordScreen() {
                                     <Ionicons
                                         name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                                         size={20}
-                                        color={theme.colors.subtext}
+                                        color={C.sub}
                                     />
                                 </TouchableOpacity>
                             </View>
@@ -222,29 +238,29 @@ export default function ResetPasswordScreen() {
                                 style={{
                                     flexDirection: 'row',
                                     alignItems: 'center',
-                                    backgroundColor: theme.colors.card,
+                                    backgroundColor: C.card,
                                     borderWidth: 1.5,
                                     borderColor:
                                         confirmPassword.length > 0 && confirmPassword === newPassword
                                             ? '#22c55e'
-                                            : theme.colors.border,
+                                            : C.border,
                                     borderRadius: 16,
                                     paddingHorizontal: 16,
                                     marginBottom: 24,
                                 }}
                             >
-                                <Ionicons name="lock-closed-outline" size={20} color={theme.colors.subtext} />
+                                <Ionicons name="lock-closed-outline" size={20} color={C.sub} />
                                 <TextInput
                                     style={{
                                         flex: 1,
                                         paddingVertical: 16,
                                         marginLeft: 12,
                                         fontSize: 16,
-                                        color: theme.colors.text,
+                                        color: C.text,
                                         backgroundColor: 'transparent',
                                     }}
                                     placeholder={t.auth.reset_password.confirm_password_placeholder}
-                                    placeholderTextColor={theme.colors.subtext}
+                                    placeholderTextColor={C.sub}
                                     value={confirmPassword}
                                     onChangeText={setConfirmPassword}
                                     editable={!loading}
@@ -256,19 +272,24 @@ export default function ResetPasswordScreen() {
                             <TouchableOpacity
                                 onPress={handleReset}
                                 disabled={loading}
-                                activeOpacity={0.8}
+                                activeOpacity={0.85}
                                 style={{
-                                    backgroundColor: loading ? theme.colors.border : theme.colors.primary,
-                                    paddingVertical: 16,
+                                    backgroundColor: loading ? 'rgba(255,255,255,0.08)' : C.primary,
+                                    paddingVertical: 18,
                                     borderRadius: 16,
                                     alignItems: 'center',
                                     justifyContent: 'center',
+                                    shadowColor: loading ? 'transparent' : C.primary,
+                                    shadowOffset: { width: 0, height: 6 },
+                                    shadowOpacity: 0.4,
+                                    shadowRadius: 16,
+                                    elevation: loading ? 0 : 10,
                                 }}
                             >
                                 {loading ? (
                                     <ActivityIndicator color="white" />
                                 ) : (
-                                    <Text style={{ color: 'white', fontWeight: '700', fontSize: 16 }}>
+                                    <Text style={{ color: 'white', fontWeight: '700', fontSize: 17, letterSpacing: 0.2 }}>
                                         {t.auth.reset_password.reset_button}
                                     </Text>
                                 )}

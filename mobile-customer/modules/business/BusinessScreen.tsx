@@ -299,6 +299,22 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
         );
     }, [products, searchQuery]);
 
+    // Only highlight the top N products by orderCount on this business page.
+    const popularProductIds = useMemo(() => {
+        const TOP_POPULAR_COUNT = 2;
+        return new Set(
+            (products ?? [])
+                .filter((p) => (p.orderCount ?? 0) > 0)
+                .sort((a, b) => {
+                    const countDiff = (b.orderCount ?? 0) - (a.orderCount ?? 0);
+                    if (countDiff !== 0) return countDiff;
+                    return (a.name ?? '').localeCompare(b.name ?? '');
+                })
+                .slice(0, TOP_POPULAR_COUNT)
+                .map((p) => p.id),
+        );
+    }, [products]);
+
     const isSearching = searchQuery.trim().length > 0;
 
     // Set initial active category
@@ -871,6 +887,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                                                     key={productCard.id}
                                                     productCard={productCard}
                                                     businessType={business.businessType}
+                                                    isPopular={popularProductIds.has(productCard.id)}
                                                 />
                                             ),
                                         )}
@@ -913,6 +930,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                                                 <ProductCard
                                                     productCard={productCard}
                                                     businessType={business.businessType}
+                                                    isPopular={popularProductIds.has(productCard.id)}
                                                 />
                                                 </Animated.View>
                                             ))}
@@ -943,6 +961,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                                                     key={productCard.id}
                                                     productCard={productCard}
                                                     businessType={business.businessType}
+                                                    isPopular={popularProductIds.has(productCard.id)}
                                                 />
                                             )
                                         )}
@@ -1039,6 +1058,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                                         key={productCard.id}
                                         productCard={productCard}
                                         businessType={business.businessType}
+                                        isPopular={popularProductIds.has(productCard.id)}
                                     />
                                 ))}
                             </View>

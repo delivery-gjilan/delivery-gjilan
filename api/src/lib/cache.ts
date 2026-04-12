@@ -176,6 +176,8 @@ export const cache = {
     del,
     delPattern,
     ping,
+    /** Exposes the raw Redis client for callers that need reliable, non-swallowed writes. */
+    getClient,
 
     // ── Business helpers ──
     async invalidateBusiness(businessId: string) {

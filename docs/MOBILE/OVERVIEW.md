@@ -63,6 +63,8 @@ After an order transitions to DELIVERED, mobile-customer queues a post-delivery 
 
 The post-delivery review prompt in mobile-customer uses localized text through the app translation dictionaries (EN/AL), including submit/loading states and skip/mute actions.
 
+For order creation in mobile-customer, the success modal now auto-dismisses shortly after the success animation/confetti and routes to home before the modal closes. The order-created modal dismisses without fade so destination Home UI elements do not briefly appear underneath during transition. After redirect, the active-order floating banner can render immediately while cart-bar suppression cooldown still applies.
+
 OrderDetails screen in mobile-customer now uses localized strings for all user-visible copy: order number label, price summary heading, delivery address heading, order items heading, show/hide summary toggle, map unavailable fallback, unknown date fallback, and cancelled status banner. Removed all `as any` translation key workarounds by adding proper schema keys.
 
 OrderDetails in mobile-customer shows a dedicated cancellation notice in the active-order panel that instructs customers to call a phone number for cancellation, and the UX treats phone call as the only cancellation path presented in that screen.

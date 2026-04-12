@@ -1,19 +1,30 @@
-import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { useAuthStore } from '@/store/authStore';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 
 import { useRouter, type Href } from 'expo-router';
 import { AppLanguage, SetMyPreferredLanguageDocument, SignupStep } from '@/gql/graphql';
 import { useTranslations } from '@/hooks/useTranslations';
-import { useTheme } from '@/hooks/useTheme';
 import type { Translation } from '@/localization/schema';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation } from '@apollo/client/react';
 import { useLocaleStore } from '@/store/useLocaleStore';
 import type { LanguageChoice } from '@/utils/types';
+
+const DARK_AUTH_THEME = {
+    colors: {
+        primary: '#7C3AED',
+        background: '#09090B',
+        card: 'rgba(255,255,255,0.06)',
+        text: '#FAFAFA',
+        subtext: '#A1A1AA',
+        border: 'rgba(255,255,255,0.10)',
+        expense: '#EF4444',
+    },
+};
 
 const getStepConfig = (t: Translation): Record<SignupStep, { number: number; title: string; description: string }> => ({
     INITIAL: { number: 1, title: t.auth.signup.step_titles.create_account, description: t.auth.signup.step_titles.create_account_desc },
@@ -119,7 +130,7 @@ export default function SignupScreen() {
     const updateUser = useAuthStore((state) => state.updateUser);
     const router = useRouter();
     const { t } = useTranslations();
-    const theme = useTheme();
+    const theme = DARK_AUTH_THEME;
 
     const { languageChoice, setLanguageChoice } = useLocaleStore();
     const [setPreferredLanguage] = useMutation(SetMyPreferredLanguageDocument);
@@ -296,68 +307,75 @@ export default function SignupScreen() {
     };
 
     /* ── Language Picker ── */
-    const LanguagePicker = () => {
-        const options: { choice: LanguageChoice; label: string; flag: string }[] = [
-            { choice: 'en', label: t.auth.signup.language_en, flag: '🇬🇧' },
-            { choice: 'al', label: t.auth.signup.language_al, flag: '🇦🇱' },
-        ];
-        return (
-            <View style={{ marginBottom: 20 }}>
-                <Text style={{ color: theme.colors.subtext, fontSize: 13, fontWeight: '500', marginBottom: 8 }}>
-                    {t.auth.signup.language_picker_label}
-                </Text>
-                <View style={{ flexDirection: 'row', gap: 12 }}>
-                    {options.map(({ choice, label, flag }) => {
-                        const isSelected = languageChoice === choice;
-                        return (
-                            <TouchableOpacity
-                                key={choice}
-                                onPress={() => handleLanguageSelect(choice)}
-                                activeOpacity={0.75}
+    const LanguagePicker = () => (
+        <View style={{ marginBottom: 20 }}>
+            <Text style={{ color: theme.colors.subtext, fontSize: 13, fontWeight: '500', marginBottom: 8 }}>
+                {t.auth.signup.language_picker_label}
+            </Text>
+            <View
+                style={{
+                    flexDirection: 'row',
+                    backgroundColor: theme.colors.card,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: theme.colors.border,
+                    padding: 3,
+                    alignSelf: 'flex-start',
+                }}
+            >
+                {(['en', 'al'] as LanguageChoice[]).map((lang) => {
+                    const active = languageChoice === lang;
+                    return (
+                        <TouchableOpacity
+                            key={lang}
+                            onPress={() => handleLanguageSelect(lang)}
+                            activeOpacity={0.7}
+                            style={{
+                                paddingHorizontal: 18,
+                                paddingVertical: 10,
+                                borderRadius: 9,
+                                backgroundColor: active ? theme.colors.primary : 'transparent',
+                            }}
+                        >
+                            <Text
                                 style={{
-                                    flex: 1,
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: 6,
-                                    paddingVertical: 12,
-                                    borderRadius: 14,
-                                    borderWidth: 1,
-                                    borderColor: theme.colors.border,
-                                    backgroundColor: theme.colors.card,
+                                    color: active ? '#FFF' : theme.colors.subtext,
+                                    fontSize: 14,
+                                    fontWeight: '600',
                                 }}
                             >
-                                <Text style={{ fontSize: 18 }}>{flag}</Text>
-                                <Text style={{ color: theme.colors.text, fontSize: 14 }}>{label}</Text>
-                                {isSelected && (
-                                    <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
-                                )}
-                            </TouchableOpacity>
-                        );
-                    })}
-                </View>
+                                {lang === 'en' ? '🇬🇧 English' : '🇦🇱 Shqip'}
+                            </Text>
+                        </TouchableOpacity>
+                    );
+                })}
             </View>
-        );
-    };
+        </View>
+    );
 
     /* ── Action button shared component ── */
     const ActionButton = ({ onPress, label }: { onPress: () => void; label: string }) => (
         <TouchableOpacity
             onPress={onPress}
             disabled={loading}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
             style={{
-                backgroundColor: loading ? theme.colors.border : theme.colors.primary,
-                paddingVertical: 16,
+                backgroundColor: loading ? 'rgba(255,255,255,0.08)' : theme.colors.primary,
+                paddingVertical: 18,
                 borderRadius: 16,
                 alignItems: 'center',
                 justifyContent: 'center',
+                shadowColor: loading ? 'transparent' : theme.colors.primary,
+                shadowOffset: { width: 0, height: 6 },
+                shadowOpacity: 0.4,
+                shadowRadius: 16,
+                elevation: loading ? 0 : 10,
             }}
         >
             {loading ? (
-                <ActivityIndicator color="white" />
+                <ActivityIndicator color="#FFF" />
             ) : (
-                <Text style={{ color: 'white', fontWeight: '700', fontSize: 16 }}>{label}</Text>
+                <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 17, letterSpacing: 0.2 }}>{label}</Text>
             )}
         </TouchableOpacity>
     );
@@ -366,17 +384,18 @@ export default function SignupScreen() {
     const SignInLink = () => (
         <TouchableOpacity style={{ paddingVertical: 16, marginTop: 16 }} onPress={() => router.push('/login' as Href)}>
             <Text style={{ textAlign: 'center', color: theme.colors.subtext, fontSize: 15 }}>
-                {'Already have an account? '}
+                {t.auth.login.no_account}
                 <Text style={{ color: theme.colors.primary, fontWeight: '600' }}>{t.auth.sign_in}</Text>
             </Text>
         </TouchableOpacity>
     );
 
     return (
-        <SafeAreaView className="flex-1 bg-background">
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#09090B' }}>
+            <StatusBar barStyle="light-content" />
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                className="flex-1"
+                style={{ flex: 1 }}
             >
                 {/* Back button */}
                 <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 }}>
@@ -391,9 +410,9 @@ export default function SignupScreen() {
                         }}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         style={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: 12,
+                            width: 44,
+                            height: 44,
+                            borderRadius: 14,
                             backgroundColor: theme.colors.card,
                             borderWidth: 1,
                             borderColor: theme.colors.border,

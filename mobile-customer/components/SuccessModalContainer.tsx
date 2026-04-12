@@ -6,6 +6,7 @@ import { useSuccessModalStore } from '@/store/useSuccessModalStore';
 import { useOrderReviewPromptStore } from '@/store/useOrderReviewPromptStore';
 
 const AUTO_DISMISS_MS = 4000;
+const ORDER_CREATED_AUTO_DISMISS_MS = 1400;
 // Approximate duration of the RN Modal 'fade' animation — used to delay
 // post-dismiss navigation so it fires after the modal has fully disappeared.
 const MODAL_FADE_MS = 320;
@@ -18,7 +19,6 @@ export default function SuccessModalContainer() {
     const autoDismissRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     // Holds the orderId to navigate to after the modal has finished fading out.
     const pendingTrackOrderIdRef = useRef<string | null>(null);
-    const pendingGoHomeRef = useRef(false);
     const pendingReviewOrderIdRef = useRef<string | null>(null);
     // Tracks whether the modal was ever opened so the !visible branch only
     // runs on genuine dismiss events, not on the initial render.
@@ -32,16 +32,17 @@ export default function SuccessModalContainer() {
                 hasScheduledDismissRef.current = true;
                 // Schedule auto-dismiss. Navigation to the correct destination has
                 // already been handled by whoever triggered the modal:
-                //   • order_created → CartScreen calls router.replace('/(tabs)/home')
-                //     before showSuccess() so home is under the modal while it plays.
+                //   • order_created → route is corrected to home right before dismiss.
                 //   • order_delivered → user is already on some screen; no nav needed.
                 autoDismissRef.current = setTimeout(() => {
                     if (type === 'order_created') {
                         suppressCartBarFor(MODAL_FADE_MS + 700);
-                        pendingGoHomeRef.current = true;
+                        // Route first while modal is still visible to prevent
+                        // seeing an intermediate underlying screen during fade-out.
+                        router.replace('/(tabs)/home');
                     }
                     hideSuccess();
-                }, AUTO_DISMISS_MS);
+                }, type === 'order_created' ? ORDER_CREATED_AUTO_DISMISS_MS : AUTO_DISMISS_MS);
             }
         } else if (wasVisibleRef.current) {
             // Modal just dismissed (visible flipped false after being true).
@@ -60,11 +61,6 @@ export default function SuccessModalContainer() {
                 pendingTrackOrderIdRef.current = null;
                 setTimeout(() => {
                     router.push(`/orders/${targetOrderId}` as any);
-                }, MODAL_FADE_MS);
-            } else if (pendingGoHomeRef.current) {
-                pendingGoHomeRef.current = false;
-                setTimeout(() => {
-                    router.replace('/(tabs)/home');
                 }, MODAL_FADE_MS);
             }
 
@@ -87,7 +83,6 @@ export default function SuccessModalContainer() {
 
     const handleTrackOrder = useCallback(() => {
         cancelAutoDismiss();
-        pendingGoHomeRef.current = false;
         if (orderId) {
             // Store the id, then dismiss. Navigation fires after the fade in the
             // !visible branch above — prevents screen flashes during the animation.
@@ -103,20 +98,22 @@ export default function SuccessModalContainer() {
         cancelAutoDismiss();
         if (type === 'order_created') {
             suppressCartBarFor(MODAL_FADE_MS + 700);
-            pendingGoHomeRef.current = true;
+            // Navigate immediately while modal is mounted so no underlying
+            // transitional UI is visible as the modal dismisses.
+            router.replace('/(tabs)/home');
         } else if (type === 'order_delivered' && orderId) {
             pendingReviewOrderIdRef.current = orderId;
         }
         // Dismiss now; optional route correction runs after fade in the effect above.
         hideSuccess();
-    }, [type, orderId, hideSuccess, cancelAutoDismiss, suppressCartBarFor]);
+    }, [type, orderId, hideSuccess, cancelAutoDismiss, suppressCartBarFor, router]);
 
     if (!visible || !type) return null;
 
     return (
         <Modal
             visible={visible}
-            animationType="fade"
+            animationType={type === 'order_created' ? 'none' : 'fade'}
             onRequestClose={handleGoHome}
             transparent={false}
         >
