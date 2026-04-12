@@ -15,7 +15,7 @@ import {
     promotions as promotionsTable,
 } from '@/database/schema';
 import { userPromoMetadata } from '@/database/schema';
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, notInArray } from 'drizzle-orm';
 import type { Order, CreateOrderInput } from '@/generated/types.generated';
 import { AppError } from '@/lib/errors';
 import { PromotionEngine } from '@/services/PromotionEngine';
@@ -181,6 +181,22 @@ export class OrderCreationModule {
             throw AppError.businessRule('User has not completed signup process');
         }
 
+        // 1b. Block if user already has an active order
+        const db = this.deps.db;
+        const activeOrderCheck = await db
+            .select({ id: ordersTable.id })
+            .from(ordersTable)
+            .where(
+                and(
+                    eq(ordersTable.userId, userId),
+                    notInArray(ordersTable.status, ['DELIVERED', 'CANCELLED']),
+                ),
+            )
+            .limit(1);
+        if (activeOrderCheck.length > 0) {
+            throw AppError.businessRule('You already have an active order. Please wait for it to be completed before placing a new one.');
+        }
+
         // 2. Validate Products and Calculate Totals (batch fetch to avoid N+1)
         const allProductIds = new Set<string>();
         for (const itemInput of input.items) {
@@ -240,7 +256,6 @@ export class OrderCreationModule {
         }
 
         // Batch-fetch options and option groups for price snapshots and validation
-        const db = this.deps.db;
         const [optionRows, optionGroupRows, productOptionGroupRows] = await Promise.all([
             allOptionIds.size > 0
                 ? db

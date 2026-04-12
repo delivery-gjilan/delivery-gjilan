@@ -340,6 +340,8 @@
         "outside_zone_inline_warning": "Selected address is outside our delivery area. Choose an in-zone address to continue.",
         "order_failed": "Order Failed",
         "unable_create_order": "Unable to create order. Please try again.",
+        "prices_changed_title": "Prices Updated",
+        "prices_changed_message": "Some prices in your cart have changed. Please review your cart and place your order again.",
         "active_order_exists_title": "Active Order Exists",
         "active_order_exists_message": "You already have an active order. Please wait for it to be delivered before placing a new order.",
         "order_placed_title": "Order Placed!",

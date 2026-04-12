@@ -329,6 +329,8 @@
         "outside_zone_inline_warning": "Adresa e zgjedhur është jashtë zonës sonë të dërgesës. Zgjidhni një adresë brenda zonës për të vazhduar.",
         "order_failed": "Porosia Dështoi",
         "unable_create_order": "Nuk mundëm të krijojmë porosinë. Ju lutem provoni përsëri.",
+        "prices_changed_title": "Çmimet u Përditësuan",
+        "prices_changed_message": "Disa çmime në shportën tuaj kanë ndryshuar. Ju lutem rishikoni shportën dhe vendosni porosinë përsëri.",
         "active_order_exists_title": "Porosi Aktive Ekziston",
         "active_order_exists_message": "Ju keni tashmë një porosi aktive. Ju lutem prisni derisa të dorëzohet para se të bëni porosi të re.",
         "order_placed_title": "Porosia u Vendos!",

@@ -782,6 +782,67 @@ export const CartScreen = () => {
         ? promoResult?.totalPrice ?? Math.max(0, total + deliveryPrice - appliedDiscount)
         : Math.max(0, total + deliveryPrice - appliedDiscount)) + prioritySurcharge + driverTip;
 
+    /**
+     * Re-fetches every product in the cart from the network and syncs unitPrice +
+     * option extraPrice in the Zustand store.  Returns true if at least one price
+     * changed (so the caller can decide whether to warn the user).
+     */
+    const refreshCartPrices = useCallback(async (): Promise<boolean> => {
+        const uniqueProductIds = Array.from(new Set(items.map((item) => item.productId)));
+        const freshPriceByProductId = new Map<string, number>();
+        const freshOptionPriceById = new Map<string, number>();
+
+        await Promise.all(
+            uniqueProductIds.map(async (productId) => {
+                try {
+                    const response = await apolloClient.query({
+                        query: GET_PRODUCT,
+                        variables: { id: productId },
+                        fetchPolicy: 'network-only',
+                    });
+                    const product = (response.data as any)?.product;
+                    if (!product) return;
+                    // effectivePrice includes markup / night-markup / sale
+                    const freshPrice: number = Number(product.effectivePrice ?? product.price ?? 0);
+                    freshPriceByProductId.set(productId, freshPrice);
+                    // Collect fresh option prices
+                    for (const og of product.optionGroups ?? []) {
+                        for (const opt of og.options ?? []) {
+                            freshOptionPriceById.set(String(opt.id), Number(opt.extraPrice ?? 0));
+                        }
+                    }
+                } catch {
+                    // best-effort — if a single product fails, leave its price as-is
+                }
+            }),
+        );
+
+        let anyChanged = false;
+        useCartDataStore.setState((state) => {
+            const nextItems = state.items.map((item) => {
+                const freshUnitPrice = freshPriceByProductId.get(item.productId);
+                const newUnitPrice = freshUnitPrice !== undefined ? freshUnitPrice : item.unitPrice;
+                const priceChanged = freshUnitPrice !== undefined && Math.abs(newUnitPrice - item.unitPrice) > 0.001;
+                if (priceChanged) anyChanged = true;
+
+                const newOptions = item.selectedOptions.map((opt) => {
+                    const freshExtra = freshOptionPriceById.get(opt.optionId);
+                    if (freshExtra !== undefined && Math.abs(freshExtra - opt.extraPrice) > 0.001) {
+                        anyChanged = true;
+                        return { ...opt, extraPrice: freshExtra };
+                    }
+                    return opt;
+                });
+
+                if (!priceChanged && newOptions === item.selectedOptions) return item;
+                return { ...item, unitPrice: newUnitPrice, selectedOptions: newOptions };
+            });
+            return { items: nextItems };
+        });
+
+        return anyChanged;
+    }, [items, apolloClient]);
+
     const reconcileCartBeforeCheckout = useCallback(async () => {
         if (items.length === 0) {
             return false;
@@ -983,6 +1044,29 @@ export const CartScreen = () => {
                 typeof (err as any)?.graphQLErrors?.[0]?.message === 'string'
                     ? (err as any).graphQLErrors[0].message
                     : null;
+
+            const combinedMessage = graphQLErrorMessage || errorMessage || '';
+            const isPriceMismatch =
+                combinedMessage.includes('price mismatch') ||
+                combinedMessage.includes('Price mismatch') ||
+                combinedMessage.includes('delivery price') ||
+                combinedMessage.includes('total price');
+
+            if (isPriceMismatch) {
+                // Refresh cart prices silently, then alert the user to review
+                try {
+                    await refreshCartPrices();
+                } catch {
+                    // best-effort
+                }
+                goToStep(1);
+                Alert.alert(
+                    t.cart.prices_changed_title,
+                    t.cart.prices_changed_message,
+                    [{ text: t.common.ok }],
+                );
+                return;
+            }
 
             Alert.alert(
                 t.cart.order_failed,
