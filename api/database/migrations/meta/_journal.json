@@ -57,6 +57,13 @@
       "when": 1776009273322,
       "tag": "0007_add-source-product-id",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1776012529400,
+      "tag": "0008_yielding_silk_fever",
+      "breakpoints": true
     }
   ]
 }
