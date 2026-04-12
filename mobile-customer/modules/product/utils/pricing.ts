@@ -8,6 +8,7 @@ function isNightHours(timestamp: Date = new Date()): boolean {
 
 type ProductPriceLike = {
     price?: number | null;
+    basePrice?: number | null;
     effectivePrice?: number | null;
     isOnSale?: boolean | null;
     saleDiscountPercentage?: number | null;
@@ -32,7 +33,7 @@ export function getEffectiveProductPrice(product: ProductPriceLike, timestamp: D
         return Number(product.markupPrice);
     }
 
-    return Number(product.price ?? 0);
+    return Number(product.price ?? product.basePrice ?? 0);
 }
 
 export function getPreDiscountProductPrice(product: ProductPriceLike, timestamp: Date = new Date()): number | null {

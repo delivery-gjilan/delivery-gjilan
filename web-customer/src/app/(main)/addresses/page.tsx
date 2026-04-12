@@ -25,7 +25,8 @@ import {
     DELETE_USER_ADDRESS,
     SET_DEFAULT_ADDRESS,
 } from "@/graphql/operations/addresses";
-import AddressPickerMap from "@/components/checkout/AddressPickerMap";
+import dynamic from "next/dynamic";
+const AddressPickerMap = dynamic(() => import("@/components/checkout/AddressPickerMap"), { ssr: false });
 
 export default function AddressesPage() {
     const { user } = useAuth();

@@ -140,23 +140,23 @@ const authLink = setContext((_, { headers }) => {
     }));
 });
 
-const errorLink = onError(({ error }) => {
-    // Check for GraphQL errors (CombinedGraphQLErrors)
+const errorLink = onError(({ error, operation }) => {
+    // On auth errors, clear stored credentials but do NOT redirect.
+    // Individual pages that require auth handle redirecting to /login themselves.
     if (error && "errors" in error && Array.isArray((error as any).errors)) {
         for (const err of (error as any).errors) {
+            // Only clear auth for explicit UNAUTHENTICATED errors, not all errors
             if (err.extensions?.code === "UNAUTHENTICATED" && typeof window !== "undefined") {
                 clearStoredAuth();
-                window.location.href = "/login";
                 return;
             }
         }
     }
-    // Check for network errors
     if (error && "statusCode" in error) {
         const statusCode = (error as any).statusCode;
-        if (statusCode === 401 && typeof window !== "undefined") {
+        // Only clear auth for 401/403, not other errors
+        if ((statusCode === 401 || statusCode === 403) && typeof window !== "undefined") {
             clearStoredAuth();
-            window.location.href = "/login";
         }
     }
 });
@@ -176,7 +176,41 @@ const splitLink =
 const createApolloClient = () => {
     return new ApolloClient({
         link: splitLink,
-        cache: new InMemoryCache(),
+        cache: new InMemoryCache({
+            typePolicies: {
+                Query: {
+                    fields: {
+                        // List queries — merge by identity, don't re-fetch if cached
+                        businesses: { merge: false },
+                        products: { merge: false },
+                        productCategories: { merge: false },
+                        productSubcategoriesByBusiness: { merge: false },
+                        banners: { merge: false },
+                        orders: { merge: false },
+                    },
+                },
+                // Normalize by id so all queries pointing to same entity share cache
+                Business: { keyFields: ["id"] },
+                Product: { keyFields: ["id"] },
+                ProductCategory: { keyFields: ["id"] },
+                ProductSubcategory: { keyFields: ["id"] },
+                OptionGroup: { keyFields: ["id"] },
+                Option: { keyFields: ["id"] },
+                Banner: { keyFields: ["id"] },
+                Promotion: { keyFields: ["id"] },
+            },
+        }),
+        defaultOptions: {
+            watchQuery: {
+                // Serve from cache instantly, refresh in background only if stale
+                fetchPolicy: "cache-first",
+                // Don't hammer the network on window re-focus
+                notifyOnNetworkStatusChange: false,
+            },
+            query: {
+                fetchPolicy: "cache-first",
+            },
+        },
     });
 };
 

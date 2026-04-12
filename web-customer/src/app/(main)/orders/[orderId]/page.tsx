@@ -24,23 +24,24 @@ import {
 } from "lucide-react";
 import { GET_ORDER, CANCEL_ORDER, SUBMIT_ORDER_REVIEW } from "@/graphql/operations/orders";
 import { ORDER_STATUS_UPDATED, ORDER_DRIVER_LIVE_TRACKING } from "@/graphql/operations/orders";
-import OrderTrackingMap from "@/components/orders/OrderTrackingMap";
+import dynamic from "next/dynamic";
+const OrderTrackingMap = dynamic(() => import("@/components/orders/OrderTrackingMap"), { ssr: false });
 
 const STATUS_FLOW = [
+    "AWAITING_APPROVAL",
     "PENDING",
     "PREPARING",
-    "READY_FOR_PICKUP",
-    "PICKED_UP",
-    "ON_THE_WAY",
+    "READY",
+    "OUT_FOR_DELIVERY",
     "DELIVERED",
 ];
 
 const statusColors: Record<string, "default" | "success" | "warning" | "danger"> = {
+    AWAITING_APPROVAL: "warning",
     PENDING: "warning",
     PREPARING: "warning",
-    READY_FOR_PICKUP: "default",
-    PICKED_UP: "default",
-    ON_THE_WAY: "default",
+    READY: "default",
+    OUT_FOR_DELIVERY: "default",
     DELIVERED: "success",
     CANCELLED: "danger",
 };
@@ -53,7 +54,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
     const { data, loading, refetch } = useQuery(GET_ORDER, {
         variables: { id: orderId },
         skip: !user,
-        fetchPolicy: "cache-and-network",
+        fetchPolicy: "no-cache",
+        errorPolicy: "all",
     });
 
     const order = (data as any)?.order;
@@ -68,7 +70,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
     // Driver live tracking
     const { data: trackingData } = useSubscription(ORDER_DRIVER_LIVE_TRACKING, {
         variables: { orderId },
-        skip: !user || !order || !["PICKED_UP", "ON_THE_WAY"].includes(order?.status),
+        skip: !user || !order || !["READY", "OUT_FOR_DELIVERY"].includes(order?.status),
     });
 
     const driverLocation = (trackingData as any)?.orderDriverLiveTracking;
@@ -84,11 +86,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
         : [];
 
     const canCancel = order?.status === "PENDING";
-    const isActive = ["PENDING", "PREPARING", "READY_FOR_PICKUP", "PICKED_UP", "ON_THE_WAY"].includes(
+    const isActive = ["AWAITING_APPROVAL", "PENDING", "PREPARING", "READY", "OUT_FOR_DELIVERY"].includes(
         order?.status
     );
     const canReview = order?.status === "DELIVERED" && !order?.reviewSubmitted && !reviewSent;
-    const showMap = isActive && ["PICKED_UP", "ON_THE_WAY"].includes(order?.status);
+    const showMap = isActive && ["READY", "OUT_FOR_DELIVERY"].includes(order?.status);
 
     const currentStepIndex = useMemo(
         () => (order ? STATUS_FLOW.indexOf(order.status) : -1),
@@ -151,7 +153,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
             {/* Header */}
             <div className="flex items-center gap-3">
                 <Link
-                    href="/orders"
+                    href="/profile"
                     className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border)] hover:bg-[var(--background-secondary)]"
                 >
                     <ArrowLeft size={16} />
@@ -175,11 +177,24 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
                             latitude: order.dropOffLocation?.latitude,
                             longitude: order.dropOffLocation?.longitude,
                         }}
+                        pickup={
+                            order.pickupLocations?.[0]
+                                ? order.pickupLocations[0]
+                                : order.businesses?.[0]?.business?.location
+                                    ? {
+                                        latitude: order.businesses[0].business.location.latitude,
+                                        longitude: order.businesses[0].business.location.longitude,
+                                    }
+                                    : null
+                        }
                         driverLocation={
                             driverLocation
                                 ? { latitude: driverLocation.latitude, longitude: driverLocation.longitude }
                                 : null
                         }
+                        driver={order.driver ?? null}
+                        businessImageUrl={order.businesses?.[0]?.business?.imageUrl ?? null}
+                        orderStatus={order.status}
                     />
                 </div>
             )}
@@ -303,17 +318,13 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
                 </div>
             </div>
 
-            {/* Cancel */}
+
+            {/* Cancel order info */}
             {canCancel && (
-                <Button
-                    variant="outline"
-                    size="lg"
-                    className="w-full text-[var(--danger)] border-[var(--danger)]/30 hover:bg-[var(--danger)]/10"
-                    onClick={handleCancel}
-                    disabled={cancelLoading}
-                >
-                    {cancelLoading ? <Loader2 size={14} className="animate-spin" /> : t("orders.cancel_order")}
-                </Button>
+                <div className="w-full flex flex-col items-center justify-center gap-2 rounded-xl border-[var(--danger)]/30 text-[var(--danger)] py-2 text-xs font-medium bg-[var(--danger)]/5">
+                    <span>{t("orders.cancel_order_phone_only")}</span>
+                    <a href="tel:045205045" className="underline font-bold">045 205 045</a>
+                </div>
             )}
 
             {/* Review */}

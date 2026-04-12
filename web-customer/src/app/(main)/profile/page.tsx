@@ -1,46 +1,54 @@
 "use client";
 
-import { useState } from "react";
-import { useMutation } from "@apollo/client/react";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery } from "@apollo/client/react";
 import { useAuth } from "@/lib/auth-context";
 import { useTranslations } from "@/localization";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
 import { cn } from "@/lib/utils";
 import { useFavoritesStore } from "@/store/favoritesStore";
 import Link from "next/link";
 import {
     User,
     MapPin,
-    Heart,
     Globe,
     LogOut,
-    Trash2,
     Loader2,
     ChevronRight,
     Moon,
     Sun,
+    History,
 } from "lucide-react";
-import { UPDATE_MY_PROFILE_MUTATION } from "@/graphql/operations/auth/updateMyProfile";
 import { SET_MY_PREFERRED_LANGUAGE_MUTATION } from "@/graphql/operations/auth/setMyPreferredLanguage";
 import { SET_MY_EMAIL_OPT_OUT_MUTATION } from "@/graphql/operations/auth/setMyEmailOptOut";
-import { DELETE_MY_ACCOUNT_MUTATION } from "@/graphql/operations/auth/deleteMyAccount";
+import { GET_ORDERS } from "@/graphql/operations/orders";
+
+const ACTIVE_STATUSES = ["AWAITING_APPROVAL", "PENDING", "PREPARING", "READY", "OUT_FOR_DELIVERY"];
 
 export default function ProfilePage() {
     const { user, logout } = useAuth();
     const { t, locale, setLocale } = useTranslations();
-    const favCount = useFavoritesStore((s) => s.favorites.length);
 
-    const [editing, setEditing] = useState(false);
-    const [firstName, setFirstName] = useState(user?.firstName ?? "");
-    const [lastName, setLastName] = useState(user?.lastName ?? "");
-    const [phone, setPhone] = useState(user?.phoneNumber ?? "");
-    const [theme, setTheme] = useState<"light" | "dark">("light");
+    const [theme, setTheme] = useState<"light" | "dark">("dark");
 
-    const [updateProfile, { loading: updateLoading }] = useMutation(UPDATE_MY_PROFILE_MUTATION);
     const [setLanguage] = useMutation(SET_MY_PREFERRED_LANGUAGE_MUTATION);
     const [setEmailOptOut] = useMutation(SET_MY_EMAIL_OPT_OUT_MUTATION);
-    const [deleteAccount, { loading: deleteLoading }] = useMutation(DELETE_MY_ACCOUNT_MUTATION);
+
+    const { data: ordersData, loading: ordersLoading, error: ordersError } = useQuery(GET_ORDERS, {
+        skip: !user,
+        fetchPolicy: "network-only",
+        variables: { limit: 50, offset: 0 },
+        errorPolicy: "ignore", // Don't fail the whole component on auth errors
+    });
+
+    useEffect(() => {
+        const saved = localStorage.getItem("theme");
+        if (saved === "light" || saved === "dark") {
+            setTheme(saved);
+        } else {
+            setTheme(document.documentElement.classList.contains("dark") ? "dark" : "light");
+        }
+    }, []);
 
     if (!user) {
         return (
@@ -59,22 +67,20 @@ export default function ProfilePage() {
         );
     }
 
-    const handleSaveProfile = async () => {
-        try {
-            await updateProfile({
-                variables: {
-                    input: {
-                        firstName: firstName.trim(),
-                        lastName: lastName.trim(),
-                        phoneNumber: phone.trim() || null,
-                    },
-                },
-            });
-            setEditing(false);
-        } catch {
-            // ignore
-        }
-    };
+    const ordersPayload = (ordersData as any)?.orders;
+    const allOrders: any[] = Array.isArray(ordersPayload?.orders)
+        ? ordersPayload.orders
+        : Array.isArray(ordersPayload)
+        ? ordersPayload
+        : [];
+    const activeOrders = allOrders.filter((o: any) => ACTIVE_STATUSES.includes(o.status));
+    const ordersSubtitle = ordersLoading
+        ? "..."
+        : ordersError
+        ? t("orders.no_past_orders")
+        : allOrders.length > 0
+        ? `${allOrders.length} order${allOrders.length !== 1 ? "s" : ""}${activeOrders.length > 0 ? ` · ${activeOrders.length} active` : ""}`
+        : t("orders.no_past_orders");
 
     const handleToggleLanguage = async () => {
         const newLocale = locale === "en" ? "al" : "en";
@@ -90,22 +96,12 @@ export default function ProfilePage() {
         const next = theme === "light" ? "dark" : "light";
         setTheme(next);
         document.documentElement.classList.toggle("dark", next === "dark");
-    };
-
-    const handleDeleteAccount = async () => {
-        if (!confirm(t("profile.delete_confirm"))) return;
-        if (!confirm(t("profile.delete_double_confirm"))) return;
-        try {
-            await deleteAccount();
-            logout();
-        } catch {
-            // ignore
-        }
+        localStorage.setItem("theme", next);
     };
 
     return (
         <div className="mx-auto max-w-2xl px-4 py-6 space-y-6">
-            <h1 className="text-2xl font-bold text-[var(--foreground)]">{t("profile.title")}</h1>
+            <h1 className="text-2xl font-bold text-[var(--foreground)]">Profile</h1>
 
             {/* User Info */}
             <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-4 space-y-4">
@@ -119,89 +115,53 @@ export default function ProfilePage() {
                         </p>
                         <p className="text-sm text-[var(--muted)]">{user.email}</p>
                     </div>
-                    <button
-                        onClick={() => setEditing(!editing)}
-                        className="text-sm text-[var(--primary)] hover:underline"
-                    >
-                        {editing ? t("common.cancel") : t("common.edit")}
-                    </button>
                 </div>
-
-                {editing && (
-                    <div className="space-y-3 border-t border-[var(--border)] pt-4">
-                        <div className="grid grid-cols-2 gap-3">
-                            <Input
-                                placeholder={t("auth.first_name")}
-                                value={firstName}
-                                onChange={(e) => setFirstName(e.target.value)}
-                            />
-                            <Input
-                                placeholder={t("auth.last_name")}
-                                value={lastName}
-                                onChange={(e) => setLastName(e.target.value)}
-                            />
-                        </div>
-                        <Input
-                            type="tel"
-                            placeholder={t("auth.phone_number")}
-                            value={phone}
-                            onChange={(e) => setPhone(e.target.value)}
-                        />
-                        <Button onClick={handleSaveProfile} disabled={updateLoading} className="w-full">
-                            {updateLoading ? <Loader2 size={14} className="animate-spin" /> : t("common.save")}
-                        </Button>
-                    </div>
-                )}
             </div>
 
             {/* Quick Links */}
             <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] divide-y divide-[var(--border)]">
                 <Link
                     href="/orders"
-                    className="flex items-center gap-3 px-4 py-3.5 hover:bg-[var(--background-secondary)] transition-colors"
+                    className="flex items-center gap-4 px-5 py-5 hover:bg-[var(--background-secondary)] transition-colors"
                 >
-                    <MapPin size={16} className="text-[var(--foreground-secondary)]" />
-                    <span className="flex-1 text-sm">{t("orders.title")}</span>
-                    <ChevronRight size={14} className="text-[var(--muted)]" />
+                    <History size={20} className="text-[var(--foreground-secondary)] shrink-0" />
+                    <span className="flex-1 text-base font-medium">{t("orders.title")}</span>
+                    <span className="text-sm text-[var(--muted)]">{ordersSubtitle}</span>
+                    <ChevronRight size={16} className="text-[var(--muted)]" />
                 </Link>
                 <Link
                     href="/addresses"
-                    className="flex items-center gap-3 px-4 py-3.5 hover:bg-[var(--background-secondary)] transition-colors"
+                    className="flex items-center gap-4 px-5 py-5 hover:bg-[var(--background-secondary)] transition-colors"
                 >
-                    <MapPin size={16} className="text-[var(--foreground-secondary)]" />
-                    <span className="flex-1 text-sm">{t("address.title")}</span>
-                    <ChevronRight size={14} className="text-[var(--muted)]" />
+                    <MapPin size={20} className="text-[var(--foreground-secondary)] shrink-0" />
+                    <span className="flex-1 text-base font-medium">My Addresses</span>
+                    <ChevronRight size={16} className="text-[var(--muted)]" />
                 </Link>
-                <div className="flex items-center gap-3 px-4 py-3.5">
-                    <Heart size={16} className="text-[var(--foreground-secondary)]" />
-                    <span className="flex-1 text-sm">{t("profile.favorites")}</span>
-                    <span className="text-xs text-[var(--muted)]">{favCount}</span>
-                </div>
             </div>
 
             {/* Preferences */}
             <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] divide-y divide-[var(--border)]">
                 <button
                     onClick={handleToggleLanguage}
-                    className="flex w-full items-center gap-3 px-4 py-3.5 hover:bg-[var(--background-secondary)] transition-colors"
+                    className="flex w-full items-center gap-4 px-5 py-5 hover:bg-[var(--background-secondary)] transition-colors"
                 >
-                    <Globe size={16} className="text-[var(--foreground-secondary)]" />
-                    <span className="flex-1 text-sm text-left">{t("profile.language")}</span>
-                    <span className="text-xs font-medium text-[var(--primary)]">
+                    <Globe size={20} className="text-[var(--foreground-secondary)] shrink-0" />
+                    <span className="flex-1 text-base font-medium text-left">{t("profile.language")}</span>
+                    <span className="text-sm font-medium text-[var(--primary)]">
                         {locale === "en" ? "English" : "Shqip"}
                     </span>
                 </button>
                 <button
                     onClick={handleToggleTheme}
-                    className="flex w-full items-center gap-3 px-4 py-3.5 hover:bg-[var(--background-secondary)] transition-colors"
+                    className="flex w-full items-center gap-4 px-5 py-5 hover:bg-[var(--background-secondary)] transition-colors"
                 >
                     {theme === "light" ? (
-                        <Sun size={16} className="text-[var(--foreground-secondary)]" />
+                        <Sun size={20} className="text-[var(--foreground-secondary)] shrink-0" />
                     ) : (
-                        <Moon size={16} className="text-[var(--foreground-secondary)]" />
+                        <Moon size={20} className="text-[var(--foreground-secondary)] shrink-0" />
                     )}
-                    <span className="flex-1 text-sm text-left">{t("profile.theme")}</span>
-                    <span className="text-xs font-medium text-[var(--primary)]">
+                    <span className="flex-1 text-base font-medium text-left">{t("profile.theme")}</span>
+                    <span className="text-sm font-medium text-[var(--primary)]">
                         {theme === "light" ? t("profile.light") : t("profile.dark")}
                     </span>
                 </button>
@@ -209,18 +169,9 @@ export default function ProfilePage() {
 
             {/* Actions */}
             <div className="space-y-2">
-                <Button variant="outline" className="w-full justify-start gap-3" onClick={logout}>
-                    <LogOut size={16} />
+                <Button variant="outline" className="w-full justify-start gap-4 px-5 py-5 text-base font-medium h-auto" onClick={logout}>
+                    <LogOut size={20} />
                     {t("auth.logout")}
-                </Button>
-                <Button
-                    variant="outline"
-                    className="w-full justify-start gap-3 text-[var(--danger)] border-[var(--danger)]/30 hover:bg-[var(--danger)]/10"
-                    onClick={handleDeleteAccount}
-                    disabled={deleteLoading}
-                >
-                    {deleteLoading ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={16} />}
-                    {t("profile.delete_account")}
                 </Button>
             </div>
         </div>

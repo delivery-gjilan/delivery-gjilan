@@ -10,6 +10,7 @@ export const GET_SERVICE_ZONES = gql`
                 lng
             }
             isActive
+            isServiceZone
         }
     }
 `;

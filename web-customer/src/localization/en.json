@@ -352,7 +352,7 @@
         "order_success_title": "Order placed!",
         "order_success_subtitle": "Sit back and relax — we're on it.",
         "order_success_track": "Track order",
-        "search_address": "Search street, place...",
+        "search_address": "Vellezerit Baftiu, Gjilan...",
         "use_gps": "Use GPS location",
         "saved_addresses": "Saved Addresses",
         "finding_address": "Finding address...",
@@ -570,6 +570,7 @@
         "discover": "Discover",
         "restaurants": "Restaurants",
         "shops": "Shops",
+        "market": "Market",
         "orders": "Orders",
         "create": "Create",
         "profile": "Profile"

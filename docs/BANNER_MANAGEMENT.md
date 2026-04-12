@@ -1,6 +1,6 @@
 # Banner Management System
 
-**Last Updated:** 2026-03-28  
+**Last Updated:** 2026-04-11  
 **Status:** ✅ Production Ready  
 **Related:** [MDS Index](./MDS_INDEX.md), [Architecture](./ARCHITECTURE.md)
 
@@ -45,6 +45,12 @@ The Banner Management System allows platform administrators to create, schedule,
    - Quick filtering
    - Relationship indicators
    - Preview thumbnails
+
+### Web Customer Home Rendering
+
+- Home requests `getActiveBanners(displayContext: HOME)`.
+- Carousel displays API banners when at least one active banner is returned.
+- Carousel displays local template banners when the API returns an empty list, so the slider area is always visible in web-customer.
 
 ---
 

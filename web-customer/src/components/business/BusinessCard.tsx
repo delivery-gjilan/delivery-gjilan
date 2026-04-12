@@ -9,6 +9,7 @@ import { Star, Clock, Heart, Percent } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 
 interface BusinessCardProps {
+    priority?: boolean;
     business: {
         id: string;
         name: string;
@@ -31,7 +32,7 @@ interface BusinessCardProps {
     };
 }
 
-export function BusinessCard({ business }: BusinessCardProps) {
+export function BusinessCard({ business, priority }: BusinessCardProps) {
     const { t } = useTranslations();
     const isFavorite = useFavoritesStore((s) => s.isFavorite(business.id));
     const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
@@ -41,10 +42,10 @@ export function BusinessCard({ business }: BusinessCardProps) {
     return (
         <Link
             href={`/business/${business.id}`}
-            className="group relative rounded-[var(--radius)] border border-[var(--card-border)] bg-[var(--card)] overflow-hidden hover:shadow-md transition-all"
+            className="group relative rounded-2xl border border-[var(--card-border)] bg-[var(--card)] overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all"
         >
             {/* Image */}
-            <div className="relative h-40 w-full overflow-hidden bg-[var(--background-secondary)]">
+            <div className="relative h-44 w-full overflow-hidden bg-[var(--background-secondary)]">
                 {business.imageUrl ? (
                     <Image
                         src={business.imageUrl}
@@ -52,6 +53,7 @@ export function BusinessCard({ business }: BusinessCardProps) {
                         fill
                         className="object-cover group-hover:scale-105 transition-transform duration-300"
                         sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        priority={priority}
                     />
                 ) : (
                     <div className="flex h-full items-center justify-center text-[var(--muted)]">
@@ -75,13 +77,13 @@ export function BusinessCard({ business }: BusinessCardProps) {
                         e.stopPropagation();
                         toggleFavorite(business.id);
                     }}
-                    className="absolute top-2.5 right-2.5 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm hover:bg-white transition-colors"
+                    className="absolute top-2.5 right-2.5 flex h-8 w-8 items-center justify-center rounded-full bg-black/45 backdrop-blur text-white shadow-sm hover:bg-black/60 transition-colors"
                 >
                     <Heart
                         size={16}
                         className={cn(
                             "transition-colors",
-                            isFavorite ? "fill-[var(--danger)] text-[var(--danger)]" : "text-gray-500"
+                            isFavorite ? "fill-[#fb7185] text-[#fb7185]" : "text-white"
                         )}
                     />
                 </button>
@@ -89,7 +91,7 @@ export function BusinessCard({ business }: BusinessCardProps) {
                 {/* Promo badge */}
                 {business.activePromotion && (
                     <div className="absolute bottom-2.5 left-2.5">
-                        <Badge variant="success" className="gap-1">
+                        <Badge variant="success" className="gap-1 bg-[#009de0] text-white border-transparent">
                             <Percent size={12} />
                             {business.activePromotion.type === "PERCENTAGE"
                                 ? `-${business.activePromotion.discountValue}%`
@@ -104,7 +106,7 @@ export function BusinessCard({ business }: BusinessCardProps) {
             {/* Content */}
             <div className="p-3.5">
                 <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-semibold text-[var(--foreground)] text-sm line-clamp-1">
+                    <h3 className="font-bold text-[var(--foreground)] text-base line-clamp-1">
                         {business.name}
                     </h3>
                     {business.ratingAverage != null && business.ratingAverage > 0 && (
@@ -121,15 +123,15 @@ export function BusinessCard({ business }: BusinessCardProps) {
                         {business.description}
                     </p>
                 )}
-                <div className="flex items-center gap-3 mt-2 text-xs text-[var(--muted-foreground)]">
+                <div className="flex items-center gap-2 mt-2 text-xs text-[var(--muted-foreground)]">
                     {prepTime && (
-                        <span className="flex items-center gap-1">
+                        <span className="flex items-center gap-1 rounded-full bg-[var(--background-secondary)] px-2 py-0.5">
                             <Clock size={12} />
                             {prepTime} {t("common.min")}
                         </span>
                     )}
                     {business.minOrderAmount != null && business.minOrderAmount > 0 && (
-                        <span>Min. {formatPrice(business.minOrderAmount)}</span>
+                        <span className="rounded-full bg-[var(--background-secondary)] px-2 py-0.5">Min. {formatPrice(business.minOrderAmount)}</span>
                     )}
                 </div>
             </div>

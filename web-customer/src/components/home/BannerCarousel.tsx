@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface Banner {
@@ -14,56 +15,128 @@ interface Banner {
     linkTarget?: string | null;
 }
 
+const GRADIENTS = [
+    "from-[#009de0] to-[#006da3]",
+    "from-[#1a1a2e] to-[#0f3460]",
+    "from-[#7209b7] to-[#3a0ca3]",
+];
+
 export function BannerCarousel({ banners }: { banners: Banner[] }) {
+    const getBannerHref = (banner: Banner): string | null => {
+        const { linkType, linkTarget } = banner;
+        if (!linkType || linkType === "none" || !linkTarget) return null;
+        switch (linkType) {
+            case "business": return `/business/${linkTarget}`;
+            case "product": return `/product/${linkTarget}`;
+            case "external": return linkTarget;
+            default: return null;
+        }
+    };
     const [current, setCurrent] = useState(0);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const trackRef = useRef<HTMLDivElement>(null);
+    const currentRef = useRef(0);
 
-    const next = useCallback(() => {
-        setCurrent((c) => (c + 1) % banners.length);
-    }, [banners.length]);
+    const applyOffset = useCallback((index: number) => {
+        if (!trackRef.current || !containerRef.current) return;
+        const cw = containerRef.current.offsetWidth;
+        const itemWidth = window.innerWidth >= 1024 ? cw / 2 : cw;
+        trackRef.current.style.transform = `translateX(-${index * itemWidth}px)`;
+    }, []);
 
-    const prev = useCallback(() => {
-        setCurrent((c) => (c - 1 + banners.length) % banners.length);
-    }, [banners.length]);
+    useEffect(() => {
+        currentRef.current = current;
+        applyOffset(current);
+    }, [current, applyOffset]);
 
-    // Auto-scroll every 5s
+    useEffect(() => {
+        const handleResize = () => applyOffset(currentRef.current);
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, [applyOffset]);
+
+    const next = useCallback(() => setCurrent((c) => (c + 1) % banners.length), [banners.length]);
+    const prev = useCallback(() => setCurrent((c) => (c - 1 + banners.length) % banners.length), [banners.length]);
+
     useEffect(() => {
         if (banners.length <= 1) return;
-        const interval = setInterval(next, 5000);
-        return () => clearInterval(interval);
+        const t = setInterval(next, 5000);
+        return () => clearInterval(t);
     }, [next, banners.length]);
 
-    if (banners.length === 0) return null;
-
-    const banner = banners[current];
+    if (!banners.length) return null;
 
     return (
-        <div className="relative overflow-hidden rounded-[var(--radius-lg)]">
-            <div className="relative h-40 sm:h-48 md:h-56 w-full bg-[var(--primary-light)]">
-                {banner.imageUrl ? (
-                    <Image
-                        src={banner.imageUrl}
-                        alt={banner.title || "Banner"}
-                        fill
-                        className="object-cover"
-                        sizes="(max-width: 1200px) 100vw, 1200px"
-                        priority
-                    />
-                ) : (
-                    <div className="flex h-full items-center justify-center p-6">
-                        <div>
-                            {banner.title && (
-                                <h3 className="text-xl font-bold text-[var(--primary-dark)]">
-                                    {banner.title}
-                                </h3>
-                            )}
-                            {banner.subtitle && (
-                                <p className="text-sm text-[var(--foreground-secondary)] mt-1">
-                                    {banner.subtitle}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                )}
+        <div className="relative">
+            {/* Track container */}
+            <div ref={containerRef} className="overflow-hidden">
+                <div
+                    ref={trackRef}
+                    className="flex"
+                    style={{ transition: "transform 0.5s ease-in-out", willChange: "transform" }}
+                >
+                    {banners.map((banner, i) => {
+                        const href = getBannerHref(banner);
+                        const cardClassName = `relative h-64 sm:h-80 lg:h-[400px] rounded-2xl overflow-hidden ${
+                            !banner.imageUrl
+                                ? `bg-gradient-to-br ${GRADIENTS[i % GRADIENTS.length]}`
+                                : "bg-[var(--background-secondary)]"
+                        }${href ? " cursor-pointer" : ""}`;
+                        const cardContent = (
+                            <>
+                                {banner.imageUrl ? (
+                                    <Image
+                                        src={banner.imageUrl}
+                                        alt={banner.title || "Banner"}
+                                        fill
+                                        className="object-cover"
+                                        sizes="(max-width: 1024px) 100vw, 50vw"
+                                        priority={i < 2}
+                                    />
+                                ) : (
+                                    <div className="flex h-full flex-col justify-end p-8">
+                                        {banner.title && (
+                                            <h3 className="text-3xl font-extrabold text-white leading-tight max-w-xs">
+                                                {banner.title}
+                                            </h3>
+                                        )}
+                                        {banner.subtitle && (
+                                            <p className="text-white/70 text-sm mt-2">
+                                                {banner.subtitle}
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+                            </>
+                        );
+                        return (
+                            <div
+                                key={banner.id}
+                                className="flex-shrink-0 w-full lg:w-1/2 lg:pr-3 last:lg:pr-0"
+                            >
+                                {href && banner.linkType === "external" ? (
+                                    <a
+                                        href={href}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={cardClassName}
+                                        style={{ display: "block" }}
+                                    >
+                                        {cardContent}
+                                    </a>
+                                ) : href ? (
+                                    <Link href={href} className={cardClassName} style={{ display: "block" }}>
+                                        {cardContent}
+                                    </Link>
+                                ) : (
+                                    <div className={cardClassName}>
+                                        {cardContent}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
 
             {/* Navigation arrows */}
@@ -71,25 +144,30 @@ export function BannerCarousel({ banners }: { banners: Banner[] }) {
                 <>
                     <button
                         onClick={prev}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-white/80 shadow hover:bg-white transition-colors"
+                        aria-label="Previous"
+                        className="absolute -left-5 top-1/2 -translate-y-1/2 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white text-gray-800 shadow-lg hover:bg-gray-50 transition-colors dark:bg-[var(--card)] dark:text-white dark:border dark:border-[var(--border)]"
                     >
                         <ChevronLeft size={18} />
                     </button>
                     <button
                         onClick={next}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-white/80 shadow hover:bg-white transition-colors"
+                        aria-label="Next"
+                        className="absolute -right-5 top-1/2 -translate-y-1/2 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white text-gray-800 shadow-lg hover:bg-gray-50 transition-colors dark:bg-[var(--card)] dark:text-white dark:border dark:border-[var(--border)]"
                     >
                         <ChevronRight size={18} />
                     </button>
 
                     {/* Dots */}
-                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
+                    <div className="flex justify-center gap-1.5 mt-3">
                         {banners.map((_, i) => (
                             <button
                                 key={i}
                                 onClick={() => setCurrent(i)}
+                                aria-label={`Go to banner ${i + 1}`}
                                 className={`h-1.5 rounded-full transition-all ${
-                                    i === current ? "w-6 bg-white" : "w-1.5 bg-white/50"
+                                    i === current
+                                        ? "w-6 bg-[var(--primary)]"
+                                        : "w-1.5 bg-[var(--muted)]"
                                 }`}
                             />
                         ))}

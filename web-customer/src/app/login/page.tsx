@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useMutation } from "@apollo/client/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { useTranslations } from "@/localization";
 import { Button } from "@/components/ui/Button";
@@ -12,7 +12,16 @@ import Link from "next/link";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
+    return (
+        <Suspense fallback={<div className="flex min-h-[calc(100vh-4rem)] items-center justify-center"><Loader2 size={24} className="animate-spin text-[var(--muted)]" /></div>}>
+            <LoginContent />
+        </Suspense>
+    );
+}
+
+function LoginContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { loginWithToken } = useAuth();
     const { t } = useTranslations();
 
@@ -34,7 +43,9 @@ export default function LoginPage() {
             const data = (res.data as any)?.login;
             if (data?.token && data?.user) {
                 loginWithToken(data.token, data.refreshToken, data.user);
-                router.push("/");
+                const nextPath = searchParams.get("next");
+                const safeNext = nextPath && nextPath.startsWith("/") ? nextPath : "/";
+                router.push(safeNext);
             } else {
                 setError(data?.message ?? t("auth.login_failed"));
             }

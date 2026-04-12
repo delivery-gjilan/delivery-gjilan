@@ -1,25 +1,28 @@
 "use client";
 
 import { useQuery } from "@apollo/client/react";
-import { useParams } from "next/navigation";
 import { GET_BUSINESS } from "@/graphql/operations/businesses";
 import { GET_PRODUCTS, GET_PRODUCT_CATEGORIES } from "@/graphql/operations/products";
 import { useTranslations } from "@/localization";
 import { useCartStore } from "@/store/cartStore";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Badge } from "@/components/ui/Badge";
 import { formatPrice, cn } from "@/lib/utils";
 import Image from "next/image";
 import Link from "next/link";
-import { useState, useMemo, useRef, use } from "react";
-import { Star, Clock, MapPin, ArrowLeft, Percent, Search } from "lucide-react";
+import { useState, useMemo, useRef, useEffect, use } from "react";
+import { Star, Clock, MapPin, ArrowLeft, Percent, Search, ShoppingBag, Plus, Minus } from "lucide-react";
+import { ProductOptionsModal } from "@/components/business/ProductOptionsModal";
 
 export default function BusinessDetailPage({ params }: { params: Promise<{ businessId: string }> }) {
     const { businessId } = use(params);
     const { t } = useTranslations();
     const [activeCategory, setActiveCategory] = useState<string | null>(null);
     const [search, setSearch] = useState("");
-    const menuRef = useRef<HTMLDivElement>(null);
+    const [modalProductId, setModalProductId] = useState<string | null>(null);
+    const sectionRefs = useRef<Map<string, HTMLElement>>(new Map());
+    const tabsRef = useRef<HTMLDivElement>(null);
+    const activeBtnRef = useRef<HTMLButtonElement>(null);
+    const observerRef = useRef<IntersectionObserver | null>(null);
 
     const { data: bizData, loading: bizLoading } = useQuery(GET_BUSINESS, {
         variables: { id: businessId },
@@ -36,16 +39,101 @@ export default function BusinessDetailPage({ params }: { params: Promise<{ busin
     const allProducts = (productsData as any)?.products ?? [];
 
     const products = useMemo(() => {
-        let list = [...allProducts];
-        if (search) {
+        let list = allProducts.map((p: any) => {
+            const prod = p?.product ?? p;
+            if (!prod) return null;
+            return {
+                ...prod,
+                hasOptionGroups: p?.hasOptionGroups ?? false,
+                variants: p?.variants?.length ? p.variants : (prod.variants ?? []),
+            };
+        }).filter(Boolean);
+        if (search.trim()) {
             const q = search.toLowerCase();
-            list = list.filter((p: any) => p.product?.name?.toLowerCase().includes(q));
-        }
-        if (activeCategory) {
-            list = list.filter((p: any) => p.product?.categoryId === activeCategory);
+            list = list.filter((p: any) =>
+                p?.name?.toLowerCase().includes(q) || p?.description?.toLowerCase().includes(q)
+            );
         }
         return list;
-    }, [allProducts, search, activeCategory]);
+    }, [allProducts, search]);
+
+    const categoryMap = useMemo(() => {
+        const m = new Map<string, any>();
+        for (const c of categories) m.set(c.id, c);
+        return m;
+    }, [categories]);
+
+    const groupedProducts = useMemo(() => {
+        const groups = new Map<string, { id: string; name: string; products: any[] }>();
+        for (const p of products) {
+            const id = p.categoryId ?? "uncategorized";
+            const name = categoryMap.get(id)?.name ?? t("business.uncategorized");
+            if (!groups.has(id)) groups.set(id, { id, name, products: [] });
+            groups.get(id)!.products.push(p);
+        }
+        const ordered: Array<{ id: string; name: string; products: any[] }> = [];
+        for (const c of categories) {
+            const group = groups.get(c.id);
+            if (group && group.products.length > 0) ordered.push(group);
+        }
+        for (const [id, group] of groups.entries()) {
+            if (id === "uncategorized") continue;
+            if (!ordered.find((g) => g.id === id) && group.products.length > 0) ordered.push(group);
+        }
+        if (groups.get("uncategorized")?.products.length) ordered.push(groups.get("uncategorized")!);
+        return ordered;
+    }, [products, categories, categoryMap, t]);
+
+    // IntersectionObserver — highlight tab as sections scroll into view
+    useEffect(() => {
+        if (observerRef.current) observerRef.current.disconnect();
+        if (groupedProducts.length === 0) return;
+
+        observerRef.current = new IntersectionObserver(
+            (entries) => {
+                for (const entry of entries) {
+                    if (entry.isIntersecting) {
+                        const id = entry.target.id.replace("cat-", "");
+                        setActiveCategory(id);
+                        break;
+                    }
+                }
+            },
+            { rootMargin: "-15% 0px -80% 0px", threshold: 0 }
+        );
+
+        groupedProducts.forEach((group) => {
+            const el = sectionRefs.current.get(group.id);
+            if (el) observerRef.current!.observe(el);
+        });
+
+        return () => observerRef.current?.disconnect();
+    }, [groupedProducts]);
+
+    // Scroll active tab button into view in the tab bar
+    useEffect(() => {
+        if (activeBtnRef.current && tabsRef.current) {
+            const btn = activeBtnRef.current;
+            const bar = tabsRef.current;
+            const btnLeft = btn.offsetLeft;
+            const btnRight = btnLeft + btn.offsetWidth;
+            const barScrollLeft = bar.scrollLeft;
+            const barRight = barScrollLeft + bar.offsetWidth;
+            if (btnLeft < barScrollLeft + 32) bar.scrollTo({ left: btnLeft - 32, behavior: "smooth" });
+            else if (btnRight > barRight - 32) bar.scrollTo({ left: btnRight - bar.offsetWidth + 32, behavior: "smooth" });
+        }
+    }, [activeCategory]);
+
+    const jumpToCategory = (id: string) => {
+        setActiveCategory(id);
+        const el = sectionRefs.current.get(id);
+        if (el) {
+            const stickyEl = tabsRef.current?.closest("[data-sticky]") as HTMLElement | null;
+            const stickyHeight = stickyEl?.offsetHeight ?? 56;
+            const top = el.getBoundingClientRect().top + window.scrollY - stickyHeight - 8;
+            window.scrollTo({ top, behavior: "smooth" });
+        }
+    };
 
     const cartItems = useCartStore((s) => s.items);
     const cartTotal = useCartStore((s) => s.getTotal());
@@ -54,15 +142,16 @@ export default function BusinessDetailPage({ params }: { params: Promise<{ busin
 
     if (bizLoading) {
         return (
-            <div className="mx-auto max-w-[var(--max-content-width)] px-4 py-6 space-y-6">
-                <Skeleton className="h-56 w-full rounded-[var(--radius-lg)]" />
-                <Skeleton className="h-8 w-1/3" />
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {Array.from({ length: 6 }).map((_, i) => (
-                        <Skeleton key={i} className="h-32 rounded-[var(--radius)]" />
-                    ))}
+            <>
+                <Skeleton className="h-64 w-full rounded-none" />
+                <div className="mx-auto max-w-[var(--max-content-width)] px-4 py-6 space-y-4">
+                    <Skeleton className="h-7 w-1/3" />
+                    <Skeleton className="h-4 w-1/2" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4">
+                        {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}
+                    </div>
                 </div>
-            </div>
+            </>
         );
     }
 
@@ -78,239 +167,313 @@ export default function BusinessDetailPage({ params }: { params: Promise<{ busin
     const promo = business.activePromotion;
 
     return (
-        <div className="mx-auto max-w-[var(--max-content-width)] px-4 py-6 space-y-6">
-            {/* Back + Header */}
-            <div className="flex items-center gap-3">
-                <Link
-                    href="/"
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border)] hover:bg-[var(--background-secondary)] transition-colors"
-                >
-                    <ArrowLeft size={18} />
-                </Link>
-                <div>
-                    <h1 className="text-xl font-bold text-[var(--foreground)]">{business.name}</h1>
-                    {business.description && (
-                        <p className="text-sm text-[var(--foreground-secondary)]">{business.description}</p>
-                    )}
-                </div>
-            </div>
-
-            {/* Hero Image */}
-            {business.imageUrl && (
-                <div className="relative h-48 sm:h-64 w-full overflow-hidden rounded-[var(--radius-lg)] bg-[var(--background-secondary)]">
+        <div>
+            {/* ── Hero ─────────────────────────────────────────── */}
+            <div className="relative h-56 sm:h-72 w-full bg-[var(--background-secondary)] overflow-hidden">
+                {business.imageUrl ? (
                     <Image
                         src={business.imageUrl}
                         alt={business.name}
                         fill
                         className="object-cover"
-                        sizes="(max-width: 1200px) 100vw, 1200px"
+                        sizes="100vw"
                         priority
                     />
-                    {!business.isOpen && (
-                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                            <span className="text-white font-bold text-lg">{t("restaurants.closed")}</span>
-                        </div>
+                ) : (
+                    <div className="h-full w-full bg-gradient-to-br from-[var(--primary)]/30 to-[var(--background-secondary)]" />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+
+                <Link
+                    href="/"
+                    className="absolute top-4 left-4 flex h-9 w-9 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
+                >
+                    <ArrowLeft size={18} />
+                </Link>
+
+                {!business.isOpen && (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <span className="text-white font-bold text-lg">{t("restaurants.closed")}</span>
+                    </div>
+                )}
+
+                <div className="absolute bottom-0 left-0 right-0 px-4 sm:px-6 pb-5 pt-10">
+                    <h1 className="text-2xl sm:text-3xl font-extrabold text-white leading-tight drop-shadow">
+                        {business.name}
+                    </h1>
+                    {business.description && (
+                        <p className="text-sm text-white/80 mt-0.5 line-clamp-1">{business.description}</p>
                     )}
                 </div>
-            )}
-
-            {/* Info row */}
-            <div className="flex flex-wrap items-center gap-4 text-sm text-[var(--foreground-secondary)]">
-                {business.ratingAverage != null && business.ratingAverage > 0 && (
-                    <span className="flex items-center gap-1">
-                        <Star size={14} className="fill-yellow-400 text-yellow-400" />
-                        {business.ratingAverage.toFixed(1)}
-                        {business.ratingCount != null && (
-                            <span className="text-[var(--muted)]">({business.ratingCount})</span>
-                        )}
-                    </span>
-                )}
-                {prepTime && (
-                    <span className="flex items-center gap-1">
-                        <Clock size={14} />
-                        {prepTime} {t("common.min")}
-                    </span>
-                )}
-                {business.location?.address && (
-                    <span className="flex items-center gap-1">
-                        <MapPin size={14} />
-                        {business.location.address}
-                    </span>
-                )}
-                {business.minOrderAmount != null && business.minOrderAmount > 0 && (
-                    <span>Min. {formatPrice(business.minOrderAmount)}</span>
-                )}
             </div>
 
-            {/* Promotion banner */}
-            {promo && (
-                <div className="flex items-center gap-3 rounded-[var(--radius)] bg-[var(--success-light)] border border-[var(--success)]/20 p-3">
-                    <Percent size={18} className="text-[var(--success)] shrink-0" />
-                    <div>
-                        <p className="text-sm font-medium text-[var(--foreground)]">{promo.name}</p>
-                        {promo.spendThreshold && (
-                            <p className="text-xs text-[var(--foreground-secondary)]">
-                                {t("business.free_delivery_over", {
-                                    threshold: String(promo.spendThreshold),
-                                })}
-                            </p>
-                        )}
+            {/* ── Info strip ───────────────────────────────────── */}
+            <div className="mx-auto max-w-[var(--max-content-width)] px-4">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 py-3 text-sm text-[var(--foreground-secondary)] border-b border-[var(--border)]">
+                    {business.ratingAverage != null && business.ratingAverage > 0 && (
+                        <span className="flex items-center gap-1">
+                            <Star size={14} className="fill-yellow-400 text-yellow-400" />
+                            <span className="font-semibold text-[var(--foreground)]">{business.ratingAverage.toFixed(1)}</span>
+                            {business.ratingCount != null && (
+                                <span className="text-[var(--muted)]">({business.ratingCount})</span>
+                            )}
+                        </span>
+                    )}
+                    {prepTime && (
+                        <span className="flex items-center gap-1">
+                            <Clock size={13} />
+                            {prepTime} {t("common.min")}
+                        </span>
+                    )}
+                    {business.minOrderAmount != null && business.minOrderAmount > 0 && (
+                        <span>Min. {formatPrice(business.minOrderAmount)}</span>
+                    )}
+                    {business.location?.address && (
+                        <span className="flex items-center gap-1">
+                            <MapPin size={13} />
+                            {business.location.address}
+                        </span>
+                    )}
+                    {promo && (
+                        <span className="flex items-center gap-1 text-[var(--success)] font-medium">
+                            <Percent size={13} />
+                            {promo.name}
+                        </span>
+                    )}
+                </div>
+            </div>
+
+            {/* ── Sticky category bar ──────────────────────────── */}
+            <div
+                data-sticky
+                className="sticky top-0 md:top-16 z-30 bg-[var(--background)]/95 backdrop-blur-sm border-b border-[var(--border)]"
+            >
+                <div className="mx-auto max-w-[var(--max-content-width)] flex items-center gap-2 px-4">
+                <div ref={tabsRef} className="flex-1 flex overflow-x-auto scrollbar-none">
+                        {groupedProducts.map((group) => {
+                            const isActive = activeCategory === group.id ||
+                                (!activeCategory && groupedProducts[0]?.id === group.id);
+                            return (
+                                <button
+                                    key={group.id}
+                                    ref={isActive ? activeBtnRef : undefined}
+                                    onClick={() => jumpToCategory(group.id)}
+                                    className={cn(
+                                        "shrink-0 px-4 py-3 text-sm font-bold whitespace-nowrap border-b-2 transition-colors",
+                                        isActive
+                                            ? "border-[var(--primary)] text-[var(--primary)]"
+                                            : "border-transparent text-[var(--muted)] hover:text-[var(--foreground)]"
+                                    )}
+                                >
+                                    {group.name}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    {/* Search — desktop only */}
+                    <div className="hidden md:block shrink-0 py-2">
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" size={15} />
+                            <input
+                                type="text"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder={`${t("market.search_products")}…`}
+                                className="h-9 w-48 rounded-full border border-[var(--border)] bg-[var(--card)] pl-9 pr-3 text-sm placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:w-64 transition-all"
+                            />
+                        </div>
                     </div>
                 </div>
-            )}
+            </div>
 
-            {/* Search + Category Tabs */}
-            <div className="space-y-3">
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" size={16} />
+            {/* ── Content ──────────────────────────────────────── */}
+            <div className="mx-auto max-w-[var(--max-content-width)] px-4 py-6 space-y-8">
+                {/* Mobile search */}
+                <div className="md:hidden relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" size={15} />
                     <input
                         type="text"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        placeholder={t("market.search_products")}
-                        className="w-full h-9 rounded-lg border border-[var(--border)] bg-[var(--card)] pl-9 pr-3 text-sm placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                        placeholder={`${t("market.search_products")}…`}
+                        className="w-full h-10 rounded-full border border-[var(--border)] bg-[var(--card)] pl-9 pr-4 text-sm placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                     />
                 </div>
 
-                {categories.length > 0 && (
-                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-                        <button
-                            onClick={() => setActiveCategory(null)}
-                            className={cn(
-                                "shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
-                                !activeCategory
-                                    ? "bg-[var(--primary)] text-white"
-                                    : "bg-[var(--background-secondary)] text-[var(--foreground-secondary)] hover:bg-[var(--border)]"
-                            )}
-                        >
-                            {t("common.all")}
-                        </button>
-                        {categories.map((cat: any) => (
-                            <button
-                                key={cat.id}
-                                onClick={() => setActiveCategory(cat.id)}
-                                className={cn(
-                                    "shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap",
-                                    activeCategory === cat.id
-                                        ? "bg-[var(--primary)] text-white"
-                                        : "bg-[var(--background-secondary)] text-[var(--foreground-secondary)] hover:bg-[var(--border)]"
-                                )}
-                            >
-                                {cat.name}
-                            </button>
-                        ))}
-                    </div>
-                )}
-            </div>
-
-            {/* Product Grid */}
-            <div ref={menuRef}>
                 {productsLoading ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {Array.from({ length: 6 }).map((_, i) => (
-                            <Skeleton key={i} className="h-28 rounded-[var(--radius)]" />
-                        ))}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}
                     </div>
-                ) : products.length === 0 ? (
-                    <div className="text-center py-12 text-[var(--muted)]">
+                ) : groupedProducts.length === 0 ? (
+                    <div className="text-center py-16 text-[var(--muted)]">
+                        <ShoppingBag size={40} className="mx-auto mb-3 opacity-30" />
                         <p>{t("market.no_products")}</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {products.map((item: any) => {
-                            const product = item.product;
-                            if (!product) return null;
-                            const effectivePrice = product.effectivePrice ?? product.markupPrice ?? product.price;
-                            const isOnSale = product.isOnSale;
-                            const cartQty = cartItems.filter(
-                                (ci) => ci.productId === product.id
-                            ).reduce((sum, ci) => sum + ci.quantity, 0);
+                    <div className="space-y-8">
+                        {groupedProducts.map((group) => (
+                            <section
+                                key={group.id}
+                                id={`cat-${group.id}`}
+                                ref={(el) => { if (el) sectionRefs.current.set(group.id, el); }}
+                            >
+                                <h2 className="text-xl font-extrabold text-[var(--foreground)] mb-3">{group.name}</h2>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    {group.products.map((product: any) => {
+                                        if (!product) return null;
+                                        const effectivePrice = parseFloat(
+                                            product.effectivePrice ?? product.markupPrice ?? product.price ?? "0"
+                                        );
+                                        const origPrice = product.isOnSale && product.price
+                                            ? parseFloat(product.price) : null;
+                                        const hasDiscount = origPrice != null && origPrice > effectivePrice;
+                                        const discountPct = hasDiscount && product.saleDiscountPercentage
+                                            ? Math.round(Number(product.saleDiscountPercentage)) : 0;
+                                        const cartQty = cartItems
+                                            .filter((ci) => ci.productId === product.id)
+                                            .reduce((s, ci) => s + ci.quantity, 0);
+                                        const isSoldOut = !product.isAvailable;
+                                        const needsOptions = product.hasOptionGroups || product.variants?.length > 0;
 
-                            return (
-                                <Link
-                                    key={product.id}
-                                    href={`/product/${product.id}?businessId=${businessId}`}
-                                    className="group flex gap-3 rounded-[var(--radius)] border border-[var(--card-border)] bg-[var(--card)] p-3 hover:shadow-sm transition-all"
-                                >
-                                    {/* Product Image */}
-                                    <div className="relative h-20 w-20 shrink-0 rounded-lg overflow-hidden bg-[var(--background-secondary)]">
-                                        {product.imageUrl ? (
-                                            <Image
-                                                src={product.imageUrl}
-                                                alt={product.name}
-                                                fill
-                                                className="object-cover"
-                                                sizes="80px"
-                                            />
-                                        ) : (
-                                            <div className="flex h-full items-center justify-center text-[var(--muted)] text-xs">
-                                                No img
-                                            </div>
-                                        )}
-                                        {isOnSale && (
-                                            <Badge variant="danger" className="absolute top-1 left-1 text-[10px]">
-                                                {t("common.sale")}
-                                            </Badge>
-                                        )}
-                                        {cartQty > 0 && (
-                                            <div className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--primary)] text-[10px] font-bold text-white">
-                                                {cartQty}
-                                            </div>
-                                        )}
-                                    </div>
+                                        const handleCardClick = () => {
+                                            if (isSoldOut) return;
+                                            if (needsOptions) {
+                                                setModalProductId(product.id);
+                                            } else {
+                                                useCartStore.getState().addItem({
+                                                    id: `${product.id}-base-${Date.now()}`,
+                                                    productId: product.id,
+                                                    businessId,
+                                                    businessName: business?.name ?? "",
+                                                    name: product.name,
+                                                    imageUrl: product.imageUrl ?? null,
+                                                    unitPrice: effectivePrice,
+                                                    quantity: 1,
+                                                    notes: "",
+                                                    selectedOptions: [],
+                                                });
+                                            }
+                                        };
 
-                                    {/* Product Info */}
-                                    <div className="flex flex-1 flex-col justify-between min-w-0">
-                                        <div>
-                                            <h4 className="font-medium text-sm text-[var(--foreground)] line-clamp-1">
-                                                {product.name}
-                                            </h4>
-                                            {product.description && (
-                                                <p className="text-xs text-[var(--muted-foreground)] line-clamp-2 mt-0.5">
-                                                    {product.description}
-                                                </p>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <span className="text-sm font-semibold text-[var(--foreground)]">
-                                                {formatPrice(effectivePrice)}
-                                            </span>
-                                            {isOnSale && product.price !== effectivePrice && (
-                                                <span className="text-xs text-[var(--muted)] line-through">
-                                                    {formatPrice(product.price)}
-                                                </span>
-                                            )}
-                                        </div>
-                                        {!product.isAvailable && (
-                                            <span className="text-xs text-[var(--danger)]">
-                                                {t("common.unavailable")}
-                                            </span>
-                                        )}
-                                    </div>
-                                </Link>
-                            );
-                        })}
+                                        return (
+                                            <div
+                                                key={product.id}
+                                                onClick={handleCardClick}
+                                                className={cn(
+                                                    "group flex gap-3 rounded-2xl bg-[var(--background-secondary)] p-3 cursor-pointer hover:brightness-95 transition-all",
+                                                    isSoldOut && "opacity-60 cursor-not-allowed"
+                                                )}
+                                            >
+                                                {/* Text side */}
+                                                <div className="flex flex-1 flex-col justify-between min-w-0 py-0.5">
+                                                    <div>
+                                                        <h4 className="font-semibold text-sm text-[var(--foreground)] line-clamp-2 leading-snug">
+                                                            {product.name}
+                                                        </h4>
+                                                        {product.description && (
+                                                            <p className="text-xs text-[var(--muted)] line-clamp-2 mt-1">
+                                                                {product.description}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                                        {discountPct > 0 && (
+                                                            <span className="text-xs font-semibold bg-[var(--primary)]/10 text-[var(--primary)] px-1.5 py-0.5 rounded-full">
+                                                                -{discountPct}%
+                                                            </span>
+                                                        )}
+                                                        <span className="text-sm font-bold text-[var(--foreground)]">
+                                                            {formatPrice(effectivePrice)}
+                                                        </span>
+                                                        {hasDiscount && origPrice != null && (
+                                                            <span className="text-xs text-[var(--muted)] line-through">
+                                                                {formatPrice(origPrice)}
+                                                            </span>
+                                                        )}
+                                                        {isSoldOut && (
+                                                            <span className="text-xs text-[var(--danger)]">
+                                                                {t("common.unavailable")}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Image side */}
+                                                <div className="relative shrink-0 h-[120px] w-[130px] sm:h-[140px] sm:w-[150px] rounded-xl overflow-visible bg-[var(--card)]">
+                                                    <div className="absolute inset-0 rounded-xl overflow-hidden">
+                                                    {product.imageUrl ? (
+                                                        <Image
+                                                            src={product.imageUrl}
+                                                            alt={product.name}
+                                                            fill
+                                                            className="object-cover"
+                                                            sizes="150px"
+                                                        />
+                                                    ) : (
+                                                        <div className="flex h-full items-center justify-center">
+                                                            <ShoppingBag size={24} className="text-[var(--muted)] opacity-40" />
+                                                        </div>
+                                                    )}
+                                                    </div>
+                                                    {!isSoldOut && cartQty === 0 && (
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleCardClick(); }}
+                                                            className="absolute -top-1 -right-1 flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--primary)] text-white shadow-lg hover:opacity-80 transition-opacity z-10"
+                                                        >
+                                                            <Plus size={18} strokeWidth={2.5} />
+                                                        </button>
+                                                    )}
+                                                    {!isSoldOut && cartQty > 0 && !needsOptions && (
+                                                        <div className="absolute -top-1 -right-1 flex items-center gap-1 rounded-xl bg-[var(--primary)] shadow-lg px-1.5 py-1 z-10">
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    const lastItem = [...cartItems].filter((ci) => ci.productId === product.id).pop();
+                                                                    if (!lastItem) return;
+                                                                    if (lastItem.quantity > 1) useCartStore.getState().updateQuantity(lastItem.id, lastItem.quantity - 1);
+                                                                    else useCartStore.getState().removeItem(lastItem.id);
+                                                                }}
+                                                                className="flex h-6 w-6 items-center justify-center rounded-lg bg-white/20 hover:bg-white/35 text-white transition-colors"
+                                                            >
+                                                                <Minus size={12} strokeWidth={2.5} />
+                                                            </button>
+                                                            <span className="min-w-[1rem] text-center text-xs font-bold text-white">{cartQty}</span>
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleCardClick(); }}
+                                                                className="flex h-6 w-6 items-center justify-center rounded-lg bg-white/20 hover:bg-white/35 text-white transition-colors"
+                                                            >
+                                                                <Plus size={12} strokeWidth={2.5} />
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                    {!isSoldOut && cartQty > 0 && needsOptions && (
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleCardClick(); }}
+                                                            className="absolute -top-1 -right-1 flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--primary)] text-white shadow-lg hover:opacity-80 transition-opacity z-10"
+                                                        >
+                                                            <span className="text-xs font-bold">{cartQty}</span>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </section>
+                        ))}
                     </div>
                 )}
             </div>
 
-            {/* Bottom Cart Bar */}
-            {hasCartItems && (
-                <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-md">
-                    <Link
-                        href="/cart"
-                        className="flex items-center justify-between rounded-2xl bg-[var(--primary)] px-5 py-3.5 text-white shadow-lg hover:bg-[var(--primary-hover)] transition-colors"
-                    >
-                        <span className="flex items-center gap-2">
-                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/20 text-xs font-bold">
-                                {cartCount}
-                            </span>
-                            <span className="font-medium">{t("cart.view_cart")}</span>
-                        </span>
-                        <span className="font-bold">{formatPrice(cartTotal)}</span>
-                    </Link>
-                </div>
-            )}
+            {/* ── Cart bar ─────────────────────────────────────── */}
+            <ProductOptionsModal
+                productId={modalProductId}
+                businessId={businessId}
+                businessName={business?.name ?? ""}
+                onClose={() => setModalProductId(null)}
+            />
+
+
         </div>
     );
 }

@@ -341,7 +341,7 @@
         "order_success_title": "Porosia u vendos!",
         "order_success_subtitle": "Uluni dhe relaksohuni — ne jemi duke u marrë me të.",
         "order_success_track": "Ndiq porosinë",
-        "search_address": "Kërko rrugën, vendin...",
+        "search_address": "Vellezerit Baftiu, Gjilan...",
         "use_gps": "Përdor vendndodhjen GPS",
         "saved_addresses": "Adresat e Ruajtura",
         "finding_address": "Duke gjetur adresën...",
@@ -570,6 +570,7 @@
         "discover": "Zbulimi",
         "restaurants": "Restorantet",
         "shops": "Dyqanet",
+        "market": "Tregu",
         "orders": "Porosite",
         "create": "Krijo",
         "profile": "Profili"
