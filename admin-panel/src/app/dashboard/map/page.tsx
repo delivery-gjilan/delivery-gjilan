@@ -1916,29 +1916,29 @@ export default function MapPage() {
       {/* ════════════════ LEFT ORDER CARDS SIDEBAR ════════════════ */}
       <div className={`absolute left-0 top-0 bottom-0 z-20 bg-[#0a0a0b] border-r border-white/5 flex flex-col transition-all duration-200 ${sidebarCollapsed ? 'w-0 overflow-hidden border-r-0' : 'w-[280px]'}`}>
         {/* Header with stats */}
-        <div className="px-3 py-2.5 border-b border-white/10">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-white">Orders</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-400 font-medium">{filteredOrders.length}</span>
+        <div className="px-3 py-2 border-b border-white/8">
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-semibold text-zinc-300">Orders</span>
+              <span className="text-[10px] text-zinc-500 font-medium">{filteredOrders.length}</span>
             </div>
             {statusFilter !== "ALL" && (
               <button onClick={() => setStatusFilter("ALL")} className="text-[9px] text-zinc-500 hover:text-white flex items-center gap-1 transition">
-                <X size={9} /> Clear filter
+                <X size={9} /> Clear
               </button>
             )}
           </div>
           <div className="flex items-center gap-1 flex-wrap">
             {([
-              { key: "PENDING", count: stats.pendingOrders, dot: "bg-amber-500", active: "bg-amber-500/25 border-amber-500/60 text-amber-300", idle: "bg-amber-500/10 border-transparent text-amber-500" },
-              { key: "PREPARING", count: stats.preparingOrders, dot: "bg-violet-500", active: "bg-violet-500/25 border-violet-500/60 text-violet-300", idle: "bg-violet-500/10 border-transparent text-violet-400" },
-              { key: "READY", count: stats.readyOrders, dot: "bg-blue-500", active: "bg-blue-500/25 border-blue-500/60 text-blue-300", idle: "bg-blue-500/10 border-transparent text-blue-500" },
-              { key: "OUT_FOR_DELIVERY", count: stats.outOrders, dot: "bg-emerald-500", active: "bg-emerald-500/25 border-emerald-500/60 text-emerald-300", idle: "bg-emerald-500/10 border-transparent text-emerald-500" },
+              { key: "PENDING", count: stats.pendingOrders, dot: "bg-amber-500", active: "bg-amber-500/20 border-amber-500/50 text-amber-300", idle: "border-transparent text-zinc-600 hover:text-zinc-400" },
+              { key: "PREPARING", count: stats.preparingOrders, dot: "bg-violet-500", active: "bg-violet-500/20 border-violet-500/50 text-violet-300", idle: "border-transparent text-zinc-600 hover:text-zinc-400" },
+              { key: "READY", count: stats.readyOrders, dot: "bg-blue-500", active: "bg-blue-500/20 border-blue-500/50 text-blue-300", idle: "border-transparent text-zinc-600 hover:text-zinc-400" },
+              { key: "OUT_FOR_DELIVERY", count: stats.outOrders, dot: "bg-emerald-500", active: "bg-emerald-500/20 border-emerald-500/50 text-emerald-300", idle: "border-transparent text-zinc-600 hover:text-zinc-400" },
             ] as const).map(({ key, count, dot, active, idle }) => (
               <button
                 key={key}
                 onClick={() => setStatusFilter(statusFilter === key ? "ALL" : key)}
-                className={`flex items-center gap-1 px-2 py-1 rounded-md border text-[10px] font-bold transition ${
+                className={`flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-semibold transition ${
                   statusFilter === key ? active : idle
                 }`}>
                 <div className={`w-1.5 h-1.5 rounded-full ${dot}`} />
@@ -1964,7 +1964,7 @@ export default function MapPage() {
         
         {/* Order cards list */}
         <div className="flex-1 overflow-y-auto scrollbar-hide" style={{ maxHeight: 'calc(100vh - 60px)' }}>
-          <div className="p-2 space-y-2">
+          <div className="p-1.5 space-y-px">
             {filteredOrders.map((order: any) => {
               const statusColor = ORDER_STATUS_COLORS[order.status as keyof typeof ORDER_STATUS_COLORS] || ORDER_STATUS_COLORS.PENDING;
               const businessName = order.businesses?.[0]?.business?.name || "Unknown";
@@ -1974,7 +1974,6 @@ export default function MapPage() {
               const elapsed = now - orderDateMs;
               const pendingTooLong = isPending && elapsed > PENDING_WARNING_MS;
               const customerName = order.user ? `${order.user.firstName} ${order.user.lastName}` : "Unknown";
-              const customerPhone = order.user?.phoneNumber || "";
               const distanceData = orderDistances[order.id];
               const preview = (order as any).settlementPreview;
               const marginSeverity = preview ? getMarginSeverity(preview.netMargin) : null;
@@ -1991,75 +1990,69 @@ export default function MapPage() {
                   key={order.id}
                   ref={(el) => { orderRefs.current[order.id] = el; }}
                   onClick={() => selectOrder(order.id)}
-                  style={isSelected
-                    ? { borderLeft: `3px solid ${statusColor.hex}`, boxShadow: `inset 0 0 0 1px ${statusColor.hex}55` }
-                    : pendingTooLong
-                      ? { borderLeft: '3px solid #ef4444' }
-                      : { borderLeft: `3px solid ${statusColor.hex}33` }}
-                  className={`w-full text-left p-3 rounded-xl transition-all ${
-                    pendingTooLong ? "bg-red-500/10 animate-pulse" : "hover:bg-white/5"
-                  }`}>
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg border-l-2 transition-all ${
+                    isSelected
+                      ? 'bg-white/[0.06]'
+                      : pendingTooLong
+                        ? 'bg-red-500/[0.06] animate-pulse'
+                        : 'hover:bg-white/[0.04]'
+                  }`}
+                  style={{ borderLeftColor: isSelected ? statusColor.hex : pendingTooLong ? '#ef4444' : `${statusColor.hex}44` }}>
                   
-                  {/* Top row: status + time */}
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: pendingTooLong ? "#ef4444" : statusColor.hex }} />
-                      <span className={`text-[10px] font-semibold uppercase ${pendingTooLong ? "text-red-400" : statusColor.text}`}>
-                        {order.status.replace(/_/g, " ")}
-                      </span>
-                      {pendingTooLong && (
-                        <span className="text-[8px] px-1.5 py-0.5 rounded bg-red-500/30 text-red-300 font-bold">LATE</span>
-                      )}
+                  {/* Row 1: Business + elapsed */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: pendingTooLong ? "#ef4444" : statusColor.hex }} />
+                      <span className="text-[13px] font-medium text-white truncate">{businessName}</span>
                     </div>
-                    <span className={`text-[10px] font-mono ${pendingTooLong ? "text-red-400" : "text-zinc-500"}`}>
+                    <span className={`text-[10px] font-mono flex-shrink-0 ${pendingTooLong ? "text-red-400" : "text-zinc-600"}`}>
                       {formatElapsed(elapsed)}
                     </span>
                   </div>
                   
-                  {/* Business name */}
-                  <div className="text-sm font-medium text-white truncate mb-1">{businessName}</div>
+                  {/* Row 2: Status · Customer */}
+                  <div className="flex items-center gap-1.5 mt-0.5 pl-3">
+                    <span className={`text-[9px] font-semibold uppercase flex-shrink-0 ${pendingTooLong ? "text-red-400" : statusColor.text}`}>
+                      {order.status.replace(/_/g, " ")}
+                    </span>
+                    {pendingTooLong && (
+                      <span className="text-[8px] px-1 py-px rounded bg-red-500/20 text-red-300 font-bold flex-shrink-0">LATE</span>
+                    )}
+                    <span className="text-zinc-700 text-[9px]">·</span>
+                    <span className="text-[10px] text-zinc-500 truncate">{customerName}</span>
+                  </div>
 
-                  {/* Prep time extended alert */}
+                  {/* Prep time alert (compact inline) */}
                   {(() => {
                     const alert = prepTimeAlerts.find((a) => a.orderId === order.id);
                     if (!alert) return null;
                     return (
-                      <div className="flex items-center gap-1.5 mb-2 px-2 py-1 rounded-md bg-amber-500/15 border border-amber-500/30">
-                        <Clock size={11} className="text-amber-400 flex-shrink-0" />
-                        <span className="text-amber-400 text-[10px] font-semibold flex-1">+{alert.addedMinutes}m (now {alert.newTotalMinutes}m)</span>
+                      <div className="flex items-center gap-1 mt-0.5 pl-3">
+                        <Clock size={9} className="text-amber-500/60 flex-shrink-0" />
+                        <span className="text-amber-500/70 text-[9px] font-medium">+{alert.addedMinutes}m → {alert.newTotalMinutes}m</span>
                         <button
                           onClick={(e) => { e.stopPropagation(); dismissPrepAlert(alert.orderId); }}
-                          className="text-amber-400/60 hover:text-amber-400 text-xs leading-none"
+                          className="text-amber-500/40 hover:text-amber-400 text-[10px] leading-none ml-auto"
                         >×</button>
                       </div>
                     );
                   })()}
                   
-                  {/* Customer */}
-                  <div className="mb-2">
-                    <div className="text-xs text-zinc-400 truncate">
-                      <span className="text-zinc-600">{"\u2192"}</span> {customerName}
-                    </div>
-                    {customerPhone && (
-                      <div className="text-[10px] text-zinc-500 truncate mt-0.5">{customerPhone}</div>
-                    )}
-                  </div>
-                  
-                  {/* Bottom row: driver + price + eta */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                  {/* Row 3: Driver + margin + eta + price */}
+                  <div className="flex items-center justify-between mt-1 pl-3">
+                    <div className="flex items-center gap-1 min-w-0">
                       {order.driver ? (
-                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-500/10">
-                          <div className={`w-4 h-4 rounded-full ${getAvatarColor(order.driver.id)} flex items-center justify-center text-[8px] font-bold text-white`}>
+                        <div className="flex items-center gap-1">
+                          <div className={`w-3.5 h-3.5 rounded-full ${getAvatarColor(order.driver.id)} flex items-center justify-center text-[7px] font-bold text-white flex-shrink-0`}>
                             {getInitials(order.driver.firstName, order.driver.lastName)}
                           </div>
-                          <span className="text-[10px] text-emerald-400 font-medium">{order.driver.firstName}</span>
+                          <span className="text-[10px] text-zinc-500">{order.driver.firstName}</span>
                         </div>
                       ) : (
-                        <span className="text-[10px] px-2 py-1 rounded-md bg-amber-500/10 text-amber-400 font-medium">Unassigned</span>
+                        <span className="text-[10px] text-amber-500/60">No driver</span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
                       {preview ? (
                         <div className="group/pill relative"
                           onMouseEnter={(e) => {
@@ -2071,8 +2064,8 @@ export default function MapPage() {
                             tip.style.top = `${rect.bottom + 6}px`;
                           }}>
                           <span
-                            className={`text-[10px] px-1.5 py-0.5 rounded font-medium cursor-default ${marginSeverity === 'healthy' ? 'bg-emerald-500/15 text-emerald-300' : marginSeverity === 'thin' ? 'bg-amber-500/15 text-amber-300' : 'bg-rose-500/15 text-rose-300'}`}>
-                            M {preview.netMargin >= 0 ? '+' : ''}€{preview.netMargin.toFixed(2)}
+                            className={`text-[9px] font-medium cursor-default ${marginSeverity === 'healthy' ? 'text-emerald-400/60' : marginSeverity === 'thin' ? 'text-amber-400/60' : 'text-rose-400/60'}`}>
+                            {preview.netMargin >= 0 ? '+' : ''}€{preview.netMargin.toFixed(2)}
                           </span>
                           <div data-settlement-tip className="pointer-events-none fixed z-[9999] w-56 rounded-lg border border-zinc-700 bg-[#0a0a0d] p-2 text-[10px] text-zinc-300 opacity-0 shadow-2xl transition-opacity group-hover/pill:opacity-100">
                             <div className="font-semibold text-zinc-200 mb-1 text-[11px]">Settlement breakdown</div>
@@ -2095,13 +2088,11 @@ export default function MapPage() {
                             )}
                           </div>
                         </div>
-                      ) : (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-zinc-500/15 text-zinc-400">M —</span>
-                      )}
+                      ) : null}
                       {etaMin && (
-                        <span className="text-[10px] text-zinc-500">{etaMin}m</span>
+                        <span className="text-[10px] text-zinc-600">{etaMin}m</span>
                       )}
-                      <span className="text-xs font-medium text-white">{"\u20AC"}{order.totalPrice?.toFixed(2) || "0"}</span>
+                      <span className="text-[11px] font-medium text-zinc-300">€{order.totalPrice?.toFixed(2) || "0"}</span>
                     </div>
                   </div>
                 </button>
@@ -3248,13 +3239,16 @@ function BottomDetailPanel({
             </div>
           )}
           {(order as any).inventoryPrice != null && Number((order as any).inventoryPrice) > 0 && (
-            <button
-              onClick={() => { setInventoryModalOrder(order); fetchOrderCoverage({ variables: { orderId: order.id } }); }}
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={(e) => { e.stopPropagation(); setInventoryModalOrder(order); fetchOrderCoverage({ variables: { orderId: order.id } }); }}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); setInventoryModalOrder(order); fetchOrderCoverage({ variables: { orderId: order.id } }); } }}
               className="mt-2 w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/30 text-violet-300 text-xs font-semibold hover:bg-violet-500/20 transition-colors text-left cursor-pointer"
             >
               📦 Stock items — €{Number((order as any).inventoryPrice).toFixed(2)}
               <span className="ml-auto text-violet-500 text-[10px]">View →</span>
-            </button>
+            </div>
           )}
           {(order as any).needsApproval && (
             <div className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold">
