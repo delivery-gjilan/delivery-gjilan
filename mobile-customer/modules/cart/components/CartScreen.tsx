@@ -997,14 +997,9 @@ export const CartScreen = () => {
         setIsProcessing(true);
         showLoading('order_created');
         try {
-            // Send the raw (pre-promo) base delivery price to the API.
-            // The backend validates deliveryPrice against server-calculated zones/tiers
-            // BEFORE applying any promotion discounts.  Priority surcharge is passed
-            // separately via prioritySurcharge so the backend can fold it into the
-            // stored deliveryPrice while keeping zone/tier validation intact.
-            // deliveryPrice = base/promo delivery fee WITHOUT priority surcharge.
-            // prioritySurcharge is sent separately for independent server validation.
-            const apiDeliveryPrice = deliveryPrice;
+            // Send delivery price after promo effects (for example free delivery),
+            // but without priority surcharge (validated separately by API).
+            const apiDeliveryPrice = effectiveDeliveryPrice;
             const order = await createOrder(
                 selectedLocation,
                 apiDeliveryPrice,

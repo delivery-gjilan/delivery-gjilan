@@ -36,6 +36,7 @@ type BusinessPromotion {
     id: ID!
     name: String!
     description: String
+    code: String
     type: PromotionType!
     creatorType: PromotionCreatorType!
     discountValue: Float

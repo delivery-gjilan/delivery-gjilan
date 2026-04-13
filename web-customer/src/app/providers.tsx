@@ -10,6 +10,7 @@ import { CartFloatingBar } from "@/components/layout/CartFloatingBar";
 import { CartDrawer } from "@/components/checkout/CartDrawer";
 import { OrderSuccessModal } from "@/components/orders/OrderSuccessModal";
 import { AwaitingApprovalModal } from "@/components/orders/AwaitingApprovalModal";
+import { StoreStatusInit, StoreClosedOverlay } from "@/components/layout/StoreStatus";
 
 const client = createApolloClient();
 
@@ -19,6 +20,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
             <AuthProvider>
                 {/* <LocationProvider> - Temporarily disabled to fix login issues */}
                 <I18nProvider>
+                    <StoreStatusInit />
+                    <StoreClosedOverlay />
                     {children}
                     <CartFloatingBar />
                     <CartDrawer />

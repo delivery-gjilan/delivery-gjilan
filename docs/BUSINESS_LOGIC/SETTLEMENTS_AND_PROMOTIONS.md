@@ -264,7 +264,107 @@ The mobile-customer cart auto-apply notifier presents recovery promotions as typ
 The same notifier also normalizes regular promotion names/codes (removes technical prefixes/tokens) and falls back to friendly type labels when names are not customer-friendly.
 On the mobile-customer business page, business-created active promotions are shown as a tappable promo card that opens an offer-details modal explaining how the promo applies, minimum spend (when present), and that the discount auto-applies at checkout.
 Promotion descriptions can be edited from the admin Promotions edit modal and are shown in the business promo offer-details modal; when empty, the modal shows fallback explanatory copy.
+The business promo card/modal now follows a structured Wolt-style presentation: value headline, condition line, apply-method badge (auto or code), and details sections (what you get, conditions, how it works).
 When checkout order creation fails because a selected promotion is invalid/expired/not combinable, mobile-customer shows a dedicated promotion modal with clear guidance and a one-tap action to remove the promo and continue.
+
+### Clean promo UX plan (Wolt-style business pages)
+
+Goal: make promotions easy to understand at a glance, with clear rules, no surprises at checkout, and strong consistency across Home, restaurant cards, Business page, cart, and order review.
+
+#### Product rules to standardize first
+
+- Separate promo visibility from promo eligibility:
+   - visibility: what users see on cards/pages
+   - eligibility: what can actually apply at checkout
+- Keep marketing surfaces focused on simple copy and key value (for example "Free delivery over EUR 20").
+- Keep detailed constraints in a promo details sheet (minimum spend, code required, expiry, stackability, assigned-user-only).
+- Prefer one primary business promo card on list surfaces, but allow a full list on the business page.
+
+#### Business-page presentation model
+
+1. Promo hero row on business page:
+- horizontal chips/cards with top 1-3 active business promos
+- each card shows:
+   - short title
+   - value headline (for example "-20%", "EUR 3 off", "Free delivery")
+   - tiny condition line (for example "Over EUR 20", "Code required")
+
+2. Promo details bottom sheet (tap a promo card):
+- sections:
+   - What you get
+   - Conditions
+   - Code and how to apply
+   - Validity window
+   - Can be combined?
+- CTA behavior:
+   - code promo: "Copy code"
+   - auto promo: "Applied automatically at checkout"
+
+3. Checkout alignment:
+- selected/active promo summary must match business-page copy and conditions exactly
+- if ineligible at checkout, show explicit reason and suggested action (already implemented modal path)
+
+#### API contract additions (recommended)
+
+Add a dedicated display DTO for business promo surfaces so UI does not infer rules from low-level fields:
+
+- `BusinessPromotionDisplay` (for cards + details)
+   - `id`
+   - `title`
+   - `subtitle`
+   - `badgeText` (for example "Code", "Auto")
+   - `valueText`
+   - `conditionText`
+   - `description`
+   - `requiresCode`
+   - `code`
+   - `startsAt`, `endsAt`
+   - `isStackable`
+   - `combinableSummary`
+
+Resolver should return both:
+- compact list for card surfaces
+- full details payload for the business promo sheet
+
+#### Admin data quality guardrails
+
+- Add explicit "Customer-facing title" and "Short condition line" fields in promo creation/edit.
+- Keep internal name separate from customer copy.
+- Add preview in admin:
+   - restaurant card preview
+   - business page promo card preview
+   - checkout summary preview
+- Validation rules:
+   - prevent empty customer-facing copy on active promos
+   - enforce short length limits (title/subtitle)
+
+#### Tracking and quality metrics
+
+- funnel metrics by promo:
+   - seen on business page
+   - tapped details
+   - copied code
+   - applied successfully
+   - failed with reason (expired/not assigned/not combinable/min spend)
+- monitor "promo confusion" signals:
+   - high details taps but low apply success
+   - repeated invalid attempts per user/session
+
+#### Implementation phases
+
+Phase 1 (quick win, 1-2 days):
+- Add business-page promo chips with concise value + condition.
+- Add promo details bottom sheet using existing fields.
+- Add explicit "Code required" badge where applicable.
+
+Phase 2 (quality, 2-4 days):
+- Add dedicated display DTO and resolver mapping.
+- Move UI to DTO-driven copy (no ad-hoc formatting in components).
+- Add admin preview block for business/list/checkout.
+
+Phase 3 (polish, 2-3 days):
+- Add analytics events for promo impressions/details/copy/apply/fail reason.
+- Tune copy based on top failure reasons.
 
 ### Business-funded promotions (item discounts)
 

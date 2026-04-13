@@ -36,6 +36,7 @@ interface BusinessScreenProps {
 
 type PromoLike = {
     name?: string | null;
+    code?: string | null;
     type?: string | null;
     discountValue?: number | null;
     spendThreshold?: number | null;
@@ -241,6 +242,25 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
             }
 
             return promotion.name || t.business.promo_details_title;
+        },
+        [t],
+    );
+
+    const formatPromotionCondition = useCallback(
+        (promotion: PromoLike) => {
+            const parts: string[] = [];
+
+            if (typeof promotion.spendThreshold === 'number' && promotion.spendThreshold > 0) {
+                parts.push(`€${Number(promotion.spendThreshold).toFixed(2)} ${t.business.promo_condition_min_spend}`);
+            }
+
+            if (promotion.code) {
+                parts.push(t.business.promo_badge_code_required);
+            } else {
+                parts.push(t.business.promo_badge_auto_apply);
+            }
+
+            return parts.join(' • ');
         },
         [t],
     );
@@ -522,6 +542,8 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
     const activePromotion = (business as any)?.activePromotion as (PromoLike & { creatorType?: string | null; description?: string | null; code?: string | null }) | null;
     const businessPromo = activePromotion?.creatorType === 'BUSINESS' ? activePromotion : null;
     const businessPromoLabel = businessPromo ? formatPromotionLabel(businessPromo) : null;
+    const businessPromoCondition = businessPromo ? formatPromotionCondition(businessPromo) : null;
+    const promoRequiresCode = Boolean(businessPromo?.code);
 
     // ─── Render ─────────────────────────────────────────────
     return (<SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['bottom']}>
@@ -724,12 +746,38 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                                             <Text style={{ color: theme.colors.text, fontSize: 13, fontWeight: '700' }} numberOfLines={1}>
                                                 {businessPromoLabel}
                                             </Text>
-                                            <Text style={{ color: theme.colors.subtext, fontSize: 12, marginTop: 1 }} numberOfLines={1}>
-                                                {t.business.promo_tap_for_details}
+                                            <Text style={{ color: theme.colors.subtext, fontSize: 11, marginTop: 2 }} numberOfLines={1}>
+                                                {businessPromoCondition}
                                             </Text>
+                                            {!!businessPromo?.description && (
+                                                <Text style={{ color: theme.colors.subtext, fontSize: 11, marginTop: 2 }} numberOfLines={1}>
+                                                    {businessPromo.description}
+                                                </Text>
+                                            )}
+                                            {!businessPromo?.description && (
+                                                <Text style={{ color: theme.colors.subtext, fontSize: 11, marginTop: 2 }} numberOfLines={1}>
+                                                    {t.business.promo_tap_for_details}
+                                                </Text>
+                                            )}
                                         </View>
                                     </View>
-                                    <Ionicons name="chevron-forward" size={15} color={theme.colors.subtext} />
+                                    <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                                        <View
+                                            style={{
+                                                borderRadius: 999,
+                                                borderWidth: 1,
+                                                borderColor: theme.colors.primary + '55',
+                                                backgroundColor: theme.colors.primary + '18',
+                                                paddingHorizontal: 8,
+                                                paddingVertical: 3,
+                                            }}
+                                        >
+                                            <Text style={{ color: theme.colors.primary, fontSize: 10, fontWeight: '700' }}>
+                                                {promoRequiresCode ? t.business.promo_badge_code : t.business.promo_badge_auto}
+                                            </Text>
+                                        </View>
+                                        <Ionicons name="chevron-forward" size={15} color={theme.colors.subtext} />
+                                    </View>
                                 </TouchableOpacity>
                             </Animated.View>
                         )}
@@ -1122,31 +1170,84 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                             </View>
                         )}
 
-                        <Text style={{ color: theme.colors.subtext, fontSize: 13, lineHeight: 19, marginTop: 12 }}>
-                            {businessPromo?.description || t.business.promo_auto_apply_hint}
-                        </Text>
+                        {businessPromoCondition && (
+                            <Text style={{ color: theme.colors.subtext, fontSize: 12, marginTop: 10 }}>
+                                {businessPromoCondition}
+                            </Text>
+                        )}
 
-                        <View style={{ marginTop: 12, gap: 8 }}>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                <Text style={{ color: theme.colors.subtext, fontSize: 12 }}>{t.business.promo_scope_label}</Text>
-                                <Text style={{ color: theme.colors.text, fontSize: 12, fontWeight: '600' }}>{t.business.promo_scope_business}</Text>
+                        <View style={{ marginTop: 12, gap: 10 }}>
+                            <View>
+                                <Text style={{ color: theme.colors.text, fontSize: 12, fontWeight: '700' }}>
+                                    {t.business.promo_section_value_title}
+                                </Text>
+                                <Text style={{ color: theme.colors.subtext, fontSize: 12, marginTop: 5, lineHeight: 18 }}>
+                                    {businessPromoLabel || t.business.promo_auto_apply_hint}
+                                </Text>
                             </View>
-                            {typeof businessPromo?.spendThreshold === 'number' && businessPromo.spendThreshold > 0 && (
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                    <Text style={{ color: theme.colors.subtext, fontSize: 12 }}>{t.business.promo_minimum_label}</Text>
-                                    <Text style={{ color: theme.colors.text, fontSize: 12, fontWeight: '600' }}>
-                                        €{Number(businessPromo.spendThreshold).toFixed(2)}
+
+                            <View>
+                                <Text style={{ color: theme.colors.text, fontSize: 12, fontWeight: '700' }}>
+                                    {t.business.promo_section_conditions_title}
+                                </Text>
+                                <View style={{ marginTop: 6, gap: 6 }}>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                        <Text style={{ color: theme.colors.subtext, fontSize: 12 }}>{t.business.promo_scope_label}</Text>
+                                        <Text style={{ color: theme.colors.text, fontSize: 12, fontWeight: '600' }}>{t.business.promo_scope_business}</Text>
+                                    </View>
+                                    {typeof businessPromo?.spendThreshold === 'number' && businessPromo.spendThreshold > 0 && (
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                            <Text style={{ color: theme.colors.subtext, fontSize: 12 }}>{t.business.promo_minimum_label}</Text>
+                                            <Text style={{ color: theme.colors.text, fontSize: 12, fontWeight: '600' }}>
+                                                €{Number(businessPromo.spendThreshold).toFixed(2)}
+                                            </Text>
+                                        </View>
+                                    )}
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                        <Text style={{ color: theme.colors.subtext, fontSize: 12 }}>{t.business.promo_apply_method_label}</Text>
+                                        <Text style={{ color: theme.colors.text, fontSize: 12, fontWeight: '600' }}>
+                                            {promoRequiresCode ? t.business.promo_badge_code_required : t.business.promo_badge_auto_apply}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+
+                            {promoRequiresCode && businessPromo?.code && (
+                                <View
+                                    style={{
+                                        borderRadius: 10,
+                                        borderWidth: 1,
+                                        borderColor: theme.colors.border,
+                                        backgroundColor: theme.colors.background,
+                                        paddingHorizontal: 10,
+                                        paddingVertical: 8,
+                                    }}
+                                >
+                                    <Text style={{ color: theme.colors.subtext, fontSize: 11 }}>{t.business.promo_code_label}</Text>
+                                    <Text style={{ color: theme.colors.text, fontSize: 13, fontWeight: '800', marginTop: 2 }}>
+                                        {businessPromo.code}
+                                    </Text>
+                                </View>
+                            )}
+
+                            {!!businessPromo?.description && (
+                                <View>
+                                    <Text style={{ color: theme.colors.text, fontSize: 12, fontWeight: '700' }}>
+                                        {t.business.promo_section_details_title}
+                                    </Text>
+                                    <Text style={{ color: theme.colors.subtext, fontSize: 12, marginTop: 5, lineHeight: 18 }}>
+                                        {businessPromo.description}
                                     </Text>
                                 </View>
                             )}
                         </View>
 
-                        <View style={{ marginTop: 14, borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: 12 }}>
+                        <View style={{ marginTop: 12, gap: 8 }}>
                             <Text style={{ color: theme.colors.text, fontSize: 12, fontWeight: '700' }}>
                                 {t.business.promo_how_it_works_title}
                             </Text>
-                            <Text style={{ color: theme.colors.subtext, fontSize: 12, marginTop: 6, lineHeight: 18 }}>
-                                {t.business.promo_how_it_works_body}
+                            <Text style={{ color: theme.colors.subtext, fontSize: 12, lineHeight: 18 }}>
+                                {promoRequiresCode ? t.business.promo_how_it_works_body_code : t.business.promo_how_it_works_body}
                             </Text>
                         </View>
                     </TouchableOpacity>

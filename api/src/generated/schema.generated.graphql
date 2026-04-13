@@ -346,6 +346,7 @@ type BusinessPerformanceStat {
 }
 
 type BusinessPromotion {
+  code: String
   creatorType: PromotionCreatorType!
   description: String
   discountValue: Float

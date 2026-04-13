@@ -372,6 +372,7 @@ export type BusinessPerformanceStat = {
 
 export type BusinessPromotion = {
   __typename?: 'BusinessPromotion';
+  code?: Maybe<Scalars['String']['output']>;
   creatorType: PromotionCreatorType;
   description?: Maybe<Scalars['String']['output']>;
   discountValue?: Maybe<Scalars['Float']['output']>;
@@ -4264,6 +4265,7 @@ export type BusinessPerformanceStatResolvers<ContextType = GraphQLContext, Paren
 };
 
 export type BusinessPromotionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['BusinessPromotion'] = ResolversParentTypes['BusinessPromotion']> = {
+  code?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   creatorType?: Resolver<ResolversTypes['PromotionCreatorType'], ParentType, ContextType>;
   description?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   discountValue?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;

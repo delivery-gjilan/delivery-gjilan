@@ -22,7 +22,8 @@ export const useOrderReviewPreferencesStore = create<OrderReviewPreferencesState
                 if (!orderId) return;
                 const state = get();
                 if (state.handledOrderIds.includes(orderId)) return;
-                set({ handledOrderIds: [...state.handledOrderIds, orderId] });
+                const updated = [...state.handledOrderIds, orderId];
+                set({ handledOrderIds: updated.length > 100 ? updated.slice(-100) : updated });
             },
 
             hideForBusiness: (businessId) => {

@@ -14,8 +14,6 @@ export default function OrderReviewModalContainer() {
     const hiddenBusinessIds = useOrderReviewPreferencesStore((state) => state.hiddenBusinessIds);
     const handledOrderIds = useOrderReviewPreferencesStore((state) => state.handledOrderIds);
     const markOrderHandled = useOrderReviewPreferencesStore((state) => state.markOrderHandled);
-    const hideForBusiness = useOrderReviewPreferencesStore((state) => state.hideForBusiness);
-    const hideForAll = useOrderReviewPreferencesStore((state) => state.hideForAll);
 
     const successModalVisible = useSuccessModalStore((state) => state.visible);
 
@@ -103,17 +101,7 @@ export default function OrderReviewModalContainer() {
                 });
                 closeAndMarkHandled();
             }}
-            onSkipOrder={closeAndMarkHandled}
-            onHideBusiness={() => {
-                if (businessId) {
-                    hideForBusiness(businessId);
-                }
-                closeAndMarkHandled();
-            }}
-            onHideAll={() => {
-                hideForAll();
-                closeAndMarkHandled();
-            }}
+            onDismiss={closeAndMarkHandled}
         />
     );
 }

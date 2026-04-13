@@ -36,6 +36,7 @@ export const GET_BUSINESSES = gql`
                 id
                 name
                 description
+                code
                 type
                 discountValue
                 spendThreshold
@@ -82,6 +83,7 @@ export const GET_BUSINESS = gql`
                 id
                 name
                 description
+                code
                 type
                 creatorType
                 discountValue
