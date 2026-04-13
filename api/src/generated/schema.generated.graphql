@@ -207,6 +207,7 @@ input BulkSetInventoryItem {
 
 type Business {
   activePromotion: BusinessPromotion
+  activePromotionsDisplay: [BusinessPromotionDisplay!]!
   avgPrepTimeMinutes: Int!
   businessType: BusinessType!
   category: String
@@ -352,6 +353,20 @@ type BusinessPromotion {
   discountValue: Float
   id: ID!
   name: String!
+  spendThreshold: Float
+  type: PromotionType!
+}
+
+type BusinessPromotionDisplay {
+  applyMethod: PromotionApplyMethod!
+  code: String
+  creatorType: PromotionCreatorType!
+  description: String
+  discountValue: Float
+  id: ID!
+  name: String!
+  priority: Int!
+  requiresCode: Boolean!
   spendThreshold: Float
   type: PromotionType!
 }
@@ -1628,6 +1643,11 @@ type PromotionAnalyticsResult {
 enum PromotionAppliesTo {
   DELIVERY
   PRICE
+}
+
+enum PromotionApplyMethod {
+  AUTO
+  CODE_REQUIRED
 }
 
 enum PromotionCreatorType {

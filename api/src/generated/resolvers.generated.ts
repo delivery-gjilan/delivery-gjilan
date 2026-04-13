@@ -249,6 +249,7 @@ import    { BusinessMessageThread } from './../models/BusinessMessage/resolvers/
 import    { BusinessMessageUser } from './../models/BusinessMessage/resolvers/BusinessMessageUser';
 import    { BusinessPerformanceStat } from './../models/Business/resolvers/BusinessPerformanceStat';
 import    { BusinessPromotion } from './../models/Business/resolvers/BusinessPromotion';
+import    { BusinessPromotionDisplay } from './../models/Business/resolvers/BusinessPromotionDisplay';
 import    { CreateBusinessWithOwnerPayload } from './../models/Business/resolvers/CreateBusinessWithOwnerPayload';
 import    { DayOfWeekDistribution } from './../models/Analytics/resolvers/DayOfWeekDistribution';
 import    { DayVolume } from './../models/Analytics/resolvers/DayVolume';
@@ -352,6 +353,7 @@ BusinessMessageThread: BusinessMessageThread,
 BusinessMessageUser: BusinessMessageUser,
 BusinessPerformanceStat: BusinessPerformanceStat,
 BusinessPromotion: BusinessPromotion,
+BusinessPromotionDisplay: BusinessPromotionDisplay,
 CreateBusinessWithOwnerPayload: CreateBusinessWithOwnerPayload,
 DayOfWeekDistribution: DayOfWeekDistribution,
 DayVolume: DayVolume,

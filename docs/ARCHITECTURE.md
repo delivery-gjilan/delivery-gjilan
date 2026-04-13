@@ -46,6 +46,9 @@ At a high level the backend is split into:
 - `lib` for shared utilities like pubsub, logger, auth helpers, and cache helpers
 - `generated` for schema/types/resolver glue from codegen
 
+Runtime schema wiring in `api/src/graphql/schema.ts` loads `typeDefs.generated` and `resolvers.generated`.
+The API Docker build runs `npm run codegen` before `npm run build` so generated schema/resolver glue stays aligned with `.graphql` and resolver source files.
+
 Services that grow beyond a single file are split into a subdirectory with domain modules and a facade:
 
 - `api/src/services/order/` — OrderService facade + 6 domain modules (Creation, Query, Lifecycle, Mapping, Publishing, UserBehavior) behind an `IOrderService` interface. A re-export shim at `api/src/services/OrderService.ts` preserves existing imports.

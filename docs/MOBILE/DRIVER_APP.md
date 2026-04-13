@@ -1,6 +1,6 @@
 # Mobile Driver App
 
-<!-- MDS:M8 | Domain: Mobile | Updated: 2026-04-10 -->
+<!-- MDS:M8 | Domain: Mobile | Updated: 2026-04-13 -->
 <!-- Depends-On: A1, B1, B4, B5, B7, BL1 -->
 <!-- Depended-By: M1, O4 -->
 <!-- Nav: Heartbeat changes → also update B4 (Watchdog). Auth changes → also update B5. Subscription shape changes → verify map.tsx and navigation.tsx cache update logic. -->
@@ -33,16 +33,24 @@ mobile-driver/
 │   ├── PickupSlider.tsx        # Extracted pickup‐arrival CTA (pickup confirm/cancel)
 │   ├── DeliverySlider.tsx      # Extracted delivery‐arrival CTA (confirm delivery, cancel reasons, ping/cancel timers)
 │   ├── OrderPoolSheet.tsx      # Bottom‐sheet pool of available orders (FAB trigger in _layout.tsx)
-│   ├── Badge, Button, Card, DateTimePicker, InfoBanner, Input, TrendIndicator
+│   ├── OrderPoolFAB.tsx        # Floating action button showing available order count (hidden when 0)
+│   ├── OrderAcceptSheet.tsx    # Global order accept overlay (modal-style, single pending order, auto-countdown or manual)
+│   ├── OrderDetailSheet.tsx    # Bottom-sheet order detail popup (animated slide-up, swipe-to-dismiss, prep countdown, items, CTA buttons)
+│   ├── DriverMessageBanner.tsx # Animated top-of-screen banner for incoming admin alerts (INFO/WARNING/URGENT color-coded, auto-dismiss 10s, tap→messages, double-tap→mark read)
+│   ├── Badge, Button, Card, DateTimePicker, InfoBanner, Input, ProfileRow, TrendIndicator
 ├── graphql/operations/
 │   ├── auth/login.ts           # LOGIN_MUTATION (generic, role-checked)
-│   ├── driver.ts               # GET_MY_DRIVER_METRICS, GET_MY_SETTLEMENTS, GET_MY_SETTLEMENT_SUMMARY
+│   ├── auth/deleteMyAccount.ts # DELETE_MY_ACCOUNT_MUTATION → profile account deletion
+│   ├── auth/setMyPreferredLanguage.ts # SET_MY_PREFERRED_LANGUAGE_MUTATION → language toggle
+│   ├── driver.ts               # GET_MY_DRIVER_METRICS, GET_MY_SETTLEMENTS, GET_MY_SETTLEMENT_SUMMARY, GET_SETTLEMENT_BREAKDOWN, GET_MY_SETTLEMENT_REQUESTS, RESPOND_TO_SETTLEMENT_REQUEST, GET_DRIVER_CASH_SUMMARY
 │   ├── driverLocation.ts       # UPDATE_DRIVER_ONLINE_STATUS
 │   ├── driverTelemetry.ts      # DRIVER_UPDATE_BATTERY_STATUS, DRIVER_PTT_SIGNAL_SUBSCRIPTION, GET_AGORA_RTC_CREDENTIALS
+│   ├── driverMessages.ts       # MY_DRIVER_MESSAGES (query), DRIVER_MESSAGE_RECEIVED (sub), REPLY_TO_DRIVER_MESSAGE (mutation), MARK_DRIVER_MESSAGES_READ_DRIVER (mutation)
 │   ├── notifications.ts        # REGISTER_DEVICE_TOKEN, UNREGISTER_DEVICE_TOKEN, TRACK_PUSH_TELEMETRY
 │   ├── orders.ts               # GET_ORDERS, GET_ORDER, ASSIGN_DRIVER_TO_ORDER, UPDATE_ORDER_STATUS, DRIVER_NOTIFY_CUSTOMER, ALL_ORDERS_UPDATED
-│   └── store.ts                # GET_STORE_STATUS
+│   └── store.ts                # GET_STORE_STATUS, STORE_STATUS_UPDATED
 ├── hooks/                      # All hooks (see Hooks Inventory below)
+│   └── GlobalOrderAcceptContext.tsx  # React context + provider wrapping useGlobalOrderAccept for global consumption via useSharedOrderAccept()
 ├── lib/graphql/
 │   ├── apolloClient.ts         # Apollo setup, cache, WS client
 │   ├── authSession.ts          # JWT validation, token refresh, refresh dedup lock
@@ -51,6 +59,7 @@ mobile-driver/
 │   ├── authStore.ts            # Auth state + online preference (Zustand persist)
 │   ├── navigationStore.ts      # Active navigation state machine (Zustand)
 │   ├── navigationLocationStore.ts   # SDK location feed → heartbeat bridge
+│   ├── orderAcceptStore.ts     # Pending order, auto-countdown, accepting, skippedAt/seenAssignedAt (persisted TTL maps), takenByOther, tryLockAccept debounce
 │   ├── driverLocationOverrideStore.ts  # Simulation override
 │   ├── useLocaleStore.ts       # Language preference
 │   └── useThemeStore.ts        # Theme preference
@@ -77,24 +86,34 @@ index.tsx
        ├── useAppSetup()
        │    ├── useSyncTheme()      → reads useThemeStore, applies system theme
        │    └── useInitializeTranslation() → loads locale from useLocaleStore
-  ├── waits for `authStore.hasHydrated === true` before rendering the app shell
+       ├── waits for `authStore.hasHydrated === true` before rendering the app shell
        ├── Mapbox.setAccessToken(MAPBOX_TOKEN)   [EXPO_PUBLIC_MAPBOX_TOKEN]
-       └── <Providers>
+       └── <Providers> (ApolloProvider + GlobalOrderAcceptProvider + ThemeProvider)
             ├── apollo3-cache-persist restores InMemoryCache from AsyncStorage
             │    └── 2s timeout guard if restore hangs
-            ├── ApolloProvider
-            ├── ThemeProvider (@react-navigation/native)
             └── <AppContent>
-                 ├── useDriverTracking()   → heartbeat + battery reporting
-                 ├── useNotifications()    → FCM token registration (iOS registers for remote messages before token fetch and ignores APNs-like raw tokens)
-                 ├── useNetworkStatus()    → OS-level connectivity → authStore.isNetworkConnected
+                 ├── useDriverTracking()    → heartbeat + battery reporting
+                 ├── useNotifications()     → FCM token registration (iOS registers for remote messages before token fetch and ignores APNs-like raw tokens)
+                 ├── useNetworkStatus()     → OS-level connectivity → authStore.isNetworkConnected
                  ├── useDriverPttReceiver() → Agora RTC PTT listener
-                 ├── useStoreStatus()      → GET_STORE_STATUS poll (30s)
-                 ├── useGlobalOrderAccept() → single ALL_ORDERS_UPDATED subscription + OrderAcceptSheet
-                 ├── <Stack> screens
-                 ├── PTT button            → floating microphone button on the middle-right edge for driver push-to-talk
-                 ├── Pool FAB button       → opens OrderPoolSheet (rendered AFTER Stack so it overlays screens)
-                 └── <OrderPoolSheet>      → props: onAccept, onAcceptAndNavigate, accepting
+                 ├── useSharedOrderAccept() → orders + accept sheet state (from GlobalOrderAcceptContext)
+                 ├── DRIVER_MESSAGE_RECEIVED subscription → triggers DriverMessageBanner on admin messages
+                 ├── Side-effect chains:
+                 │    ├── setAppSessionActive(true) on mount
+                 │    ├── haptic on pendingOrder change
+                 │    ├── 4s auto-dismiss on acceptError
+                 │    ├── 2s auto-dismiss on takenByOther
+                 │    └── auto-navigate to /(tabs)/drive when assignedOrders.length > 0
+                 ├── Global overlays (z-ordered):
+                 │    ├── No-internet banner (top)
+                 │    ├── Admin-talking PTT indicator (top)
+                 │    ├── DriverMessageBanner (top, animated slide-in, auto-dismiss 10s)
+                 │    ├── Accept error toast (bottom-left, 4s auto-dismiss)
+                 │    └── OrderAcceptSheet (global modal for pending order)
+                 ├── <Stack> screens (login, tabs, navigation modal)
+                 ├── PTT button (mid-right, z:60, only when authenticated + online)
+                 ├── Pool FAB (bottom-right, only when poolOrders.length > 0)
+                 └── <OrderPoolSheet> (bottom modal)
 ```
 
 ---
@@ -580,27 +599,37 @@ When `dispatchModeEnabled` is `true` and the driver is online, an amber pill is 
 | `registerDeviceToken` | `notifications.ts` | App start / token refresh |
 | `unregisterDeviceToken` | `notifications.ts` | Logout |
 | `trackPushTelemetry` | `notifications.ts` | All push lifecycle events |
+| `setMyPreferredLanguage` | `auth/setMyPreferredLanguage.ts` | Profile language toggle |
+| `deleteMyAccount` | `auth/deleteMyAccount.ts` | Profile account deletion |
+| `replyToDriverMessage` | `driverMessages.ts` | Messages screen — driver replies to admin |
+| `markDriverMessagesRead` | `driverMessages.ts` | DriverMessageBanner double-tap or messages screen |
+| `respondToSettlementRequest` | `driver.ts` | Earnings screen — accept/dispute settlement request |
 
 ### Queries
 
 | Query | File | Where Used |
 |-------|------|-----------|
-| `orders` | `orders.ts` | map.tsx, navigation.tsx |
+| `orders` | `orders.ts` | drive.tsx (via useSharedOrderAccept), navigation.tsx |
 | `order(id)` | `orders.ts` | Individual order view (via cache read) |
-| `myDriverMetrics` | `driver.ts` | (available, not currently wired to a screen) |
+| `myDriverMetrics` | `driver.ts` | home.tsx (30s poll — active orders, earnings, capacity bar) |
 | `settlements` | `driver.ts` | Earnings screen |
 | `settlementSummary` | `driver.ts` | Earnings screen |
-| `getStoreStatus` | `store.ts` | `useStoreStatus` (30s poll) |
+| `settlementBreakdown` | `driver.ts` | Earnings screen (settled vs unsettled) |
+| `mySettlementRequests` | `driver.ts` | Earnings screen (pending requests + dispute) |
+| `driverCashSummary` | `driver.ts` | Earnings screen (cash summary by period) |
+| `getStoreStatus` | `store.ts` | `useStoreStatus` (30s poll + subscription) |
+| `myDriverMessages` | `driverMessages.ts` | Messages screen (limit: 100, 30s poll) |
 | `getAgoraRtcCredentials` | `driverTelemetry.ts` | PTT channel join |
 
 ### Subscriptions
 
 | Subscription | File | Where Used |
 |--------------|------|-----------|
-| `allOrdersUpdated` | `orders.ts` | `useGlobalOrderAccept` only (single global instance in `AppContent`); includes `estimatedReadyAt` for cache parity with `GET_ORDERS` |
+| `allOrdersUpdated` | `orders.ts` | `useGlobalOrderAccept` only (single global instance via `GlobalOrderAcceptProvider`); includes `estimatedReadyAt` for cache parity with `GET_ORDERS` |
 | `orderStatusUpdated(orderId)` | `orders.ts` | `navigation.tsx` for active-order close/reassign events; backend publishes exact order updates on the per-order topic |
 | `storeStatusUpdated` | `store.ts` | `useStoreStatus` (real-time dispatch mode + banner updates) |
 | `driverPttSignal(driverId)` | `driverTelemetry.ts` | `useDriverPttReceiver` |
+| `driverMessageReceived` | `driverMessages.ts` | `_layout.tsx` (triggers DriverMessageBanner) + `messages.tsx` (appends to chat) |
 
 `useGlobalOrderAccept` also refetches `GET_ORDERS` on app foreground, with a short throttle guard, to backfill any events missed while backgrounded.
 
@@ -610,9 +639,11 @@ When `dispatchModeEnabled` is `true` and the driver is online, an amber pill is 
 
 | Store | Persisted | Key State |
 |-------|-----------|-----------|
-| `authStore` | Yes (AsyncStorage) | `token`, `user`, `isAuthenticated`, `isOnline` |
-| `navigationStore` | No | `isNavigating`, `phase`, `order`, `destination`, `durationRemainingS` |
-| `navigationLocationStore` | No | SDK location feed, freshness check (10s max age) || `orderAcceptStore` | No | `pendingOrder`, `autoCountdown`, `accepting`, `skippedIds` (mutate-in-place Set), `takenByOther` || `driverLocationOverrideStore` | No | Simulation mode location override |
+| `authStore` | Yes (AsyncStorage) | `token`, `user`, `isAuthenticated`, `isOnline`, `isNetworkConnected`, `appSessionActive` |
+| `navigationStore` | No | `isNavigating`, `isNavigationMinimized`, `phase`, `order`, `destination`, `durationRemainingS` |
+| `navigationLocationStore` | No | SDK location feed, freshness check (10s max age) |
+| `orderAcceptStore` | Partial (AsyncStorage) | `pendingOrder`, `autoCountdown`, `accepting`, `acceptError`, `takenByOther`, `skippedAt` (persisted TTL map), `seenAssignedAt` (persisted TTL map), `_acceptingRef` (debounce lock). Persists only `skippedAt` and `seenAssignedAt`; expired entries pruned on rehydration. |
+| `driverLocationOverrideStore` | No | Simulation mode location override |
 | `useLocaleStore` | Yes | `languageChoice` ('en' \| 'al') |
 | `useThemeStore` | Yes | `theme` ('light' \| 'dark' \| 'system') |
 
@@ -633,7 +664,8 @@ When `dispatchModeEnabled` is `true` and the driver is online, an amber pill is 
 | `useNotifications` | `_layout.tsx` | FCM token lifecycle |
 | `useNetworkStatus` | `_layout.tsx` | OS-level connectivity via `@react-native-community/netinfo` → `authStore.isNetworkConnected` |
 | `useStoreStatus` | `_layout.tsx`, `map.tsx`, `home.tsx` | Store banner poll + real-time subscription; exposes `dispatchModeEnabled` |
-| `useGlobalOrderAccept` | `_layout.tsx` | Single `ALL_ORDERS_UPDATED` subscription + capacity-aware auto-present + accept/skip handlers; passive snatch detection (`takenByOther`); renders `OrderAcceptSheet` globally |
+| `useGlobalOrderAccept` | `_layout.tsx` (via context) | Single `ALL_ORDERS_UPDATED` subscription + capacity-aware auto-present + accept/skip handlers; passive snatch detection (`takenByOther`); `networkReady` gate prevents stale-cache auto-present; 12s bootstrap timeout guard; foreground refresh on AppState change; renders `OrderAcceptSheet` globally |
+| `useSharedOrderAccept` | Many screens | Context consumer hook wrapping `useGlobalOrderAccept` via `GlobalOrderAcceptProvider` — all screens call this instead of the raw hook |
 | `useTheme` | Many | Theme token access |
 | `useSyncTheme` | `useAppSetup` | System theme listener |
 | `useTranslations` | Many | i18n strings + language switch |
@@ -696,10 +728,7 @@ These are documented for pre-refactor awareness. All are non-breaking as-is.
 | Issue | Location | Impact |
 |-------|----------|--------|
 | README promises a `modules/` isolation pattern but actual code uses flat top-level `hooks/`, `store/` | `README.md` vs codebase | Cognitive mismatch only |
-| `App.tsx` is empty | `App.tsx` | Dead file; `index.tsx` is the real entry |
-| `lib/graphql/driverSocket.ts` is empty | `driverSocket.ts` | Dead file |
 | `graphql/operations/auth/driverLogin.ts` defines `DRIVER_LOGIN_MUTATION` / `DRIVER_REGISTER_MUTATION` but neither is imported | `driverLogin.ts` | Dead code; login uses generic `login` mutation |
-| `map.backup.tsx` exists at repo root of `mobile-driver` | `map.backup.tsx` | Stale backup, should be deleted |
 | `drizzle.config.ts` + `drizzle-orm` + `expo-drizzle-studio-plugin` in dependencies | `package.json` | Unused SQLite setup — no local DB is actually used |
 | `socket.io-client` in dependencies | `package.json` | WS transport is `graphql-ws` via Apollo; socket.io is unused |
 

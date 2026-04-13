@@ -230,6 +230,7 @@ export type BulkSetInventoryItem = {
 export type Business = {
   __typename?: 'Business';
   activePromotion?: Maybe<BusinessPromotion>;
+  activePromotionsDisplay: Array<BusinessPromotionDisplay>;
   avgPrepTimeMinutes: Scalars['Int']['output'];
   businessType: BusinessType;
   category?: Maybe<Scalars['String']['output']>;
@@ -378,6 +379,21 @@ export type BusinessPromotion = {
   discountValue?: Maybe<Scalars['Float']['output']>;
   id: Scalars['ID']['output'];
   name: Scalars['String']['output'];
+  spendThreshold?: Maybe<Scalars['Float']['output']>;
+  type: PromotionType;
+};
+
+export type BusinessPromotionDisplay = {
+  __typename?: 'BusinessPromotionDisplay';
+  applyMethod: PromotionApplyMethod;
+  code?: Maybe<Scalars['String']['output']>;
+  creatorType: PromotionCreatorType;
+  description?: Maybe<Scalars['String']['output']>;
+  discountValue?: Maybe<Scalars['Float']['output']>;
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+  priority: Scalars['Int']['output'];
+  requiresCode: Scalars['Boolean']['output'];
   spendThreshold?: Maybe<Scalars['Float']['output']>;
   type: PromotionType;
 };
@@ -2326,6 +2342,10 @@ export type PromotionAppliesTo =
   | 'DELIVERY'
   | 'PRICE';
 
+export type PromotionApplyMethod =
+  | 'AUTO'
+  | 'CODE_REQUIRED';
+
 export type PromotionCreatorType =
   | 'BUSINESS'
   | 'PLATFORM';
@@ -3669,7 +3689,7 @@ export type ResolversTypes = {
   BannerType: ResolverTypeWrapper<'INFO' | 'WARNING' | 'SUCCESS'>;
   BulkSetInventoryInput: BulkSetInventoryInput;
   BulkSetInventoryItem: BulkSetInventoryItem;
-  Business: ResolverTypeWrapper<Omit<Business, 'activePromotion' | 'businessType'> & { activePromotion?: Maybe<ResolversTypes['BusinessPromotion']>, businessType: ResolversTypes['BusinessType'] }>;
+  Business: ResolverTypeWrapper<Omit<Business, 'activePromotion' | 'activePromotionsDisplay' | 'businessType'> & { activePromotion?: Maybe<ResolversTypes['BusinessPromotion']>, activePromotionsDisplay: Array<ResolversTypes['BusinessPromotionDisplay']>, businessType: ResolversTypes['BusinessType'] }>;
   BusinessDayHours: ResolverTypeWrapper<BusinessDayHours>;
   BusinessDayHoursInput: BusinessDayHoursInput;
   BusinessDeviceHealth: ResolverTypeWrapper<Omit<BusinessDeviceHealth, 'onlineStatus' | 'platform'> & { onlineStatus: ResolversTypes['BusinessDeviceOnlineStatus'], platform: ResolversTypes['DevicePlatform'] }>;
@@ -3681,6 +3701,7 @@ export type ResolversTypes = {
   BusinessMessageUser: ResolverTypeWrapper<BusinessMessageUser>;
   BusinessPerformanceStat: ResolverTypeWrapper<BusinessPerformanceStat>;
   BusinessPromotion: ResolverTypeWrapper<Omit<BusinessPromotion, 'creatorType' | 'type'> & { creatorType: ResolversTypes['PromotionCreatorType'], type: ResolversTypes['PromotionType'] }>;
+  BusinessPromotionDisplay: ResolverTypeWrapper<Omit<BusinessPromotionDisplay, 'applyMethod' | 'creatorType' | 'type'> & { applyMethod: ResolversTypes['PromotionApplyMethod'], creatorType: ResolversTypes['PromotionCreatorType'], type: ResolversTypes['PromotionType'] }>;
   BusinessType: ResolverTypeWrapper<'MARKET' | 'PHARMACY' | 'RESTAURANT'>;
   CampaignStatus: ResolverTypeWrapper<'DRAFT' | 'SENDING' | 'SENT' | 'FAILED'>;
   CartContextInput: CartContextInput;
@@ -3785,6 +3806,7 @@ export type ResolversTypes = {
   Promotion: ResolverTypeWrapper<Omit<Promotion, 'assignedUsers' | 'creatorType' | 'eligibleBusinesses' | 'target' | 'type'> & { assignedUsers?: Maybe<Array<ResolversTypes['UserPromotion']>>, creatorType: ResolversTypes['PromotionCreatorType'], eligibleBusinesses?: Maybe<Array<ResolversTypes['Business']>>, target: ResolversTypes['PromotionTarget'], type: ResolversTypes['PromotionType'] }>;
   PromotionAnalyticsResult: ResolverTypeWrapper<Omit<PromotionAnalyticsResult, 'promotion'> & { promotion: ResolversTypes['Promotion'] }>;
   PromotionAppliesTo: ResolverTypeWrapper<'PRICE' | 'DELIVERY'>;
+  PromotionApplyMethod: ResolverTypeWrapper<'AUTO' | 'CODE_REQUIRED'>;
   PromotionCreatorType: ResolverTypeWrapper<'PLATFORM' | 'BUSINESS'>;
   PromotionResult: ResolverTypeWrapper<Omit<PromotionResult, 'promotions'> & { promotions: Array<ResolversTypes['ApplicablePromotion']> }>;
   PromotionTarget: ResolverTypeWrapper<'ALL_USERS' | 'SPECIFIC_USERS' | 'FIRST_ORDER' | 'CONDITIONAL'>;
@@ -3878,7 +3900,7 @@ export type ResolversParentTypes = {
   Banner: Omit<Banner, 'business' | 'promotion'> & { business?: Maybe<ResolversParentTypes['Business']>, promotion?: Maybe<ResolversParentTypes['Promotion']> };
   BulkSetInventoryInput: BulkSetInventoryInput;
   BulkSetInventoryItem: BulkSetInventoryItem;
-  Business: Omit<Business, 'activePromotion'> & { activePromotion?: Maybe<ResolversParentTypes['BusinessPromotion']> };
+  Business: Omit<Business, 'activePromotion' | 'activePromotionsDisplay'> & { activePromotion?: Maybe<ResolversParentTypes['BusinessPromotion']>, activePromotionsDisplay: Array<ResolversParentTypes['BusinessPromotionDisplay']> };
   BusinessDayHours: BusinessDayHours;
   BusinessDayHoursInput: BusinessDayHoursInput;
   BusinessDeviceHealth: BusinessDeviceHealth;
@@ -3889,6 +3911,7 @@ export type ResolversParentTypes = {
   BusinessMessageUser: BusinessMessageUser;
   BusinessPerformanceStat: BusinessPerformanceStat;
   BusinessPromotion: BusinessPromotion;
+  BusinessPromotionDisplay: BusinessPromotionDisplay;
   CartContextInput: CartContextInput;
   CartItemInput: CartItemInput;
   CreateBannerInput: CreateBannerInput;
@@ -4147,6 +4170,7 @@ export type BannerTypeResolvers = EnumResolverSignature<{ INFO?: any, SUCCESS?: 
 
 export type BusinessResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Business'] = ResolversParentTypes['Business']> = {
   activePromotion?: Resolver<Maybe<ResolversTypes['BusinessPromotion']>, ParentType, ContextType>;
+  activePromotionsDisplay?: Resolver<Array<ResolversTypes['BusinessPromotionDisplay']>, ParentType, ContextType>;
   avgPrepTimeMinutes?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   businessType?: Resolver<ResolversTypes['BusinessType'], ParentType, ContextType>;
   category?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
@@ -4271,6 +4295,21 @@ export type BusinessPromotionResolvers<ContextType = GraphQLContext, ParentType 
   discountValue?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  spendThreshold?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
+  type?: Resolver<ResolversTypes['PromotionType'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type BusinessPromotionDisplayResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['BusinessPromotionDisplay'] = ResolversParentTypes['BusinessPromotionDisplay']> = {
+  applyMethod?: Resolver<ResolversTypes['PromotionApplyMethod'], ParentType, ContextType>;
+  code?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  creatorType?: Resolver<ResolversTypes['PromotionCreatorType'], ParentType, ContextType>;
+  description?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  discountValue?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  priority?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  requiresCode?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   spendThreshold?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   type?: Resolver<ResolversTypes['PromotionType'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
@@ -5085,6 +5124,8 @@ export type PromotionAnalyticsResultResolvers<ContextType = GraphQLContext, Pare
 
 export type PromotionAppliesToResolvers = EnumResolverSignature<{ DELIVERY?: any, PRICE?: any }, ResolversTypes['PromotionAppliesTo']>;
 
+export type PromotionApplyMethodResolvers = EnumResolverSignature<{ AUTO?: any, CODE_REQUIRED?: any }, ResolversTypes['PromotionApplyMethod']>;
+
 export type PromotionCreatorTypeResolvers = EnumResolverSignature<{ BUSINESS?: any, PLATFORM?: any }, ResolversTypes['PromotionCreatorType']>;
 
 export type PromotionResultResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['PromotionResult'] = ResolversParentTypes['PromotionResult']> = {
@@ -5576,6 +5617,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   BusinessMessageUser?: BusinessMessageUserResolvers<ContextType>;
   BusinessPerformanceStat?: BusinessPerformanceStatResolvers<ContextType>;
   BusinessPromotion?: BusinessPromotionResolvers<ContextType>;
+  BusinessPromotionDisplay?: BusinessPromotionDisplayResolvers<ContextType>;
   BusinessType?: BusinessTypeResolvers;
   CampaignStatus?: CampaignStatusResolvers;
   CreateBusinessWithOwnerPayload?: CreateBusinessWithOwnerPayloadResolvers<ContextType>;
@@ -5648,6 +5690,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   Promotion?: PromotionResolvers<ContextType>;
   PromotionAnalyticsResult?: PromotionAnalyticsResultResolvers<ContextType>;
   PromotionAppliesTo?: PromotionAppliesToResolvers;
+  PromotionApplyMethod?: PromotionApplyMethodResolvers;
   PromotionCreatorType?: PromotionCreatorTypeResolvers;
   PromotionResult?: PromotionResultResolvers<ContextType>;
   PromotionTarget?: PromotionTargetResolvers;
