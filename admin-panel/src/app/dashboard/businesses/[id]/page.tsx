@@ -212,6 +212,18 @@ export default function BusinessDetailsPage() {
             {/* PRODUCTS */}
             <ProductsBlock businessId={businessId} />
 
+            {/* REVIEWS LINK */}
+            <div
+                className="bg-[#111113] border border-[#1e1e22] rounded-xl p-4 flex items-center justify-between cursor-pointer hover:border-zinc-600 transition-colors"
+                onClick={() => router.push(`/dashboard/businesses/${businessId}/reviews`)}
+            >
+                <div>
+                    <p className="text-sm font-medium text-zinc-200">Customer Reviews</p>
+                    <p className="text-xs text-zinc-500 mt-0.5">View and filter reviews left by customers</p>
+                </div>
+                <ChevronLeft className="h-4 w-4 text-zinc-500 rotate-180" />
+            </div>
+
             {/* EDIT MODAL */}
             <Modal isOpen={editOpen} onClose={() => setEditOpen(false)} title="Edit Business">
                 <div className="space-y-4">

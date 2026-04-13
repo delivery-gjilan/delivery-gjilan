@@ -1502,7 +1502,15 @@ type OrderReview {
   quickFeedback: [String!]!
   rating: Int!
   updatedAt: DateTime!
+  user: OrderReviewUser
   userId: ID!
+}
+
+type OrderReviewUser {
+  firstName: String!
+  id: ID!
+  lastName: String!
+  phoneNumber: String
 }
 
 type OrderSettlementLineItem {
@@ -1773,6 +1781,7 @@ type PushTelemetrySummary {
 }
 
 type Query {
+  adminOrderReviews(businessId: ID!, limit: Int, offset: Int, rating: Int): [OrderReview!]!
   auditLog(id: ID!): AuditLog
   auditLogs(action: ActionType, actorId: ID, actorType: ActorType, endDate: DateTime, entityId: ID, entityType: EntityType, limit: Int, offset: Int, startDate: DateTime): AuditLogConnection!
   business(id: ID!): Business

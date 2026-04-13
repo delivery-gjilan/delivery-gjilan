@@ -2206,7 +2206,16 @@ export type OrderReview = {
   quickFeedback: Array<Scalars['String']['output']>;
   rating: Scalars['Int']['output'];
   updatedAt: Scalars['DateTime']['output'];
+  user?: Maybe<OrderReviewUser>;
   userId: Scalars['ID']['output'];
+};
+
+export type OrderReviewUser = {
+  __typename?: 'OrderReviewUser';
+  firstName: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  lastName: Scalars['String']['output'];
+  phoneNumber?: Maybe<Scalars['String']['output']>;
 };
 
 export type OrderSettlementLineItem = {
@@ -2488,6 +2497,7 @@ export type PushTelemetrySummary = {
 
 export type Query = {
   __typename?: 'Query';
+  adminOrderReviews: Array<OrderReview>;
   auditLog?: Maybe<AuditLog>;
   auditLogs: AuditLogConnection;
   business?: Maybe<Business>;
@@ -2586,6 +2596,14 @@ export type Query = {
   userBehavior?: Maybe<UserBehavior>;
   users: Array<User>;
   validatePromotions: PromotionResult;
+};
+
+
+export type QueryadminOrderReviewsArgs = {
+  businessId: Scalars['ID']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  rating?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -3865,6 +3883,7 @@ export type ResolversTypes = {
   OrderPaymentCollection: ResolverTypeWrapper<'CASH_TO_DRIVER' | 'PREPAID_TO_PLATFORM'>;
   OrderPromotion: ResolverTypeWrapper<Omit<OrderPromotion, 'appliesTo'> & { appliesTo: ResolversTypes['PromotionAppliesTo'] }>;
   OrderReview: ResolverTypeWrapper<OrderReview>;
+  OrderReviewUser: ResolverTypeWrapper<OrderReviewUser>;
   OrderSettlementLineItem: ResolverTypeWrapper<OrderSettlementLineItem>;
   OrderSettlementPreview: ResolverTypeWrapper<OrderSettlementPreview>;
   OrderStatus: ResolverTypeWrapper<'PENDING' | 'PREPARING' | 'READY' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED' | 'AWAITING_APPROVAL'>;
@@ -4067,6 +4086,7 @@ export type ResolversParentTypes = {
   OrderItemOption: OrderItemOption;
   OrderPromotion: OrderPromotion;
   OrderReview: OrderReview;
+  OrderReviewUser: OrderReviewUser;
   OrderSettlementLineItem: OrderSettlementLineItem;
   OrderSettlementPreview: OrderSettlementPreview;
   PeakHourAnalysis: PeakHourAnalysis;
@@ -5068,7 +5088,16 @@ export type OrderReviewResolvers<ContextType = GraphQLContext, ParentType extend
   quickFeedback?: Resolver<Array<ResolversTypes['String']>, ParentType, ContextType>;
   rating?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   updatedAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
+  user?: Resolver<Maybe<ResolversTypes['OrderReviewUser']>, ParentType, ContextType>;
   userId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type OrderReviewUserResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['OrderReviewUser'] = ResolversParentTypes['OrderReviewUser']> = {
+  firstName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  lastName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  phoneNumber?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -5306,6 +5335,7 @@ export type PushTelemetrySummaryResolvers<ContextType = GraphQLContext, ParentTy
 };
 
 export type QueryResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Query'] = ResolversParentTypes['Query']> = {
+  adminOrderReviews?: Resolver<Array<ResolversTypes['OrderReview']>, ParentType, ContextType, RequireFields<QueryadminOrderReviewsArgs, 'businessId'>>;
   auditLog?: Resolver<Maybe<ResolversTypes['AuditLog']>, ParentType, ContextType, RequireFields<QueryauditLogArgs, 'id'>>;
   auditLogs?: Resolver<ResolversTypes['AuditLogConnection'], ParentType, ContextType, Partial<QueryauditLogsArgs>>;
   business?: Resolver<Maybe<ResolversTypes['Business']>, ParentType, ContextType, RequireFields<QuerybusinessArgs, 'id'>>;
@@ -5788,6 +5818,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   OrderPaymentCollection?: OrderPaymentCollectionResolvers;
   OrderPromotion?: OrderPromotionResolvers<ContextType>;
   OrderReview?: OrderReviewResolvers<ContextType>;
+  OrderReviewUser?: OrderReviewUserResolvers<ContextType>;
   OrderSettlementLineItem?: OrderSettlementLineItemResolvers<ContextType>;
   OrderSettlementPreview?: OrderSettlementPreviewResolvers<ContextType>;
   OrderStatus?: OrderStatusResolvers;

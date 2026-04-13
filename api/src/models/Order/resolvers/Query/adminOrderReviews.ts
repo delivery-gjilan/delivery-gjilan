@@ -1,39 +1,34 @@
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 import { orderReviews } from '@/database/schema';
 import type { QueryResolvers } from './../../../../generated/types.generated';
 
-const DEFAULT_LIMIT = 30;
-const MAX_LIMIT = 100;
+const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 200;
 
-export const businessOrderReviews: NonNullable<QueryResolvers['businessOrderReviews']> = async (
+export const adminOrderReviews: NonNullable<QueryResolvers['adminOrderReviews']> = async (
     _parent,
-    { limit, offset },
+    { businessId, rating, limit, offset },
     { db, userData },
 ) => {
     if (!userData.userId) {
-        throw new GraphQLError('Unauthorized', {
-            extensions: { code: 'UNAUTHORIZED' },
-        });
+        throw new GraphQLError('Unauthorized', { extensions: { code: 'UNAUTHORIZED' } });
     }
 
-    if (userData.role !== 'BUSINESS_OWNER' && userData.role !== 'BUSINESS_EMPLOYEE') {
-        throw new GraphQLError('Only business users can view order reviews', {
-            extensions: { code: 'FORBIDDEN' },
-        });
-    }
-
-    if (!userData.businessId) {
-        throw new GraphQLError('Business user must be associated with a business', {
-            extensions: { code: 'FORBIDDEN' },
-        });
+    if (userData.role !== 'ADMIN' && userData.role !== 'SUPER_ADMIN') {
+        throw new GraphQLError('Admin access required', { extensions: { code: 'FORBIDDEN' } });
     }
 
     const safeLimit = Math.min(Math.max(limit ?? DEFAULT_LIMIT, 1), MAX_LIMIT);
     const safeOffset = Math.max(offset ?? 0, 0);
 
+    const conditions = [
+        eq(orderReviews.businessId, businessId),
+        ...(rating != null ? [eq(orderReviews.rating, rating)] : []),
+    ];
+
     const rows = await db.query.orderReviews.findMany({
-        where: eq(orderReviews.businessId, userData.businessId),
+        where: and(...conditions),
         orderBy: [desc(orderReviews.createdAt)],
         limit: safeLimit,
         offset: safeOffset,

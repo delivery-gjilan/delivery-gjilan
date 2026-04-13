@@ -20,7 +20,6 @@ import { useApolloClient, useQuery, useMutation, useSubscription } from '@apollo
 import { Ionicons } from '@expo/vector-icons';
 import {
     GET_BUSINESS_ORDERS,
-    GET_BUSINESS_ORDER_REVIEWS,
     UPDATE_ORDER_STATUS,
     START_PREPARING,
     ORDERS_SUBSCRIPTION,
@@ -429,9 +428,6 @@ export default function OrdersScreen() {
     const [startPreparing, { loading: startingPrep }] = useMutation(START_PREPARING);
     const [updatePreparationTimeMutation] = useMutation(UPDATE_PREPARATION_TIME);
     const [removeOrderItemMut, { loading: removingItem }] = useMutation(REMOVE_ORDER_ITEM);
-    const { data: reviewsData, loading: reviewsLoading } = useQuery(GET_BUSINESS_ORDER_REVIEWS, {
-        variables: { limit: 25, offset: 0 },
-    });
     const [updateBusinessOperations, { loading: updatingBusinessOps }] = useMutation(UPDATE_BUSINESS_OPERATIONS);
 
     const businessOps = businessData?.business;
@@ -1133,96 +1129,21 @@ export default function OrdersScreen() {
                         <RefreshControl refreshing={false} onRefresh={refetch} tintColor="#7C3AED" />
                     }
                     ListEmptyComponent={
-                        <View style={{ paddingHorizontal: 4 }}>
-                            <View className="items-center justify-center py-10">
-                                <View
-                                    className="w-24 h-24 rounded-2xl items-center justify-center mb-4"
-                                    style={{
-                                        borderWidth: 2,
-                                        borderStyle: 'dashed',
-                                        borderColor: '#475569',
-                                        backgroundColor: '#1E293B',
-                                    }}
-                                >
-                                    <Ionicons name="image-outline" size={36} color="#94A3B8" />
-                                </View>
-                                <Text className="text-text text-lg font-bold mb-1">
-                                    {t('orders.no_orders_now', 'No orders for now')}
-                                </Text>
+                        <View className="items-center justify-center py-10">
+                            <View
+                                className="w-24 h-24 rounded-2xl items-center justify-center mb-4"
+                                style={{
+                                    borderWidth: 2,
+                                    borderStyle: 'dashed',
+                                    borderColor: '#475569',
+                                    backgroundColor: '#1E293B',
+                                }}
+                            >
+                                <Ionicons name="image-outline" size={36} color="#94A3B8" />
                             </View>
-                            {completedOrders.length > 0 && (
-                                <View style={{ paddingTop: 4 }}>
-                                    <TouchableOpacity
-                                        style={{
-                                            flexDirection: 'row',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            paddingVertical: 14,
-                                            borderRadius: 16,
-                                            backgroundColor: showCompleted ? '#374151' : '#1E293B',
-                                            borderWidth: 1,
-                                            borderColor: showCompleted ? '#6b7280' : '#475569',
-                                        }}
-                                        onPress={() => dispatch({ type: 'TOGGLE_COMPLETED' })}
-                                    >
-                                        <Ionicons
-                                            name={showCompleted ? 'chevron-up' : 'checkbox-outline'}
-                                            size={18}
-                                            color="#9ca3af"
-                                        />
-                                        <Text style={{ color: '#9ca3af', fontWeight: '700', fontSize: 14, marginLeft: 8 }}>
-                                            {showCompleted
-                                                ? t('orders.hide_completed', 'Hide Completed')
-                                                : t('orders.show_completed', 'Show Completed') + ` (${completedOrders.length})`}
-                                        </Text>
-                                    </TouchableOpacity>
-                                    {showCompleted && (
-                                        <View style={{ marginTop: 12 }}>
-                                            {visibleCompletedOrders.map((order) => {
-                                                const businessOrder = order.businesses.find((b) => b.business.id === user?.businessId);
-                                                if (!businessOrder) return null;
-                                                const businessSubtotal = businessOrder.items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
-                                                const isCancelled = order.status === 'CANCELLED';
-                                                return (
-                                                    <View
-                                                        key={order.id}
-                                                        style={{
-                                                            backgroundColor: '#1E293B', borderRadius: 16, padding: 14, marginBottom: 10,
-                                                            borderWidth: 1, borderColor: isCancelled ? '#ef444440' : '#22c55e40', opacity: 0.85,
-                                                        }}
-                                                    >
-                                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                                <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: isCancelled ? '#ef444420' : '#22c55e20' }}>
-                                                                    <Text style={{ color: isCancelled ? '#ef4444' : '#22c55e', fontSize: 11, fontWeight: '700' }}>
-                                                                        {isCancelled ? t('orders.cancelled', 'Cancelled') : t('orders.delivered', 'Delivered')}
-                                                                    </Text>
-                                                                </View>
-                                                                <Text style={{ color: '#94a3b8', fontSize: 13, fontWeight: '600', marginLeft: 8 }}>#{order.displayId}</Text>
-                                                            </View>
-                                                            <Text style={{ color: '#64748b', fontSize: 12 }}>{timeAgo(order.orderDate)}</Text>
-                                                        </View>
-                                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                            <Text style={{ color: '#cbd5e1', fontSize: 13 }} numberOfLines={1}>
-                                                                {businessOrder.items.map((i) => `${i.quantity}× ${i.name}`).join(', ')}
-                                                            </Text>
-                                                            <Text style={{ color: '#94a3b8', fontSize: 13, fontWeight: '700', marginLeft: 8 }}>{businessSubtotal.toFixed(2)}€</Text>
-                                                        </View>
-                                                    </View>
-                                                );
-                                            })}
-                                            {hasMoreCompleted && (
-                                                <TouchableOpacity
-                                                    style={{ alignItems: 'center', paddingVertical: 12, borderRadius: 12, backgroundColor: '#374151', marginTop: 4 }}
-                                                    onPress={() => dispatch({ type: 'SET_COMPLETED_PAGE', page: completedPage + 1 })}
-                                                >
-                                                    <Text style={{ color: '#9ca3af', fontWeight: '600', fontSize: 13 }}>{t('orders.load_more', 'Load More')}</Text>
-                                                </TouchableOpacity>
-                                            )}
-                                        </View>
-                                    )}
-                                </View>
-                            )}
+                            <Text className="text-text text-lg font-bold mb-1">
+                                {t('orders.no_orders_now', 'No orders for now')}
+                            </Text>
                         </View>
                     }
                     ListFooterComponent={
@@ -1311,91 +1232,8 @@ export default function OrdersScreen() {
                                             );
                                         })}
 
-                                        {hasMoreCompleted && (
-                                            <TouchableOpacity
-                                                style={{
-                                                    alignItems: 'center',
-                                                    paddingVertical: 12,
-                                                    borderRadius: 12,
-                                                    backgroundColor: '#374151',
-                                                    marginTop: 4,
-                                                }}
-                                                onPress={() => dispatch({ type: 'SET_COMPLETED_PAGE', page: completedPage + 1 })}
-                                            >
-                                                <Text style={{ color: '#9ca3af', fontWeight: '600', fontSize: 13 }}>
-                                                    {t('orders.load_more', 'Load More')}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        )}
                                     </View>
                                 )}
-
-                                <View style={{ marginTop: 14 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                                        <Text style={{ color: '#cbd5e1', fontSize: 14, fontWeight: '700' }}>
-                                            {t('orders.reviews_title', 'Recent Customer Reviews')}
-                                        </Text>
-                                        {reviewsLoading ? (
-                                            <ActivityIndicator size="small" color="#94a3b8" />
-                                        ) : null}
-                                    </View>
-
-                                    {((reviewsData?.businessOrderReviews as any[]) ?? []).length === 0 ? (
-                                        <View
-                                            style={{
-                                                backgroundColor: '#1E293B',
-                                                borderRadius: 14,
-                                                borderWidth: 1,
-                                                borderColor: '#334155',
-                                                paddingVertical: 12,
-                                                paddingHorizontal: 12,
-                                            }}
-                                        >
-                                            <Text style={{ color: '#94a3b8', fontSize: 12 }}>
-                                                {t('orders.reviews_empty', 'No private reviews yet.')}
-                                            </Text>
-                                        </View>
-                                    ) : (
-                                        ((reviewsData?.businessOrderReviews as any[]) ?? []).slice(0, 8).map((review: any) => {
-                                            const stars = '★'.repeat(Math.max(0, Number(review?.rating ?? 0))).padEnd(5, '☆');
-                                            const quick = Array.isArray(review?.quickFeedback) ? review.quickFeedback : [];
-                                            const comment = String(review?.comment ?? '').trim();
-                                            return (
-                                                <View
-                                                    key={String(review.id)}
-                                                    style={{
-                                                        backgroundColor: '#1E293B',
-                                                        borderRadius: 14,
-                                                        borderWidth: 1,
-                                                        borderColor: '#334155',
-                                                        paddingVertical: 12,
-                                                        paddingHorizontal: 12,
-                                                        marginBottom: 8,
-                                                    }}
-                                                >
-                                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                        <Text style={{ color: '#fbbf24', fontSize: 14, fontWeight: '700' }}>{stars}</Text>
-                                                        <Text style={{ color: '#64748b', fontSize: 11 }}>
-                                                            #{review.orderId?.slice?.(0, 8) ?? ''} · {timeAgo(String(review.createdAt))}
-                                                        </Text>
-                                                    </View>
-
-                                                    {quick.length > 0 ? (
-                                                        <Text style={{ color: '#cbd5e1', fontSize: 12, marginTop: 6 }}>
-                                                            {quick.join(' • ')}
-                                                        </Text>
-                                                    ) : null}
-
-                                                    {comment ? (
-                                                        <Text style={{ color: '#e2e8f0', fontSize: 13, marginTop: 6, lineHeight: 18 }}>
-                                                            {comment}
-                                                        </Text>
-                                                    ) : null}
-                                                </View>
-                                            );
-                                        })
-                                    )}
-                                </View>
                             </View>
                         ) : null
                     }

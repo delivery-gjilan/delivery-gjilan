@@ -283,3 +283,22 @@ export const GET_CANCELLED_ORDERS = graphql(`
         }
     }
 `);
+
+export const GET_ADMIN_ORDER_REVIEWS = graphql(`
+    query GetAdminOrderReviews($businessId: ID!, $rating: Int, $limit: Int, $offset: Int) {
+        adminOrderReviews(businessId: $businessId, rating: $rating, limit: $limit, offset: $offset) {
+            id
+            orderId
+            rating
+            comment
+            quickFeedback
+            createdAt
+            user {
+                id
+                firstName
+                lastName
+                phoneNumber
+            }
+        }
+    }
+`);

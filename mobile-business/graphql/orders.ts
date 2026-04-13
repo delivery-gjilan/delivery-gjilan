@@ -64,6 +64,12 @@ export const GET_BUSINESS_ORDER_REVIEWS = graphql(`
             comment
             quickFeedback
             createdAt
+            user {
+                id
+                firstName
+                lastName
+                phoneNumber
+            }
         }
     }
 `);

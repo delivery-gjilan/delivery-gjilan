@@ -49,6 +49,7 @@ type Review = {
     comment?: string | null;
     quickFeedback: string[];
     createdAt: string;
+    user?: { id: string; firstName: string; lastName: string; phoneNumber?: string | null } | null;
 };
 
 export default function ReviewsScreen() {
@@ -166,7 +167,10 @@ export default function ReviewsScreen() {
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                     <View>
                         <Stars rating={item.rating} />
-                        <Text style={{ color: '#64748b', fontSize: 12, marginTop: 4 }}>
+                        <Text style={{ color: '#e2e8f0', fontSize: 13, fontWeight: '600', marginTop: 4 }}>
+                            {item.user ? `${item.user.firstName} ${item.user.lastName}` : 'Anonymous'}
+                        </Text>
+                        <Text style={{ color: '#64748b', fontSize: 12 }}>
                             Order #{item.orderId.slice(0, 8).toUpperCase()}
                         </Text>
                     </View>
