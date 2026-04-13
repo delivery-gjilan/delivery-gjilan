@@ -247,6 +247,14 @@ Links orders to applied promotions:
 | `promotion_business_eligibility` | Restricts a promo to specific businesses |
 | `user_promo_metadata` | Per-user stats: first order promo used, total savings |
 
+### Promotion application modes
+
+- Promotions with a `code` are manual-entry promotions: the customer must enter the code in checkout to activate them.
+- Promotions without a `code` are auto-applicable promotions: they are evaluated automatically when eligibility rules match.
+- Recovery/compensation promotions are currently created without a code, assigned to specific users, and auto-applied only for those assigned users.
+- The admin Promotions page includes a dedicated Promo Codes tab for group-style assignment (for example friends/VIP groups), where a code-based promotion is selected and assigned to chosen users in bulk.
+- The Promo Codes tab also supports creating and assigning a new code promotion in one flow, including promo kind (fixed/percentage/free-delivery/spend-threshold), limits, stacking, priority, and driver payout for delivery-fee promotions.
+
 ### Recovery promo labels on customer UI
 
 Recovery/compensation promotions can use internal names for operations (for example names prefixed with `[Recovery]`).

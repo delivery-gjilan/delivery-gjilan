@@ -3,16 +3,18 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "@apollo/client/react";
-import { Tag, Plus, Edit, Trash2, HeartHandshake, CheckCircle2, Clock, Users } from "lucide-react";
+import { Tag, Plus, Edit, Trash2, HeartHandshake, CheckCircle2, Clock, Users, Search, X } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { GET_BUSINESSES } from "@/graphql/operations/businesses";
+import { USERS_QUERY } from "@/graphql/operations/users/queries";
 import { Table, Th, Td } from "@/components/ui/Table";
 import { GET_PROMOTIONS, GET_RECOVERY_PROMOTIONS } from "@/graphql/operations/promotions/queries";
 import { CREATE_PROMOTION, UPDATE_PROMOTION, DELETE_PROMOTION } from "@/graphql/operations/promotions/mutations";
+import { ASSIGN_PROMOTION_TO_USERS } from "@/graphql/operations/notifications";
 import type { PromotionType, PromotionTarget, GetPromotionsQuery, GetRecoveryPromotionsQuery } from "@/gql/graphql";
 
 const promotionTypeLabels: Record<PromotionType, string> = {
@@ -74,6 +76,30 @@ type PromotionFormState = {
     driverPayoutAmount: string;
 };
 
+type PromoAssignUser = {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    role: string;
+};
+
+type QuickCodePromoFormState = {
+    name: string;
+    code: string;
+    description: string;
+    type: PromotionType;
+    discountValue: string;
+    maxDiscountCap: string;
+    minOrderAmount: string;
+    spendThreshold: string;
+    maxUsagePerUser: string;
+    maxGlobalUsage: string;
+    isStackable: string;
+    priority: string;
+    driverPayoutAmount: string;
+};
+
 const emptyForm: PromotionFormState = {
     name: "",
     description: "",
@@ -96,6 +122,22 @@ const emptyForm: PromotionFormState = {
     eligibleBusinessIds: [],
     creatorType: "PLATFORM",
     creatorId: "",
+    driverPayoutAmount: "",
+};
+
+const emptyQuickCodePromoForm: QuickCodePromoFormState = {
+    name: "",
+    code: "",
+    description: "",
+    type: "FIXED_AMOUNT",
+    discountValue: "",
+    maxDiscountCap: "",
+    minOrderAmount: "",
+    spendThreshold: "",
+    maxUsagePerUser: "1",
+    maxGlobalUsage: "",
+    isStackable: "false",
+    priority: "50",
     driverPayoutAmount: "",
 };
 
@@ -132,7 +174,7 @@ export default function PromotionsPage() {
         onCompleted: () => { refetch(); refetchRecovery(); },
     });
 
-    const [activeTab, setActiveTab] = useState<"promotions" | "compensations">("promotions");
+    const [activeTab, setActiveTab] = useState<"promotions" | "promoCodes" | "compensations">("promotions");
     const [showModal, setShowModal] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [editingPromotion, setEditingPromotion] = useState<GetPromotionsQuery["getAllPromotions"][number] | null>(null);
@@ -140,6 +182,12 @@ export default function PromotionsPage() {
     const [formData, setFormData] = useState<PromotionFormState>(emptyForm);
     const [searchTerm, setSearchTerm] = useState("");
     const [wizardStep, setWizardStep] = useState(1);
+    const [selectedCodePromotionId, setSelectedCodePromotionId] = useState("");
+    const [promoGroupName, setPromoGroupName] = useState("Friends");
+    const [promoUserSearch, setPromoUserSearch] = useState("");
+    const [promoUsers, setPromoUsers] = useState<PromoAssignUser[]>([]);
+    const [promoAssignResult, setPromoAssignResult] = useState<{ success: boolean; message: string } | null>(null);
+    const [quickCodePromoForm, setQuickCodePromoForm] = useState<QuickCodePromoFormState>(emptyQuickCodePromoForm);
 
     const { data: recoveryData, loading: recoveryLoading, refetch: refetchRecovery } = useQuery<GetRecoveryPromotionsQuery>(GET_RECOVERY_PROMOTIONS, {
         fetchPolicy: "cache-and-network",
@@ -147,10 +195,30 @@ export default function PromotionsPage() {
     const recoveryPromotions = useMemo(() => (recoveryData as any)?.getRecoveryPromotions ?? [], [recoveryData]);
 
     const { data: businessesData, loading: businessesLoading } = useQuery(GET_BUSINESSES);
+    const { data: usersData } = useQuery(USERS_QUERY);
+    const [assignPromotionToUsers, { loading: assigningPromo }] = useMutation(ASSIGN_PROMOTION_TO_USERS, {
+        onCompleted: () => refetch(),
+    });
     const businesses = businessesData?.businesses || [];
     const filteredBusinesses = businesses.filter((b: any) => b.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const promotions = useMemo(() => data?.getAllPromotions ?? [], [data?.getAllPromotions]);
+    const codePromotions = useMemo(() => promotions.filter((promotion) => Boolean(promotion.code)), [promotions]);
+    const quickCodeVis = typeFieldVisibility[quickCodePromoForm.type];
+    const allUsers = useMemo(() => ((usersData as any)?.users ?? []) as PromoAssignUser[], [usersData]);
+    const promoFilteredUsers = useMemo(() => {
+        if (!promoUserSearch.trim()) return [];
+        const term = promoUserSearch.toLowerCase();
+        return allUsers
+            .filter(
+                (user) =>
+                    !promoUsers.some((selected) => selected.id === user.id) &&
+                    (user.firstName.toLowerCase().includes(term) ||
+                        user.lastName.toLowerCase().includes(term) ||
+                        user.email.toLowerCase().includes(term)),
+            )
+            .slice(0, 12);
+    }, [allUsers, promoUserSearch, promoUsers]);
     const stackingGuidance = useMemo(() => {
         const isDeliveryType = formData.type === "FREE_DELIVERY" || formData.type === "SPEND_X_GET_FREE";
         const isPriceType = !isDeliveryType;
@@ -222,6 +290,97 @@ export default function PromotionsPage() {
         await deletePromotion({ variables: { id: promotionToDelete.id } });
         setShowDeleteModal(false);
         setPromotionToDelete(null);
+    };
+
+    const handleAssignPromoCodeToGroup = async () => {
+        if (!selectedCodePromotionId || promoUsers.length === 0) {
+            return;
+        }
+
+        const result = await assignPromotionToUsers({
+            variables: {
+                input: {
+                    promotionId: selectedCodePromotionId,
+                    userIds: promoUsers.map((user) => user.id),
+                },
+            },
+        });
+
+        const assignedCount = ((result.data as any)?.assignPromotionToUsers ?? []).length;
+        const selectedPromo = codePromotions.find((promotion) => promotion.id === selectedCodePromotionId);
+        const groupLabel = promoGroupName.trim() || "selected group";
+        setPromoAssignResult({
+            success: true,
+            message: `Assigned ${selectedPromo?.code ?? "promo code"} to ${assignedCount} users (${groupLabel}).`,
+        });
+        setPromoUsers([]);
+        setPromoUserSearch("");
+    };
+
+    const handleCreateAndAssignPromoCode = async () => {
+        if (!quickCodePromoForm.name.trim() || !quickCodePromoForm.code.trim() || promoUsers.length === 0) {
+            return;
+        }
+
+        const isDeliveryFeePromotion = quickCodePromoForm.type === "FREE_DELIVERY" || quickCodePromoForm.type === "SPEND_X_GET_FREE";
+        const driverPayoutAmount = isDeliveryFeePromotion ? toOptionalNumber(quickCodePromoForm.driverPayoutAmount) : undefined;
+        if (isDeliveryFeePromotion && !driverPayoutAmount) {
+            return;
+        }
+
+        const createPayload: any = {
+            name: quickCodePromoForm.name.trim(),
+            description: quickCodePromoForm.description.trim() || undefined,
+            code: quickCodePromoForm.code.trim().toUpperCase(),
+            type: quickCodePromoForm.type,
+            target: "SPECIFIC_USERS",
+            discountValue: quickCodeVis.discountValue ? toOptionalNumber(quickCodePromoForm.discountValue) : undefined,
+            maxDiscountCap: quickCodeVis.maxDiscountCap ? toOptionalNumber(quickCodePromoForm.maxDiscountCap) : undefined,
+            minOrderAmount: toOptionalNumber(quickCodePromoForm.minOrderAmount),
+            spendThreshold: quickCodeVis.spendThreshold ? toOptionalNumber(quickCodePromoForm.spendThreshold) : undefined,
+            maxGlobalUsage: toOptionalNumber(quickCodePromoForm.maxGlobalUsage)
+                ? Math.round(Number(quickCodePromoForm.maxGlobalUsage))
+                : undefined,
+            maxUsagePerUser: toOptionalNumber(quickCodePromoForm.maxUsagePerUser)
+                ? Math.round(Number(quickCodePromoForm.maxUsagePerUser))
+                : 1,
+            isStackable: quickCodePromoForm.isStackable === "true",
+            priority: Number(quickCodePromoForm.priority || "50"),
+            isActive: true,
+            creatorType: "PLATFORM",
+            driverPayoutAmount,
+        };
+
+        if (quickCodePromoForm.type === "SPEND_X_GET_FREE") {
+            createPayload.thresholdReward = JSON.stringify({ type: "FREE_DELIVERY" });
+        }
+
+        const createRes = await createPromotion({ variables: { input: createPayload } });
+        const createdPromotionId = (createRes.data as any)?.createPromotion?.id;
+
+        if (!createdPromotionId) {
+            return;
+        }
+
+        const assignRes = await assignPromotionToUsers({
+            variables: {
+                input: {
+                    promotionId: createdPromotionId,
+                    userIds: promoUsers.map((user) => user.id),
+                },
+            },
+        });
+
+        const assignedCount = ((assignRes.data as any)?.assignPromotionToUsers ?? []).length;
+        const groupLabel = promoGroupName.trim() || "selected group";
+        setPromoAssignResult({
+            success: true,
+            message: `Created ${quickCodePromoForm.code.trim().toUpperCase()} and assigned it to ${assignedCount} users (${groupLabel}).`,
+        });
+        setSelectedCodePromotionId(createdPromotionId);
+        setPromoUsers([]);
+        setPromoUserSearch("");
+        setQuickCodePromoForm(emptyQuickCodePromoForm);
     };
 
     const handleSave = async () => {
@@ -358,6 +517,16 @@ export default function PromotionsPage() {
                         )}
                     </span>
                 </button>
+                <button
+                    onClick={() => setActiveTab("promoCodes")}
+                    className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                        activeTab === "promoCodes"
+                            ? "border-violet-500 text-violet-300"
+                            : "border-transparent text-zinc-500 hover:text-zinc-300"
+                    }`}
+                >
+                    <span className="flex items-center gap-2"><Users size={14} /> Promo Codes</span>
+                </button>
             </div>
 
             {error && (
@@ -398,8 +567,19 @@ export default function PromotionsPage() {
                                     <tr key={promotion.id}>
                                         <Td>
                                             <div className="text-white font-semibold">{promotion.name}</div>
-                                            {promotion.code && (
-                                                <div className="text-xs text-violet-400 font-mono">{promotion.code}</div>
+                                            {promotion.code ? (
+                                                <div className="mt-1 flex items-center gap-2">
+                                                    <div className="text-xs text-violet-400 font-mono">{promotion.code}</div>
+                                                    <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium border border-amber-500/40 bg-amber-500/10 text-amber-300">
+                                                        Manual code
+                                                    </span>
+                                                </div>
+                                            ) : (
+                                                <div className="mt-1">
+                                                    <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium border border-green-500/40 bg-green-500/10 text-green-300">
+                                                        Auto-applied
+                                                    </span>
+                                                </div>
                                             )}
                                         </Td>
                                         <Td>
@@ -465,6 +645,262 @@ export default function PromotionsPage() {
                 )}
             </div>
             )} {/* end promotions tab */}
+
+            {/* ── Promo Codes Tab ── */}
+            {activeTab === "promoCodes" && (
+                <div className="space-y-4">
+                    <div className="bg-violet-950/30 border border-violet-800/40 rounded-lg p-4 text-sm text-violet-200 flex gap-3">
+                        <Users size={16} className="mt-0.5 shrink-0 text-violet-400" />
+                        <div>
+                            <div className="font-medium mb-1">Friend group promo codes</div>
+                            <div className="text-violet-300/80">
+                                Use this tab to assign a code-based promotion to a selected user group (friends, VIPs, partners). 
+                                Users still need to enter the code in checkout, but only assigned users can redeem targeted promos.
+                            </div>
+                        </div>
+                    </div>
+
+                    {promoAssignResult && (
+                        <div className="rounded-lg border border-green-700/40 bg-green-900/10 p-3 text-sm text-green-300">
+                            {promoAssignResult.message}
+                        </div>
+                    )}
+
+                    <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-4">
+                        <div className="rounded-lg border border-zinc-700 bg-zinc-900/60 p-4 space-y-4">
+                            <div className="text-sm font-medium text-white">Create new code promo for this group</div>
+                            <div className="text-xs text-zinc-400">
+                                Set the promo kind and rules, then create and assign it directly to selected users.
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <Input
+                                    label="Promo Name *"
+                                    value={quickCodePromoForm.name}
+                                    onChange={(e) => setQuickCodePromoForm((prev) => ({ ...prev, name: e.target.value }))}
+                                    placeholder="Friends Spring Drop"
+                                />
+                                <Input
+                                    label="Promo Code *"
+                                    value={quickCodePromoForm.code}
+                                    onChange={(e) => setQuickCodePromoForm((prev) => ({ ...prev, code: e.target.value.toUpperCase() }))}
+                                    placeholder="FRIENDS15"
+                                />
+                                <Select
+                                    label="Promo Kind *"
+                                    value={quickCodePromoForm.type}
+                                    onChange={(e) => {
+                                        const nextType = e.target.value as PromotionType;
+                                        setQuickCodePromoForm((prev) => ({
+                                            ...prev,
+                                            type: nextType,
+                                            discountValue: typeFieldVisibility[nextType].discountValue ? prev.discountValue : "",
+                                            maxDiscountCap: typeFieldVisibility[nextType].maxDiscountCap ? prev.maxDiscountCap : "",
+                                            spendThreshold: typeFieldVisibility[nextType].spendThreshold ? prev.spendThreshold : "",
+                                            driverPayoutAmount: nextType === "FREE_DELIVERY" || nextType === "SPEND_X_GET_FREE" ? prev.driverPayoutAmount : "",
+                                        }));
+                                    }}
+                                >
+                                    <option value="FIXED_AMOUNT">Fixed amount off</option>
+                                    <option value="PERCENTAGE">Percentage off</option>
+                                    <option value="FREE_DELIVERY">Free delivery</option>
+                                    <option value="SPEND_X_FIXED">Spend X, get fixed off</option>
+                                    <option value="SPEND_X_PERCENT">Spend X, get percent off</option>
+                                    <option value="SPEND_X_GET_FREE">Spend X, get free delivery</option>
+                                </Select>
+                            </div>
+
+                            <Input
+                                label="Description"
+                                value={quickCodePromoForm.description}
+                                onChange={(e) => setQuickCodePromoForm((prev) => ({ ...prev, description: e.target.value }))}
+                                placeholder="Private promo code for friends"
+                            />
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                {quickCodeVis.discountValue && (
+                                    <Input
+                                        label={isPercentType(quickCodePromoForm.type) ? "Discount % *" : "Discount € *"}
+                                        type="number"
+                                        step="0.01"
+                                        value={quickCodePromoForm.discountValue}
+                                        onChange={(e) => setQuickCodePromoForm((prev) => ({ ...prev, discountValue: e.target.value }))}
+                                        placeholder={isPercentType(quickCodePromoForm.type) ? "15" : "5.00"}
+                                    />
+                                )}
+                                {quickCodeVis.maxDiscountCap && (
+                                    <Input
+                                        label="Max cap (€)"
+                                        type="number"
+                                        step="0.01"
+                                        value={quickCodePromoForm.maxDiscountCap}
+                                        onChange={(e) => setQuickCodePromoForm((prev) => ({ ...prev, maxDiscountCap: e.target.value }))}
+                                        placeholder="30.00"
+                                    />
+                                )}
+                                {quickCodeVis.spendThreshold && (
+                                    <Input
+                                        label="Spend threshold (€) *"
+                                        type="number"
+                                        step="0.01"
+                                        value={quickCodePromoForm.spendThreshold}
+                                        onChange={(e) => setQuickCodePromoForm((prev) => ({ ...prev, spendThreshold: e.target.value }))}
+                                        placeholder="20.00"
+                                    />
+                                )}
+                                <Input
+                                    label="Min order (€)"
+                                    type="number"
+                                    step="0.01"
+                                    value={quickCodePromoForm.minOrderAmount}
+                                    onChange={(e) => setQuickCodePromoForm((prev) => ({ ...prev, minOrderAmount: e.target.value }))}
+                                    placeholder="Optional"
+                                />
+                                {(quickCodePromoForm.type === "FREE_DELIVERY" || quickCodePromoForm.type === "SPEND_X_GET_FREE") && (
+                                    <Input
+                                        label="Driver payout (€) *"
+                                        type="number"
+                                        step="0.01"
+                                        value={quickCodePromoForm.driverPayoutAmount}
+                                        onChange={(e) => setQuickCodePromoForm((prev) => ({ ...prev, driverPayoutAmount: e.target.value }))}
+                                        placeholder="2.50"
+                                    />
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                <Input
+                                    label="Max uses per user"
+                                    type="number"
+                                    value={quickCodePromoForm.maxUsagePerUser}
+                                    onChange={(e) => setQuickCodePromoForm((prev) => ({ ...prev, maxUsagePerUser: e.target.value }))}
+                                    placeholder="1"
+                                />
+                                <Input
+                                    label="Max uses total"
+                                    type="number"
+                                    value={quickCodePromoForm.maxGlobalUsage}
+                                    onChange={(e) => setQuickCodePromoForm((prev) => ({ ...prev, maxGlobalUsage: e.target.value }))}
+                                    placeholder="Unlimited"
+                                />
+                                <Input
+                                    label="Priority"
+                                    type="number"
+                                    value={quickCodePromoForm.priority}
+                                    onChange={(e) => setQuickCodePromoForm((prev) => ({ ...prev, priority: e.target.value }))}
+                                    placeholder="50"
+                                />
+                                <Select
+                                    label="Stackable"
+                                    value={quickCodePromoForm.isStackable}
+                                    onChange={(e) => setQuickCodePromoForm((prev) => ({ ...prev, isStackable: e.target.value }))}
+                                >
+                                    <option value="false">No</option>
+                                    <option value="true">Yes</option>
+                                </Select>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <Select
+                                label="Promo Code *"
+                                value={selectedCodePromotionId}
+                                onChange={(e) => setSelectedCodePromotionId(e.target.value)}
+                            >
+                                <option value="">Select a code-based promotion...</option>
+                                {codePromotions.map((promotion) => (
+                                    <option key={promotion.id} value={promotion.id}>
+                                        {promotion.code} - {promotion.name}
+                                    </option>
+                                ))}
+                            </Select>
+                            <Input
+                                label="Group Label"
+                                value={promoGroupName}
+                                onChange={(e) => setPromoGroupName(e.target.value)}
+                                placeholder="Friends"
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-xs text-zinc-400">Select users for this group</label>
+                            <div className="relative">
+                                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
+                                <input
+                                    type="text"
+                                    value={promoUserSearch}
+                                    onChange={(e) => setPromoUserSearch(e.target.value)}
+                                    placeholder="Search by name or email..."
+                                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg pl-8 pr-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-violet-600"
+                                />
+                            </div>
+
+                            {promoFilteredUsers.length > 0 && (
+                                <div className="border border-zinc-800 rounded-lg overflow-hidden">
+                                    {promoFilteredUsers.map((user) => (
+                                        <button
+                                            key={user.id}
+                                            onClick={() => {
+                                                setPromoUsers((prev) => [...prev, user]);
+                                                setPromoUserSearch("");
+                                            }}
+                                            className="w-full px-3 py-2.5 flex items-center gap-3 hover:bg-zinc-900 transition-colors text-left border-b border-zinc-900 last:border-0"
+                                        >
+                                            <div className="w-7 h-7 rounded-full bg-zinc-800 flex items-center justify-center text-xs text-zinc-400 flex-shrink-0 font-medium">
+                                                {user.firstName[0]}{user.lastName[0]}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm text-white truncate">{user.firstName} {user.lastName}</p>
+                                                <p className="text-xs text-zinc-500 truncate">{user.email}</p>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
+                            {promoUsers.length > 0 && (
+                                <div>
+                                    <p className="text-xs text-zinc-500 mb-2">{promoUsers.length} user{promoUsers.length !== 1 ? "s" : ""} selected</p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {promoUsers.map((user) => (
+                                            <span
+                                                key={user.id}
+                                                className="inline-flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-full pl-2.5 pr-1.5 py-1 text-xs text-zinc-300"
+                                            >
+                                                {user.firstName} {user.lastName}
+                                                <button
+                                                    onClick={() => setPromoUsers((prev) => prev.filter((item) => item.id !== user.id))}
+                                                    className="p-0.5 rounded-full hover:bg-zinc-700 transition-colors"
+                                                >
+                                                    <X size={10} />
+                                                </button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex justify-end">
+                            <div className="flex gap-2">
+                                <Button
+                                    variant="outline"
+                                    onClick={handleAssignPromoCodeToGroup}
+                                    disabled={assigningPromo || !selectedCodePromotionId || promoUsers.length === 0}
+                                >
+                                    {assigningPromo ? "Assigning..." : "Assign Existing Code"}
+                                </Button>
+                                <Button
+                                    onClick={handleCreateAndAssignPromoCode}
+                                    disabled={creating || assigningPromo || !quickCodePromoForm.name.trim() || !quickCodePromoForm.code.trim() || promoUsers.length === 0}
+                                >
+                                    {creating || assigningPromo ? "Working..." : "Create & Assign New Code"}
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )} {/* end promo codes tab */}
 
             {/* ── Compensations Tab ── */}
             {activeTab === "compensations" && (
@@ -670,7 +1106,13 @@ export default function PromotionsPage() {
                                     placeholder="SUMMER20"
                                 />
                                 <div className="text-xs text-zinc-600 -mt-2">
-                                    Leave empty for auto-applied promotions. Enter a code for manual entry by customers.
+                                    Leave empty for auto-applied promotions. Enter a code when the customer must type it in checkout.
+                                </div>
+                                <div className="rounded-lg border border-zinc-700 bg-zinc-900/60 p-3 text-xs text-zinc-300">
+                                    <strong>Application mode:</strong>{" "}
+                                    {formData.code.trim()
+                                        ? "Manual code entry (only users who enter this code can activate it)."
+                                        : "Automatic eligibility (promotion is considered automatically when checkout rules match)."}
                                 </div>
 
                                 {!editingPromotion && (

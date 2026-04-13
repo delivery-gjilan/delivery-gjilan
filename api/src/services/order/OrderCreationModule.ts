@@ -761,7 +761,7 @@ export class OrderCreationModule {
         const selectedPromotionIds = Array.from(
             new Set(
                 [
-                    ...((((input as any).promotionIds as string[] | undefined) ?? []),
+                    ...(((input as any).promotionIds as string[] | undefined) ?? []),
                     input.promotionId ?? null,
                 ].filter(Boolean) as string[]
             ),
