@@ -251,6 +251,7 @@ Links orders to applied promotions:
 
 - Promotions with a `code` are manual-entry promotions: the customer must enter the code in checkout to activate them.
 - Promotions without a `code` are auto-applicable promotions: they are evaluated automatically when eligibility rules match.
+- Business promo badges (`Business.activePromotion`) and global promo banners (`getActiveGlobalPromotions`) include only code-less auto-applicable promotions.
 - Recovery/compensation promotions are currently created without a code, assigned to specific users, and auto-applied only for those assigned users.
 - The admin Promotions page includes a dedicated Promo Codes tab for group-style assignment (for example friends/VIP groups), where a code-based promotion is selected and assigned to chosen users in bulk.
 - The Promo Codes tab also supports creating and assigning a new code promotion in one flow, including promo kind (fixed/percentage/free-delivery/spend-threshold), limits, stacking, priority, and driver payout for delivery-fee promotions.
@@ -263,6 +264,7 @@ The mobile-customer cart auto-apply notifier presents recovery promotions as typ
 The same notifier also normalizes regular promotion names/codes (removes technical prefixes/tokens) and falls back to friendly type labels when names are not customer-friendly.
 On the mobile-customer business page, business-created active promotions are shown as a tappable promo card that opens an offer-details modal explaining how the promo applies, minimum spend (when present), and that the discount auto-applies at checkout.
 Promotion descriptions can be edited from the admin Promotions edit modal and are shown in the business promo offer-details modal; when empty, the modal shows fallback explanatory copy.
+When checkout order creation fails because a selected promotion is invalid/expired/not combinable, mobile-customer shows a dedicated promotion modal with clear guidance and a one-tap action to remove the promo and continue.
 
 ### Business-funded promotions (item discounts)
 
@@ -330,6 +332,7 @@ Flow:
 
 1. De-duplicate selected IDs.
 2. Verify each selected promotion remains applicable for the current cart.
+   - Explicitly selected code-based promotions remain eligible during this revalidation step (to match manual code entry done at checkout).
 3. Sort selected promotions by priority.
 4. Apply stacking compatibility:
    - first promo is anchor

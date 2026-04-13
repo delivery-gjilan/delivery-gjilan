@@ -30,7 +30,7 @@ import Mapbox from '@rnmapbox/maps';
 function AppContent() {
     const theme = useTheme();
     useStoreStatusInit();
-    const { isStoreClosed, closedMessage, loading: storeStatusLoading } = useStoreStatus();
+    const { isStoreClosed, closedMessage, wasOpenOnEntry, loading: storeStatusLoading } = useStoreStatus();
 
     // Initialize push notifications
     useNotifications();
@@ -46,7 +46,9 @@ function AppContent() {
         return <LoadingScreen />;
     }
 
-    if (isStoreClosed) {
+    // Only block users who opened the app while the store was already closed.
+    // Users already in the app continue browsing; the API rejects orders at creation time.
+    if (isStoreClosed && !wasOpenOnEntry) {
         return <StoreClosedScreen message={closedMessage} />;
     }
 

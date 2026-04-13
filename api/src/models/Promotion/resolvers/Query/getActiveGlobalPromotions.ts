@@ -22,6 +22,8 @@ export const getActiveGlobalPromotions: NonNullable<QueryResolvers['getActiveGlo
       and(
         eq(promotions.isActive, true),
         eq(promotions.isDeleted, false),
+        // Global marketing surfaces should only include auto-applicable promos.
+        isNull(promotions.code),
         or(eq(promotions.target, 'ALL_USERS'), eq(promotions.target, 'FIRST_ORDER')),
         // Only include promos that have started (or have no start date)
         or(isNull(promotions.startsAt), lte(promotions.startsAt, now)),

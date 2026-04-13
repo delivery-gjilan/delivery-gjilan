@@ -34,6 +34,7 @@ import { StepIndicator } from './StepIndicator';
 import { CartReview } from './CartReview';
 import { OrderReview } from './OrderReview';
 import { SaveAddressModal } from './SaveAddressModal';
+import { PromotionIssueModal } from './PromotionIssueModal';
 
 // Persists across CartScreen mounts so we never replay the celebration for the same promo
 const _celebrationShownPromoIds = new Set<string>();
@@ -76,6 +77,7 @@ export const CartScreen = () => {
     const [isPriority, setIsPriority] = useState(false);
     const [driverTip, setDriverTip] = useState(0);
     const [promoError, setPromoError] = useState<string | null>(null);
+    const [promoIssueModal, setPromoIssueModal] = useState<{ title: string; message: string } | null>(null);
     const [saveAddressError, setSaveAddressError] = useState<string | null>(null);
     
     // Query saved addresses
@@ -1063,6 +1065,16 @@ export const CartScreen = () => {
                 combinedMessage.includes('Price mismatch') ||
                 combinedMessage.includes('delivery price') ||
                 combinedMessage.includes('total price');
+            const lowerMessage = combinedMessage.toLowerCase();
+            const isPromoInvalidation =
+                lowerMessage.includes('selected promotions are no longer valid') ||
+                lowerMessage.includes('selected promotion is no longer valid') ||
+                lowerMessage.includes('promotion has expired') ||
+                lowerMessage.includes('promotion has reached its usage limit') ||
+                lowerMessage.includes('promotion is not available for you') ||
+                lowerMessage.includes('promotion code not found') ||
+                lowerMessage.includes('selected promotions cannot be combined') ||
+                lowerMessage.includes('multiple free-delivery promotions cannot be combined');
 
             if (isPriceMismatch) {
                 // Refresh cart prices silently, then alert the user to review
@@ -1077,6 +1089,26 @@ export const CartScreen = () => {
                     t.cart.prices_changed_message,
                     [{ text: t.common.ok }],
                 );
+                return;
+            }
+
+            if (isPromoInvalidation) {
+                let promoModalMessage = t.cart.promotion_unavailable_generic;
+
+                if (lowerMessage.includes('expired')) {
+                    promoModalMessage = t.cart.promotion_unavailable_expired;
+                } else if (lowerMessage.includes('usage limit')) {
+                    promoModalMessage = t.cart.promotion_unavailable_usage_limit;
+                } else if (lowerMessage.includes('not available for you')) {
+                    promoModalMessage = t.cart.promotion_unavailable_not_assigned;
+                } else if (lowerMessage.includes('cannot be combined') || lowerMessage.includes('multiple free-delivery')) {
+                    promoModalMessage = t.cart.promotion_unavailable_not_combinable;
+                }
+
+                setPromoIssueModal({
+                    title: t.cart.promotion_unavailable_title,
+                    message: promoModalMessage,
+                });
                 return;
             }
 
@@ -1258,6 +1290,19 @@ export const CartScreen = () => {
                 error={saveAddressError}
                 onSave={handleSaveAsDefault}
                 onSkip={handleSkipSaving}
+            />
+
+            <PromotionIssueModal
+                visible={!!promoIssueModal}
+                title={promoIssueModal?.title ?? t.cart.promotion_unavailable_title}
+                message={promoIssueModal?.message ?? ''}
+                onClose={() => setPromoIssueModal(null)}
+                onRemovePromotion={() => {
+                    setPromoResult(null);
+                    setCouponCode('');
+                    setPromoError(null);
+                    setPromoIssueModal(null);
+                }}
             />
 
             <PromoAppliedCelebration

@@ -81,6 +81,8 @@ export const Business: BusinessResolvers = {
                 and(
                     eq(promotions.isActive, true),
                     eq(promotions.isDeleted, false),
+                    // Business/public promo badges should only show auto-applicable promos.
+                    isNull(promotions.code),
                     or(
                         isNull(promotions.startsAt),
                         lte(promotions.startsAt, now)

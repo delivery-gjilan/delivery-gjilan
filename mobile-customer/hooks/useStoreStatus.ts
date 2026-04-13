@@ -53,5 +53,6 @@ export const useStoreStatus = () => {
         bannerMessage: s.bannerMessage,
         bannerType: s.bannerType,
         loading: s.loading,
+        wasOpenOnEntry: s.wasOpenOnEntry,
     })));
 };

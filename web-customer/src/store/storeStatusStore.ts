@@ -1,15 +1,15 @@
-import { create } from 'zustand';
+import { create } from "zustand";
 
-type BannerType = 'INFO' | 'WARNING' | 'SUCCESS';
+type BannerType = "INFO" | "WARNING" | "SUCCESS";
 
 interface StoreStatusState {
     isStoreClosed: boolean;
-    closedMessage: string | null | undefined;
+    closedMessage: string | null;
     bannerEnabled: boolean;
     bannerMessage: string | null;
     bannerType: BannerType;
     loading: boolean;
-    /** Whether the store was open when the user first opened the app. null = not determined yet. */
+    /** Whether the store was open when the user first loaded the page. null = not determined yet. */
     wasOpenOnEntry: boolean | null;
     _update: (status: {
         isStoreClosed?: boolean;
@@ -21,12 +21,12 @@ interface StoreStatusState {
     _setLoading: (loading: boolean) => void;
 }
 
-export const useStoreStatusStore = create<StoreStatusState>((set, get) => ({
+export const useStoreStatusStore = create<StoreStatusState>((set) => ({
     isStoreClosed: false,
-    closedMessage: undefined,
+    closedMessage: null,
     bannerEnabled: false,
     bannerMessage: null,
-    bannerType: 'INFO',
+    bannerType: "INFO",
     loading: true,
     wasOpenOnEntry: null,
     _update: (status) =>
@@ -34,13 +34,14 @@ export const useStoreStatusStore = create<StoreStatusState>((set, get) => ({
             const isClosed = status.isStoreClosed ?? false;
             return {
                 isStoreClosed: isClosed,
-                closedMessage: status.closedMessage,
+                closedMessage: status.closedMessage ?? null,
                 bannerEnabled: status.bannerEnabled ?? false,
                 bannerMessage: status.bannerMessage ?? null,
-                bannerType: (status.bannerType ?? 'INFO') as BannerType,
+                bannerType: (status.bannerType ?? "INFO") as BannerType,
                 loading: false,
                 // Record once on the very first update (initial query result)
-                wasOpenOnEntry: state.wasOpenOnEntry === null ? !isClosed : state.wasOpenOnEntry,
+                wasOpenOnEntry:
+                    state.wasOpenOnEntry === null ? !isClosed : state.wasOpenOnEntry,
             };
         }),
     _setLoading: (loading) => set({ loading }),

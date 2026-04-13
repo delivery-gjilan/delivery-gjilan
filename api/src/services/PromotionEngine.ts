@@ -66,11 +66,13 @@ export class PromotionEngine {
     async getApplicablePromotions(
         userId: string,
         cart: CartContext,
-        manualPromoCode?: string
+        manualPromoCode?: string,
+        explicitlySelectedPromotionIds?: string[],
     ): Promise<ApplicablePromotion[]> {
         const now = new Date().toISOString();
         const applicable: ApplicablePromotion[] = [];
         const normalizedManualCode = manualPromoCode?.trim().toUpperCase();
+        const explicitlySelectedSet = new Set((explicitlySelectedPromotionIds ?? []).filter(Boolean));
         let manualPromoFound = false;
 
         // 1. Check First Order Eligibility
@@ -167,8 +169,10 @@ export class PromotionEngine {
                     continue;
                 }
             } else if (promo.code) {
-                // Promotions with codes must be explicitly selected by manual code input.
-                continue;
+                // Promotions with codes must be manually selected or explicitly revalidated by selected IDs.
+                if (!explicitlySelectedSet.has(promo.id)) {
+                    continue;
+                }
             }
 
             // Per-user usage check (shared by checkCodeEligibility and checkUsageLimits)
@@ -354,7 +358,7 @@ export class PromotionEngine {
             };
         }
 
-        const applicable = await this.getApplicablePromotions(userId, cart);
+        const applicable = await this.getApplicablePromotions(userId, cart, undefined, uniquePromotionIds);
         const applicableById = new Map(applicable.map((promo) => [promo.id, promo]));
         const selectedPromotions = uniquePromotionIds.map((id) => applicableById.get(id)).filter(Boolean) as ApplicablePromotion[];
 
