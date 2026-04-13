@@ -337,6 +337,17 @@ type BusinessMessageUser {
   lastName: String!
 }
 
+type BusinessOrderFinancials {
+  amountOwedByBusiness: Float!
+  amountOwedToBusiness: Float!
+  businessNetEarnings: Float!
+  businessPrice: Float!
+  customerPaid: Float!
+  markupAmount: Float!
+  orderId: ID!
+  paymentCollection: OrderPaymentCollection!
+}
+
 type BusinessPerformanceStat {
   avgOrderValue: Float!
   businessId: ID!
@@ -1774,6 +1785,7 @@ type Query {
 
   """Admin: full conversation with a specific business user"""
   businessMessages(businessUserId: ID!, limit: Int, offset: Int): [BusinessMessage!]!
+  businessOrderFinancials(businessId: ID!, orderId: ID!): BusinessOrderFinancials
   businessOrderReviews(limit: Int, offset: Int): [OrderReview!]!
   businessPerformanceStats(days: Int): [BusinessPerformanceStat!]!
   businesses: [Business!]!

@@ -128,6 +128,62 @@ export class OrderQueryModule {
         };
     }
 
+    async getBusinessOrderFinancials(
+        orderId: string,
+        businessId: string,
+    ): Promise<{
+        orderId: string;
+        paymentCollection: OrderPaymentCollection;
+        businessPrice: number;
+        markupAmount: number;
+        customerPaid: number;
+        amountOwedToBusiness: number;
+        amountOwedByBusiness: number;
+        businessNetEarnings: number;
+    } | null> {
+        const dbOrder = await this.deps.orderRepository.findById(orderId);
+        if (!dbOrder) return null;
+
+        const paymentCollection = dbOrder.paymentCollection;
+        const businessPrice = Number(dbOrder.businessPrice ?? dbOrder.basePrice ?? dbOrder.actualPrice ?? 0);
+        const actualPrice = Number(dbOrder.actualPrice ?? 0);
+        const markupAmount = Number(dbOrder.markupPrice ?? 0);
+        // customerPaid = actualPrice (what the customer paid for items excluding delivery/surcharge/tip)
+        const customerPaid = actualPrice;
+
+        // Fetch business-type settlements for this order + business
+        const businessSettlements = await this.deps.db
+            .select({ amount: settlementsTable.amount, direction: settlementsTable.direction })
+            .from(settlementsTable)
+            .where(
+                and(
+                    eq(settlementsTable.orderId, orderId),
+                    eq(settlementsTable.type, 'BUSINESS'),
+                    eq(settlementsTable.businessId, businessId),
+                ),
+            );
+
+        const amountOwedToBusiness = businessSettlements
+            .filter((s) => s.direction === 'PAYABLE')
+            .reduce((sum, s) => sum + Number(s.amount), 0);
+        const amountOwedByBusiness = businessSettlements
+            .filter((s) => s.direction === 'RECEIVABLE')
+            .reduce((sum, s) => sum + Number(s.amount), 0);
+
+        const businessNetEarnings = Number((amountOwedToBusiness - amountOwedByBusiness).toFixed(2));
+
+        return {
+            orderId,
+            paymentCollection,
+            businessPrice: Number(businessPrice.toFixed(2)),
+            markupAmount: Number(markupAmount.toFixed(2)),
+            customerPaid: Number(customerPaid.toFixed(2)),
+            amountOwedToBusiness: Number(amountOwedToBusiness.toFixed(2)),
+            amountOwedByBusiness: Number(amountOwedByBusiness.toFixed(2)),
+            businessNetEarnings,
+        };
+    }
+
     async getOrdersByStatus(status: OrderStatus, limit = 500, offset = 0): Promise<Order[]> {
         const dbOrders = await this.deps.orderRepository.findByStatus(status, limit, offset);
         return this.mapping.mapOrders(dbOrders);

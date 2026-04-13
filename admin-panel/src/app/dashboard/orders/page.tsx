@@ -803,9 +803,6 @@ export default function OrdersPage() {
                             const approvalReasons = deriveApprovalReasons(order);
                             const promotions = order.orderPromotions ?? [];
                             const promoCount = promotions.length;
-                            const promoTotalSavings = roundMoney(
-                                promotions.reduce((sum, promo) => sum + Number(promo.discountAmount || 0), 0),
-                            );
                             return (
                                 <div
                                     key={order.id}
@@ -999,22 +996,8 @@ export default function OrdersPage() {
                                                 <div className="text-lg font-bold text-white">${order.totalPrice.toFixed(2)}</div>
                                                 {promoCount > 0 && (
                                                     <div className="mt-1.5 flex flex-wrap gap-1">
-                                                        {promotions.map((promo) => {
-                                                            const promoScope = promo.appliesTo === 'DELIVERY' ? 'Delivery' : 'Order';
-                                                            const promoIdentity = (promo.promoCode || '').trim() || 'Auto';
-                                                            return (
-                                                                <span
-                                                                    key={promo.id}
-                                                                    className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] ${promo.appliesTo === 'DELIVERY'
-                                                                        ? 'border-blue-500/35 bg-blue-500/10 text-blue-300'
-                                                                        : 'border-emerald-500/35 bg-emerald-500/10 text-emerald-300'}`}
-                                                                >
-                                                                    {promoScope}: {promoIdentity} -€{Number(promo.discountAmount || 0).toFixed(2)} off
-                                                                </span>
-                                                            );
-                                                        })}
                                                         <span className="inline-flex items-center rounded-full border border-emerald-500/35 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
-                                                            Saved €{promoTotalSavings.toFixed(2)}
+                                                            {promoCount > 1 ? 'Promotions applied' : 'Promotion applied'}
                                                         </span>
                                                     </div>
                                                 )}
@@ -1224,9 +1207,6 @@ export default function OrdersPage() {
                                         const marginSeverity = preview ? getMarginSeverity(preview.netMargin) : null;
                                         const promotions = order.orderPromotions ?? [];
                                         const promoCount = promotions.length;
-                                        const promoTotalSavings = roundMoney(
-                                            promotions.reduce((sum, promo) => sum + Number(promo.discountAmount || 0), 0),
-                                        );
                                         return (
                                             <tr key={order.id} className="border-b border-zinc-800/70 hover:bg-zinc-900/40">
                                                 <td className="px-3 py-3 align-top">
@@ -1288,22 +1268,8 @@ export default function OrdersPage() {
                                                     ${order.totalPrice.toFixed(2)}
                                                     {promoCount > 0 && (
                                                         <div className="mt-1.5 flex flex-wrap gap-1">
-                                                            {promotions.map((promo) => {
-                                                                const promoScope = promo.appliesTo === 'DELIVERY' ? 'Delivery' : 'Order';
-                                                                const promoIdentity = (promo.promoCode || '').trim() || 'Auto';
-                                                                return (
-                                                                    <span
-                                                                        key={promo.id}
-                                                                        className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] ${promo.appliesTo === 'DELIVERY'
-                                                                            ? 'border-blue-500/35 bg-blue-500/10 text-blue-300'
-                                                                            : 'border-emerald-500/35 bg-emerald-500/10 text-emerald-300'}`}
-                                                                    >
-                                                                        {promoScope}: {promoIdentity} -€{Number(promo.discountAmount || 0).toFixed(2)} off
-                                                                    </span>
-                                                                );
-                                                            })}
                                                             <span className="inline-flex items-center rounded-full border border-emerald-500/35 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
-                                                                Saved €{promoTotalSavings.toFixed(2)}
+                                                                {promoCount > 1 ? 'Promotions applied' : 'Promotion applied'}
                                                             </span>
                                                         </div>
                                                     )}
@@ -1717,21 +1683,6 @@ export default function OrdersPage() {
                                         </div>
                                         <span className="text-xs font-semibold text-emerald-300">
                                             Saved €{selectedOrderPromoSummary.totalSavings.toFixed(2)}
-                                        </span>
-                                    </div>
-
-                                    <div className="flex flex-wrap gap-1.5 text-[11px]">
-                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
-                                            Order {selectedOrderPromoSummary.orderCount}
-                                        </span>
-                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
-                                            Delivery {selectedOrderPromoSummary.deliveryCount}
-                                        </span>
-                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-zinc-500/10 border border-zinc-500/30 text-zinc-300">
-                                            Code {selectedOrderPromoSummary.codeCount}
-                                        </span>
-                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-zinc-500/10 border border-zinc-500/30 text-zinc-300">
-                                            Auto {selectedOrderPromoSummary.autoCount}
                                         </span>
                                     </div>
 

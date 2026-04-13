@@ -107,6 +107,23 @@ type DriverOrderFinancials {
     driverTip: Float!
 }
 
+type BusinessOrderFinancials {
+    orderId: ID!
+    paymentCollection: OrderPaymentCollection!
+    # The base price of items from this business (before platform markup)
+    businessPrice: Float!
+    # Platform markup added on top of businessPrice
+    markupAmount: Float!
+    # What the customer paid for items (businessPrice + markup - promotions)
+    customerPaid: Float!
+    # Total amount owed TO the business (PAYABLE settlements)
+    amountOwedToBusiness: Float!
+    # Total amount owed BY the business (RECEIVABLE settlements)
+    amountOwedByBusiness: Float!
+    # Net settlement = owedTo - owedBy (positive = platform pays business)
+    businessNetEarnings: Float!
+}
+
 type OrderSettlementLineItem {
     type: String!
     direction: String!
@@ -183,6 +200,7 @@ type Query {
     uncompletedOrders: [Order!]!
     prioritySurchargeAmount: Float!
     driverOrderFinancials(orderId: ID!): DriverOrderFinancials
+    businessOrderFinancials(orderId: ID!, businessId: ID!): BusinessOrderFinancials
     businessOrderReviews(limit: Int, offset: Int): [OrderReview!]!
 }
 

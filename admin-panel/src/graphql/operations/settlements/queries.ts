@@ -414,3 +414,18 @@ export const GET_EARNINGS_TREND = graphql(`
         }
     }
 `);
+
+export const GET_BUSINESS_ORDER_FINANCIALS = graphql(`
+    query GetBusinessOrderFinancials($orderId: ID!, $businessId: ID!) {
+        businessOrderFinancials(orderId: $orderId, businessId: $businessId) {
+            orderId
+            paymentCollection
+            businessPrice
+            markupAmount
+            customerPaid
+            amountOwedToBusiness
+            amountOwedByBusiness
+            businessNetEarnings
+        }
+    }
+`);

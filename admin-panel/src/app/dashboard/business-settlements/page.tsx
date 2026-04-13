@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery, useMutation } from '@apollo/client/react';
+import { useQuery, useMutation, useLazyQuery } from '@apollo/client/react';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -32,6 +32,7 @@ import {
   GET_BUSINESS_BALANCE,
   GET_SETTLEMENT_REQUESTS,
   CREATE_SETTLEMENT_REQUEST,
+  GET_BUSINESS_ORDER_FINANCIALS,
 } from '@/graphql/operations/settlements/queries';
 
 type SettlementRecord = SettlementsPageQuery['settlements'][number];
@@ -66,6 +67,13 @@ export default function BusinessSettlementsPage() {
   const [reqAmount, setReqAmount] = useState('');
   const [reqNote, setReqNote] = useState('');
   const [reqSubmitting, setReqSubmitting] = useState(false);
+
+  // Order detail dialog
+  const [selectedSettlement, setSelectedSettlement] = useState<SettlementRecord | null>(null);
+  const [fetchFinancials, { data: financialsData, loading: financialsLoading }] = useLazyQuery(
+    GET_BUSINESS_ORDER_FINANCIALS,
+    { fetchPolicy: 'network-only' },
+  );
 
   const { data, loading, refetch } = useQuery(GET_SETTLEMENTS_PAGE, {
     variables: {
@@ -309,7 +317,16 @@ export default function BusinessSettlementsPage() {
                 </TableRow>
               ) : (
                 filtered.map((s) => (
-                  <TableRow key={s.id} className="border-gray-800 hover:bg-gray-800/40">
+                  <TableRow
+                    key={s.id}
+                    className="border-gray-800 hover:bg-gray-800/40 cursor-pointer"
+                    onClick={() => {
+                      setSelectedSettlement(s);
+                      if (s.order?.id) {
+                        fetchFinancials({ variables: { orderId: s.order.id, businessId } });
+                      }
+                    }}
+                  >
                     <TableCell className="font-mono text-xs text-gray-300">
                       {s.order?.displayId ?? s.order?.id?.slice(0, 8) ?? '—'}
                     </TableCell>
@@ -374,6 +391,111 @@ export default function BusinessSettlementsPage() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Order Financial Breakdown Dialog */}
+      <Dialog open={selectedSettlement !== null} onOpenChange={(open) => { if (!open) setSelectedSettlement(null); }}>
+        <DialogContent className="bg-gray-900 border-gray-700 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle>Order Financial Breakdown</DialogTitle>
+          </DialogHeader>
+          {selectedSettlement && (() => {
+            const s = selectedSettlement;
+            const fin = financialsData?.businessOrderFinancials;
+            return (
+              <div className="space-y-4 mt-2">
+                {/* Order info */}
+                <div className="rounded-lg bg-gray-800 border border-gray-700 p-3 space-y-1.5">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Order</span>
+                    <span className="font-mono text-gray-200">{s.order?.displayId ?? s.order?.id?.slice(0, 8) ?? '—'}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Date</span>
+                    <span className="text-gray-200">{s.createdAt ? new Date(s.createdAt as string).toLocaleDateString() : '—'}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Settlement</span>
+                    <div className="flex items-center gap-2">
+                      {directionBadge(s.direction)}
+                      <span className="font-semibold text-white">€{Number(s.amount ?? 0).toFixed(2)}</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Status</span>
+                    {statusBadge(!!s.isSettled)}
+                  </div>
+                </div>
+
+                {/* Financial breakdown */}
+                {financialsLoading ? (
+                  <div className="flex justify-center py-6">
+                    <Skeleton className="h-24 w-full bg-gray-800 rounded-lg" />
+                  </div>
+                ) : fin ? (
+                  <div className="rounded-lg bg-gray-800 border border-gray-700 p-3 space-y-2">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Breakdown</p>
+
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">Payment Method</span>
+                      <Badge className={cn(
+                        fin.paymentCollection === 'CASH_TO_DRIVER' ? 'bg-amber-600/20 text-amber-400 border-amber-600/30' : 'bg-blue-600/20 text-blue-400 border-blue-600/30',
+                      )} variant="outline">
+                        {fin.paymentCollection === 'CASH_TO_DRIVER' ? 'Cash' : 'Prepaid'}
+                      </Badge>
+                    </div>
+
+                    <div className="h-px bg-gray-700 my-1" />
+
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">Business Price</span>
+                      <span className="text-gray-200">€{fin.businessPrice.toFixed(2)}</span>
+                    </div>
+
+                    {fin.markupAmount > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-400">Platform Markup</span>
+                        <span className="text-gray-400">+€{fin.markupAmount.toFixed(2)}</span>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">Customer Paid</span>
+                      <span className="text-gray-200">€{fin.customerPaid.toFixed(2)}</span>
+                    </div>
+
+                    <div className="h-px bg-gray-700 my-1" />
+
+                    {fin.amountOwedToBusiness > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-400">Owed to Business</span>
+                        <span className="text-green-400 font-medium">+€{fin.amountOwedToBusiness.toFixed(2)}</span>
+                      </div>
+                    )}
+
+                    {fin.amountOwedByBusiness > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-400">Owed by Business</span>
+                        <span className="text-red-400 font-medium">-€{fin.amountOwedByBusiness.toFixed(2)}</span>
+                      </div>
+                    )}
+
+                    <div className="h-px bg-gray-700 my-1" />
+
+                    <div className="flex justify-between text-sm font-semibold">
+                      <span className="text-white">Business Net Earnings</span>
+                      <span className={fin.businessNetEarnings >= 0 ? 'text-green-400' : 'text-red-400'}>
+                        {fin.businessNetEarnings >= 0 ? '+' : ''}€{fin.businessNetEarnings.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                ) : s.order?.id ? (
+                  <p className="text-sm text-gray-500 text-center py-4">No financial data available for this order.</p>
+                ) : null}
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </div>

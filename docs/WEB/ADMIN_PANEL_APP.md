@@ -213,6 +213,7 @@ The most complex page. Manages the full active + completed order pipeline.
 - Inventory coverage modal showing stock vs. market fulfillment.
 - Incident tagging (JSON stored in `adminNote`).
 - `usePrepTimeAlerts` for overrun notifications.
+- Order cards/tables show a compact promo-applied indicator only; detailed promotion rows and amounts are shown in the order details modal.
 
 ### `/dashboard/map` — Live Dispatching Map
 
