@@ -15,6 +15,7 @@ import {
 import { ASSIGN_DRIVER_TO_ORDER, UPDATE_ORDER_STATUS, ADMIN_CANCEL_ORDER, SET_ORDER_ADMIN_NOTE, APPROVE_ORDER, START_PREPARING } from "@/graphql/operations/orders";
 import { ADMIN_UPDATE_DRIVER_LOCATION, ADMIN_SET_SHIFT_DRIVERS, UPDATE_USER_NOTE_MUTATION } from "@/graphql/operations/users/mutations";
 import { getDirectionsTelemetry } from "@/lib/utils/mapbox";
+import { TRUSTED_CUSTOMER_MARKER, APPROVAL_MODAL_SUPPRESS_MARKER, getMarginSeverity } from "@/lib/constants/orderHelpers";
 import { USERS_QUERY } from "@/graphql/operations/users/queries";
 import { SEND_DRIVER_MESSAGE, MARK_DRIVER_MESSAGES_READ } from "@/graphql/operations/driverMessages/mutations";
 import { GET_DRIVER_MESSAGES } from "@/graphql/operations/driverMessages/queries";
@@ -42,14 +43,8 @@ const MIN_ZOOM = 11.5;
 const MAX_ZOOM = 17;
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 const MAP_STYLE = process.env.NEXT_PUBLIC_MAP_STYLE_URL || "mapbox://styles/mapbox/dark-v11";
-const TRUSTED_CUSTOMER_MARKER = '[TRUSTED_CUSTOMER]';
-const APPROVAL_MODAL_SUPPRESS_MARKER = '[SUPPRESS_APPROVAL_MODAL]';
-
 const PENDING_WARNING_MS = 2 * 60 * 1000; // 2 minutes
 
-function getMarginSeverity(netMargin: number): 'healthy' | 'thin' | 'negative' {
-  return netMargin < 0 ? 'negative' : netMargin < 1.5 ? 'thin' : 'healthy';
-}
 const READY_WARNING_MS = 3 * 60 * 1000;
 const OUT_FOR_DELIVERY_WARNING_MS = 10 * 60 * 1000;
 const ANIMATION_COMMIT_INTERVAL_MS = 33; // ~30 FPS UI commits

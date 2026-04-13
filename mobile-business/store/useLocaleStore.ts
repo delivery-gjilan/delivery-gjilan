@@ -45,6 +45,12 @@ export const useLocaleStore = create<LocaleStore>()(
             name: 'business-locale-storage',
             storage: createJSONStorage(() => AsyncStorage),
             partialize: (state) => ({ languageChoice: state.languageChoice }),
+            onRehydrateStorage: () => (state) => {
+                if (state) {
+                    const translations = getTranslationFromLanguage(state.languageChoice);
+                    state.translations = translations;
+                }
+            },
         },
     ),
 );

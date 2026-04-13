@@ -51,26 +51,24 @@ However, if you change the versions and the problem still persists, make sure to
 
 ## Project Structure and Development Rules
 
-This project follows a modular structure. Each domain has its own isolated module under the modules directory. Every module includes its own components, hooks, services, store, and validation. This keeps domain logic isolated and avoids cross-feature dependencies.
+This project uses a flat shared structure (not per-domain modules). The `modules/` directory only contains the `expo-mapbox-navigation` native module. All other domain logic lives in top-level shared directories.
 
-Top level directories contain shared logic used across the entire app. Shared code never depends on module code.
+Top level directories contain all shared and feature logic:
 
-Structure rules:
-- app contains all routes. Route files render screens only. No business logic.
-- modules contains isolated domain logic. Each module has its own components, hooks, services, store, and validation. Example modules include auth and stores.
-- components contains shared UI components used by multiple modules.
-- hooks contains shared hooks that apply to the whole application.
-- services contains shared service logic such as apiClient and notificationService.
-- store contains shared Zustand stores used across modules.
-- utils contains shared helpers, formatters, and constants.
-- assets contains images and static files.
+- `app/` — All routes. Route files render screens only. No business logic.
+- `components/` — Shared UI components used across screens.
+- `hooks/` — All React hooks (auth, heartbeat, notifications, PTT, navigation camera, etc.).
+- `store/` — Zustand stores: `authStore`, `navigationStore`, `navigationLocationStore`, `orderAcceptStore`, `useLocaleStore`, `useThemeStore`.
+- `graphql/operations/` — GraphQL query/mutation/subscription definitions.
+- `lib/` — Apollo client setup, auth session utilities.
+- `utils/` — Shared helpers, formatters, and constants.
+- `localization/` — Translation JSONs and schema validation.
+- `modules/` — Contains only the `expo-mapbox-navigation` native Expo module.
+- `assets/` — Images and static files.
 
 Coding rules:
-- All domain logic stays inside its module. For example, authentication logic stays under modules/auth.
-- Shared logic goes to top level. Modules do not import from each other, but both can import from shared directories.
-- Do not write API code inside screens. Screens only call hooks or services.
-- Stores handle business state. Hooks connect screens to stores and services.
-- Services perform all network calls and data formatting for their module.
-- Validation stays inside the module, never in screens.
-
-This structure lets you replace APIs or change implementation details in one place. Modules stay independent and the shared layer stays clean and stable.
+- All business logic stays in hooks or stores. Screens only call hooks.
+- Do not write API code inside screens. Use GraphQL operations from `graphql/operations/`.
+- Stores handle global state (auth, navigation, order accept). Hooks connect screens to stores and the Apollo client.
+- Use the repository convention: queries go through Apollo Client not raw `fetch`, except the background heartbeat task which runs in a headless context and must use `fetch`.
+- Shared logic never depends on app/ screens.

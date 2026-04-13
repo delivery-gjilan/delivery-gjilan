@@ -29,6 +29,7 @@ import {
     products,
     productCategories,
     users,
+    promotions,
     userPromoMetadata,
     userBehaviors,
     orderItems,
@@ -98,6 +99,14 @@ const IDS = {
 
     // Prior order for repeatCustomer (inserted directly)
     priorOrderId:    '00000000-0000-0000-0000-000000009170',
+
+    // Promotions for total/delivery validation tests
+    promoFixed2:     '00000000-0000-0000-0000-000000009180',
+    promoFreeDelivery:'00000000-0000-0000-0000-000000009181',
+    promoStackableFixed1: '00000000-0000-0000-0000-000000009182',
+    promoStackableFreeDelivery: '00000000-0000-0000-0000-000000009183',
+    promoNonStackableFixed2: '00000000-0000-0000-0000-000000009184',
+    promoSecondFreeDelivery: '00000000-0000-0000-0000-000000009185',
 } as const;
 
 // Drop-off point used in all happy-path tests.
@@ -504,6 +513,81 @@ async function seedAll() {
         { userId: IDS.repeatCustomer },
         { userId: IDS.incompleteUser },
     ]).onConflictDoNothing();
+
+    // ---- Promotions (used by promo price-validation tests) --------------
+    await db.insert(promotions).values([
+        {
+            id: IDS.promoFixed2,
+            name: 'Fixed 2 EUR Off',
+            type: 'FIXED_AMOUNT',
+            target: 'ALL_USERS',
+            discountValue: 2,
+            isActive: true,
+            isDeleted: false,
+            createdAt: now,
+            updatedAt: now,
+        },
+        {
+            id: IDS.promoFreeDelivery,
+            name: 'Free Delivery',
+            type: 'FREE_DELIVERY',
+            target: 'ALL_USERS',
+            isActive: true,
+            isDeleted: false,
+            createdAt: now,
+            updatedAt: now,
+        },
+        {
+            id: IDS.promoStackableFixed1,
+            name: 'Stackable Fixed 1 EUR Off',
+            type: 'FIXED_AMOUNT',
+            target: 'ALL_USERS',
+            discountValue: 1,
+            isStackable: true,
+            priority: 80,
+            isActive: true,
+            isDeleted: false,
+            createdAt: now,
+            updatedAt: now,
+        },
+        {
+            id: IDS.promoStackableFreeDelivery,
+            name: 'Stackable Free Delivery',
+            type: 'FREE_DELIVERY',
+            target: 'ALL_USERS',
+            isStackable: true,
+            priority: 90,
+            isActive: true,
+            isDeleted: false,
+            createdAt: now,
+            updatedAt: now,
+        },
+        {
+            id: IDS.promoNonStackableFixed2,
+            name: 'Non-stackable Fixed 2 EUR Off',
+            type: 'FIXED_AMOUNT',
+            target: 'ALL_USERS',
+            discountValue: 2,
+            isStackable: false,
+            priority: 95,
+            isActive: true,
+            isDeleted: false,
+            createdAt: now,
+            updatedAt: now,
+        },
+        {
+            id: IDS.promoSecondFreeDelivery,
+            name: 'Second Free Delivery',
+            type: 'FREE_DELIVERY',
+            target: 'ALL_USERS',
+            isStackable: true,
+            priority: 70,
+            isActive: true,
+            isDeleted: false,
+            createdAt: now,
+            updatedAt: now,
+        },
+    ]);
 }
 
 // ---------------------------------------------------------------------------
@@ -564,6 +648,19 @@ async function cleanupAll() {
     await db.delete(userPromoMetadata).where(
         inArray(userPromoMetadata.userId, [IDS.newCustomer, IDS.repeatCustomer, IDS.incompleteUser]),
     );
+
+    // Cleanup promotions
+    await db.delete(promotions).where(
+        inArray(promotions.id, [
+            IDS.promoFixed2,
+            IDS.promoFreeDelivery,
+            IDS.promoStackableFixed1,
+            IDS.promoStackableFreeDelivery,
+            IDS.promoNonStackableFixed2,
+            IDS.promoSecondFreeDelivery,
+        ]),
+    );
+
     await db.delete(users).where(
         inArray(users.id, [IDS.newCustomer, IDS.repeatCustomer, IDS.incompleteUser]),
     );
@@ -588,6 +685,20 @@ async function createOrder(userId: string, input: Parameters<OrderService['creat
 async function cleanNewCustomerOrders() {
     const rows = await db.select({ id: orders.id }).from(orders).where(eq(orders.userId, IDS.newCustomer));
     const ids = rows.map((r) => r.id);
+    if (ids.length > 0) {
+        await db.delete(orderPromotions).where(inArray(orderPromotions.orderId, ids));
+        await db.delete(orderItems).where(inArray(orderItems.orderId, ids));
+        await db.delete(orders).where(inArray(orders.id, ids));
+        for (const id of ids) {
+            const idx = createdOrderIds.indexOf(id);
+            if (idx !== -1) createdOrderIds.splice(idx, 1);
+        }
+    }
+}
+
+async function cleanRepeatCustomerOrders() {
+    const rows = await db.select({ id: orders.id }).from(orders).where(eq(orders.userId, IDS.repeatCustomer));
+    const ids = rows.map((r) => r.id).filter((id) => id !== IDS.priorOrderId);
     if (ids.length > 0) {
         await db.delete(orderPromotions).where(inArray(orderPromotions.orderId, ids));
         await db.delete(orderItems).where(inArray(orderItems.orderId, ids));
@@ -932,7 +1043,192 @@ describe('invalid promotion', () => {
 });
 
 // ===========================================================================
-// 9. ORDER STATUS — APPROVAL ROUTING
+// 9. PROMOTION PRICE VALIDATION
+// ===========================================================================
+
+describe('promotion price validation', () => {
+    beforeEach(async () => {
+        await cleanRepeatCustomerOrders();
+    });
+
+    it('accepts order when free-delivery promo totals match server-side calculation', async () => {
+        // productA: 10, free delivery: 0 => total 10
+        const order = await createOrder(
+            IDS.repeatCustomer,
+            makeOrderInput({
+                items: [{
+                    productId: IDS.productA,
+                    quantity: 1,
+                    price: 10,
+                    selectedOptions: [{ optionGroupId: IDS.optionGroupReq, optionId: IDS.optionA, price: 0 }],
+                }],
+                promotionId: IDS.promoFreeDelivery,
+                deliveryPrice: 0,
+                totalPrice: normalizeMoney(10),
+            }),
+        );
+        expect(order.id).toBeTruthy();
+    });
+
+    it('rejects when client total is lower than expected total for free-delivery promo', async () => {
+        await expect(
+            orderService.createOrder(
+                IDS.repeatCustomer,
+                makeOrderInput({
+                    items: [{
+                        productId: IDS.productA,
+                        quantity: 1,
+                        price: 10,
+                        selectedOptions: [{ optionGroupId: IDS.optionGroupReq, optionId: IDS.optionA, price: 0 }],
+                    }],
+                    promotionId: IDS.promoFreeDelivery,
+                    deliveryPrice: 0,
+                    // Expected: 10 + 0, client sends less
+                    totalPrice: normalizeMoney(9),
+                }),
+            ),
+        ).rejects.toThrow('Total price mismatch');
+    });
+
+    it('rejects when free-delivery promo is selected but client sends non-zero delivery fee', async () => {
+        await expect(
+            orderService.createOrder(
+                IDS.repeatCustomer,
+                makeOrderInput({
+                    items: [{
+                        productId: IDS.productA,
+                        quantity: 1,
+                        price: 10,
+                        selectedOptions: [{ optionGroupId: IDS.optionGroupReq, optionId: IDS.optionA, price: 0 }],
+                    }],
+                    promotionId: IDS.promoFreeDelivery,
+                    // Expected effective delivery is 0, client sends tier fee
+                    deliveryPrice: TIER_DELIVERY_PRICE,
+                    totalPrice: normalizeMoney(10 + TIER_DELIVERY_PRICE),
+                }),
+            ),
+        ).rejects.toThrow('Delivery price mismatch');
+    });
+});
+
+// ===========================================================================
+// 10. PROMOTION COMBINATION VALIDATION (promotionIds)
+// ===========================================================================
+
+describe('promotion combination validation', () => {
+    beforeEach(async () => {
+        await cleanRepeatCustomerOrders();
+    });
+
+    it('accepts a valid stackable combination via promotionIds', async () => {
+        // Free delivery (stackable) + fixed 1 => expected total = 10 - 1 + 0 = 9
+        const order = await createOrder(
+            IDS.repeatCustomer,
+            {
+                ...makeOrderInput({
+                    items: [{
+                        productId: IDS.productA,
+                        quantity: 1,
+                        price: 10,
+                        selectedOptions: [{ optionGroupId: IDS.optionGroupReq, optionId: IDS.optionA, price: 0 }],
+                    }],
+                    deliveryPrice: 0,
+                    totalPrice: normalizeMoney(9),
+                }),
+                promotionIds: [IDS.promoStackableFreeDelivery, IDS.promoStackableFixed1],
+            } as any,
+        );
+        expect(order.id).toBeTruthy();
+    });
+
+    it('rejects non-combinable promotionIds when one is non-stackable', async () => {
+        await expect(
+            orderService.createOrder(
+                IDS.repeatCustomer,
+                {
+                    ...makeOrderInput({
+                        items: [{
+                            productId: IDS.productA,
+                            quantity: 1,
+                            price: 10,
+                            selectedOptions: [{ optionGroupId: IDS.optionGroupReq, optionId: IDS.optionA, price: 0 }],
+                        }],
+                        deliveryPrice: 0,
+                        totalPrice: normalizeMoney(8),
+                    }),
+                    promotionIds: [IDS.promoNonStackableFixed2, IDS.promoStackableFreeDelivery],
+                } as any,
+            ),
+        ).rejects.toThrow('Selected promotions cannot be combined');
+    });
+
+    it('rejects multiple free-delivery promotionIds', async () => {
+        await expect(
+            orderService.createOrder(
+                IDS.repeatCustomer,
+                {
+                    ...makeOrderInput({
+                        items: [{
+                            productId: IDS.productA,
+                            quantity: 1,
+                            price: 10,
+                            selectedOptions: [{ optionGroupId: IDS.optionGroupReq, optionId: IDS.optionA, price: 0 }],
+                        }],
+                        deliveryPrice: 0,
+                        totalPrice: normalizeMoney(10),
+                    }),
+                    promotionIds: [IDS.promoStackableFreeDelivery, IDS.promoSecondFreeDelivery],
+                } as any,
+            ),
+        ).rejects.toThrow('Multiple free-delivery promotions cannot be combined');
+    });
+
+    it('rejects when client total is tampered for a valid promotionIds combination', async () => {
+        await expect(
+            orderService.createOrder(
+                IDS.repeatCustomer,
+                {
+                    ...makeOrderInput({
+                        items: [{
+                            productId: IDS.productA,
+                            quantity: 1,
+                            price: 10,
+                            selectedOptions: [{ optionGroupId: IDS.optionGroupReq, optionId: IDS.optionA, price: 0 }],
+                        }],
+                        deliveryPrice: 0,
+                        // Expected is 9, client sends 8
+                        totalPrice: normalizeMoney(8),
+                    }),
+                    promotionIds: [IDS.promoStackableFreeDelivery, IDS.promoStackableFixed1],
+                } as any,
+            ),
+        ).rejects.toThrow('Total price mismatch');
+    });
+
+    it('rejects mixed valid + invalid promotionIds with stable business-rule message', async () => {
+        await expect(
+            orderService.createOrder(
+                IDS.repeatCustomer,
+                {
+                    ...makeOrderInput({
+                        items: [{
+                            productId: IDS.productA,
+                            quantity: 1,
+                            price: 10,
+                            selectedOptions: [{ optionGroupId: IDS.optionGroupReq, optionId: IDS.optionA, price: 0 }],
+                        }],
+                        deliveryPrice: 0,
+                        totalPrice: normalizeMoney(9),
+                    }),
+                    promotionIds: [IDS.promoStackableFreeDelivery, '00000000-0000-0000-0000-000000009999'],
+                } as any,
+            ),
+        ).rejects.toThrow('One or more selected promotions are no longer valid');
+    });
+});
+
+// ===========================================================================
+// 11. ORDER STATUS — APPROVAL ROUTING
 // ===========================================================================
 
 describe('approval routing — FIRST_ORDER triggers AWAITING_APPROVAL', () => {
@@ -1005,7 +1301,7 @@ describe('approval routing — out-of-zone (locationFlagged) triggers AWAITING_A
 });
 
 // ===========================================================================
-// 10. DELIVERY ZONE FEE ROUTING
+// 12. DELIVERY ZONE FEE ROUTING
 // ===========================================================================
 
 describe('delivery zone fee routing', () => {
@@ -1111,7 +1407,7 @@ describe('delivery zone fee routing', () => {
 });
 
 // ===========================================================================
-// 11. PAYMENT COLLECTION
+// 13. PAYMENT COLLECTION
 // ===========================================================================
 
 describe('payment collection', () => {
@@ -1156,7 +1452,7 @@ describe('payment collection', () => {
 });
 
 // ===========================================================================
-// 12. MINIMUM ORDER AMOUNT
+// 14. MINIMUM ORDER AMOUNT
 // ===========================================================================
 
 describe('minimum order amount', () => {

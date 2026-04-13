@@ -91,13 +91,7 @@ function AppContent() {
                                 headerShown: false,
                             }}
                         />
-                        <Stack.Screen
-                            name="admin"
-                            options={{
-                                headerShown: false,
-                                animation: 'slide_from_right',
-                            }}
-                        />
+
                     </Stack>
                     <FloatingBars />
                     <ToastContainer />

@@ -58,8 +58,15 @@ function MarketProductCard({ product, businessId, businessName }: { product: any
         });
     }, [isSoldOut, addItem, product, businessId, businessName, effectivePrice]);
 
-    const handleIncrement = useCallback(() => updateQuantity(product.id, qty + 1), [updateQuantity, product.id, qty]);
-    const handleDecrement = useCallback(() => updateQuantity(product.id, qty - 1), [updateQuantity, product.id, qty]);
+    const handleIncrement = useCallback(() => {
+        const cartItem = items.find((i) => i.productId === product.id);
+        if (cartItem) updateQuantity(cartItem.id, cartItem.quantity + 1);
+        else handleAdd();
+    }, [items, product.id, updateQuantity, handleAdd]);
+    const handleDecrement = useCallback(() => {
+        const cartItem = items.find((i) => i.productId === product.id);
+        if (cartItem) updateQuantity(cartItem.id, cartItem.quantity - 1);
+    }, [items, product.id, updateQuantity]);
 
     return (
         <div className={cn(

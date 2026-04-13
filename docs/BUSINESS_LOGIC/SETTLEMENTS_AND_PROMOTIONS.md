@@ -7,6 +7,11 @@
 
 ## Recent Updates
 
+- 2026-04-13: Promo test coverage in `api/src/services/__tests__/promotion-engine.test.ts` now includes combination guardrails and final-price safety checks for `applySelectedPromotions` and stacking behavior: invalid selected IDs rejection, non-stackable combination rejection, multiple free-delivery rejection, priority-ordered multi-promo application, manual-code-first selection, and subtotal floor protection (`finalSubtotal` never negative).
+- 2026-04-13: Order-creation integration coverage in `api/src/__tests__/integration/order-creation.integration.test.ts` now includes promo price-validation scenarios for a selected free-delivery promo: accepted checkout when `deliveryPrice=0` and total matches server-side promo result, rejection when client total is lower than promo-adjusted total, and rejection when client sends non-zero delivery with free-delivery selected.
+- 2026-04-13: Order-creation integration coverage now includes multi-selection `promotionIds` combination validation: accepted stackable combination path, rejection when a non-stackable promo is combined, rejection when multiple free-delivery promos are combined, and rejection when client total is tampered for an otherwise valid combination.
+- 2026-04-13: Multi-selection `promotionIds` integration coverage also asserts mixed valid+invalid promotion IDs return the stable business-rule message: `One or more selected promotions are no longer valid`.
+
 - 2026-04-06: Compensation system matured — tracking switched from per-user to **per-order**. `promotions.order_id` column added (migration `0002_add_order_id_to_promotions.sql`); `IssueRecoveryPromotionInput` now requires `orderId`; service stores it on the promo row after creation; the Cancelled Orders page builds a `Set<orderId>` with a legacy fallback (extracts displayId from promo name for promos created before this column existed). `UserPromotion.user` field resolver implemented. Compensations tab on the Promotions page shows: reason, user name + phone, compensation value, usage state (pending/used), expiry. Issue Compensation modal includes a push notification section — toggle (on by default), pre-filled title + body, fires `sendPushNotification` for the user after the promo is issued. `refetchRecovery()` is now awaited before the modal auto-closes so the "Compensated" badge appears immediately.
 
 - 2026-04-06: Recovery/compensation promotion system added. `issueRecoveryPromotion` mutation creates a hidden `SPECIFIC_USERS` promotion with `isRecovery = true`, `maxUsagePerUser = 1`, no promo code. Auto-applies at checkout via `PromotionEngine.checkUserAssignment()`. `getRecoveryPromotions` query (SUPER_ADMIN only) returns recovery promos with `assignedUsers { userId, usageCount, expiresAt, user { firstName, lastName, phoneNumber } }` and `orderId`. Admin Promotions page has a **Compensations** tab. Cancelled Orders page shows a green "Compensated" badge per order (not per user).
@@ -249,13 +254,36 @@ Links orders to applied promotions:
 
 ### Promotion application modes
 
-- Promotions with a `code` are manual-entry promotions: the customer must enter the code in checkout to activate them.
-- Promotions without a `code` are auto-applicable promotions: they are evaluated automatically when eligibility rules match.
-- Business promo badges (`Business.activePromotion`) and global promo banners (`getActiveGlobalPromotions`) include only code-less auto-applicable promotions.
-- Business page promo chips are powered by `Business.activePromotionsDisplay` and expose the top active auto-applicable promotions (typically up to 3 rendered by mobile UI).
-- Recovery/compensation promotions are currently created without a code, assigned to specific users, and auto-applied only for those assigned users.
-- The admin Promotions page includes a dedicated Promo Codes tab for group-style assignment (for example friends/VIP groups), where a code-based promotion is selected and assigned to chosen users in bulk.
-- The Promo Codes tab also supports creating and assigning a new code promotion in one flow, including promo kind (fixed/percentage/free-delivery/spend-threshold), limits, stacking, priority, and driver payout for delivery-fee promotions.
+- **Manual code promos**: promotions with `code` require customer entry in checkout.
+- **Auto promos**: promotions without `code` are evaluated automatically when the user/cart/order context is eligible.
+- **Recovery promos**: compensation/recovery promotions are code-less `SPECIFIC_USERS` promos with single-use behavior (`maxUsagePerUser = 1`) and auto-apply for assigned users.
+
+### Promotion eligibility capabilities (current)
+
+- **Global eligibility**: supported. Leave `promotion_business_eligibility` empty to make a promotion valid across businesses.
+- **Business-scoped eligibility**: supported via `eligibleBusinessIds` and `promotion_business_eligibility`.
+- **Individual user coupons**: supported via `target = SPECIFIC_USERS` and `assignPromotionToUsers` (single user or multiple users).
+- **Friend/VIP group coupons**: supported as bulk user assignment from the admin Promo Codes tab (operator-selected user sets).
+- **Validity windows**: supported via `startsAt` and `endsAt`.
+- **One-time usage**: supported via `maxUsagePerUser = 1` (default behavior in recovery flow).
+- **Global usage cap**: supported via `maxGlobalUsage`.
+- **First-order targeting**: supported via `target = FIRST_ORDER`.
+- **Conditional spend targeting**: supported via `target = CONDITIONAL` and `spendThreshold`.
+
+### Promotion targeting model notes
+
+- Group targeting supports both ad-hoc selected users and persistent audience groups.
+- Persistent audience groups allow reusable cohorts and membership updates without recreating promotions.
+- Business promo badges (`Business.activePromotion`) and global promo banners (`getActiveGlobalPromotions`) show code-less auto promotions.
+- Business promo chips (`Business.activePromotionsDisplay`) render top active auto promotions on the business page.
+
+### Persistent audience groups (current)
+
+- Promotions now support persistent audience groups via `promotion_audience_groups` + `promotion_audience_group_members`.
+- Audience groups are reusable user cohorts (for example Friends, VIP, Partners) and can be used repeatedly when assigning targeted promotions.
+- `assignPromotionToUsers` supports both direct `userIds` and `audienceGroupIds`; effective assignment is the deduplicated union of both sets.
+- `createPromotion` supports `targetAudienceGroupIds`, so SPECIFIC_USERS promotions can be assigned to groups at creation time.
+- Audience group membership is mutable through dedicated admin mutations (create/update/delete group), so campaigns can be re-targeted without recreating promotions.
 
 ### Recovery promo labels on customer UI
 

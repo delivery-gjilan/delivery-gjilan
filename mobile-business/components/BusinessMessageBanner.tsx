@@ -1,5 +1,12 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, Pressable, Text, View, Dimensions } from 'react-native';
+import React, { useEffect } from 'react';
+import { Pressable, Text, View, Dimensions } from 'react-native';
+import Animated, {
+    useSharedValue,
+    useAnimatedStyle,
+    withSpring,
+    withTiming,
+    runOnJS,
+} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMutation } from '@apollo/client/react';
@@ -61,52 +68,33 @@ const ALERT_CONFIG: Record<AlertType, {
 
 export default function BusinessMessageBanner({ senderName, body, alertType, adminId, onDismiss }: BusinessMessageBannerProps) {
     const router = useRouter();
-    const scale = useRef(new Animated.Value(0.82)).current;
-    const opacity = useRef(new Animated.Value(0)).current;
-    const backdropOpacity = useRef(new Animated.Value(0)).current;
+    const scale = useSharedValue(0.82);
+    const opacity = useSharedValue(0);
+    const backdropOpacity = useSharedValue(0);
     const config = ALERT_CONFIG[alertType] ?? ALERT_CONFIG.INFO;
     const [markRead] = useMutation(MARK_BUSINESS_MESSAGES_READ_BUSINESS);
 
+    const backdropStyle = useAnimatedStyle(() => ({
+        opacity: backdropOpacity.value,
+    }));
+
+    const cardStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: scale.value }],
+        opacity: opacity.value,
+    }));
+
     useEffect(() => {
-        Animated.parallel([
-            Animated.spring(scale, {
-                toValue: 1,
-                useNativeDriver: true,
-                tension: 80,
-                friction: 10,
-            }),
-            Animated.timing(opacity, {
-                toValue: 1,
-                duration: 220,
-                useNativeDriver: true,
-            }),
-            Animated.timing(backdropOpacity, {
-                toValue: 1,
-                duration: 200,
-                useNativeDriver: true,
-            }),
-        ]).start();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        scale.value = withSpring(1, { damping: 10, stiffness: 80 });
+        opacity.value = withTiming(1, { duration: 220 });
+        backdropOpacity.value = withTiming(1, { duration: 200 });
     }, []);
 
     const dismiss = () => {
-        Animated.parallel([
-            Animated.timing(scale, {
-                toValue: 0.88,
-                duration: 220,
-                useNativeDriver: true,
-            }),
-            Animated.timing(opacity, {
-                toValue: 0,
-                duration: 200,
-                useNativeDriver: true,
-            }),
-            Animated.timing(backdropOpacity, {
-                toValue: 0,
-                duration: 200,
-                useNativeDriver: true,
-            }),
-        ]).start(() => onDismiss());
+        scale.value = withTiming(0.88, { duration: 220 });
+        opacity.value = withTiming(0, { duration: 200 });
+        backdropOpacity.value = withTiming(0, { duration: 200 }, (finished) => {
+            if (finished) runOnJS(onDismiss)();
+        });
     };
 
     const handleTap = () => {
@@ -134,17 +122,16 @@ export default function BusinessMessageBanner({ senderName, body, alertType, adm
         >
             {/* Backdrop */}
             <Animated.View
-                style={{
+                style={[{
                     position: 'absolute',
                     inset: 0,
                     backgroundColor: 'rgba(0,0,0,0.65)',
-                    opacity: backdropOpacity,
-                }}
+                }, backdropStyle]}
             />
 
             {/* Card */}
             <Animated.View
-                style={{
+                style={[{
                     width: SCREEN_WIDTH * 0.88,
                     borderRadius: 24,
                     overflow: 'hidden',
@@ -156,9 +143,7 @@ export default function BusinessMessageBanner({ senderName, body, alertType, adm
                     shadowRadius: 32,
                     shadowOffset: { width: 0, height: 12 },
                     elevation: 20,
-                    transform: [{ scale }],
-                    opacity,
-                }}
+                }, cardStyle]}
             >
                 {/* Top accent bar */}
                 <View style={{ height: 4, backgroundColor: config.accent }} />

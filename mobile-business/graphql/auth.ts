@@ -1,5 +1,26 @@
 import { gql } from '@apollo/client';
 
+export const GET_ME = gql`
+    query GetMeBusiness {
+        me {
+            id
+            email
+            firstName
+            lastName
+            role
+            permissions
+            businessId
+            business {
+                id
+                name
+                imageUrl
+                businessType
+                isActive
+            }
+        }
+    }
+`;
+
 export const LOGIN_MUTATION = gql`
     mutation BusinessLogin($input: LoginInput!) {
         login(input: $input) {

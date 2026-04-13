@@ -116,12 +116,16 @@ const OrderHistoryItem = ({ order, onPress }: { order: Order; onPress: () => voi
                         source={{ uri: firstItem.imageUrl }}
                         style={{ width: '100%', height: '100%' }}
                         contentFit="cover"
+                        cachePolicy="memory-disk"
+                        transition={200}
                     />
                 ) : firstBusiness?.imageUrl ? (
                     <Image
                         source={{ uri: firstBusiness.imageUrl }}
                         style={{ width: '100%', height: '100%' }}
                         contentFit="cover"
+                        cachePolicy="memory-disk"
+                        transition={200}
                     />
                 ) : (
                     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>

@@ -17,7 +17,7 @@ export const assignPromotionToUsers: NonNullable<MutationResolvers['assignPromot
     const db = await getDB();
     const service = new PromotionService(db);
 
-    await service.assignPromotionToUsers(input.promotionId, input.userIds);
+    await service.assignPromotionToUsers(input.promotionId, input.userIds, input.expiresAt ?? undefined, input.audienceGroupIds ?? undefined);
 
     // Return assigned user promotions
     const assignments = await db.query.userPromotions.findMany({

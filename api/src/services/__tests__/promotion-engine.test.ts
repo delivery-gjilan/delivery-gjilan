@@ -5,8 +5,8 @@
  * the DB calls (eligibility checks, usage queries) are bypassed.
  * These tests exercise every promotion type and the stacking rules.
  */
-import { describe, it, expect } from 'vitest';
-import type { ApplicablePromotion, CartContext, PromotionResult } from '../PromotionEngine';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { PromotionEngine, type ApplicablePromotion, type CartContext, type PromotionResult } from '../PromotionEngine';
 
 // ---------------------------------------------------------------------------
 // Mirror of PromotionEngine.calculateDiscount (private method)
@@ -63,7 +63,11 @@ function calculateDiscount(promo: {
 // Mirror of PromotionEngine stacking logic (from applyPromotions)
 // ---------------------------------------------------------------------------
 
-function applyPromotions(applicable: ApplicablePromotion[], cart: CartContext): PromotionResult {
+function applyPromotions(
+    applicable: ApplicablePromotion[],
+    cart: CartContext,
+    manualPromoCode?: string,
+): PromotionResult {
     if (applicable.length === 0) {
         return {
             promotions: [],
@@ -79,15 +83,31 @@ function applyPromotions(applicable: ApplicablePromotion[], cart: CartContext): 
     let totalDiscount = 0;
     let freeDeliveryApplied = false;
 
-    const firstPromo = applicable[0];
+    const normalizedManualCode = manualPromoCode?.trim().toUpperCase();
+    const firstPromo = normalizedManualCode
+        ? applicable.find((promo) => promo.code === normalizedManualCode) ?? applicable[0]
+        : applicable[0];
+
+    if (!firstPromo) {
+        return {
+            promotions: [],
+            totalDiscount: 0,
+            freeDeliveryApplied: false,
+            finalSubtotal: cart.subtotal,
+            finalDeliveryPrice: cart.deliveryPrice,
+            finalTotal: cart.subtotal + cart.deliveryPrice,
+        };
+    }
+
     applied.push(firstPromo);
     totalDiscount += firstPromo.appliedAmount;
     if (firstPromo.freeDelivery) freeDeliveryApplied = true;
 
     if (firstPromo.isStackable) {
-        for (let i = 1; i < applicable.length; i++) {
-            const promo = applicable[i];
+        for (const promo of applicable) {
+            if (promo.id === firstPromo.id) continue;
             if (promo.isStackable) {
+                if (promo.freeDelivery && freeDeliveryApplied) continue;
                 applied.push(promo);
                 totalDiscount += promo.appliedAmount;
                 if (promo.freeDelivery) freeDeliveryApplied = true;
@@ -125,6 +145,10 @@ const cart: CartContext = {
     deliveryPrice: 3,
     businessIds: ['biz-1'],
 };
+
+afterEach(() => {
+    vi.restoreAllMocks();
+});
 
 // ---------------------------------------------------------------------------
 // calculateDiscount — each type
@@ -254,5 +278,96 @@ describe('applyPromotions stacking', () => {
         const promos = [makePromo({ appliedAmount: 999, isStackable: false })];
         const result = applyPromotions(promos, cart);
         expect(result.finalSubtotal).toBe(0);
+    });
+
+    it('keeps only one free-delivery promo when stacking', () => {
+        const promos = [
+            makePromo({ id: 'fd-1', freeDelivery: true, appliedAmount: 0, isStackable: true }),
+            makePromo({ id: 'fd-2', freeDelivery: true, appliedAmount: 0, isStackable: true }),
+            makePromo({ id: 'd-1', freeDelivery: false, appliedAmount: 5, isStackable: true }),
+        ];
+        const result = applyPromotions(promos, cart);
+        expect(result.promotions.map((p) => p.id)).toEqual(['fd-1', 'd-1']);
+        expect(result.freeDeliveryApplied).toBe(true);
+        expect(result.finalDeliveryPrice).toBe(0);
+        expect(result.totalDiscount).toBe(5);
+    });
+
+    it('prefers manual code promo as first promo when present', () => {
+        const promos = [
+            makePromo({ id: 'auto', code: null, priority: 10, appliedAmount: 8, isStackable: true }),
+            makePromo({ id: 'manual', code: 'SAVE5', priority: 1, appliedAmount: 5, isStackable: false }),
+        ];
+        const result = applyPromotions(promos, cart, 'save5');
+        expect(result.promotions).toHaveLength(1);
+        expect(result.promotions[0]?.id).toBe('manual');
+        expect(result.totalDiscount).toBe(5);
+    });
+});
+
+describe('PromotionEngine.applySelectedPromotions', () => {
+    it('rejects when any selected promotion is no longer applicable', async () => {
+        const engine = new PromotionEngine({} as any);
+        vi.spyOn(engine, 'getApplicablePromotions').mockResolvedValue([
+            makePromo({ id: 'p1', isStackable: true, appliedAmount: 5 }),
+        ]);
+
+        await expect(
+            engine.applySelectedPromotions('user-1', ['p1', 'p2'], cart),
+        ).rejects.toThrow('One or more selected promotions are no longer valid');
+    });
+
+    it('rejects non-combinable selections when one promo is non-stackable', async () => {
+        const engine = new PromotionEngine({} as any);
+        vi.spyOn(engine, 'getApplicablePromotions').mockResolvedValue([
+            makePromo({ id: 'p1', priority: 50, isStackable: false, appliedAmount: 10 }),
+            makePromo({ id: 'p2', priority: 20, isStackable: true, appliedAmount: 5 }),
+        ]);
+
+        await expect(
+            engine.applySelectedPromotions('user-1', ['p1', 'p2'], cart),
+        ).rejects.toThrow('Selected promotions cannot be combined');
+    });
+
+    it('rejects multiple free-delivery selections', async () => {
+        const engine = new PromotionEngine({} as any);
+        vi.spyOn(engine, 'getApplicablePromotions').mockResolvedValue([
+            makePromo({ id: 'fd-1', priority: 40, isStackable: true, freeDelivery: true, appliedAmount: 0 }),
+            makePromo({ id: 'fd-2', priority: 30, isStackable: true, freeDelivery: true, appliedAmount: 0 }),
+        ]);
+
+        await expect(
+            engine.applySelectedPromotions('user-1', ['fd-1', 'fd-2'], cart),
+        ).rejects.toThrow('Multiple free-delivery promotions cannot be combined');
+    });
+
+    it('applies valid stackable selected promotions in priority order', async () => {
+        const engine = new PromotionEngine({} as any);
+        vi.spyOn(engine, 'getApplicablePromotions').mockResolvedValue([
+            makePromo({ id: 'low', priority: 10, isStackable: true, appliedAmount: 4 }),
+            makePromo({ id: 'high', priority: 100, isStackable: true, appliedAmount: 9 }),
+        ]);
+
+        const result = await engine.applySelectedPromotions('user-1', ['low', 'high'], cart);
+
+        expect(result.promotions.map((p) => p.id)).toEqual(['high', 'low']);
+        expect(result.totalDiscount).toBe(13);
+        expect(result.finalSubtotal).toBe(37);
+        expect(result.finalDeliveryPrice).toBe(3);
+        expect(result.finalTotal).toBe(40);
+    });
+
+    it('guards final subtotal from going below zero', async () => {
+        const engine = new PromotionEngine({} as any);
+        vi.spyOn(engine, 'getApplicablePromotions').mockResolvedValue([
+            makePromo({ id: 'p1', priority: 10, isStackable: true, appliedAmount: 40 }),
+            makePromo({ id: 'p2', priority: 5, isStackable: true, appliedAmount: 30 }),
+        ]);
+
+        const result = await engine.applySelectedPromotions('user-1', ['p1', 'p2'], cart);
+
+        expect(result.totalDiscount).toBe(70);
+        expect(result.finalSubtotal).toBe(0);
+        expect(result.finalTotal).toBe(3);
     });
 });

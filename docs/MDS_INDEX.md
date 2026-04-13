@@ -73,8 +73,9 @@
 | O19 | [OPERATIONS/APP_STORE_CONNECT_CUSTOMER.md](OPERATIONS/APP_STORE_CONNECT_CUSTOMER.md) | Operations | Exact App Store Connect field selections, metadata choices, screenshot guidance, and review-info checklist for the customer iOS app |
 | O20 | [OPERATIONS/DEPLOYMENT_GUIDE.md](OPERATIONS/DEPLOYMENT_GUIDE.md) | Operations | Hetzner production deployment runbook: server bootstrap, Docker stack, Caddy TLS on api.zippgo.uk, health verification, and GHCR deploy flow |
 | O16 | [DEMO_MODE_PLAN.md](DEMO_MODE_PLAN.md) | Operations | Apple review demo-account flow, auto-progression behavior, reviewer credentials strategy, and admin-panel demo-account operations |
-| O21 | [OPERATIONS/OPTIMIZATION_TRACKER.md](OPERATIONS/OPTIMIZATION_TRACKER.md) | Operations | Per-project optimization recommendations tracker — performance, code quality, reliability, and future considerations with priority and status. Covers: mobile-customer (16 items), mobile-driver (15 items), mobile-business (18 items), mobile-admin (19 items), admin-panel/web (21 items) |
-| W1 | [WEB/ADMIN_PANEL_APP.md](WEB/ADMIN_PANEL_APP.md) | Web | Admin panel deep-dive: Next.js 16 App Router, 21 dashboard routes + 6 admin-only routes, 138 GraphQL ops (51q/82m/5s), role system (SUPER_ADMIN/ADMIN/BUSINESS_OWNER/BUSINESS_EMPLOYEE), Mapbox live map + Agora PTT, Apollo 3 + graphql-ws, 9 custom hooks, drag-and-drop (dnd-kit), push campaign query builder, ops-wall REST monitor, audit logs, settlements, inventory, all known issues and tech debt |
+| O21 | [OPERATIONS/OPTIMIZATION_TRACKER.md](OPERATIONS/OPTIMIZATION_TRACKER.md) | Operations | Per-project optimization recommendations tracker — performance, code quality, reliability, and future considerations with priority and status. Covers: mobile-customer (16 items), mobile-driver (15 items), mobile-business (18 items), mobile-admin (19 items), admin-panel/web (21 items), web-customer (21 items) |
+| W1 | [WEB/ADMIN_PANEL_APP.md](WEB/ADMIN_PANEL_APP.md) | Web | Admin panel deep-dive: Next.js 16 App Router, 21 dashboard routes + 6 admin-only routes, 138 GraphQL ops (51q/82m/5s), role system (SUPER_ADMIN/ADMIN/BUSINESS_OWNER/BUSINESS_EMPLOYEE), Mapbox live map + Agora PTT, Apollo 3 + graphql-ws, 9 custom hooks, drag-and-drop (dnd-kit), push campaign query builder, ops-wall REST monitor, audit logs, settlements, inventory, all known issues and tech debt. Optimizations applied: `getAuthToken()` util (#1/#2), BannerType enum casts in topbar (#5), businesses/[id] businessType pre-fill bug (#7), ScheduleEditor UTF-8 arrow (#8), debug logs removed (#15), categories GET_BUSINESSES skip (#17) |
+| W2 | [WEB/WEB_CUSTOMER_APP.md](WEB/WEB_CUSTOMER_APP.md) | Web | Web customer deep-dive: Next.js 16 / React 19, 11 routes (home/business/market/product/orders/profile/addresses/checkout), 6 Zustand stores, ~43 GraphQL ops (20q/20m/3s), Mapbox address picker + live order tracking, 5-step signup, animated driver map with cinematic approach, i18n (en/al), Apollo 4 + graphql-ws, all known bugs (market qty stepper, cancelled-order delivered modal, N+1 home load) |
 | UI1 | [ADMIN_MOBILEBUSINESS_UI_CONTEXT.md](ADMIN_MOBILEBUSINESS_UI_CONTEXT.md) | UI | Product types, variant groups, admin/mobile-business UX |
 | UI2 | [ADMIN_PANEL_BUSINESS_SETTLEMENTS.md](ADMIN_PANEL_BUSINESS_SETTLEMENTS.md) | UI | Business-facing settlements semantics, filters, lazy order details |
 
@@ -388,7 +389,14 @@ ARCHITECTURE (A1)
 ### Mobile Driver (mobile-driver/)
 | File | Referenced By |
 |------|--------------|
-| `app/(tabs)/messages.tsx` | M8 — driver↔admin chat; extraMessages persisted to AsyncStorage (key: driver_chat_extra_messages) |
+| `app/_layout.tsx` | M8 — root layout; app-level overlays delegated to `components/AppOverlays.tsx` |
+| `components/AppOverlays.tsx` | M8 — all floating overlays (network banner, PTT, pool FAB, OrderAcceptSheet, message banner) |
+| `hooks/useGlobalOrderAccept.ts` | M8 — thin orchestrator; delegates to `useOrdersFeed` + `useAcceptOrderMutation` |
+| `hooks/useOrdersFeed.ts` | M8 — orders query + subscription + cache management sub-hook |
+| `hooks/useAcceptOrderMutation.ts` | M8 — accept/skip/navigate mutation sub-hook |
+| `hooks/useDriverHeartbeat.ts` | M8 — background heartbeat with retry, 401 handling, and GraphQL error parsing |
+| `app/(tabs)/messages.tsx` | M8 — driver↔admin chat; extraMessages capped at `MAX_EXTRA_MESSAGES = 200` and persisted to AsyncStorage |
+| `utils/__tests__/driver-logic.test.ts` | M8 — 30 pure-logic unit tests (pruneTimestampMap, capMessages, ETA logic, accept error classification) |
 | `utils/secureTokenStore.ts` | O6 |
 | `utils/mapbox.ts` | B1, O5 |
 | `utils/route.ts` | B1, O5 |
@@ -398,13 +406,28 @@ ARCHITECTURE (A1)
 | `app/(tabs)/products.tsx` | UI1 |
 | `app/(tabs)/dashboard.tsx` | UI1 |
 
+### Mobile Business (mobile-business/)
+| File | Referenced By |
+|------|--------------|
+| `lib/apollo.ts` | M13 — Apollo client + WS link; `cache` + `initializeCache()` for apollo3-cache-persist; errorLink forces logout on UNAUTHENTICATED |
+| `app/_layout.tsx` | M13 — calls `initializeCache()` before `ApolloProvider` mounts; `loadTranslation()` call now redundant (onRehydrateStorage handles it) |
+| `store/useLocaleStore.ts` | M13 — `onRehydrateStorage` now loads translations immediately on cold start |
+| `components/StoreClosedOverlay.tsx` | M13 — `pointerEvents="none"` (was `box-none`) |
+| `components/BusinessMessageBanner.tsx` | M13 — migrated from legacy `Animated` to Reanimated (`useSharedValue`, `useAnimatedStyle`, `withSpring`, `withTiming`, `runOnJS`) |
+| `hooks/useNotifications.ts` | M13 — `setNotificationHandler` moved inside hook (guarded by module flag); `resolveDeviceId` now imported from `utils/deviceId.ts` |
+| `hooks/useBusinessDeviceMonitoring.ts` | M13 — `resolveDeviceId` now imported from `utils/deviceId.ts` |
+| `hooks/useAuthInitialization.ts` | M13 — server-round-trip `GET_ME` query after local checks; offline-safe |
+| `utils/deviceId.ts` | M13 — shared `resolveDeviceId()` utility |
+| `graphql/auth.ts` | M13 — `GET_ME` query (GetMeBusiness) added |
+| `app/(tabs)/index.tsx` | M13 — 17 modal/view `useState` consolidated to `useReducer` (`screenReducer`); `isTablet` wrapped in `useMemo`; beep haptic fallback added |
+
 ---
 
 ## Versioning
 
 | Field | Value |
 |-------|-------|
-| Last full scan | 2026-03-28 (admin map BIZ tab + freshness fixes; merged messages page; sidebar collapsible; driver chat persistence; business devices page refactor) |
+| Last full scan | 2026-04-13 (mobile-business M13 optimizations complete: apollo3-cache-persist wired, useReducer for orders screen, locale onRehydrateStorage, UNAUTHENTICATED logout, resolveDeviceId extracted, setNotificationHandler moved, StoreClosedOverlay pointer fix, me query on startup, beep haptic fallback, Reanimated banner migration) |
 | Total MDS files | 50 |
 | Total docs/ files | 35 |
 | Broken links found | 0 |

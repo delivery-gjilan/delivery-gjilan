@@ -45,6 +45,11 @@ type PromoLike = {
     priority?: number | null;
     requiresCode?: boolean | null;
     applyMethod?: string | null;
+    target?: string | null;
+    maxUsagePerUser?: number | null;
+    maxGlobalUsage?: number | null;
+    endsAt?: string | null;
+    eligibleBusinessIds?: string[] | null;
     description?: string | null;
 };
 
@@ -268,6 +273,64 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
             }
 
             return parts.join(' • ');
+        },
+        [t],
+    );
+
+    const getPromotionBreakdownChips = useCallback(
+        (promotion: PromoLike) => {
+            const chips: string[] = [];
+            const applyMethod = (promotion.applyMethod ?? '').toUpperCase();
+            const target = (promotion.target ?? '').toUpperCase();
+
+            chips.push(t.business.promo_scope_business);
+            chips.push(
+                applyMethod === 'CODE_REQUIRED' || promotion.code
+                    ? t.business.promo_badge_code_required
+                    : t.business.promo_badge_auto_apply,
+            );
+
+            if (target === 'FIRST_ORDER') {
+                chips.push(t.business.promo_target_first_order);
+            } else if (target === 'SPECIFIC_USERS') {
+                chips.push(t.business.promo_target_specific_users);
+            }
+
+            if (typeof promotion.spendThreshold === 'number' && promotion.spendThreshold > 0) {
+                chips.push(
+                    t.business.promo_chip_min_spend.replace(
+                        '{{amount}}',
+                        `€${Number(promotion.spendThreshold).toFixed(2)}`,
+                    ),
+                );
+            }
+
+            if (typeof promotion.maxUsagePerUser === 'number' && promotion.maxUsagePerUser > 0) {
+                if (promotion.maxUsagePerUser === 1) {
+                    chips.push(t.business.promo_chip_one_time_only);
+                } else {
+                    chips.push(
+                        t.business.promo_chip_usage_per_user.replace(
+                            '{{count}}',
+                            String(promotion.maxUsagePerUser),
+                        ),
+                    );
+                }
+            }
+
+            if (promotion.endsAt) {
+                const date = new Date(promotion.endsAt);
+                if (!Number.isNaN(date.getTime())) {
+                    chips.push(
+                        t.business.promo_chip_ends_on.replace(
+                            '{{date}}',
+                            date.toLocaleDateString(),
+                        ),
+                    );
+                }
+            }
+
+            return chips.slice(0, 4);
         },
         [t],
     );
@@ -520,6 +583,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
 
     const selectedPromoLabel = selectedPromo ? formatPromotionLabel(selectedPromo) : null;
     const selectedPromoCondition = selectedPromo ? formatPromotionCondition(selectedPromo) : null;
+    const selectedPromoBreakdownChips = selectedPromo ? getPromotionBreakdownChips(selectedPromo) : [];
     const promoRequiresCode = Boolean(selectedPromo?.requiresCode ?? selectedPromo?.code);
 
     // ─── Loading / Error States ─────────────────────────────
@@ -746,6 +810,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                                         const isSelected = (promo.id ?? null) === (selectedPromo?.id ?? null);
                                         const promoLabel = formatPromotionLabel(promo);
                                         const promoCondition = formatPromotionCondition(promo);
+                                        const promoBreakdownChips = getPromotionBreakdownChips(promo);
                                         const isCodePromo = Boolean(promo.requiresCode ?? promo.code);
 
                                         return (
@@ -791,6 +856,27 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                                                         <Text style={{ color: theme.colors.subtext, fontSize: 11, marginTop: 2 }} numberOfLines={1}>
                                                             {promoCondition}
                                                         </Text>
+                                                        {promoBreakdownChips.length > 0 && (
+                                                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 6, gap: 4 }}>
+                                                                {promoBreakdownChips.map((chip, chipIdx) => (
+                                                                    <View
+                                                                        key={`${promo.id ?? idx}-chip-${chipIdx}`}
+                                                                        style={{
+                                                                            borderRadius: 999,
+                                                                            borderWidth: 1,
+                                                                            borderColor: theme.colors.border,
+                                                                            backgroundColor: theme.colors.background,
+                                                                            paddingHorizontal: 7,
+                                                                            paddingVertical: 2,
+                                                                        }}
+                                                                    >
+                                                                        <Text style={{ color: theme.colors.subtext, fontSize: 10, fontWeight: '600' }} numberOfLines={1}>
+                                                                            {chip}
+                                                                        </Text>
+                                                                    </View>
+                                                                ))}
+                                                            </View>
+                                                        )}
                                                         {!!promo.description && (
                                                             <Text style={{ color: theme.colors.subtext, fontSize: 11, marginTop: 2 }} numberOfLines={1}>
                                                                 {promo.description}
@@ -1219,6 +1305,28 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                             <Text style={{ color: theme.colors.subtext, fontSize: 12, marginTop: 10 }}>
                                 {selectedPromoCondition}
                             </Text>
+                        )}
+
+                        {selectedPromoBreakdownChips.length > 0 && (
+                            <View style={{ marginTop: 10, flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                                {selectedPromoBreakdownChips.map((chip, idx) => (
+                                    <View
+                                        key={`selected-chip-${idx}`}
+                                        style={{
+                                            borderRadius: 999,
+                                            borderWidth: 1,
+                                            borderColor: theme.colors.border,
+                                            backgroundColor: theme.colors.background,
+                                            paddingHorizontal: 8,
+                                            paddingVertical: 3,
+                                        }}
+                                    >
+                                        <Text style={{ color: theme.colors.subtext, fontSize: 11, fontWeight: '600' }}>
+                                            {chip}
+                                        </Text>
+                                    </View>
+                                ))}
+                            </View>
                         )}
 
                         <View style={{ marginTop: 12, gap: 10 }}>

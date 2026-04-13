@@ -2,7 +2,7 @@ import '../global.css';
 import { useEffect, useRef, useState } from 'react';
 import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-router';
 import { ApolloProvider, useSubscription } from '@apollo/client/react';
-import { apolloClient } from '@/lib/apollo';
+import { apolloClient, initializeCache } from '@/lib/apollo';
 import { useAuthStore } from '@/store/authStore';
 import { useLocaleStore } from '@/store/useLocaleStore';
 import { useAuthInitialization } from '@/hooks/useAuthInitialization';
@@ -100,6 +100,20 @@ function AppContent() {
 }
 
 export default function RootLayout() {
+    const [cacheReady, setCacheReady] = useState(false);
+
+    useEffect(() => {
+        initializeCache().finally(() => setCacheReady(true));
+    }, []);
+
+    if (!cacheReady) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
+                <ActivityIndicator size="large" color="#7C3AED" />
+            </View>
+        );
+    }
+
     return (
         <ApolloProvider client={apolloClient}>
             <AppContent />

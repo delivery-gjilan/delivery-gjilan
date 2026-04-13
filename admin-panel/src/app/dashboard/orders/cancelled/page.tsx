@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import { useMemo, useState } from "react";
@@ -8,6 +7,7 @@ import { ISSUE_RECOVERY_PROMOTION } from "@/graphql/operations/promotions/mutati
 import { GET_RECOVERY_PROMOTIONS } from "@/graphql/operations/promotions/queries";
 import { SEND_PUSH_NOTIFICATION } from "@/graphql/operations/notifications";
 import { Package, Store, User, Hash, Copy, Check, Phone, HeartHandshake, X, CheckCircle2 } from "lucide-react";
+import { PromotionType } from "@/gql/graphql";
 import Link from "next/link";
 
 /* ---------------------------------------------------------
@@ -150,7 +150,7 @@ export default function CancelledOrdersPage() {
 
     // Recovery modal state
     const [recoveryTarget, setRecoveryTarget] = useState<RecoveryTarget | null>(null);
-    const [recoveryType, setRecoveryType] = useState<"FREE_DELIVERY" | "FIXED_AMOUNT" | "PERCENTAGE">("FREE_DELIVERY");
+    const [recoveryType, setRecoveryType] = useState<PromotionType>(PromotionType.FreeDelivery);
     const [recoveryAmount, setRecoveryAmount] = useState("");
     const [recoveryReason, setRecoveryReason] = useState("");
     const [recoverySent, setRecoverySent] = useState<"success" | "error" | null>(null);
@@ -179,7 +179,7 @@ export default function CancelledOrdersPage() {
             userName: `${order.user.firstName} ${order.user.lastName}`,
             phoneNumber: order.user.phoneNumber,
         });
-        setRecoveryType("FREE_DELIVERY");
+        setRecoveryType(PromotionType.FreeDelivery);
         setRecoveryAmount("");
         setRecoveryReason(order.cancellationReason ? `Order #${order.displayId} cancelled: ${order.cancellationReason}` : `Order #${order.displayId} was cancelled`);
         setPushEnabled(true);
@@ -457,7 +457,7 @@ export default function CancelledOrdersPage() {
                                         <button
                                             key={opt.value}
                                             type="button"
-                                            onClick={() => setRecoveryType(opt.value)}
+                                            onClick={() => setRecoveryType(opt.value as PromotionType)}
                                             className={`py-2 px-3 rounded-lg border text-xs font-medium transition-colors ${
                                                 recoveryType === opt.value
                                                     ? "border-violet-500 bg-violet-950 text-violet-300"

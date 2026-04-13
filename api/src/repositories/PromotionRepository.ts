@@ -4,11 +4,14 @@ import {
     userPromotions,
     promotionUsage,
     promotionBusinessEligibility,
+    promotionAudienceGroups,
+    promotionAudienceGroupMembers,
     userPromoMetadata,
+    users,
     DbPromotion,
     NewDbPromotion,
 } from '@/database/schema';
-import { eq, and, or, isNull, lte, gte, ne, desc } from 'drizzle-orm';
+import { eq, and, or, isNull, lte, gte, ne, desc, inArray, ilike, sql } from 'drizzle-orm';
 
 /** NOTE: The promotions table has an isDeleted column. All queries MUST filter by isDeleted=false.
  *  Deletions MUST set isDeleted=true instead of removing the row. See SOFT_DELETE_CONVENTION.md. */
@@ -21,6 +24,11 @@ export interface PromotionFilters {
     hasExpired?: boolean;
     limit?: number;
     offset?: number;
+}
+
+export interface PromotionAudienceGroupFilters {
+    isActive?: boolean;
+    search?: string;
 }
 
 export class PromotionRepository {
@@ -236,6 +244,205 @@ export class PromotionRepository {
                     }))
                 );
         }
+    }
+
+    async createAudienceGroup(input: {
+        name: string;
+        description?: string | null;
+        userIds: string[];
+        createdBy?: string | null;
+        isActive?: boolean;
+    }): Promise<{ id: string; name: string; description: string | null; isActive: boolean; createdAt: string; updatedAt: string }> {
+        const [group] = await this.db
+            .insert(promotionAudienceGroups)
+            .values({
+                name: input.name,
+                description: input.description ?? null,
+                createdBy: input.createdBy ?? null,
+                isActive: input.isActive ?? true,
+            })
+            .returning();
+
+        if (!group) {
+            throw new Error('Failed to create promotion audience group');
+        }
+
+        if (input.userIds.length > 0) {
+            await this.db
+                .insert(promotionAudienceGroupMembers)
+                .values(
+                    input.userIds.map((userId) => ({
+                        groupId: group.id,
+                        userId,
+                    })),
+                )
+                .onConflictDoNothing();
+        }
+
+        return {
+            id: group.id,
+            name: group.name,
+            description: group.description,
+            isActive: group.isActive,
+            createdAt: String(group.createdAt),
+            updatedAt: String(group.updatedAt),
+        };
+    }
+
+    async updateAudienceGroup(input: {
+        id: string;
+        name?: string;
+        description?: string | null;
+        userIds?: string[];
+        isActive?: boolean;
+    }): Promise<{ id: string; name: string; description: string | null; isActive: boolean; createdAt: string; updatedAt: string }> {
+        const updates: Record<string, unknown> = {};
+        if (input.name !== undefined) updates.name = input.name;
+        if (input.description !== undefined) updates.description = input.description;
+        if (input.isActive !== undefined) updates.isActive = input.isActive;
+
+        let group;
+        if (Object.keys(updates).length > 0) {
+            const [updated] = await this.db
+                .update(promotionAudienceGroups)
+                .set(updates)
+                .where(eq(promotionAudienceGroups.id, input.id))
+                .returning();
+            group = updated;
+        } else {
+            const [existing] = await this.db
+                .select()
+                .from(promotionAudienceGroups)
+                .where(eq(promotionAudienceGroups.id, input.id))
+                .limit(1);
+            group = existing;
+        }
+
+        if (!group) {
+            throw new Error('Promotion audience group not found');
+        }
+
+        if (input.userIds) {
+            await this.db
+                .delete(promotionAudienceGroupMembers)
+                .where(eq(promotionAudienceGroupMembers.groupId, input.id));
+
+            if (input.userIds.length > 0) {
+                await this.db
+                    .insert(promotionAudienceGroupMembers)
+                    .values(
+                        input.userIds.map((userId) => ({
+                            groupId: input.id,
+                            userId,
+                        })),
+                    )
+                    .onConflictDoNothing();
+            }
+        }
+
+        return {
+            id: group.id,
+            name: group.name,
+            description: group.description,
+            isActive: group.isActive,
+            createdAt: String(group.createdAt),
+            updatedAt: String(group.updatedAt),
+        };
+    }
+
+    async deleteAudienceGroup(id: string): Promise<boolean> {
+        const [deleted] = await this.db
+            .delete(promotionAudienceGroups)
+            .where(eq(promotionAudienceGroups.id, id))
+            .returning({ id: promotionAudienceGroups.id });
+
+        return !!deleted;
+    }
+
+    async listAudienceGroups(filters: PromotionAudienceGroupFilters = {}): Promise<Array<{
+        id: string;
+        name: string;
+        description: string | null;
+        isActive: boolean;
+        createdAt: string;
+        updatedAt: string;
+        memberCount: number;
+        members: any[];
+    }>> {
+        const conditions = [];
+
+        if (filters.isActive !== undefined) {
+            conditions.push(eq(promotionAudienceGroups.isActive, filters.isActive));
+        }
+
+        if (filters.search?.trim()) {
+            const term = `%${filters.search.trim()}%`;
+            conditions.push(
+                or(
+                    ilike(promotionAudienceGroups.name, term),
+                    ilike(promotionAudienceGroups.description, term),
+                )!,
+            );
+        }
+
+        const groups = await this.db
+            .select()
+            .from(promotionAudienceGroups)
+            .where(conditions.length > 0 ? and(...conditions) : undefined)
+            .orderBy(promotionAudienceGroups.name);
+
+        const groupIds = groups.map((g) => g.id);
+        if (groupIds.length === 0) return [];
+
+        const memberRows = await this.db
+            .select({
+                groupId: promotionAudienceGroupMembers.groupId,
+                user: users,
+            })
+            .from(promotionAudienceGroupMembers)
+            .innerJoin(users, eq(users.id, promotionAudienceGroupMembers.userId))
+            .where(inArray(promotionAudienceGroupMembers.groupId, groupIds));
+
+        const membersByGroup = new Map<string, any[]>();
+        for (const row of memberRows) {
+            const existing = membersByGroup.get(row.groupId) ?? [];
+            existing.push(row.user);
+            membersByGroup.set(row.groupId, existing);
+        }
+
+        return groups.map((group) => {
+            const members = membersByGroup.get(group.id) ?? [];
+            return {
+                id: group.id,
+                name: group.name,
+                description: group.description,
+                isActive: group.isActive,
+                createdAt: String(group.createdAt),
+                updatedAt: String(group.updatedAt),
+                memberCount: members.length,
+                members,
+            };
+        });
+    }
+
+    async getAudienceGroupUserIds(groupIds: string[], onlyActiveGroups = true): Promise<string[]> {
+        if (groupIds.length === 0) return [];
+
+        const rows = await this.db
+            .select({ userId: promotionAudienceGroupMembers.userId })
+            .from(promotionAudienceGroupMembers)
+            .innerJoin(
+                promotionAudienceGroups,
+                eq(promotionAudienceGroups.id, promotionAudienceGroupMembers.groupId),
+            )
+            .where(
+                and(
+                    inArray(promotionAudienceGroupMembers.groupId, groupIds),
+                    onlyActiveGroups ? eq(promotionAudienceGroups.isActive, true) : sql`true`,
+                ),
+            );
+
+        return Array.from(new Set(rows.map((r) => r.userId)));
     }
 
     async getBusinessEligibility(promotionId: string): Promise<string[]> {

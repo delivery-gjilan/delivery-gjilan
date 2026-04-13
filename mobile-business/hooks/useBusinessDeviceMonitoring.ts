@@ -3,6 +3,7 @@ import { AppState, Platform } from 'react-native';
 import { useMutation, useSubscription } from '@apollo/client/react';
 import * as Battery from 'expo-battery';
 import Constants from 'expo-constants';
+import { resolveDeviceId } from '@/utils/deviceId';
 import { useAuthStore } from '@/store/authStore';
 import { getWsHealthSnapshot } from '@/lib/apollo';
 import { ORDERS_SUBSCRIPTION } from '@/graphql/orders';
@@ -14,10 +15,6 @@ import {
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const ORDER_SIGNAL_THROTTLE_MS = 4_000;
-
-function resolveDeviceId(): string {
-  return Constants.installationId || Constants.sessionId || Constants.deviceName || 'unknown';
-}
 
 export function useBusinessDeviceMonitoring() {
   const { isAuthenticated, user } = useAuthStore();

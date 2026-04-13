@@ -39,6 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [authCheckComplete, setAuthCheckComplete] = useState(false);
+    const [hasStoredToken, setHasStoredToken] = useState(false);
     const [loginMutation] = useMutation(LOGIN_MUTATION);
 
     useEffect(() => {
@@ -48,6 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 const userData = localStorage.getItem("userData");
                 if (token && userData) {
                     setUser(JSON.parse(userData));
+                    setHasStoredToken(true);
                 }
             } catch {
                 localStorage.removeItem("authToken");
@@ -60,6 +62,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
         checkAuth();
     }, []);
+
+    // Validate the stored token server-side on mount
+    const { data: meData, error: meError } = useQuery(ME_QUERY, {
+        skip: !hasStoredToken,
+        fetchPolicy: "network-only",
+    });
+
+    useEffect(() => {
+        const me = (meData as any)?.me;
+        if (!me) return;
+        const validated: User = {
+            id: me.id ?? "",
+            email: me.email ?? "",
+            firstName: me.firstName ?? null,
+            lastName: me.lastName ?? null,
+            signupStep: me.signupStep ?? null,
+            emailVerified: me.emailVerified ?? false,
+            phoneVerified: me.phoneVerified ?? false,
+            phoneNumber: me.phoneNumber ?? null,
+            role: me.role ?? null,
+            preferredLanguage: me.preferredLanguage ?? null,
+            emailOptOut: me.emailOptOut ?? null,
+        };
+        localStorage.setItem("userData", JSON.stringify(validated));
+        setUser(validated);
+    }, [meData]);
+
+    useEffect(() => {
+        if (!meError) return;
+        // Token is invalid or expired — clear auth state
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("refreshToken");
+        localStorage.removeItem("userData");
+        setUser(null);
+        setHasStoredToken(false);
+    }, [meError]);
 
     const login = useCallback(
         async (email: string, password: string) => {

@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { getValidAccessToken } from '@/lib/authSession';
+import { apolloClient } from '@/lib/apollo';
+import { GET_ME } from '@/graphql/auth';
 
 /**
  * Hook to initialize authentication state on app startup
@@ -62,6 +64,30 @@ export function useAuthInitialization() {
                     setAuthInitComplete(true);
                     hasInitialized.current = true;
                     return;
+                }
+
+                // Server-side verification: confirm the token is still valid and the server
+                // recognises this user with the expected role/business association.
+                try {
+                    const { data } = await apolloClient.query({
+                        query: GET_ME,
+                        fetchPolicy: 'network-only',
+                    });
+                    const serverUser = data?.me;
+                    if (
+                        !serverUser ||
+                        (serverUser.role !== 'BUSINESS_OWNER' && serverUser.role !== 'BUSINESS_EMPLOYEE') ||
+                        !serverUser.businessId
+                    ) {
+                        console.log('[AuthInit] Server me query failed business check, logging out');
+                        await logout();
+                        setAuthInitComplete(true);
+                        hasInitialized.current = true;
+                        return;
+                    }
+                } catch (meError) {
+                    // Network unavailable — allow offline startup with local token
+                    console.warn('[AuthInit] me query failed (offline?), proceeding with local token', meError);
                 }
 
                 // All good - load token into memory, navigation guard will route to tabs

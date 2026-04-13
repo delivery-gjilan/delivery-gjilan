@@ -18,7 +18,7 @@ export function ProductHeader({ product }: ProductHeaderProps) {
             {/* Product Image */}
             <View style={{ width: '100%', height: 280, backgroundColor: theme.colors.card, borderBottomLeftRadius: 20, borderBottomRightRadius: 20, overflow: 'hidden' }}>
                 {product.imageUrl ? (
-                    <Image source={{ uri: product.imageUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                    <Image source={{ uri: product.imageUrl }} style={{ width: '100%', height: '100%' }} contentFit="cover" cachePolicy="memory-disk" transition={200} />
                 ) : (
                     <View style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.card }}>
                         <Ionicons name="image-outline" size={64} color={theme.colors.subtext} />

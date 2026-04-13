@@ -476,7 +476,7 @@ const DriverAvatar = ({
     const backgroundColor = getAvatarColor(driver?.id);
 
     if (imageUrl) {
-        return <Image source={{ uri: imageUrl }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
+        return <Image source={{ uri: imageUrl }} style={{ width: size, height: size, borderRadius: size / 2 }} contentFit="cover" cachePolicy="memory-disk" transition={200} />;
     }
 
     return (
@@ -2257,7 +2257,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                                     marginRight: 10, overflow: 'hidden',
                                                 }}>
                                                     {item.imageUrl ? (
-                                                        <Image source={{ uri: item.imageUrl }} style={{ width: 28, height: 28, borderRadius: 8 }} />
+                                                        <Image source={{ uri: item.imageUrl }} style={{ width: 28, height: 28, borderRadius: 8 }} contentFit="cover" cachePolicy="memory-disk" transition={200} />
                                                     ) : (
                                                         <Ionicons name="fast-food-outline" size={13} color={config.color} />
                                                     )}

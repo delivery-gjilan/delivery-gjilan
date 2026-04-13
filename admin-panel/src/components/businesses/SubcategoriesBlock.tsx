@@ -1,4 +1,3 @@
-﻿// @ts-nocheck
 "use client";
 
 import { useMemo, useState } from "react";
@@ -92,7 +91,6 @@ export default function SubcategoriesBlock({ businessId }: { businessId: string 
 
         const { success, error: updateErr } = await updateSubcategory(editForm.id, {
             name: editForm.name,
-            categoryId: editForm.categoryId,
         });
 
         if (success) {

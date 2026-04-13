@@ -1,10 +1,10 @@
-// @ts-nocheck
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { GET_BANNERS, CREATE_BANNER, UPDATE_BANNER, DELETE_BANNER, UPDATE_BANNER_ORDER } from '@/graphql/operations/banners';
 import type { GetBannersQuery as BannersQuery, CreateBannerInput } from '@/gql/graphql';
+import { BannerMediaType, BannerDisplayContext } from '@/gql/graphql';
 import { GET_BUSINESSES_LIST, GET_BUSINESS_PRODUCTS, GET_BUSINESS_PERFORMANCE_STATS } from '@/graphql/operations/banners/businessProducts';
 import { GET_PROMOTIONS } from '@/graphql/operations/promotions/queries';
 import Button from '@/components/ui/Button';
@@ -20,7 +20,7 @@ interface Banner {
   title?: string | null;
   subtitle?: string | null;
   imageUrl: string;
-  mediaType: 'IMAGE' | 'GIF' | 'VIDEO';
+  mediaType: BannerMediaType;
   businessId?: string | null;
   business?: { id: string; name: string } | null;
   productId?: string | null;
@@ -29,7 +29,7 @@ interface Banner {
   promotion?: { id: string; name: string; code?: string | null } | null;
   linkType?: string | null;
   linkTarget?: string | null;
-  displayContext: 'HOME' | 'BUSINESS' | 'CATEGORY' | 'PRODUCT' | 'CART' | 'ALL';
+  displayContext: BannerDisplayContext;
   startsAt?: string | null;
   endsAt?: string | null;
   sortOrder: number;
@@ -42,13 +42,13 @@ interface BannerFormData {
   title?: string;
   subtitle?: string;
   imageUrl: string;
-  mediaType: 'IMAGE' | 'GIF' | 'VIDEO';
+  mediaType: BannerMediaType;
   businessId?: string;
   productId?: string;
   promotionId?: string;
   linkType?: string;
   linkTarget?: string;
-  displayContext: 'HOME' | 'BUSINESS' | 'CATEGORY' | 'PRODUCT' | 'CART' | 'ALL';
+  displayContext: BannerDisplayContext;
   startsAt?: string;
   endsAt?: string;
   isActive: boolean;
@@ -68,13 +68,13 @@ export default function BannersPage() {
     title: '',
     subtitle: '',
     imageUrl: '',
-    mediaType: 'IMAGE',
+    mediaType: BannerMediaType.Image,
     businessId: '',
     productId: '',
     promotionId: '',
     linkType: '',
     linkTarget: '',
-    displayContext: 'HOME',
+    displayContext: BannerDisplayContext.Home,
     startsAt: '',
     endsAt: '',
     isActive: true,
@@ -177,13 +177,13 @@ export default function BannersPage() {
       title: '',
       subtitle: '',
       imageUrl: '',
-      mediaType: 'IMAGE',
+      mediaType: BannerMediaType.Image,
       businessId: '',
       productId: '',
       promotionId: '',
       linkType: '',
       linkTarget: '',
-      displayContext: 'HOME',
+      displayContext: BannerDisplayContext.Home,
       startsAt: '',
       endsAt: '',
       isActive: true,
@@ -197,13 +197,13 @@ export default function BannersPage() {
       title: banner.title || '',
       subtitle: banner.subtitle || '',
       imageUrl: banner.imageUrl,
-      mediaType: banner.mediaType || 'IMAGE',
+      mediaType: banner.mediaType || BannerMediaType.Image,
       businessId: banner.businessId || '',
       productId: banner.productId || '',
       promotionId: banner.promotionId || '',
       linkType: banner.linkType || '',
       linkTarget: banner.linkTarget || '',
-      displayContext: banner.displayContext || 'HOME',
+      displayContext: banner.displayContext || BannerDisplayContext.Home,
       startsAt: banner.startsAt ? new Date(banner.startsAt).toISOString().slice(0, 16) : '',
       endsAt: banner.endsAt ? new Date(banner.endsAt).toISOString().slice(0, 16) : '',
       isActive: banner.isActive,
@@ -223,13 +223,13 @@ export default function BannersPage() {
       title: '',
       subtitle: '',
       imageUrl: '',
-      mediaType: 'IMAGE',
+      mediaType: BannerMediaType.Image,
       businessId: '',
       productId: '',
       promotionId: '',
       linkType: '',
       linkTarget: '',
-      displayContext: 'HOME',
+      displayContext: BannerDisplayContext.Home,
       startsAt: '',
       endsAt: '',
       isActive: true,
@@ -684,7 +684,7 @@ export default function BannersPage() {
                 </label>
                 <Input
                   type="text"
-                  value={formData.title}
+                  value={formData.title ?? ""}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   placeholder="Banner title"
                 />
@@ -696,7 +696,7 @@ export default function BannersPage() {
                 </label>
                 <Input
                   type="text"
-                  value={formData.subtitle}
+                  value={formData.subtitle ?? ""}
                   onChange={(e) => setFormData({ ...formData, subtitle: e.target.value })}
                   placeholder="Banner subtitle"
                 />
@@ -732,8 +732,8 @@ export default function BannersPage() {
                   Media Type
                 </label>
                 <Select
-                  value={formData.mediaType}
-                  onChange={(e) => setFormData({ ...formData, mediaType: e.target.value as any })}
+                  value={formData.mediaType ?? BannerMediaType.Image}
+                  onChange={(e) => setFormData({ ...formData, mediaType: e.target.value as BannerMediaType })}
                 >
                   <option value="IMAGE">Image</option>
                   <option value="GIF">GIF</option>
@@ -754,7 +754,7 @@ export default function BannersPage() {
                   Business (Optional)
                 </label>
                 <Select
-                  value={formData.businessId}
+                  value={formData.businessId ?? ""}
                   onChange={(e) => {
                     setFormData({ ...formData, businessId: e.target.value, productId: '' });
                   }}
@@ -775,7 +775,7 @@ export default function BannersPage() {
                     Product (Optional)
                   </label>
                   <Select
-                    value={formData.productId}
+                    value={formData.productId ?? ""}
                     onChange={(e) => setFormData({ ...formData, productId: e.target.value })}
                   >
                     <option value="">None</option>
@@ -794,7 +794,7 @@ export default function BannersPage() {
                   Promotion (Optional)
                 </label>
                 <Select
-                  value={formData.promotionId}
+                  value={formData.promotionId ?? ""}
                   onChange={(e) => setFormData({ ...formData, promotionId: e.target.value })}
                 >
                   <option value="">None</option>
@@ -818,8 +818,8 @@ export default function BannersPage() {
                   Display Context
                 </label>
                 <Select
-                  value={formData.displayContext}
-                  onChange={(e) => setFormData({ ...formData, displayContext: e.target.value as any })}
+                  value={formData.displayContext ?? BannerDisplayContext.Home}
+                  onChange={(e) => setFormData({ ...formData, displayContext: e.target.value as BannerDisplayContext })}
                 >
                   <option value="HOME">Home Page</option>
                   <option value="BUSINESS">Business Page</option>
@@ -835,7 +835,7 @@ export default function BannersPage() {
                   Link Type (Legacy)
                 </label>
                 <Select
-                  value={formData.linkType}
+                  value={formData.linkType ?? ""}
                   onChange={(e) => setFormData({ ...formData, linkType: e.target.value })}
                 >
                   <option value="">No Link</option>
@@ -854,7 +854,7 @@ export default function BannersPage() {
                   </label>
                   <Input
                     type="text"
-                    value={formData.linkTarget}
+                    value={formData.linkTarget ?? ""}
                     onChange={(e) => setFormData({ ...formData, linkTarget: e.target.value })}
                     placeholder={
                       formData.linkType === 'url'

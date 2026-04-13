@@ -21,10 +21,12 @@ interface GetBusinessesData {
 export default function CategoriesPage() {
     const { admin } = useAuth();
     const [selectedBusinessId, setSelectedBusinessId] = useState<string>("");
-    const { data, loading } = useQuery<GetBusinessesData>(GET_BUSINESSES);
+    const isBusinessUser = admin?.role === "BUSINESS_OWNER" || admin?.role === "BUSINESS_EMPLOYEE";
+    const { data, loading } = useQuery<GetBusinessesData>(GET_BUSINESSES, {
+        skip: isBusinessUser,
+    });
 
     const businesses = data?.businesses || [];
-    const isBusinessUser = admin?.role === "BUSINESS_OWNER" || admin?.role === "BUSINESS_EMPLOYEE";
 
     const effectiveBusinessId = useMemo(() => {
         if (isBusinessUser) {

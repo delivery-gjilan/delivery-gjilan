@@ -50,6 +50,7 @@ import {
     UNADOPT_CATALOG_PRODUCT,
 } from "@/graphql/operations/products";
 import { useAuth } from "@/lib/auth-context";
+import { getAuthToken } from "@/lib/utils/auth";
 
 /* ===============================================
    TYPES
@@ -386,7 +387,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
         formData.append('image', file);
         formData.append('folder', folder);
 
-        const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+        const token = getAuthToken();
         try {
             const response = await fetch(`${apiBase}/api/upload/image`, {
                 method: 'POST',
@@ -407,7 +408,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
     }
 
     async function deleteImage(imageUrl: string): Promise<void> {
-        const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+        const token = getAuthToken();
         try {
             await fetch(`${apiBase}/api/upload/image`, {
                 method: 'DELETE',

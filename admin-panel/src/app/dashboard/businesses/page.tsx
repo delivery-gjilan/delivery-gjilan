@@ -1,9 +1,9 @@
-﻿// @ts-nocheck
 "use client";
 
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "@apollo/client/react";
 import { useState } from "react";
+import { getAuthToken } from "@/lib/utils/auth";
 
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -48,6 +48,7 @@ interface Business {
     location?: Location;
     workingHours?: WorkingHours;
     schedule?: Array<{ id: string; dayOfWeek: number; opensAt: string; closesAt: string }>;
+    minOrderAmount?: number | null;
 }
 
 interface GetBusinessesData {
@@ -147,7 +148,7 @@ export default function BusinessesPage() {
         formData.append('image', file);
         formData.append('folder', folder);
 
-        const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+        const token = getAuthToken();
         try {
             const response = await fetch(`${apiBase}/api/upload/image`, {
                 method: 'POST',
@@ -168,7 +169,7 @@ export default function BusinessesPage() {
     }
 
     async function deleteImage(imageUrl: string): Promise<void> {
-        const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+        const token = getAuthToken();
         try {
             await fetch(`${apiBase}/api/upload/image`, {
                 method: 'DELETE',
@@ -493,7 +494,7 @@ export default function BusinessesPage() {
                                 </Td>
                                 <Td>
                                     <span className="text-zinc-400 text-sm truncate max-w-[200px] block">
-                                        {b.location?.address || <span className="text-zinc-600">—</span>}
+                                        {b.location?.address || <span className="text-zinc-600">�</span>}
                                     </span>
                                 </Td>
                                 <Td>
@@ -821,7 +822,7 @@ export default function BusinessesPage() {
                     {/* Minimum Order */}
                     <div className="border-t border-gray-700 pt-4">
                         <label className="block text-xs text-gray-500 mb-1">
-                            Minimum Order Amount (€)
+                            Minimum Order Amount (�)
                         </label>
                         <Input
                             type="number"
@@ -1056,7 +1057,7 @@ export default function BusinessesPage() {
                         <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Ordering Rules</h3>
                         <div>
                             <label className="block text-sm font-medium text-gray-400 mb-1">
-                                Minimum Order Amount (€)
+                                Minimum Order Amount (�)
                             </label>
                             <Input
                                 type="number"

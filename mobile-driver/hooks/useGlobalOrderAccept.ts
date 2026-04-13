@@ -1,16 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { NetworkStatus } from '@apollo/client';
-import { AppState } from 'react-native';
-import { useApolloClient, useMutation, useQuery, useSubscription } from '@apollo/client/react';
-import { GET_ORDERS, ALL_ORDERS_UPDATED, ASSIGN_DRIVER_TO_ORDER } from '@/graphql/operations/orders';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@apollo/client/react';
 import { GET_MY_DRIVER_METRICS } from '@/graphql/operations/driver';
 import { useAuthStore } from '@/store/authStore';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import { useOrderAcceptStore } from '@/store/orderAcceptStore';
-import { useNavigationStore } from '@/store/navigationStore';
-import { useNavigationLocationStore } from '@/store/navigationLocationStore';
-import { useRouter } from 'expo-router';
-import type { NavigationPhase } from '@/store/navigationStore';
+import { useOrdersFeed } from '@/hooks/useOrdersFeed';
+import { useAcceptOrderMutation } from '@/hooks/useAcceptOrderMutation';
 
 /**
  * Global order-accept hook — runs in AppContent (root layout) so the accept
@@ -20,78 +15,27 @@ import type { NavigationPhase } from '@/store/navigationStore';
  *  - ALL_ORDERS_UPDATED subscription (updates Apollo cache once, globally)
  *  - Auto-present logic (capacity-aware)
  *  - Accept / skip handlers
+ *
+ * Sub-hooks:
+ *  - useOrdersFeed   — network query + subscription + bootstrap state
+ *  - useAcceptOrderMutation — accept/skip/navigate mutation logic
  */
 export function useGlobalOrderAccept() {
-    const apolloClient = useApolloClient();
     const hasHydrated = useAuthStore((s) => s.hasHydrated);
     const currentDriverId = useAuthStore((s) => s.user?.id);
     const isOnline = useAuthStore((s) => s.isOnline);
     const { dispatchModeEnabled } = useStoreStatus();
-    const startNavigation = useNavigationStore((s) => s.startNavigation);
-    const router = useRouter();
 
     const pendingOrder = useOrderAcceptStore((s) => s.pendingOrder);
     const autoCountdown = useOrderAcceptStore((s) => s.autoCountdown);
     const accepting = useOrderAcceptStore((s) => s.accepting);
     const acceptError = useOrderAcceptStore((s) => s.acceptError);
     const skippedAt = useOrderAcceptStore((s) => s.skippedAt);
-    const lastOrdersRefreshAt = useRef(0);
-    const [bootstrapExpired, setBootstrapExpired] = useState(false);
 
-    // ── Orders query (keeps cache warm when driver is off the map) ──
-    const { data, refetch, networkStatus } = useQuery(GET_ORDERS, {
-        fetchPolicy: 'network-only',
-        nextFetchPolicy: 'cache-first',
-        notifyOnNetworkStatusChange: true,
-        skip: !hasHydrated || !currentDriverId,
-    });
-
-    // True once the first successful network response arrives — prevents
-    // auto-present from firing against a stale persisted Apollo cache on
-    // app cold-start.  With fetchPolicy: 'network-only', `data` is only
-    // populated from an actual network response (not the persisted cache),
-    // so checking data + ready status is sufficient.
-    const [networkReady, setNetworkReady] = useState(false);
-    useEffect(() => {
-        if (!networkReady && data && (data as any)?.orders?.orders && networkStatus === NetworkStatus.ready) {
-            setNetworkReady(true);
-        }
-    }, [networkStatus, networkReady, data]);
-
-    useEffect(() => {
-        setBootstrapExpired(false);
-        if (!currentDriverId) {
-            return;
-        }
-        // Avoid an endless full-screen loader if the initial network request
-        // hangs during cold start.
-        const timer = setTimeout(() => setBootstrapExpired(true), 12000);
-        return () => clearTimeout(timer);
-    }, [currentDriverId]);
-
-    const refreshOrders = useCallback(async () => {
-        const now = Date.now();
-        if (now - lastOrdersRefreshAt.current < 2500) {
-            return;
-        }
-        lastOrdersRefreshAt.current = now;
-        try {
-            await refetch();
-        } catch {
-            // Best-effort freshness sync; keep existing cache if refetch fails.
-        }
-    }, [refetch]);
-
-    useEffect(() => {
-        if (networkReady || !currentDriverId) return;
-        if (networkStatus !== NetworkStatus.error) return;
-
-        const retryTimer = setTimeout(() => {
-            void refreshOrders();
-        }, 3000);
-
-        return () => clearTimeout(retryTimer);
-    }, [currentDriverId, networkReady, networkStatus, refreshOrders]);
+    // ── Orders feed (query + subscription + bootstrap) ──
+    const driverId = hasHydrated ? currentDriverId : undefined;
+    const { orders, networkReady, isOrdersBootstrapping, refreshOrders, lastOrdersRefreshAt } =
+        useOrdersFeed(driverId);
 
     // ── Driver metrics for capacity check ──
     const { data: metricsData } = useQuery(GET_MY_DRIVER_METRICS, {
@@ -101,99 +45,29 @@ export function useGlobalOrderAccept() {
     const maxActiveOrders: number =
         (metricsData as any)?.myDriverMetrics?.maxActiveOrders ?? 5;
 
-    const [assignDriver] = useMutation(ASSIGN_DRIVER_TO_ORDER);
-
-    // Track the latest subscription payload directly so that orders are
-    // available even while the initial network-only query is still in-flight.
-    const [subscriptionOrders, setSubscriptionOrders] = useState<any[] | null>(null);
-
-    // ── Single global subscription — updates cache; drive.tsx reads from cache ──
-    useSubscription(ALL_ORDERS_UPDATED, {
-        skip: !currentDriverId,
-        onData: ({ data: subData }) => {
-            const incomingOrders = (subData.data as any)?.allOrdersUpdated as any[] | undefined;
-            if (incomingOrders === undefined || incomingOrders === null) {
-                // Truly missing payload (parse error / network issue) — fall back to refetch
-                void refreshOrders();
-                return;
-            }
-            // Replace cache with full server list. Empty array [] is valid — means all orders done.
-            apolloClient.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
-                return {
-                    ...(existing ?? {}),
-                    orders: {
-                        ...(existing?.orders ?? {}),
-                        orders: incomingOrders,
-                        __typename: 'OrderConnection',
-                    },
-                };
-            });
-            // Store subscription data directly — while the initial query is
-            // still in network-only mode, cache writes don't propagate to
-            // useQuery's `data`.  This fallback ensures orders are available
-            // immediately and unblocks card rendering on cold start.
-            setSubscriptionOrders(incomingOrders);
-            // Subscription data is fresh from the server — safe to allow
-            // auto-present and card display.
-            setNetworkReady(true);
-        },
+    // ── Accept / skip / navigate mutations ──
+    const { handleAcceptOrder, handleSkipOrder, handleAcceptAndNavigate } = useAcceptOrderMutation({
+        currentDriverId,
+        lastOrdersRefreshAt,
+        refetchOrders: refreshOrders,
     });
 
-    // Refetch on foreground transition to backfill any events missed while app was backgrounded.
-    useEffect(() => {
-        if (!currentDriverId) return;
-        const appStateSubscription = AppState.addEventListener('change', (nextState) => {
-            if (nextState === 'active') {
-                void refreshOrders();
-            }
-        });
-        return () => {
-            appStateSubscription.remove();
-        };
-    }, [currentDriverId, refreshOrders]);
-
-    const cachedOrders = useMemo(() => {
-        try {
-            return ((apolloClient.readQuery({ query: GET_ORDERS }) as any)?.orders?.orders ?? []) as any[];
-        } catch {
-            return [];
-        }
-    }, [apolloClient, data, subscriptionOrders]);
-
-    const orders = useMemo(() => {
-        // Prefer the query response, then live subscription payload.
-        // Fall back to the persisted Apollo cache ONLY after the first
-        // successful network response (networkReady) so stale data from a
-        // previous app session never leaks into the UI on cold start.
-        return (data as any)?.orders?.orders ?? subscriptionOrders ?? (networkReady ? cachedOrders : []);
-    }, [data, subscriptionOrders, cachedOrders, networkReady]);
-
-    const isOrdersBootstrapping =
-        !!currentDriverId &&
-        !networkReady &&
-        networkStatus === NetworkStatus.loading &&
-        !bootstrapExpired;
-
-    const getEstimatedReadyMs = useCallback((order: any): number | null => {
+    const getEstimatedReadyMs = (order: any): number | null => {
         const estimatedReadyRaw = order?.estimatedReadyAt;
         if (estimatedReadyRaw) {
             const estimatedReadyMs = new Date(estimatedReadyRaw).getTime();
-            if (Number.isFinite(estimatedReadyMs)) {
-                return estimatedReadyMs;
-            }
+            if (Number.isFinite(estimatedReadyMs)) return estimatedReadyMs;
         }
 
         const preparingAtRaw = order?.preparingAt;
         const prepMinutes = Number(order?.preparationMinutes);
         if (preparingAtRaw && Number.isFinite(prepMinutes) && prepMinutes > 0) {
             const preparingAtMs = new Date(preparingAtRaw).getTime();
-            if (Number.isFinite(preparingAtMs)) {
-                return preparingAtMs + prepMinutes * 60 * 1000;
-            }
+            if (Number.isFinite(preparingAtMs)) return preparingAtMs + prepMinutes * 60 * 1000;
         }
 
         return null;
-    }, []);
+    };
 
     // ── Precise per-order timers: fire exactly when each PREPARING order crosses
     //    the 5-min threshold instead of polling every 30s.
@@ -319,111 +193,6 @@ export function useGlobalOrderAccept() {
         store.setPendingOrder(next, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [availableOrdersSignature, pendingOrder, networkReady, isOnline, dispatchModeEnabled, assignedOrders.length, maxActiveOrders]);
-
-    // ── Shared accept mutation with guards and error handling ──
-    const executeAcceptMutation = useCallback(async (
-        orderId: string,
-        onSuccess: () => void,
-    ): Promise<void> => {
-        if (!currentDriverId) return;
-        if (!useOrderAcceptStore.getState().tryLockAccept()) return;
-
-        const authState = useAuthStore.getState();
-        if (!authState.isOnline || !authState.isNetworkConnected) {
-            useOrderAcceptStore.getState().setAcceptError('You are offline. Please check your connection.');
-            useOrderAcceptStore.getState().setAccepting(false);
-            (useOrderAcceptStore.getState() as any)._acceptingRef = false;
-            return;
-        }
-
-        useOrderAcceptStore.getState().setAcceptError(null);
-        useOrderAcceptStore.getState().setAccepting(true);
-        try {
-            await assignDriver({ variables: { id: orderId, driverId: currentDriverId } });
-            useOrderAcceptStore.getState().setPendingOrder(null);
-            lastOrdersRefreshAt.current = 0;
-            void refetch();
-            onSuccess();
-        } catch (err: any) {
-            const msg = err?.message?.toLowerCase() ?? '';
-            console.error('[accept] assignDriverToOrder failed:', err?.message, err?.graphQLErrors);
-            if (msg.includes('already') || msg.includes('assigned') || msg.includes('taken')) {
-                useOrderAcceptStore.getState().setTakenByOther(true);
-            } else {
-                useOrderAcceptStore.getState().setPendingOrder(null);
-                if (msg.includes('maximum') || msg.includes('max active')) {
-                    useOrderAcceptStore.getState().setAcceptError('You have reached your maximum active orders.');
-                } else if (msg.includes('not available') || msg.includes('not available for driver')) {
-                    useOrderAcceptStore.getState().setAcceptError('This order is no longer available.');
-                } else {
-                    useOrderAcceptStore.getState().setAcceptError(`Failed to accept: ${err?.message ?? 'Please try again.'}`);
-                }
-            }
-        } finally {
-            useOrderAcceptStore.getState().setAccepting(false);
-        }
-    }, [currentDriverId, assignDriver, refetch]);
-
-    // ── Accept ──
-    const handleAcceptOrder = useCallback(async (orderId: string) => {
-        await executeAcceptMutation(orderId, () => {
-            router.push('/(tabs)/drive' as any);
-        });
-    }, [executeAcceptMutation, router]);
-
-    // ── Skip ──
-    const handleSkipOrder = useCallback(() => {
-        useOrderAcceptStore.getState().skipOrder();
-    }, []);
-
-    // ── Accept & immediately start navigation ──
-    const handleAcceptAndNavigate = useCallback(async (orderId: string) => {
-        const order = useOrderAcceptStore.getState().pendingOrder;
-        if (!order) return;
-
-        await executeAcceptMutation(orderId, () => {
-            const bizLoc = order.businesses?.[0]?.business?.location;
-            const dropLoc = order.dropOffLocation;
-            if (!bizLoc) return;
-
-            const loc =
-                useNavigationLocationStore.getState().location ??
-                useNavigationLocationStore.getState().lastKnownCoords;
-            if (!loc) return;
-
-            const pickup = {
-                latitude: Number(bizLoc.latitude),
-                longitude: Number(bizLoc.longitude),
-                label: order.businesses?.[0]?.business?.name ?? 'Pickup',
-            };
-            const dropoff = dropLoc
-                ? {
-                    latitude: Number(dropLoc.latitude),
-                    longitude: Number(dropLoc.longitude),
-                    label: dropLoc.address ?? 'Drop-off',
-                }
-                : null;
-            const customerName = order.user
-                ? `${order.user.firstName} ${order.user.lastName}`
-                : 'Customer';
-
-            const navOrder = {
-                id: order.id,
-                status: order.status,
-                businessName: order.businesses?.[0]?.business?.name ?? 'Business',
-                customerName,
-                customerPhone: order.user?.phoneNumber ?? null,
-                pickup,
-                dropoff,
-            };
-
-            const phase: NavigationPhase =
-                order.status === 'OUT_FOR_DELIVERY' ? 'to_dropoff' : 'to_pickup';
-
-            startNavigation(navOrder, phase, loc);
-            router.push('/navigation' as any);
-        });
-    }, [executeAcceptMutation, startNavigation, router]);
 
     const takenByOther = useOrderAcceptStore((s) => s.takenByOther);
 

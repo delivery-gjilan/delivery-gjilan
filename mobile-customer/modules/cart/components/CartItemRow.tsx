@@ -49,6 +49,7 @@ export const CartItemRow = memo(function CartItemRow({
                         style={styles.compactImage}
                         contentFit="cover"
                         cachePolicy="memory-disk"
+                        transition={200}
                     />
                 ) : (
                     <View style={[styles.compactImagePlaceholder, { backgroundColor: theme.colors.border }]}>

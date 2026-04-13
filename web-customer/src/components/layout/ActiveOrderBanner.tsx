@@ -71,7 +71,7 @@ export function ActiveOrderBanner() {
         if (!isFirstLoadRef.current && source.length > 0) {
             prevOrderIdsRef.current.forEach((prevId) => {
                 const found = source.find((o: any) => o.id === prevId);
-                if (!found || found.status === "DELIVERED") {
+                if (found?.status === "DELIVERED") {
                     showOrderDelivered(prevId);
                 }
             });

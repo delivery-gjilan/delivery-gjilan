@@ -9,6 +9,7 @@ import Input from "@/components/ui/Input";
 import { useOrders, useUpdateOrderStatus } from "@/lib/hooks/useOrders";
 import { usePrepTimeAlerts, type PrepTimeAlert } from "@/lib/hooks/usePrepTimeAlerts";
 import { useAuth } from "@/lib/auth-context";
+import { TRUSTED_CUSTOMER_MARKER, APPROVAL_MODAL_SUPPRESS_MARKER, getMarginSeverity } from "@/lib/constants/orderHelpers";
 import { ASSIGN_DRIVER_TO_ORDER, CREATE_TEST_ORDER, START_PREPARING, UPDATE_PREPARATION_TIME, ADMIN_CANCEL_ORDER, APPROVE_ORDER, REMOVE_ORDER_ITEM } from "@/graphql/operations/orders";
 import { GRANT_FREE_DELIVERY } from "@/graphql/operations/promotions/mutations";
 import { UPDATE_USER_NOTE_MUTATION } from "@/graphql/operations/users/mutations";
@@ -102,9 +103,6 @@ interface Order {
         promoCode?: string | null;
     }[] | null;
 }
-
-const TRUSTED_CUSTOMER_MARKER = "[TRUSTED_CUSTOMER]";
-const APPROVAL_MODAL_SUPPRESS_MARKER = '[SUPPRESS_APPROVAL_MODAL]';
 
 function isTrustedCustomer(user?: Order["user"]): boolean {
     if (!user) return false;
@@ -204,9 +202,7 @@ const getBusinessItemsSafe = (business: any): OrderItem[] => {
 
 const roundMoney = (value: number) => Math.round(value * 100) / 100;
 
-function getMarginSeverity(netMargin: number): 'healthy' | 'thin' | 'negative' {
-    return netMargin < 0 ? 'negative' : netMargin < 1.5 ? 'thin' : 'healthy';
-}
+// getMarginSeverity imported from @/lib/constants/orderHelpers
 
 /* ---------------------------------------------------------
    STATUS CONFIG
@@ -807,8 +803,6 @@ export default function OrdersPage() {
                             const approvalReasons = deriveApprovalReasons(order);
                             const promotions = order.orderPromotions ?? [];
                             const promoCount = promotions.length;
-                            const promoDeliveryCount = promotions.filter((promo) => promo.appliesTo === 'DELIVERY').length;
-                            const promoOrderCount = promoCount - promoDeliveryCount;
                             const promoTotalSavings = roundMoney(
                                 promotions.reduce((sum, promo) => sum + Number(promo.discountAmount || 0), 0),
                             );
@@ -1005,19 +999,20 @@ export default function OrdersPage() {
                                                 <div className="text-lg font-bold text-white">${order.totalPrice.toFixed(2)}</div>
                                                 {promoCount > 0 && (
                                                     <div className="mt-1.5 flex flex-wrap gap-1">
-                                                        <span className="inline-flex items-center rounded-full border border-emerald-500/35 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
-                                                            Promos {promoCount}
-                                                        </span>
-                                                        {promoOrderCount > 0 && (
-                                                            <span className="inline-flex items-center rounded-full border border-zinc-600/60 bg-zinc-800/70 px-1.5 py-0.5 text-[10px] text-zinc-300">
-                                                                Order {promoOrderCount}
-                                                            </span>
-                                                        )}
-                                                        {promoDeliveryCount > 0 && (
-                                                            <span className="inline-flex items-center rounded-full border border-zinc-600/60 bg-zinc-800/70 px-1.5 py-0.5 text-[10px] text-zinc-300">
-                                                                Delivery {promoDeliveryCount}
-                                                            </span>
-                                                        )}
+                                                        {promotions.map((promo) => {
+                                                            const promoScope = promo.appliesTo === 'DELIVERY' ? 'Delivery' : 'Order';
+                                                            const promoIdentity = (promo.promoCode || '').trim() || 'Auto';
+                                                            return (
+                                                                <span
+                                                                    key={promo.id}
+                                                                    className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] ${promo.appliesTo === 'DELIVERY'
+                                                                        ? 'border-blue-500/35 bg-blue-500/10 text-blue-300'
+                                                                        : 'border-emerald-500/35 bg-emerald-500/10 text-emerald-300'}`}
+                                                                >
+                                                                    {promoScope}: {promoIdentity} -€{Number(promo.discountAmount || 0).toFixed(2)} off
+                                                                </span>
+                                                            );
+                                                        })}
                                                         <span className="inline-flex items-center rounded-full border border-emerald-500/35 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
                                                             Saved €{promoTotalSavings.toFixed(2)}
                                                         </span>
@@ -1229,8 +1224,6 @@ export default function OrdersPage() {
                                         const marginSeverity = preview ? getMarginSeverity(preview.netMargin) : null;
                                         const promotions = order.orderPromotions ?? [];
                                         const promoCount = promotions.length;
-                                        const promoDeliveryCount = promotions.filter((promo) => promo.appliesTo === 'DELIVERY').length;
-                                        const promoOrderCount = promoCount - promoDeliveryCount;
                                         const promoTotalSavings = roundMoney(
                                             promotions.reduce((sum, promo) => sum + Number(promo.discountAmount || 0), 0),
                                         );
@@ -1295,19 +1288,20 @@ export default function OrdersPage() {
                                                     ${order.totalPrice.toFixed(2)}
                                                     {promoCount > 0 && (
                                                         <div className="mt-1.5 flex flex-wrap gap-1">
-                                                            <span className="inline-flex items-center rounded-full border border-emerald-500/35 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
-                                                                Promos {promoCount}
-                                                            </span>
-                                                            {promoOrderCount > 0 && (
-                                                                <span className="inline-flex items-center rounded-full border border-zinc-600/60 bg-zinc-800/70 px-1.5 py-0.5 text-[10px] text-zinc-300">
-                                                                    Order {promoOrderCount}
-                                                                </span>
-                                                            )}
-                                                            {promoDeliveryCount > 0 && (
-                                                                <span className="inline-flex items-center rounded-full border border-zinc-600/60 bg-zinc-800/70 px-1.5 py-0.5 text-[10px] text-zinc-300">
-                                                                    Delivery {promoDeliveryCount}
-                                                                </span>
-                                                            )}
+                                                            {promotions.map((promo) => {
+                                                                const promoScope = promo.appliesTo === 'DELIVERY' ? 'Delivery' : 'Order';
+                                                                const promoIdentity = (promo.promoCode || '').trim() || 'Auto';
+                                                                return (
+                                                                    <span
+                                                                        key={promo.id}
+                                                                        className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] ${promo.appliesTo === 'DELIVERY'
+                                                                            ? 'border-blue-500/35 bg-blue-500/10 text-blue-300'
+                                                                            : 'border-emerald-500/35 bg-emerald-500/10 text-emerald-300'}`}
+                                                                    >
+                                                                        {promoScope}: {promoIdentity} -€{Number(promo.discountAmount || 0).toFixed(2)} off
+                                                                    </span>
+                                                                );
+                                                            })}
                                                             <span className="inline-flex items-center rounded-full border border-emerald-500/35 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
                                                                 Saved €{promoTotalSavings.toFixed(2)}
                                                             </span>

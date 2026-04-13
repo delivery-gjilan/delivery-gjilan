@@ -95,12 +95,17 @@ export const GET_BUSINESS = gql`
                 description
                 code
                 type
+                target
                 creatorType
                 discountValue
                 spendThreshold
                 priority
                 requiresCode
                 applyMethod
+                maxUsagePerUser
+                maxGlobalUsage
+                endsAt
+                eligibleBusinessIds
             }
             minOrderAmount
             createdAt

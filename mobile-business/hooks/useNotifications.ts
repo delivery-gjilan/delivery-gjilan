@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
+import { resolveDeviceId } from '@/utils/deviceId';
 import messaging, { firebase } from '@react-native-firebase/messaging';
 import { useMutation } from '@apollo/client/react';
 import { useAuthStore } from '@/store/authStore';
@@ -12,20 +13,6 @@ import { useNotificationSettingsStore } from '@/store/useNotificationSettingsSto
 function isLikelyRawApnsToken(token: string): boolean {
     // APNs tokens are typically represented as 64 hex chars, while FCM tokens are opaque.
     return /^[a-fA-F0-9]{64}$/.test(token);
-}
-
-Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-        shouldShowBanner: true,
-        shouldShowList: true,
-    }),
-});
-
-function resolveDeviceId(): string {
-    return Constants.installationId || Constants.sessionId || 'unknown';
 }
 
 async function registerForPushNotifications(): Promise<string | null> {
@@ -77,10 +64,26 @@ async function registerForPushNotifications(): Promise<string | null> {
     return token;
 }
 
+const notificationHandlerSet = { current: false };
+
 export function useNotifications() {
     const { isAuthenticated, token: authToken } = useAuthStore();
     const pushEnabled = useNotificationSettingsStore((state) => state.pushEnabled);
     const currentPushToken = useRef<string | null>(null);
+
+    // Set notification handler once per app lifetime (not at module load time)
+    if (!notificationHandlerSet.current) {
+        Notifications.setNotificationHandler({
+            handleNotification: async () => ({
+                shouldShowAlert: true,
+                shouldPlaySound: true,
+                shouldSetBadge: true,
+                shouldShowBanner: true,
+                shouldShowList: true,
+            }),
+        });
+        notificationHandlerSet.current = true;
+    }
 
     const [registerToken] = useMutation(REGISTER_DEVICE_TOKEN);
     const [unregisterToken] = useMutation(UNREGISTER_DEVICE_TOKEN);

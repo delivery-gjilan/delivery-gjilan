@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import { useMemo, useState } from "react";
@@ -12,10 +11,16 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { GET_BUSINESSES } from "@/graphql/operations/businesses";
 import { USERS_QUERY } from "@/graphql/operations/users/queries";
 import { Table, Th, Td } from "@/components/ui/Table";
-import { GET_PROMOTIONS, GET_RECOVERY_PROMOTIONS } from "@/graphql/operations/promotions/queries";
-import { CREATE_PROMOTION, UPDATE_PROMOTION, DELETE_PROMOTION } from "@/graphql/operations/promotions/mutations";
+import { GET_PROMOTIONS, GET_RECOVERY_PROMOTIONS, GET_PROMOTION_AUDIENCE_GROUPS } from "@/graphql/operations/promotions/queries";
+import {
+    CREATE_PROMOTION,
+    UPDATE_PROMOTION,
+    DELETE_PROMOTION,
+    CREATE_PROMOTION_AUDIENCE_GROUP,
+    DELETE_PROMOTION_AUDIENCE_GROUP,
+} from "@/graphql/operations/promotions/mutations";
 import { ASSIGN_PROMOTION_TO_USERS } from "@/graphql/operations/notifications";
-import type { PromotionType, PromotionTarget, GetPromotionsQuery, GetRecoveryPromotionsQuery } from "@/gql/graphql";
+import { PromotionType, PromotionCreatorType, type PromotionTarget, type GetPromotionsQuery, type GetRecoveryPromotionsQuery } from "@/gql/graphql";
 
 const promotionTypeLabels: Record<PromotionType, string> = {
     FIXED_AMOUNT: "Fixed Amount",
@@ -129,7 +134,7 @@ const emptyQuickCodePromoForm: QuickCodePromoFormState = {
     name: "",
     code: "",
     description: "",
-    type: "FIXED_AMOUNT",
+    type: PromotionType.FixedAmount,
     discountValue: "",
     maxDiscountCap: "",
     minOrderAmount: "",
@@ -178,16 +183,24 @@ export default function PromotionsPage() {
     const [showModal, setShowModal] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [editingPromotion, setEditingPromotion] = useState<GetPromotionsQuery["getAllPromotions"][number] | null>(null);
-    const [promotionToDelete, setPromotionToDelete] = useState<GetPromotionsQuery["getAllPromotions"][number] | null>(null);
+    const [promotionToDelete, setPromotionToDelete] = useState<{ id: string; name?: string | null } | null>(null);
     const [formData, setFormData] = useState<PromotionFormState>(emptyForm);
-    const [searchTerm, setSearchTerm] = useState("");
+    const [businessSearchTerm, setBusinessSearchTerm] = useState("");
+    const [promoSearchTerm, setPromoSearchTerm] = useState("");
+    const [promoStatusFilter, setPromoStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
+    const [promoModeFilter, setPromoModeFilter] = useState<"ALL" | "AUTO" | "MANUAL">("ALL");
+    const [promoTargetFilter, setPromoTargetFilter] = useState<"ALL" | PromotionTarget>("ALL");
+    const [promoBusinessFilter, setPromoBusinessFilter] = useState<"ALL" | "GLOBAL" | "TARGETED" | string>("ALL");
     const [wizardStep, setWizardStep] = useState(1);
     const [selectedCodePromotionId, setSelectedCodePromotionId] = useState("");
     const [promoGroupName, setPromoGroupName] = useState("Friends");
     const [promoUserSearch, setPromoUserSearch] = useState("");
     const [promoUsers, setPromoUsers] = useState<PromoAssignUser[]>([]);
+    const [promoAssignmentMode, setPromoAssignmentMode] = useState<"single" | "group">("group");
+    const [promoAssignValidation, setPromoAssignValidation] = useState<string | null>(null);
     const [promoAssignResult, setPromoAssignResult] = useState<{ success: boolean; message: string } | null>(null);
     const [quickCodePromoForm, setQuickCodePromoForm] = useState<QuickCodePromoFormState>(emptyQuickCodePromoForm);
+    const [selectedAudienceGroupId, setSelectedAudienceGroupId] = useState("");
 
     const { data: recoveryData, loading: recoveryLoading, refetch: refetchRecovery } = useQuery<GetRecoveryPromotionsQuery>(GET_RECOVERY_PROMOTIONS, {
         fetchPolicy: "cache-and-network",
@@ -196,14 +209,84 @@ export default function PromotionsPage() {
 
     const { data: businessesData, loading: businessesLoading } = useQuery(GET_BUSINESSES);
     const { data: usersData } = useQuery(USERS_QUERY);
+    const {
+        data: audienceGroupsData,
+        loading: audienceGroupsLoading,
+        refetch: refetchAudienceGroups,
+    } = useQuery(GET_PROMOTION_AUDIENCE_GROUPS, {
+        variables: { isActive: true },
+    });
     const [assignPromotionToUsers, { loading: assigningPromo }] = useMutation(ASSIGN_PROMOTION_TO_USERS, {
         onCompleted: () => refetch(),
     });
+    const [createAudienceGroup, { loading: creatingAudienceGroup }] = useMutation(CREATE_PROMOTION_AUDIENCE_GROUP, {
+        onCompleted: () => refetchAudienceGroups(),
+    });
+    const [deleteAudienceGroup, { loading: deletingAudienceGroup }] = useMutation(DELETE_PROMOTION_AUDIENCE_GROUP, {
+        onCompleted: () => refetchAudienceGroups(),
+    });
     const businesses = businessesData?.businesses || [];
-    const filteredBusinesses = businesses.filter((b: any) => b.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    const filteredBusinesses = businesses.filter((b: any) => b.name.toLowerCase().includes(businessSearchTerm.toLowerCase()));
 
     const promotions = useMemo(() => data?.getAllPromotions ?? [], [data?.getAllPromotions]);
+    const businessNameById = useMemo(() => {
+        const map = new Map<string, string>();
+        businesses.forEach((b: any) => map.set(b.id, b.name));
+        return map;
+    }, [businesses]);
+    const filteredPromotions = useMemo(() => {
+        const term = promoSearchTerm.trim().toLowerCase();
+
+        return promotions.filter((promotion) => {
+            const eligibleBusinesses = (promotion as any).eligibleBusinesses ?? [];
+            const eligibleBusinessIds = eligibleBusinesses.map((b: any) => b.id);
+            const isManual = Boolean(promotion.code);
+            const isBusinessScoped = promotion.creatorType === "BUSINESS" || eligibleBusinessIds.length > 0;
+            const isGlobal = promotion.creatorType !== "BUSINESS" && eligibleBusinessIds.length === 0;
+
+            const matchesSearch =
+                !term ||
+                promotion.name.toLowerCase().includes(term) ||
+                (promotion.code ?? "").toLowerCase().includes(term) ||
+                (promotion.description ?? "").toLowerCase().includes(term);
+
+            const matchesStatus =
+                promoStatusFilter === "ALL" ||
+                (promoStatusFilter === "ACTIVE" && promotion.isActive) ||
+                (promoStatusFilter === "INACTIVE" && !promotion.isActive);
+
+            const matchesMode =
+                promoModeFilter === "ALL" ||
+                (promoModeFilter === "MANUAL" && isManual) ||
+                (promoModeFilter === "AUTO" && !isManual);
+
+            const matchesTarget =
+                promoTargetFilter === "ALL" || promotion.target === promoTargetFilter;
+
+            const matchesBusiness =
+                promoBusinessFilter === "ALL" ||
+                (promoBusinessFilter === "GLOBAL" && isGlobal) ||
+                (promoBusinessFilter === "TARGETED" && isBusinessScoped) ||
+                (promoBusinessFilter !== "GLOBAL" &&
+                    promoBusinessFilter !== "TARGETED" &&
+                    (promotion.creatorId === promoBusinessFilter || eligibleBusinessIds.includes(promoBusinessFilter)));
+
+            return matchesSearch && matchesStatus && matchesMode && matchesTarget && matchesBusiness;
+        });
+    }, [promotions, promoSearchTerm, promoStatusFilter, promoModeFilter, promoTargetFilter, promoBusinessFilter]);
     const codePromotions = useMemo(() => promotions.filter((promotion) => Boolean(promotion.code)), [promotions]);
+    const audienceGroups = useMemo(() => (audienceGroupsData as any)?.getPromotionAudienceGroups ?? [], [audienceGroupsData]);
+    const selectedAudienceGroup = useMemo(
+        () => audienceGroups.find((group: any) => group.id === selectedAudienceGroupId) ?? null,
+        [audienceGroups, selectedAudienceGroupId],
+    );
+    const isSingleUserMode = promoAssignmentMode === "single";
+    const assignedTargetCount = promoUsers.length;
+    const assignedTargetLabel = isSingleUserMode
+        ? promoUsers[0]
+            ? `${promoUsers[0].firstName} ${promoUsers[0].lastName}`
+            : "selected user"
+        : selectedAudienceGroup?.name || promoGroupName.trim() || "selected group";
     const quickCodeVis = typeFieldVisibility[quickCodePromoForm.type];
     const allUsers = useMemo(() => ((usersData as any)?.users ?? []) as PromoAssignUser[], [usersData]);
     const promoFilteredUsers = useMemo(() => {
@@ -280,7 +363,7 @@ export default function PromotionsPage() {
         setWizardStep(1);
     };
 
-    const handleDeleteRequest = (promotion: GetPromotionsQuery["getAllPromotions"][number]) => {
+    const handleDeleteRequest = (promotion: { id: string }) => {
         setPromotionToDelete(promotion);
         setShowDeleteModal(true);
     };
@@ -293,7 +376,19 @@ export default function PromotionsPage() {
     };
 
     const handleAssignPromoCodeToGroup = async () => {
-        if (!selectedCodePromotionId || promoUsers.length === 0) {
+        setPromoAssignValidation(null);
+        if (!selectedCodePromotionId) {
+            setPromoAssignValidation("Please select an existing promo code first.");
+            return;
+        }
+
+        if (isSingleUserMode) {
+            if (promoUsers.length !== 1) {
+                setPromoAssignValidation("Single-user mode requires exactly one selected user.");
+                return;
+            }
+        } else if (promoUsers.length === 0 && !selectedAudienceGroupId) {
+            setPromoAssignValidation("Select at least one user or choose an audience group.");
             return;
         }
 
@@ -302,29 +397,44 @@ export default function PromotionsPage() {
                 input: {
                     promotionId: selectedCodePromotionId,
                     userIds: promoUsers.map((user) => user.id),
+                    audienceGroupIds: !isSingleUserMode && selectedAudienceGroupId ? [selectedAudienceGroupId] : undefined,
                 },
             },
         });
 
         const assignedCount = ((result.data as any)?.assignPromotionToUsers ?? []).length;
         const selectedPromo = codePromotions.find((promotion) => promotion.id === selectedCodePromotionId);
-        const groupLabel = promoGroupName.trim() || "selected group";
         setPromoAssignResult({
             success: true,
-            message: `Assigned ${selectedPromo?.code ?? "promo code"} to ${assignedCount} users (${groupLabel}).`,
+            message: isSingleUserMode
+                ? `Assigned ${selectedPromo?.code ?? "promo code"} to ${assignedTargetLabel}.`
+                : `Assigned ${selectedPromo?.code ?? "promo code"} to ${assignedCount} users (${assignedTargetLabel}).`,
         });
         setPromoUsers([]);
         setPromoUserSearch("");
     };
 
     const handleCreateAndAssignPromoCode = async () => {
-        if (!quickCodePromoForm.name.trim() || !quickCodePromoForm.code.trim() || promoUsers.length === 0) {
+        setPromoAssignValidation(null);
+        if (!quickCodePromoForm.name.trim() || !quickCodePromoForm.code.trim()) {
+            setPromoAssignValidation("Promo name and code are required.");
+            return;
+        }
+
+        if (isSingleUserMode) {
+            if (promoUsers.length !== 1) {
+                setPromoAssignValidation("Single-user mode requires exactly one selected user.");
+                return;
+            }
+        } else if (promoUsers.length === 0 && !selectedAudienceGroupId) {
+            setPromoAssignValidation("Select at least one user or choose an audience group.");
             return;
         }
 
         const isDeliveryFeePromotion = quickCodePromoForm.type === "FREE_DELIVERY" || quickCodePromoForm.type === "SPEND_X_GET_FREE";
         const driverPayoutAmount = isDeliveryFeePromotion ? toOptionalNumber(quickCodePromoForm.driverPayoutAmount) : undefined;
         if (isDeliveryFeePromotion && !driverPayoutAmount) {
+            setPromoAssignValidation("Driver payout is required for delivery promotions.");
             return;
         }
 
@@ -367,20 +477,65 @@ export default function PromotionsPage() {
                 input: {
                     promotionId: createdPromotionId,
                     userIds: promoUsers.map((user) => user.id),
+                    audienceGroupIds: !isSingleUserMode && selectedAudienceGroupId ? [selectedAudienceGroupId] : undefined,
                 },
             },
         });
 
         const assignedCount = ((assignRes.data as any)?.assignPromotionToUsers ?? []).length;
-        const groupLabel = promoGroupName.trim() || "selected group";
         setPromoAssignResult({
             success: true,
-            message: `Created ${quickCodePromoForm.code.trim().toUpperCase()} and assigned it to ${assignedCount} users (${groupLabel}).`,
+            message: isSingleUserMode
+                ? `Created ${quickCodePromoForm.code.trim().toUpperCase()} and assigned it to ${assignedTargetLabel}.`
+                : `Created ${quickCodePromoForm.code.trim().toUpperCase()} and assigned it to ${assignedCount} users (${assignedTargetLabel}).`,
         });
         setSelectedCodePromotionId(createdPromotionId);
         setPromoUsers([]);
         setPromoUserSearch("");
         setQuickCodePromoForm(emptyQuickCodePromoForm);
+    };
+
+    const handleCreateAudienceGroupFromSelection = async () => {
+        setPromoAssignValidation(null);
+        if (isSingleUserMode) {
+            setPromoAssignValidation("Audience groups are available in Group mode only.");
+            return;
+        }
+        if (!promoGroupName.trim() || promoUsers.length === 0) {
+            setPromoAssignValidation("Group label and at least one selected user are required to save a group.");
+            return;
+        }
+
+        const result = await createAudienceGroup({
+            variables: {
+                input: {
+                    name: promoGroupName.trim(),
+                    userIds: promoUsers.map((user) => user.id),
+                    isActive: true,
+                },
+            },
+        });
+
+        const createdGroup = (result.data as any)?.createPromotionAudienceGroup;
+        if (createdGroup?.id) {
+            setSelectedAudienceGroupId(createdGroup.id);
+            setPromoAssignResult({
+                success: true,
+                message: `Saved audience group ${createdGroup.name} with ${createdGroup.memberCount ?? promoUsers.length} users.`,
+            });
+        }
+    };
+
+    const handleDeleteSelectedAudienceGroup = async () => {
+        if (!selectedAudienceGroupId) return;
+
+        const groupName = selectedAudienceGroup?.name ?? "selected group";
+        await deleteAudienceGroup({ variables: { id: selectedAudienceGroupId } });
+        setSelectedAudienceGroupId("");
+        setPromoAssignResult({
+            success: true,
+            message: `Deleted audience group ${groupName}.`,
+        });
     };
 
     const handleSave = async () => {
@@ -446,7 +601,7 @@ export default function PromotionsPage() {
                     : undefined,
             startsAt: formData.startsAt || undefined,
             endsAt: formData.endsAt || undefined,
-            creatorType: formData.creatorType,
+            creatorType: formData.creatorType as PromotionCreatorType,
             creatorId: formData.creatorType === "BUSINESS" && formData.creatorId ? formData.creatorId : undefined,
             driverPayoutAmount,
         };
@@ -538,6 +693,60 @@ export default function PromotionsPage() {
             {/* ── Promotions Tab ── */}
             {activeTab === "promotions" && (
             <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+                <div className="p-4 border-b border-gray-800 bg-zinc-950/40 space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+                        <Input
+                            label="Search promos"
+                            value={promoSearchTerm}
+                            onChange={(e) => setPromoSearchTerm(e.target.value)}
+                            placeholder="Name, code, description..."
+                        />
+                        <Select
+                            label="Status"
+                            value={promoStatusFilter}
+                            onChange={(e) => setPromoStatusFilter(e.target.value as "ALL" | "ACTIVE" | "INACTIVE")}
+                        >
+                            <option value="ALL">All statuses</option>
+                            <option value="ACTIVE">Active</option>
+                            <option value="INACTIVE">Inactive</option>
+                        </Select>
+                        <Select
+                            label="Apply mode"
+                            value={promoModeFilter}
+                            onChange={(e) => setPromoModeFilter(e.target.value as "ALL" | "AUTO" | "MANUAL")}
+                        >
+                            <option value="ALL">All modes</option>
+                            <option value="AUTO">Auto-applied</option>
+                            <option value="MANUAL">Manual code</option>
+                        </Select>
+                        <Select
+                            label="Target"
+                            value={promoTargetFilter}
+                            onChange={(e) => setPromoTargetFilter(e.target.value as "ALL" | PromotionTarget)}
+                        >
+                            <option value="ALL">All targets</option>
+                            <option value="ALL_USERS">All users</option>
+                            <option value="SPECIFIC_USERS">Specific users</option>
+                            <option value="FIRST_ORDER">First order</option>
+                            <option value="CONDITIONAL">Conditional</option>
+                        </Select>
+                        <Select
+                            label="Business"
+                            value={promoBusinessFilter}
+                            onChange={(e) => setPromoBusinessFilter(e.target.value)}
+                        >
+                            <option value="ALL">All businesses</option>
+                            <option value="GLOBAL">Global only</option>
+                            <option value="TARGETED">Targeted only</option>
+                            {businesses.map((b: any) => (
+                                <option key={b.id} value={b.id}>{b.name}</option>
+                            ))}
+                        </Select>
+                    </div>
+                    <div className="text-xs text-zinc-500">
+                        Showing {filteredPromotions.length} of {promotions.length} promotions
+                    </div>
+                </div>
                 {loading ? (
                     <div className="p-6 text-zinc-500">Loading promotions...</div>
                 ) : (
@@ -547,6 +756,7 @@ export default function PromotionsPage() {
                                 <Th>Name / Code</Th>
                                 <Th>Type</Th>
                                 <Th>Target</Th>
+                                <Th>Business Scope</Th>
                                 <Th>Value</Th>
                                 <Th>Priority</Th>
                                 <Th>Status</Th>
@@ -554,16 +764,16 @@ export default function PromotionsPage() {
                             </tr>
                         </thead>
                         <tbody>
-                            {promotions.length === 0 ? (
+                            {filteredPromotions.length === 0 ? (
                                 <tr>
-                                    <Td colSpan={7}>
+                                    <Td colSpan={8}>
                                         <div className="text-center py-10 text-zinc-500">
-                                            No promotions created yet.
+                                            No promotions match the current filters.
                                         </div>
                                     </Td>
                                 </tr>
                             ) : (
-                                promotions.map((promotion) => (
+                                filteredPromotions.map((promotion) => (
                                     <tr key={promotion.id}>
                                         <Td>
                                             <div className="text-white font-semibold">{promotion.name}</div>
@@ -591,6 +801,28 @@ export default function PromotionsPage() {
                                             <div className="text-sm text-zinc-400">
                                                 {promotionTargetLabels[promotion.target]}
                                             </div>
+                                        </Td>
+                                        <Td>
+                                            {promotion.creatorType === "BUSINESS" ? (
+                                                <div className="text-xs text-orange-300">
+                                                    Business: {businessNameById.get(promotion.creatorId ?? "") ?? "Unknown"}
+                                                </div>
+                                            ) : ((promotion as any).eligibleBusinesses ?? []).length > 0 ? (
+                                                <div className="space-y-1">
+                                                    <div className="text-xs text-blue-300">Targeted businesses</div>
+                                                    <div className="text-[11px] text-zinc-500">
+                                                        {((promotion as any).eligibleBusinesses ?? [])
+                                                            .slice(0, 2)
+                                                            .map((b: any) => b.name ?? b.id)
+                                                            .join(", ")}
+                                                        {((promotion as any).eligibleBusinesses ?? []).length > 2
+                                                            ? ` +${((promotion as any).eligibleBusinesses ?? []).length - 2} more`
+                                                            : ""}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="text-xs text-zinc-500">Global</div>
+                                            )}
                                         </Td>
                                         <Td>
                                             <div className="text-sm text-white">
@@ -660,9 +892,51 @@ export default function PromotionsPage() {
                         </div>
                     </div>
 
+                    <div className="rounded-lg border border-zinc-700 bg-zinc-900/60 p-3">
+                        <div className="text-xs text-zinc-400 mb-2">Assignment Mode</div>
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setPromoAssignmentMode("single");
+                                    setSelectedAudienceGroupId("");
+                                    setPromoUsers((prev) => (prev.length > 0 ? [prev[0]] : []));
+                                    setPromoAssignValidation(null);
+                                }}
+                                className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
+                                    isSingleUserMode
+                                        ? "bg-violet-600 border-violet-500 text-white"
+                                        : "bg-gray-900 border-zinc-700 text-zinc-400 hover:border-zinc-500"
+                                }`}
+                            >
+                                Single user
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setPromoAssignmentMode("group");
+                                    setPromoAssignValidation(null);
+                                }}
+                                className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
+                                    !isSingleUserMode
+                                        ? "bg-violet-600 border-violet-500 text-white"
+                                        : "bg-gray-900 border-zinc-700 text-zinc-400 hover:border-zinc-500"
+                                }`}
+                            >
+                                Audience group
+                            </button>
+                        </div>
+                    </div>
+
                     {promoAssignResult && (
                         <div className="rounded-lg border border-green-700/40 bg-green-900/10 p-3 text-sm text-green-300">
                             {promoAssignResult.message}
+                        </div>
+                    )}
+
+                    {promoAssignValidation && (
+                        <div className="rounded-lg border border-red-700/40 bg-red-900/10 p-3 text-sm text-red-300">
+                            {promoAssignValidation}
                         </div>
                     )}
 
@@ -815,12 +1089,63 @@ export default function PromotionsPage() {
                                 ))}
                             </Select>
                             <Input
-                                label="Group Label"
+                                label={isSingleUserMode ? "Target Label" : "Group Label"}
                                 value={promoGroupName}
                                 onChange={(e) => setPromoGroupName(e.target.value)}
-                                placeholder="Friends"
+                                placeholder={isSingleUserMode ? "VIP customer" : "Friends"}
                             />
                         </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <Select
+                                label="Persistent Audience Group"
+                                value={selectedAudienceGroupId}
+                                disabled={isSingleUserMode}
+                                onChange={(e) => {
+                                    const nextGroupId = e.target.value;
+                                    setSelectedAudienceGroupId(nextGroupId);
+                                    const selected = audienceGroups.find((group: any) => group.id === nextGroupId);
+                                    if (selected) {
+                                        setPromoUsers(selected.members ?? []);
+                                        setPromoUserSearch("");
+                                        setPromoGroupName(selected.name ?? promoGroupName);
+                                    }
+                                }}
+                            >
+                                <option value="">Select an audience group...</option>
+                                {audienceGroups.map((group: any) => (
+                                    <option key={group.id} value={group.id}>
+                                        {group.name} ({group.memberCount})
+                                    </option>
+                                ))}
+                            </Select>
+                            <div className="flex items-end gap-2">
+                                <Button
+                                    variant="outline"
+                                    onClick={handleCreateAudienceGroupFromSelection}
+                                    disabled={isSingleUserMode || creatingAudienceGroup || !promoGroupName.trim() || promoUsers.length === 0}
+                                >
+                                    {creatingAudienceGroup ? "Saving Group..." : "Save Selection as Group"}
+                                </Button>
+                                <Button
+                                    variant="danger"
+                                    onClick={handleDeleteSelectedAudienceGroup}
+                                    disabled={isSingleUserMode || deletingAudienceGroup || !selectedAudienceGroupId}
+                                >
+                                    {deletingAudienceGroup ? "Deleting..." : "Delete Group"}
+                                </Button>
+                            </div>
+                        </div>
+
+                        {audienceGroupsLoading && (
+                            <div className="text-xs text-zinc-500">Loading audience groups...</div>
+                        )}
+
+                        {isSingleUserMode && (
+                            <div className="text-xs text-zinc-500 -mt-2">
+                                Audience group controls are disabled in single-user mode.
+                            </div>
+                        )}
 
                         <div className="space-y-2">
                             <label className="text-xs text-zinc-400">Select users for this group</label>
@@ -841,8 +1166,13 @@ export default function PromotionsPage() {
                                         <button
                                             key={user.id}
                                             onClick={() => {
-                                                setPromoUsers((prev) => [...prev, user]);
+                                                if (isSingleUserMode) {
+                                                    setPromoUsers([user]);
+                                                } else {
+                                                    setPromoUsers((prev) => [...prev, user]);
+                                                }
                                                 setPromoUserSearch("");
+                                                setPromoAssignValidation(null);
                                             }}
                                             className="w-full px-3 py-2.5 flex items-center gap-3 hover:bg-zinc-900 transition-colors text-left border-b border-zinc-900 last:border-0"
                                         >
@@ -860,7 +1190,11 @@ export default function PromotionsPage() {
 
                             {promoUsers.length > 0 && (
                                 <div>
-                                    <p className="text-xs text-zinc-500 mb-2">{promoUsers.length} user{promoUsers.length !== 1 ? "s" : ""} selected</p>
+                                    <p className="text-xs text-zinc-500 mb-2">
+                                        {isSingleUserMode
+                                            ? `${promoUsers.length === 1 ? "1 user selected" : "Select exactly 1 user"}`
+                                            : `${promoUsers.length} user${promoUsers.length !== 1 ? "s" : ""} selected`}
+                                    </p>
                                     <div className="flex flex-wrap gap-1.5">
                                         {promoUsers.map((user) => (
                                             <span
@@ -881,20 +1215,36 @@ export default function PromotionsPage() {
                             )}
                         </div>
 
+                        <div className="rounded-lg border border-zinc-700 bg-zinc-900/60 p-3 space-y-2">
+                            <div className="text-sm font-medium text-white">Assignment Preview</div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                                <div className="text-zinc-400">Target</div>
+                                <div className="text-zinc-200">
+                                    {isSingleUserMode
+                                        ? (promoUsers[0] ? `${promoUsers[0].firstName} ${promoUsers[0].lastName} (${promoUsers[0].email})` : "No user selected")
+                                        : (selectedAudienceGroup?.name ? `${selectedAudienceGroup.name} (${selectedAudienceGroup.memberCount} users)` : `${promoUsers.length} selected users`)}
+                                </div>
+                                <div className="text-zinc-400">Method</div>
+                                <div className="text-zinc-200">Manual code or auto promo (based on selected promo type)</div>
+                                <div className="text-zinc-400">Mode</div>
+                                <div className="text-zinc-200">{isSingleUserMode ? "Single user" : "Audience group"}</div>
+                            </div>
+                        </div>
+
                         <div className="flex justify-end">
                             <div className="flex gap-2">
                                 <Button
                                     variant="outline"
                                     onClick={handleAssignPromoCodeToGroup}
-                                    disabled={assigningPromo || !selectedCodePromotionId || promoUsers.length === 0}
+                                    disabled={assigningPromo || !selectedCodePromotionId || (isSingleUserMode ? promoUsers.length !== 1 : (promoUsers.length === 0 && !selectedAudienceGroupId))}
                                 >
-                                    {assigningPromo ? "Assigning..." : "Assign Existing Code"}
+                                    {assigningPromo ? "Assigning..." : isSingleUserMode ? "Assign Existing Code to User" : "Assign Existing Code"}
                                 </Button>
                                 <Button
                                     onClick={handleCreateAndAssignPromoCode}
-                                    disabled={creating || assigningPromo || !quickCodePromoForm.name.trim() || !quickCodePromoForm.code.trim() || promoUsers.length === 0}
+                                    disabled={creating || assigningPromo || !quickCodePromoForm.name.trim() || !quickCodePromoForm.code.trim() || (isSingleUserMode ? promoUsers.length !== 1 : (promoUsers.length === 0 && !selectedAudienceGroupId))}
                                 >
-                                    {creating || assigningPromo ? "Working..." : "Create & Assign New Code"}
+                                    {creating || assigningPromo ? "Working..." : isSingleUserMode ? "Create & Assign to User" : "Create & Assign New Code"}
                                 </Button>
                             </div>
                         </div>
@@ -1431,8 +1781,8 @@ export default function PromotionsPage() {
                                     <div>
                                         <Input
                                             label="Search businesses"
-                                            value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            value={businessSearchTerm}
+                                            onChange={(e) => setBusinessSearchTerm(e.target.value)}
                                             placeholder="Filter by name..."
                                         />
                                     </div>

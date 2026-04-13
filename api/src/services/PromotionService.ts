@@ -1,6 +1,6 @@
 import { DbType } from '@/database';
 import { DbPromotion, NewDbPromotion } from '@/database/schema';
-import { PromotionRepository, PromotionFilters } from '@/repositories/PromotionRepository';
+import { PromotionRepository, PromotionFilters, PromotionAudienceGroupFilters } from '@/repositories/PromotionRepository';
 import { SettlementRuleRepository } from '@/repositories/SettlementRuleRepository';
 import logger from '@/lib/logger';
 import { AppError } from '@/lib/errors';
@@ -31,6 +31,7 @@ export interface CreatePromotionInput {
     creatorId?: string;
 
     targetUserIds?: string[];
+    targetAudienceGroupIds?: string[];
     eligibleBusinessIds?: string[];
 
     /** Required for delivery-fee promotions (FREE_DELIVERY / SPEND_X_GET_FREE). Fixed euros per order. */
@@ -170,8 +171,14 @@ export class PromotionService {
         } as NewDbPromotion);
 
         // Assign to specific users if provided
-        if (input.targetUserIds && input.targetUserIds.length > 0) {
-            await this.repository.assignToUsers(promo.id, input.targetUserIds);
+        const targetUserIds = new Set<string>(input.targetUserIds ?? []);
+        if (input.targetAudienceGroupIds && input.targetAudienceGroupIds.length > 0) {
+            const groupUsers = await this.repository.getAudienceGroupUserIds(input.targetAudienceGroupIds, true);
+            groupUsers.forEach((id) => targetUserIds.add(id));
+        }
+
+        if (targetUserIds.size > 0) {
+            await this.repository.assignToUsers(promo.id, Array.from(targetUserIds));
         }
 
         // Set business eligibility
@@ -335,12 +342,70 @@ export class PromotionService {
         return this.repository.delete(id);
     }
 
-    async assignPromotionToUsers(promotionId: string, userIds: string[], expiresAt?: string): Promise<void> {
+    async assignPromotionToUsers(
+        promotionId: string,
+        userIds: string[],
+        expiresAt?: string,
+        audienceGroupIds?: string[],
+    ): Promise<void> {
         const promo = await this.getPromotion(promotionId);
         if (promo.target !== 'SPECIFIC_USERS') {
             log.warn({ promotionId }, 'promo:assignUsers:wrongTarget');
         }
-        await this.repository.assignToUsers(promotionId, userIds, expiresAt ?? null);
+
+        const resolvedUserIds = new Set<string>(userIds);
+        if (audienceGroupIds && audienceGroupIds.length > 0) {
+            const groupUserIds = await this.repository.getAudienceGroupUserIds(audienceGroupIds, true);
+            groupUserIds.forEach((id) => resolvedUserIds.add(id));
+        }
+
+        await this.repository.assignToUsers(promotionId, Array.from(resolvedUserIds), expiresAt ?? null);
+    }
+
+    async listPromotionAudienceGroups(filters?: PromotionAudienceGroupFilters): Promise<any[]> {
+        return this.repository.listAudienceGroups(filters);
+    }
+
+    async createPromotionAudienceGroup(
+        input: { name: string; description?: string | null; userIds: string[]; isActive?: boolean },
+        userData: { role?: string; userId?: string },
+    ): Promise<any> {
+        if (!userData.userId || userData.role !== 'SUPER_ADMIN') {
+            throw AppError.forbidden();
+        }
+
+        return this.repository.createAudienceGroup({
+            name: input.name.trim(),
+            description: input.description?.trim() || null,
+            userIds: input.userIds,
+            createdBy: userData.userId,
+            isActive: input.isActive ?? true,
+        });
+    }
+
+    async updatePromotionAudienceGroup(
+        input: { id: string; name?: string; description?: string | null; userIds?: string[]; isActive?: boolean },
+        userData: { role?: string; userId?: string },
+    ): Promise<any> {
+        if (!userData.userId || userData.role !== 'SUPER_ADMIN') {
+            throw AppError.forbidden();
+        }
+
+        return this.repository.updateAudienceGroup({
+            id: input.id,
+            name: input.name?.trim(),
+            description: input.description !== undefined ? input.description?.trim() || null : undefined,
+            userIds: input.userIds,
+            isActive: input.isActive,
+        });
+    }
+
+    async deletePromotionAudienceGroup(id: string, userData: { role?: string; userId?: string }): Promise<boolean> {
+        if (!userData.userId || userData.role !== 'SUPER_ADMIN') {
+            throw AppError.forbidden();
+        }
+
+        return this.repository.deleteAudienceGroup(id);
     }
 
     /**

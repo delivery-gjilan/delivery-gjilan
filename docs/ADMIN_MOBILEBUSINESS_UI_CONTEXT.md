@@ -9,6 +9,8 @@ This document is a fast context handoff for future UI changes across `admin-pane
 
 ## Recent Updates
 
+- 2026-04-13: Admin promotions page (`/dashboard/promotions`) now has list-level filtering in the Promotions tab: search (name/code/description), status (active/inactive), apply mode (auto/manual code), target audience, and business scope filters. Business filter supports global-only, targeted-only, and a specific business match (creator business promos + platform promos with eligible business targeting).
+- 2026-04-13: Admin Promo Codes tab now supports persistent audience groups: select reusable groups, save current selected users as a new group, delete groups, and assign promotions using direct user selection plus audience group IDs.
 - 2026-03-19: Admin orders earnings calculation now derives business commission from active business settlement rules (same finance-rule source) instead of only business profile percentage, so `+earnings` matches configured `Settlement Rules` behavior.
 - 2026-03-19: Refined admin orders earnings indicator behavior: delivery commission is now conditionally included only after driver assignment/out-for-delivery, marked with `DEL+`, and earnings tooltip now overlays above rows to avoid table layout/scroll expansion.
 - 2026-03-19: Admin orders page (`/dashboard/orders`) refactored from dual layout (card view for business users, table view for super admin) to a unified card grid for all roles. Cards show status-colored border, customer + business + driver info, items preview, driver notes, prep time controls. Super admin cards additionally show driver assignment dropdown, status dropdown, and platform earnings with hover breakdown. Completed orders also use card grid with dimmed opacity, and super admin gets status dropdown on those too. Removed `Table`/`Th`/`Td` and `TimeDisplay` component (no longer used).
@@ -226,10 +228,30 @@ This document is a fast context handoff for future UI changes across `admin-pane
 - Admin panel orders page (`/dashboard/orders`) shows completed orders in a table view (not cards).
 - Completed table supports quick status filtering with `All`, `Delivered`, and `Cancelled` filter controls.
 - Completed rows include order id/time, customer (including phone when present), business, status, total, and details action.
-- Completed rows include compact promo badges under total when promotions are present: total promo count, order-vs-delivery split, and total savings.
+- Completed rows include per-promo badges under total when promotions are present, each showing scope (`Order`/`Delivery`), identity (code or auto-applied), and `€ off` amount; a separate savings badge shows total saved.
 - Order details panel shows promotion history metadata: total applied promo count, split counts for order vs delivery promos, split counts for code-based vs auto-applied promos, and total saved amount.
 - Applied Promotions list in order details shows each promo's target (`Order` or `Delivery`), code (or auto-applied fallback), promotion ID, and per-promo discount amount.
-- Active order cards show compact promo badges under total when promotions are present: total promo count, order-vs-delivery split, and total savings.
+- Active order cards show per-promo badges under total when promotions are present, each showing scope (`Order`/`Delivery`), identity (code or auto-applied), and `€ off` amount; a separate savings badge shows total saved.
+
+## Admin Promotions Filtering (Current State)
+
+- Admin promotions list supports free-text search over promotion name, code, and description.
+- Admin promotions list supports filters for status, apply mode (auto/manual), and target audience.
+- Admin promotions list supports business filtering scope: global only (promotions with no business targeting).
+- Admin promotions list supports business filtering scope: targeted only (business-created promos or platform promos with eligible business targeting).
+- Admin promotions list supports business filtering scope: specific business (creator business promos plus platform promos that include that business in eligible businesses).
+
+## Admin Promotions Audience Groups (Current State)
+
+- Promo Codes tab supports persistent audience groups backed by API entities (group + members).
+- Operators can select an existing audience group to prefill selected users.
+- Operators can save current selected users as a reusable group and delete existing groups.
+- Promo assignment supports both explicit selected users and selected audience groups in one action.
+- Promo Codes tab has assignment-mode controls for `Single user` and `Audience group` targeting.
+- Single-user mode keeps exactly one selected user and replaces the prior selection when a different user is picked.
+- Audience-group controls are disabled in single-user mode to prevent mixed targeting intent.
+- Inline validation clearly explains missing target requirements before assignment actions run.
+- Assignment preview summarizes target, mode, and assignment method before creating or assigning promo codes.
 
 ## Dev Workflow (Safe)
 

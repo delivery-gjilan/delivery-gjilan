@@ -208,6 +208,21 @@ export function Header() {
                             </Link>
                         );
                     })}
+                    {/* Orders tab — authenticated only */}
+                    {isAuthenticated && (
+                        <Link
+                            href="/orders"
+                            className={cn(
+                                "flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg transition-colors",
+                                pathname.startsWith("/orders")
+                                    ? "text-[var(--primary)]"
+                                    : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                            )}
+                        >
+                            <ClipboardList size={22} strokeWidth={pathname.startsWith("/orders") ? 2.5 : 2} />
+                            <span className="text-[10px] font-medium">{t("tabs.orders")}</span>
+                        </Link>
+                    )}
                     {/* Profile */}
                     <Link
                         href={isAuthenticated ? "/profile" : "/login"}

@@ -15,6 +15,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const CLEAR_STORAGE_KEY = 'driver_chat_cleared_at';
 const EXTRA_MESSAGES_KEY = 'driver_chat_extra_messages';
+const MAX_EXTRA_MESSAGES = 200;
+
+/** Keep only the most-recent N messages to prevent unbounded AsyncStorage growth. */
+function capMessages<T>(msgs: T[]): T[] {
+    return msgs.length > MAX_EXTRA_MESSAGES ? msgs.slice(msgs.length - MAX_EXTRA_MESSAGES) : msgs;
+}
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useMutation, useQuery, useSubscription } from '@apollo/client/react';
@@ -143,7 +149,7 @@ export default function MessagesScreen() {
         onCompleted: (data) => {
             if (data?.replyToDriverMessage) {
                 setExtraMessages((prev) => {
-                    const next = [...prev, data.replyToDriverMessage];
+                    const next = capMessages([...prev, data.replyToDriverMessage]);
                     AsyncStorage.setItem(EXTRA_MESSAGES_KEY, JSON.stringify(next));
                     return next;
                 });
@@ -158,7 +164,7 @@ export default function MessagesScreen() {
             if (!msg) return;
             setExtraMessages((prev) => {
                 if (prev.some((m) => m.id === msg.id)) return prev;
-                const next = [...prev, msg];
+                const next = capMessages([...prev, msg]);
                 AsyncStorage.setItem(EXTRA_MESSAGES_KEY, JSON.stringify(next));
                 return next;
             });

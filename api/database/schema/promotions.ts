@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, numeric, timestamp, boolean, pgEnum, jsonb, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, numeric, timestamp, boolean, pgEnum, jsonb, index, uniqueIndex } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 import { users } from './users';
 import { businesses } from './businesses';
@@ -198,6 +198,51 @@ export const promotionBusinessEligibility = pgTable(
     }),
 );
 
+// ==================== PERSISTENT AUDIENCE GROUPS ====================
+
+export const promotionAudienceGroups = pgTable(
+    'promotion_audience_groups',
+    {
+        id: uuid('id').primaryKey().defaultRandom().notNull(),
+        name: text('name').notNull(),
+        description: text('description'),
+        isActive: boolean('is_active').default(true).notNull(),
+        createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+        createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+            .default(sql`CURRENT_TIMESTAMP`)
+            .notNull(),
+        updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' })
+            .default(sql`CURRENT_TIMESTAMP`)
+            .notNull()
+            .$onUpdate(() => sql`CURRENT_TIMESTAMP`),
+    },
+    (table) => ({
+        nameIdx: index('idx_promotion_audience_groups_name').on(table.name),
+        activeIdx: index('idx_promotion_audience_groups_active').on(table.isActive),
+    }),
+);
+
+export const promotionAudienceGroupMembers = pgTable(
+    'promotion_audience_group_members',
+    {
+        id: uuid('id').primaryKey().defaultRandom().notNull(),
+        groupId: uuid('group_id')
+            .references(() => promotionAudienceGroups.id, { onDelete: 'cascade' })
+            .notNull(),
+        userId: uuid('user_id')
+            .references(() => users.id, { onDelete: 'cascade' })
+            .notNull(),
+        createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+            .default(sql`CURRENT_TIMESTAMP`)
+            .notNull(),
+    },
+    (table) => ({
+        groupIdx: index('idx_promotion_audience_group_members_group').on(table.groupId),
+        userIdx: index('idx_promotion_audience_group_members_user').on(table.userId),
+        groupUserUnique: uniqueIndex('uq_promotion_audience_group_members_group_user').on(table.groupId, table.userId),
+    }),
+);
+
 // ==================== USER METADATA ====================
 
 export const userPromoMetadata = pgTable(
@@ -285,6 +330,25 @@ export const userPromoMetadataRelations = relations(userPromoMetadata, ({ one })
     }),
 }));
 
+export const promotionAudienceGroupsRelations = relations(promotionAudienceGroups, ({ many, one }) => ({
+    members: many(promotionAudienceGroupMembers),
+    createdByUser: one(users, {
+        fields: [promotionAudienceGroups.createdBy],
+        references: [users.id],
+    }),
+}));
+
+export const promotionAudienceGroupMembersRelations = relations(promotionAudienceGroupMembers, ({ one }) => ({
+    group: one(promotionAudienceGroups, {
+        fields: [promotionAudienceGroupMembers.groupId],
+        references: [promotionAudienceGroups.id],
+    }),
+    user: one(users, {
+        fields: [promotionAudienceGroupMembers.userId],
+        references: [users.id],
+    }),
+}));
+
 // ==================== TYPES ====================
 
 export type DbPromotion = typeof promotions.$inferSelect;
@@ -295,3 +359,7 @@ export type DbPromotionUsage = typeof promotionUsage.$inferSelect;
 export type NewDbPromotionUsage = typeof promotionUsage.$inferInsert;
 export type DbUserPromoMetadata = typeof userPromoMetadata.$inferSelect;
 export type NewDbUserPromoMetadata = typeof userPromoMetadata.$inferInsert;
+export type DbPromotionAudienceGroup = typeof promotionAudienceGroups.$inferSelect;
+export type NewDbPromotionAudienceGroup = typeof promotionAudienceGroups.$inferInsert;
+export type DbPromotionAudienceGroupMember = typeof promotionAudienceGroupMembers.$inferSelect;
+export type NewDbPromotionAudienceGroupMember = typeof promotionAudienceGroupMembers.$inferInsert;

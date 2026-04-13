@@ -124,6 +124,10 @@ export const CartScreen = () => {
         code: string;
         promotionSummary: string | null;
         deliveryPromotionSummary: string | null;
+        orderDiscountAmount: number;
+        deliveryDiscountAmount: number;
+        autoApplyReason?: string | null;
+        selectionReason?: string | null;
         discountAmount: number;
         freeDeliveryApplied: boolean;
         effectiveDeliveryPrice: number;
@@ -168,16 +172,12 @@ export const CartScreen = () => {
             }
 
             if (type === 'PERCENTAGE' || type === 'SPEND_X_PERCENT') {
-                const fallbackPercentFromApplied =
-                    Number.isFinite(Number(promotion.appliedAmount)) && total > 0
-                        ? (Number(promotion.appliedAmount) / total) * 100
-                        : NaN;
-                const percentValue = hasDiscountValue ? rawDiscountValue : fallbackPercentFromApplied;
+                const percentValue = Number(promotion.discountValue ?? NaN);
                 const normalizedPercent = Number.isFinite(percentValue) && percentValue > 0
                     ? (Number.isInteger(percentValue) ? String(percentValue) : percentValue.toFixed(1).replace(/\.0$/, ''))
                     : null;
-                return normalizedValue
-                    ? t.cart.promo_summary_percent_off.replace('{{percent}}', normalizedPercent ?? normalizedValue)
+                return normalizedPercent
+                    ? t.cart.promo_summary_percent_off.replace('{{percent}}', normalizedPercent)
                     : t.cart.promo_type_percentage;
             }
 
@@ -189,7 +189,7 @@ export const CartScreen = () => {
 
             return t.cart.promo_type_generic;
         },
-        [formatCurrency, t, total],
+        [formatCurrency, t],
     );
 
     const isFreeDeliveryPromotion = useCallback(
@@ -466,6 +466,18 @@ export const CartScreen = () => {
                         .filter((promotion) => isFreeDeliveryPromotion(promotion))
                         .map((promotion) => buildPromotionSummary(promotion)),
                 ) ?? (result.freeDeliveryApplied ? t.cart.free_delivery : null);
+                const effectiveDeliveryPrice = Number(result.finalDeliveryPrice ?? ctx.deliveryPrice);
+                const totalPrice = Number(result.finalTotal ?? ctx.subtotal + ctx.deliveryPrice);
+                const deliveryDiscountAmount = Math.max(0, ctx.deliveryPrice - effectiveDeliveryPrice);
+                const totalDiscountAmount = Math.max(0, ctx.subtotal + ctx.deliveryPrice - totalPrice);
+                const orderDiscountAmount = Math.max(0, totalDiscountAmount - deliveryDiscountAmount);
+                const autoApplyReason =
+                    typeof selectedEligiblePromotion.spendThreshold === 'number' && selectedEligiblePromotion.spendThreshold > 0
+                        ? t.cart.auto_apply_reason_min_spend.replace(
+                            '{{amount}}',
+                            formatCurrency(Number(selectedEligiblePromotion.spendThreshold)),
+                        )
+                        : t.cart.auto_apply_reason_best_match;
 
                 if (!mounted) return;
 
@@ -477,10 +489,14 @@ export const CartScreen = () => {
                     code: autoPromoLabel,
                     promotionSummary: nonDeliverySummary,
                     deliveryPromotionSummary: deliverySummary,
-                    discountAmount: Number(result.totalDiscount ?? 0),
+                    orderDiscountAmount,
+                    deliveryDiscountAmount,
+                    autoApplyReason,
+                    selectionReason: t.cart.auto_apply_best_savings,
+                    discountAmount: totalDiscountAmount,
                     freeDeliveryApplied: result.freeDeliveryApplied ?? false,
-                    effectiveDeliveryPrice: Number(result.finalDeliveryPrice ?? ctx.deliveryPrice),
-                    totalPrice: Number(result.finalTotal ?? ctx.subtotal + ctx.deliveryPrice),
+                    effectiveDeliveryPrice,
+                    totalPrice,
                     source: 'eligible',
                 });
                 const promoDisplayName = getPromotionDisplayName(selectedEligiblePromotion);
@@ -813,6 +829,11 @@ export const CartScreen = () => {
                     .filter((promotion) => isFreeDeliveryPromotion(promotion))
                     .map((promotion) => buildPromotionSummary(promotion)),
             ) ?? (result.freeDeliveryApplied ? t.cart.free_delivery : null);
+            const effectiveDeliveryPrice = Number(result.finalDeliveryPrice ?? deliveryPrice);
+            const totalPrice = Number(result.finalTotal ?? total + deliveryPrice);
+            const deliveryDiscountAmount = Math.max(0, deliveryPrice - effectiveDeliveryPrice);
+            const totalDiscountAmount = Math.max(0, total + deliveryPrice - totalPrice);
+            const orderDiscountAmount = Math.max(0, totalDiscountAmount - deliveryDiscountAmount);
 
             setPromoResult({
                 promotionId: result.promotions?.[0]?.id ?? null,
@@ -822,10 +843,14 @@ export const CartScreen = () => {
                 code: couponCode.trim(),
                 promotionSummary: nonDeliverySummary,
                 deliveryPromotionSummary: deliverySummary,
-                discountAmount: Number(result.totalDiscount ?? 0),
+                orderDiscountAmount,
+                deliveryDiscountAmount,
+                autoApplyReason: null,
+                selectionReason: null,
+                discountAmount: totalDiscountAmount,
                 freeDeliveryApplied: result.freeDeliveryApplied ?? false,
-                effectiveDeliveryPrice: Number(result.finalDeliveryPrice ?? deliveryPrice),
-                totalPrice: Number(result.finalTotal ?? total + deliveryPrice),
+                effectiveDeliveryPrice,
+                totalPrice,
                 source: 'manual',
             });
             showNotifier(

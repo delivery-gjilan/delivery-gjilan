@@ -265,7 +265,7 @@ export const cache = new InMemoryCache({
 export const cacheReady: Promise<void> = persistCache({
     cache,
     storage: new AsyncStorageWrapper(AsyncStorage),
-    maxSize: 5 * 1024 * 1024,
+    maxSize: 2 * 1024 * 1024,
     debug: __DEV__,
 }).catch(async (err) => {
     console.warn('[ApolloCache] Failed to persist/restore cache, purging:', err);

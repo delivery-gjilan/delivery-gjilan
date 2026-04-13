@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client';
 
 import { useState } from 'react';
@@ -101,7 +100,7 @@ export default function BusinessSettlementsPage() {
   const normalized = searchQuery.trim().toLowerCase();
   const filtered = settlements.filter((s) => {
     if (!normalized) return true;
-    return [s.id, s.order?.id, s.paymentReference, s.paymentMethod]
+    return [s.id, s.order?.id, (s as any).paymentReference, (s as any).paymentMethod]
       .filter(Boolean)
       .some((v) => v!.toString().toLowerCase().includes(normalized));
   });
@@ -319,9 +318,9 @@ export default function BusinessSettlementsPage() {
                       €{Number(s.amount ?? 0).toFixed(2)}
                     </TableCell>
                     <TableCell>{statusBadge(!!s.isSettled)}</TableCell>
-                    <TableCell className="text-gray-400 text-sm">{s.paymentMethod ?? '—'}</TableCell>
+                    <TableCell className="text-gray-400 text-sm">{(s as any).paymentMethod ?? '—'}</TableCell>
                     <TableCell className="text-gray-400 text-sm">
-                      {s.paidAt ? new Date(s.paidAt as string).toLocaleDateString() : '—'}
+                      {(s as any).paidAt ? new Date((s as any).paidAt as string).toLocaleDateString() : '—'}
                     </TableCell>
                     <TableCell className="text-gray-400 text-sm">
                       {s.createdAt ? new Date(s.createdAt as string).toLocaleDateString() : '—'}

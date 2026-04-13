@@ -112,6 +112,7 @@ enum ApprovalReason {
 }
 
 input AssignPromotionToUserInput {
+  audienceGroupIds: [ID!]
   expiresAt: String
   promotionId: ID!
   userIds: [ID!]!
@@ -558,6 +559,13 @@ input CreateProductVariantGroupInput {
   name: String!
 }
 
+input CreatePromotionAudienceGroupInput {
+  description: String
+  isActive: Boolean
+  name: String!
+  userIds: [ID!]!
+}
+
 input CreatePromotionInput {
   code: String
   creatorId: ID
@@ -579,6 +587,7 @@ input CreatePromotionInput {
   spendThreshold: Float
   startsAt: String
   target: PromotionTarget!
+  targetAudienceGroupIds: [ID!]
   targetUserIds: [ID!]
   thresholdReward: String
   type: PromotionType!
@@ -1124,6 +1133,7 @@ type Mutation {
   createProductSubcategory(input: CreateProductSubcategoryInput!): ProductSubcategory!
   createProductVariantGroup(input: CreateProductVariantGroupInput!): ProductVariantGroup!
   createPromotion(input: CreatePromotionInput!): Promotion!
+  createPromotionAudienceGroup(input: CreatePromotionAudienceGroupInput!): PromotionAudienceGroup!
 
   """
   Admin creates a settlement request, notifying the business or driver via push.
@@ -1146,6 +1156,7 @@ type Mutation {
   deleteProductSubcategory(id: ID!): Boolean!
   deleteProductVariantGroup(id: ID!): Boolean!
   deletePromotion(id: ID!): Boolean!
+  deletePromotionAudienceGroup(id: ID!): Boolean!
   deleteSettlementRule(id: ID!): Boolean!
   deleteUser(id: ID!): Boolean!
   deleteUserAddress(id: ID!): Boolean!
@@ -1256,6 +1267,7 @@ type Mutation {
   updateProductSubcategory(id: ID!, input: UpdateProductSubcategoryInput!): ProductSubcategory!
   updateProductsOrder(businessId: ID!, products: [ProductOrderInput!]!): Boolean!
   updatePromotion(input: UpdatePromotionInput!): Promotion!
+  updatePromotionAudienceGroup(input: UpdatePromotionAudienceGroupInput!): PromotionAudienceGroup!
   updateSettlementRule(id: ID!, input: UpdateSettlementRuleInput!): SettlementRule!
   updateStoreStatus(input: UpdateStoreStatusInput!): StoreStatus!
   updateUser(input: UpdateUserInput!): User!
@@ -1650,6 +1662,17 @@ enum PromotionApplyMethod {
   CODE_REQUIRED
 }
 
+type PromotionAudienceGroup {
+  createdAt: String!
+  description: String
+  id: ID!
+  isActive: Boolean!
+  memberCount: Int!
+  members: [User!]!
+  name: String!
+  updatedAt: String!
+}
+
 enum PromotionCreatorType {
   BUSINESS
   PLATFORM
@@ -1791,6 +1814,7 @@ type Query {
   getBanners(filter: GetBannersFilter): [Banner!]!
   getPromotion(id: ID!): Promotion
   getPromotionAnalytics(promotionId: ID!): PromotionAnalyticsResult!
+  getPromotionAudienceGroups(isActive: Boolean, search: String): [PromotionAudienceGroup!]!
   getPromotionThresholds(cart: CartContextInput!): [PromotionThreshold!]!
   getPromotionUsage(limit: Int, offset: Int, promotionId: ID!): [PromotionUsage!]!
   getRecoveryPromotions: [Promotion!]!
@@ -2274,6 +2298,14 @@ input UpdateProductInput {
 
 input UpdateProductSubcategoryInput {
   name: String
+}
+
+input UpdatePromotionAudienceGroupInput {
+  description: String
+  id: ID!
+  isActive: Boolean
+  name: String
+  userIds: [ID!]
 }
 
 input UpdatePromotionInput {

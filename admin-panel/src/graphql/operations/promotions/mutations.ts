@@ -79,3 +79,49 @@ export const ISSUE_RECOVERY_PROMOTION = graphql(`
     }
 `);
 
+export const CREATE_PROMOTION_AUDIENCE_GROUP = graphql(`
+    mutation CreatePromotionAudienceGroup($input: CreatePromotionAudienceGroupInput!) {
+        createPromotionAudienceGroup(input: $input) {
+            id
+            name
+            description
+            isActive
+            memberCount
+            members {
+                id
+                firstName
+                lastName
+                email
+            }
+            createdAt
+            updatedAt
+        }
+    }
+`);
+
+export const UPDATE_PROMOTION_AUDIENCE_GROUP = graphql(`
+    mutation UpdatePromotionAudienceGroup($input: UpdatePromotionAudienceGroupInput!) {
+        updatePromotionAudienceGroup(input: $input) {
+            id
+            name
+            description
+            isActive
+            memberCount
+            members {
+                id
+                firstName
+                lastName
+                email
+            }
+            createdAt
+            updatedAt
+        }
+    }
+`);
+
+export const DELETE_PROMOTION_AUDIENCE_GROUP = graphql(`
+    mutation DeletePromotionAudienceGroup($id: ID!) {
+        deletePromotionAudienceGroup(id: $id)
+    }
+`);
+

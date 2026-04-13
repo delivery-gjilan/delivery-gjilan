@@ -187,8 +187,6 @@ export default function AdminsPage() {
                     },
                 });
 
-                console.log('[DEBUG] User created successfully:', created?.createUser?.user);
-
                 // If creating a business employee, set their permissions
                 if (formData.role === 'BUSINESS_EMPLOYEE' && created?.createUser?.user?.id) {
                     await setUserPermissions({
@@ -201,13 +199,12 @@ export default function AdminsPage() {
 
                 if (created && created.createUser) {
                     const successMessage = `${created.createUser.message || "Admin created successfully"}. Email: ${formData.email}`;
-                    console.log('[DEBUG] Success message:', successMessage);
                     setFormSuccess(successMessage);
                     handleCloseModal();
                 }
             }
         } catch (err) {
-            console.error('[DEBUG] Error creating/updating admin:', err);
+            console.error('Error creating/updating admin:', err);
             setFormError(err instanceof Error ? err.message : "Failed to " + (editingUser ? "update" : "create") + " admin");
         }
     };

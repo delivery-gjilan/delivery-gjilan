@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, GestureResponderEvent, Animated } from 'r
 import { Ionicons } from '@expo/vector-icons';
 import { Product, BusinessType } from '@/gql/graphql';
 import { useTheme } from '@/hooks/useTheme';
-import { useProductInCart } from '../hooks/useProductInCart';
+import { useProductInCart } from '@/modules/cart/hooks/useProductInCart';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -14,7 +14,7 @@ interface CartControlsProps {
 
 export function CartControls({ product, businessType }: CartControlsProps) {
     const theme = useTheme();
-    const { quantity, addToCart, incrementQuantity, decrementQuantity } = useProductInCart(product as any, businessType);
+    const { quantity, addToCart, incrementQuantity, decrementQuantity } = useProductInCart(product, businessType);
     const scaleAnim = useRef(new Animated.Value(1)).current;
     const [showFloatingNumber, setShowFloatingNumber] = useState(false);
     const floatingOpacity = useRef(new Animated.Value(0)).current;

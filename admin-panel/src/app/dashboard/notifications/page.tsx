@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import { useState, useMemo } from "react";
@@ -43,6 +42,7 @@ import {
   ChevronDown,
   HeartHandshake,
 } from "lucide-react";
+import { PromotionType, PromotionTarget, PromotionCreatorType } from "@/gql/graphql";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -464,7 +464,7 @@ export default function NotificationsPage() {
   const [promoSent, setPromoSent] = useState<{ success: boolean; count: number } | null>(null);
 
   // Recovery state
-  const [recoveryType, setRecoveryType] = useState<"FREE_DELIVERY" | "FIXED_AMOUNT" | "PERCENTAGE">("FREE_DELIVERY");
+  const [recoveryType, setRecoveryType] = useState<PromotionType>(PromotionType.FreeDelivery);
   const [recoveryAmount, setRecoveryAmount] = useState("");
   const [recoveryReason, setRecoveryReason] = useState("");
   const [recoveryExpiry, setRecoveryExpiry] = useState("");
@@ -1031,7 +1031,7 @@ export default function NotificationsPage() {
                   <button
                     key={opt.value}
                     type="button"
-                    onClick={() => setRecoveryType(opt.value)}
+                    onClick={() => setRecoveryType(opt.value as PromotionType)}
                     className={`py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${
                       recoveryType === opt.value
                         ? "border-violet-500 bg-violet-950 text-violet-300"
@@ -1281,13 +1281,13 @@ export default function NotificationsPage() {
                           variables: {
                             input: {
                               name: newPromoName.trim(),
-                              type: newPromoType,
-                              target: "ALL_USERS",
+                              type: newPromoType as PromotionType,
+                              target: "ALL_USERS" as unknown as PromotionTarget,
                               discountValue: newPromoValue.trim() ? Number(newPromoValue) : undefined,
                               isActive: true,
                               isStackable: false,
                               priority: 1,
-                              creatorType: "ADMIN",
+                              creatorType: "ADMIN" as unknown as PromotionCreatorType,
                               endsAt: newPromoExpiry ? new Date(newPromoExpiry).toISOString() : undefined,
                             },
                           },

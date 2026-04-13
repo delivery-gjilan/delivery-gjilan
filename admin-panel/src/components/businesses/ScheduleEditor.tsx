@@ -116,7 +116,7 @@ export default function ScheduleEditor({ businessId, schedule, onSaved }: Props)
                     className="text-xs px-3 py-1.5 rounded-md bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 transition-colors border border-purple-600/30"
                     onClick={applyToAll}
                 >
-                    Copy Mon â†’ All
+                    Copy Mon → All
                 </button>
             </div>
 

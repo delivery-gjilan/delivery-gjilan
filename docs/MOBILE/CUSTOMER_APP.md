@@ -323,20 +323,38 @@ Step 1: Cart Items          Step 2: Address           Step 3: Review & Confirm
 - Active order blocks checkout (`hasActiveOrders` guard)
 
 **Promotion engine:**
-- `PromotionProgressBar` shows spend-threshold progress in business detail
-- `PromoCodeSection` for manual promo codes
-- `CartScreen` auto-applies the highest-priority eligible promotion during checkout review
-- Auto-applicable promotions that do not expose a code render with a derived promo label in the applied chip
-- When an auto-applied promotion is active, `PromoCodeSection` still shows manual coupon input so users can override it
-- `PriceBreakdown` promo row shows explicit promo summary labels (for example `20% off`, `€5 off`, `Free delivery`) together with deducted amount
-- Promo summary labels are derived from existing promotion response fields (`type`, `appliedAmount`, `freeDelivery`) during checkout validation
-- When multiple promotions combine (for example item discount + free delivery), checkout displays non-delivery promo summary and delivery promo summary on separate rows with matching deducted amounts
-- Checkout computes discount split from validated totals (`subtotal + delivery - finalTotal`) and `finalDeliveryPrice` so item-discount and delivery-discount rows remain numerically consistent in combined promo cases
-- `PromoCodeSection` applied chip shows combined promo labels when multiple promo kinds are active (for example `20% off + Free delivery`)
-- Applied promo chip keeps the entered/auto code visible and renders promo-kind labels on a separate line for combined promo scenarios
-- `PromoAppliedCelebration` confetti animation on promo unlock
-- `ValidatePromotions` validates cart context → discount, free delivery, final totals
-- `PromotionIssueModal` shows why a promo failed to apply
+- `PromotionProgressBar` shows spend-threshold progress in business detail.
+- `PromoCodeSection` supports manual code entry and applied-promo display.
+- Promotions are resolved through `ValidatePromotions` and can include multiple applied promotions in one checkout.
+
+**Apply behavior (current):**
+- `CartScreen` auto-applies the highest-priority eligible promotion when no manual promo is active.
+- Manual code entry remains available even when an eligible auto-promo is active, so users can override with a code.
+- Auto-applied promotions can be code-less; UI uses a safe display fallback and does not assume `Promotion.code` is always present.
+- Auto-applied state now includes an inline explanation card in checkout (for example best-savings selection and threshold unlock context) while still allowing manual code override.
+
+**Applied promo UI (current):**
+- Applied promo display is lightweight and row-based.
+- Each applied promotion is rendered as one row containing coupon identity/code, promo summary, and applied amount.
+- If multiple promos are active (for example order discount + free delivery), rows are stacked one-per-promotion.
+- Auto-applied promo rows include translatable best-savings and reason labels to reduce confusion around why a promo was selected.
+
+**Global promo visibility (current):**
+- Home tab includes a personalized `Your coupons` horizontal strip populated from `getUserPromotions` for the authenticated user.
+- Personalized strip includes exclusive/compensation-style user coupons with apply mode (`AUTO`/`CODE`), coupon value summary, and expiry information.
+
+**Business promo cards (current):**
+- Business detail promo cards now show compact condition chips (scope/method/target/min-spend/usage/expiry where available).
+- Promo details modal also renders the same chip-based breakdown for easier condition scanning.
+
+**Price breakdown behavior (current):**
+- Breakdown separates non-delivery promo discount and delivery promo discount.
+- Delivery discount row uses `Delivery Promo (...)`; non-delivery uses `Promo (...)`.
+- Discount split is derived from validated totals (`subtotal + delivery - finalTotal`) plus `finalDeliveryPrice`, keeping math consistent for combined promotions.
+
+**User feedback and error handling:**
+- `PromoAppliedCelebration` provides confetti on promo unlock.
+- `PromotionIssueModal` explains invalid/expired/not-combinable promo failures during checkout.
 
 ---
 

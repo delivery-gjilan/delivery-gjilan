@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState, useEffect } from 'react';
+import React, { useMemo, useRef, useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, Dimensions, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,6 +17,7 @@ import { useTranslations } from '@/hooks/useTranslations';
 import { useQuery } from '@apollo/client/react';
 import { GET_ACTIVE_BANNERS } from '@/graphql/operations/banners';
 import { GET_FEATURED_BUSINESSES } from '@/graphql/operations/businesses';
+import { GET_USER_PROMOTIONS } from '@/graphql/operations/promotions';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import type { WoltHeaderBannerType } from '@/components/WoltHeader';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
@@ -117,7 +118,40 @@ export default function Discover() {
     const { data: featuredData } = useQuery(GET_FEATURED_BUSINESSES, {
         fetchPolicy: 'cache-and-network',
     });
+    const { data: userPromotionsData } = useQuery(GET_USER_PROMOTIONS, {
+        variables: { userId },
+        skip: !userId,
+        fetchPolicy: 'cache-and-network',
+    });
     const featuredBusinesses = useMemo(() => (featuredData as any)?.featuredBusinesses ?? [], [featuredData]);
+
+    const personalizedCoupons = useMemo(() => {
+        const rows = ((userPromotionsData as any)?.getUserPromotions ?? []) as Array<any>;
+        return rows
+            .filter((row) => row?.promotion?.isActive)
+            .filter((row) => {
+                const expiresAt = row?.expiresAt;
+                if (!expiresAt) return true;
+                const expiry = new Date(expiresAt);
+                return !Number.isNaN(expiry.getTime()) && expiry.getTime() > Date.now();
+            })
+            .slice(0, 6);
+    }, [userPromotionsData]);
+
+    const formatUserCouponValue = useCallback((promotion: any) => {
+        const type = promotion?.type;
+        const discountValue = Number(promotion?.discountValue ?? 0);
+        if (type === 'FREE_DELIVERY' || type === 'SPEND_X_GET_FREE') {
+            return t.home.coupon_value_free_delivery;
+        }
+        if ((type === 'PERCENTAGE' || type === 'SPEND_X_PERCENT') && discountValue > 0) {
+            return t.home.coupon_value_percent.replace('{{percent}}', String(Math.round(discountValue)));
+        }
+        if ((type === 'FIXED_AMOUNT' || type === 'SPEND_X_FIXED') && discountValue > 0) {
+            return t.home.coupon_value_fixed.replace('{{amount}}', `€${discountValue.toFixed(2)}`);
+        }
+        return t.home.coupon_value_generic;
+    }, [t]);
 
     const restaurants = useMemo(
         () => (businesses || []).filter((b) => b.businessType === 'RESTAURANT'),
@@ -278,6 +312,78 @@ export default function Discover() {
                         <Animated.View entering={hasAnimated.current ? undefined : FadeInDown.delay(100).duration(500)} style={{ marginBottom: 20 }}>
                             <PromoSlider banners={promoBanners} />
                         </Animated.View>
+
+                        {personalizedCoupons.length > 0 && (
+                            <Animated.View entering={hasAnimated.current ? undefined : FadeInDown.delay(130).duration(500)} style={{ marginBottom: 16 }}>
+                                <View style={{ paddingHorizontal: 16, marginBottom: 10 }}>
+                                    <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '800' }}>
+                                        {t.home.your_coupons}
+                                    </Text>
+                                    <Text style={{ color: theme.colors.subtext, fontSize: 12, marginTop: 2 }}>
+                                        {t.home.your_coupons_subtitle}
+                                    </Text>
+                                </View>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 16, paddingRight: 4 }}>
+                                    {personalizedCoupons.map((userPromo, idx) => {
+                                        const promo = userPromo.promotion;
+                                        if (!promo) return null;
+                                        const isCodePromo = Boolean(promo.code);
+                                        const expiresAt = userPromo.expiresAt ? new Date(userPromo.expiresAt) : null;
+                                        const expiryText =
+                                            expiresAt && !Number.isNaN(expiresAt.getTime())
+                                                ? t.home.coupon_expires_on.replace('{{date}}', expiresAt.toLocaleDateString())
+                                                : t.home.coupon_no_expiry;
+
+                                        return (
+                                            <View
+                                                key={userPromo.id ?? `user-promo-${idx}`}
+                                                style={{
+                                                    width: 230,
+                                                    marginRight: idx === personalizedCoupons.length - 1 ? 0 : 10,
+                                                    borderRadius: 12,
+                                                    borderWidth: 1,
+                                                    borderColor: theme.colors.border,
+                                                    backgroundColor: theme.colors.card,
+                                                    paddingHorizontal: 12,
+                                                    paddingVertical: 10,
+                                                }}
+                                            >
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                    <Text style={{ color: theme.colors.primary, fontSize: 12, fontWeight: '800' }} numberOfLines={1}>
+                                                        {formatUserCouponValue(promo)}
+                                                    </Text>
+                                                    <View
+                                                        style={{
+                                                            borderRadius: 999,
+                                                            borderWidth: 1,
+                                                            borderColor: theme.colors.primary + '55',
+                                                            backgroundColor: theme.colors.primary + '18',
+                                                            paddingHorizontal: 7,
+                                                            paddingVertical: 2,
+                                                        }}
+                                                    >
+                                                        <Text style={{ color: theme.colors.primary, fontSize: 10, fontWeight: '700' }}>
+                                                            {isCodePromo ? t.home.coupon_badge_code : t.home.coupon_badge_auto}
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                                <Text style={{ color: theme.colors.text, fontSize: 13, fontWeight: '700', marginTop: 8 }} numberOfLines={1}>
+                                                    {promo.name || t.home.coupon_generic_name}
+                                                </Text>
+                                                <Text style={{ color: theme.colors.subtext, fontSize: 11, marginTop: 4 }} numberOfLines={2}>
+                                                    {isCodePromo
+                                                        ? t.home.coupon_code_required.replace('{{code}}', String(promo.code))
+                                                        : t.home.coupon_auto_applies}
+                                                </Text>
+                                                <Text style={{ color: theme.colors.subtext, fontSize: 11, marginTop: 4 }} numberOfLines={1}>
+                                                    {expiryText}
+                                                </Text>
+                                            </View>
+                                        );
+                                    })}
+                                </ScrollView>
+                            </Animated.View>
+                        )}
 
                         {/* Popular Right Now */}
                         <Animated.View entering={hasAnimated.current ? undefined : FadeInDown.delay(200).duration(500)}>

@@ -1,7 +1,7 @@
 // Hooks
 export { useCart } from './hooks/useCart';
 export { useCartActions } from './hooks/useCartActions';
-export { useCartProductDetails } from './hooks/useCartProductDetails';
+export { useProductInCart } from './hooks/useProductInCart';
 
 // Components
 export { CartFloatingBar } from './components/CartFloatingBar';

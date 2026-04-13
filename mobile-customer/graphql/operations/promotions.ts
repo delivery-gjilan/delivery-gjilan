@@ -65,3 +65,28 @@ export const GET_ACTIVE_GLOBAL_PROMOTIONS = gql`
         }
     }
 `;
+
+export const GET_USER_PROMOTIONS = gql`
+    query GetUserPromotions($userId: ID!) {
+        getUserPromotions(userId: $userId) {
+            id
+            userId
+            usageCount
+            expiresAt
+            promotion {
+                id
+                name
+                code
+                type
+                target
+                applyMethod
+                discountValue
+                spendThreshold
+                maxUsagePerUser
+                maxGlobalUsage
+                isActive
+                endsAt
+            }
+        }
+    }
+`;

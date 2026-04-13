@@ -208,6 +208,8 @@ export function OrderSummarySheet({ orderId, onClose }: Props) {
                                                     marginRight: 10,
                                                 }}
                                                 contentFit="cover"
+                                                cachePolicy="memory-disk"
+                                                transition={200}
                                             />
                                         ) : (
                                             <View

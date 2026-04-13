@@ -134,6 +134,17 @@ type UserPromoMetadata {
   user: User
 }
 
+type PromotionAudienceGroup {
+  id: ID!
+  name: String!
+  description: String
+  isActive: Boolean!
+  memberCount: Int!
+  members: [User!]!
+  createdAt: String!
+  updatedAt: String!
+}
+
 # ============================================
 # INPUTS
 # ============================================
@@ -163,6 +174,9 @@ input CreatePromotionInput {
 
   # Optional: Assign to specific users
   targetUserIds: [ID!]
+
+  # Optional: Assign to persistent audience groups (users resolved at creation time)
+  targetAudienceGroupIds: [ID!]
 
   # Optional: Restrict to specific businesses
   eligibleBusinessIds: [ID!]
@@ -203,7 +217,23 @@ input IssueRecoveryPromotionInput {
 input AssignPromotionToUserInput {
   promotionId: ID!
   userIds: [ID!]!
+  audienceGroupIds: [ID!]
   expiresAt: String
+}
+
+input CreatePromotionAudienceGroupInput {
+  name: String!
+  description: String
+  userIds: [ID!]!
+  isActive: Boolean
+}
+
+input UpdatePromotionAudienceGroupInput {
+  id: ID!
+  name: String
+  description: String
+  userIds: [ID!]
+  isActive: Boolean
 }
 
 input CartContextInput {
@@ -257,6 +287,9 @@ type Query {
   
   # Analytics
   getPromotionAnalytics(promotionId: ID!): PromotionAnalyticsResult!
+
+  # Persistent audience groups for targeted promotions
+  getPromotionAudienceGroups(isActive: Boolean, search: String): [PromotionAudienceGroup!]!
 }
 
 type PromotionAnalyticsResult {
@@ -297,4 +330,9 @@ type Mutation {
 
   # Grant the user a free delivery on their next order (one-time courtesy comp)
   grantFreeDelivery(userId: ID!, orderId: ID!): Boolean!
+
+  # Persistent audience groups
+  createPromotionAudienceGroup(input: CreatePromotionAudienceGroupInput!): PromotionAudienceGroup!
+  updatePromotionAudienceGroup(input: UpdatePromotionAudienceGroupInput!): PromotionAudienceGroup!
+  deletePromotionAudienceGroup(id: ID!): Boolean!
 }

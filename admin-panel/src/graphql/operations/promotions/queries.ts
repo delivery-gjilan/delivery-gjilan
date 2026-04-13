@@ -27,6 +27,10 @@ export const GET_PROMOTIONS = graphql(`
             totalRevenue
             creatorType
             creatorId
+            eligibleBusinesses {
+                id
+                name
+            }
         }
     }
 `);
@@ -56,6 +60,26 @@ export const GET_RECOVERY_PROMOTIONS = graphql(`
                     email
                 }
             }
+        }
+    }
+`);
+
+export const GET_PROMOTION_AUDIENCE_GROUPS = graphql(`
+    query GetPromotionAudienceGroups($isActive: Boolean, $search: String) {
+        getPromotionAudienceGroups(isActive: $isActive, search: $search) {
+            id
+            name
+            description
+            isActive
+            memberCount
+            members {
+                id
+                firstName
+                lastName
+                email
+            }
+            createdAt
+            updatedAt
         }
     }
 `);

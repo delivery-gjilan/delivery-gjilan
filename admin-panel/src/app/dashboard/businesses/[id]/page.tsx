@@ -76,7 +76,7 @@ export default function BusinessDetailsPage() {
         setEditForm({
             name: b.name,
             phoneNumber: b.phoneNumber || '',
-            businessType: BusinessType.Restaurant,
+            businessType: (b.businessType as BusinessType) ?? BusinessType.Restaurant,
             category: b.category || '',
             imageUrl: b.imageUrl || '',
             minOrderAmount: b.minOrderAmount ?? 0,

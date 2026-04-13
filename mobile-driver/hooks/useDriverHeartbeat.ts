@@ -74,13 +74,13 @@ const DRIVER_HEARTBEAT_MUTATION_TEXT = `
 `;
 
 async function sendBackgroundHeartbeat(latitude: number, longitude: number): Promise<void> {
-  try {
-    const token = await getValidAccessToken(30_000);
-    const endpoint = process.env.EXPO_PUBLIC_API_URL;
+  const endpoint = process.env.EXPO_PUBLIC_API_URL;
+  if (!endpoint) return;
 
-    if (!token || !endpoint) {
-      return;
-    }
+  const attemptRequest = async (): Promise<void> => {
+    // getValidAccessToken refreshes the token automatically if near-expiry
+    const token = await getValidAccessToken(30_000);
+    if (!token) return;
 
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -94,11 +94,39 @@ async function sendBackgroundHeartbeat(latitude: number, longitude: number): Pro
       }),
     });
 
-    if (!response.ok) {
-      console.warn('[Heartbeat][Background] Request failed with status', response.status);
+    if (response.status === 401) {
+      // Token rejected by server — force a fresh access token next time
+      console.warn('[Heartbeat][Background] 401 received, will retry with refreshed token on next tick');
+      return;
     }
-  } catch (error) {
-    console.warn('[Heartbeat][Background] Failed:', error);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    // GraphQL responds with HTTP 200 even for application-level errors
+    let body: { errors?: Array<{ message: string }> } | null = null;
+    try {
+      body = await response.json() as typeof body;
+    } catch {
+      // Non-JSON body — not a fatal error for a heartbeat
+    }
+    if (body?.errors?.length) {
+      console.warn('[Heartbeat][Background] GraphQL errors:', body.errors.map((e) => e.message));
+    }
+  };
+
+  try {
+    await attemptRequest();
+  } catch (firstErr) {
+    console.warn('[Heartbeat][Background] First attempt failed:', firstErr instanceof Error ? firstErr.message : firstErr);
+    // Single retry after 2 s for transient network / server errors
+    await new Promise<void>((resolve) => setTimeout(resolve, 2000));
+    try {
+      await attemptRequest();
+    } catch (retryErr) {
+      console.warn('[Heartbeat][Background] Retry also failed:', retryErr instanceof Error ? retryErr.message : retryErr);
+    }
   }
 }
 

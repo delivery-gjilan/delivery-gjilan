@@ -4,7 +4,10 @@ import { getMainDefinition } from '@apollo/client/utilities';
 import { createClient } from 'graphql-ws';
 import { setContext } from '@apollo/client/link/context';
 import { onError } from '@apollo/client/link/error';
+import { persistCache, AsyncStorageWrapper } from 'apollo3-cache-persist';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getValidAccessToken } from './authSession';
+import { useAuthStore } from '@/store/authStore';
 
 const AUTH_SKIP_OPERATIONS = new Set([
     'BusinessLogin',
@@ -118,10 +121,12 @@ const authLink = setContext(async (operation, { headers }) => {
 const errorLink = onError((errorContext: any) => {
     const { graphQLErrors, networkError } = errorContext;
     if (graphQLErrors) {
-        graphQLErrors.forEach(({ message, path }: any) => {
+        graphQLErrors.forEach(({ message, extensions, path }: any) => {
             console.error(`[GraphQL error]: Message: ${message}, Path: ${path}`);
-            if (message.includes('Unauthorized') || message.includes('token')) {
-                console.warn('[Apollo] Auth-related error received, preserving session');
+            const code = extensions?.code as string | undefined;
+            if (code === 'UNAUTHENTICATED' || message.includes('Unauthorized') || message.includes('token')) {
+                console.warn('[Apollo] UNAUTHENTICATED error — forcing logout');
+                useAuthStore.getState().logout().catch(() => null);
             }
         });
     }
@@ -140,9 +145,29 @@ const splitLink = split(
     from([errorLink, authLink, httpLink])
 );
 
+export const cache = new InMemoryCache();
+
+/**
+ * Restores the Apollo cache from AsyncStorage.
+ * Call this once on app startup before rendering ApolloProvider.
+ * Always resolves — errors are caught so the app can still start.
+ */
+export async function initializeCache(): Promise<void> {
+    try {
+        await persistCache({
+            cache,
+            storage: new AsyncStorageWrapper(AsyncStorage),
+            maxSize: false,
+            debug: __DEV__,
+        });
+    } catch (err) {
+        console.warn('[Apollo] Cache persistence initialization failed — starting fresh', err);
+    }
+}
+
 export const apolloClient = new ApolloClient({
     link: splitLink,
-    cache: new InMemoryCache(),
+    cache,
     defaultOptions: {
         watchQuery: {
             fetchPolicy: 'cache-and-network',

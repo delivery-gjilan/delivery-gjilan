@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, Image, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Product, BusinessType } from '@/gql/graphql';
 import { useTheme } from '@/hooks/useTheme';
-import { useProductInCart } from '../hooks/useProductInCart';
+import { useProductInCart } from '@/modules/cart/hooks/useProductInCart';
 import { getEffectiveProductPrice, getPreDiscountProductPrice } from '@/modules/product/utils/pricing';
 
 interface MarketProductCardProps {
@@ -52,7 +52,7 @@ export function MarketProductCard({ product, businessType, onPress }: MarketProd
         >
             <View className="relative">
                 {product.imageUrl ? (
-                    <Image source={{ uri: product.imageUrl }} style={{ width: '100%', height: 165 }} resizeMode="cover" />
+                    <Image source={{ uri: product.imageUrl }} style={{ width: '100%', height: 165 }} contentFit="cover" cachePolicy="memory-disk" transition={200} />
                 ) : (
                     <View
                         className="items-center justify-center"

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo, useReducer } from 'react';
 import {
     View,
     Text,
@@ -176,36 +176,132 @@ function getElapsedTime(statusChangeDate: string): string {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
+type ScreenState = {
+    etaModal: { visible: boolean; orderId: string | null; selectedEta: number; customEta: string };
+    storeCloseModal: { visible: boolean; reason: string };
+    prepModal: { visible: boolean; selectedTime: number; customTime: string };
+    productModalOrder: Order | null;
+    addTimeModal: { order: Order | null; amount: number; customTime: string };
+    removeItemModal: { data: { orderId: string; itemId: string; itemName: string } | null; reason: string };
+    completedView: { show: boolean; page: number };
+};
+
+type ScreenAction =
+    | { type: 'OPEN_ETA_MODAL'; orderId: string }
+    | { type: 'CLOSE_ETA_MODAL' }
+    | { type: 'SET_ETA'; eta: number }
+    | { type: 'SET_CUSTOM_ETA'; value: string }
+    | { type: 'OPEN_STORE_CLOSE_MODAL'; reason?: string }
+    | { type: 'CLOSE_STORE_CLOSE_MODAL' }
+    | { type: 'SET_CLOSING_REASON'; reason: string }
+    | { type: 'OPEN_PREP_MODAL'; time: number }
+    | { type: 'CLOSE_PREP_MODAL' }
+    | { type: 'SET_PREP_TIME'; time: number }
+    | { type: 'SET_CUSTOM_PREP_TIME'; value: string }
+    | { type: 'OPEN_PRODUCT_MODAL'; order: Order }
+    | { type: 'CLOSE_PRODUCT_MODAL' }
+    | { type: 'OPEN_ADD_TIME_MODAL'; order: Order }
+    | { type: 'CLOSE_ADD_TIME_MODAL' }
+    | { type: 'SET_ADD_TIME_AMOUNT'; amount: number }
+    | { type: 'SET_CUSTOM_ADD_TIME'; value: string }
+    | { type: 'OPEN_REMOVE_ITEM_MODAL'; data: { orderId: string; itemId: string; itemName: string } }
+    | { type: 'CLOSE_REMOVE_ITEM_MODAL' }
+    | { type: 'SET_REMOVE_ITEM_REASON'; reason: string }
+    | { type: 'TOGGLE_COMPLETED' }
+    | { type: 'SET_COMPLETED_PAGE'; page: number };
+
+const initialScreenState: ScreenState = {
+    etaModal: { visible: false, orderId: null, selectedEta: 10, customEta: '' },
+    storeCloseModal: { visible: false, reason: '' },
+    prepModal: { visible: false, selectedTime: 20, customTime: '' },
+    productModalOrder: null,
+    addTimeModal: { order: null, amount: 10, customTime: '' },
+    removeItemModal: { data: null, reason: '' },
+    completedView: { show: false, page: 0 },
+};
+
+function screenReducer(state: ScreenState, action: ScreenAction): ScreenState {
+    switch (action.type) {
+        case 'OPEN_ETA_MODAL':
+            return { ...state, etaModal: { visible: true, orderId: action.orderId, selectedEta: 10, customEta: '' } };
+        case 'CLOSE_ETA_MODAL':
+            return { ...state, etaModal: { ...state.etaModal, visible: false, orderId: null, customEta: '' } };
+        case 'SET_ETA':
+            return { ...state, etaModal: { ...state.etaModal, selectedEta: action.eta, customEta: '' } };
+        case 'SET_CUSTOM_ETA':
+            return { ...state, etaModal: { ...state.etaModal, customEta: action.value } };
+        case 'OPEN_STORE_CLOSE_MODAL':
+            return { ...state, storeCloseModal: { visible: true, reason: action.reason ?? '' } };
+        case 'CLOSE_STORE_CLOSE_MODAL':
+            return { ...state, storeCloseModal: { visible: false, reason: '' } };
+        case 'SET_CLOSING_REASON':
+            return { ...state, storeCloseModal: { ...state.storeCloseModal, reason: action.reason } };
+        case 'OPEN_PREP_MODAL':
+            return { ...state, prepModal: { visible: true, selectedTime: action.time, customTime: '' } };
+        case 'CLOSE_PREP_MODAL':
+            return { ...state, prepModal: { ...state.prepModal, visible: false, customTime: '' } };
+        case 'SET_PREP_TIME':
+            return { ...state, prepModal: { ...state.prepModal, selectedTime: action.time, customTime: '' } };
+        case 'SET_CUSTOM_PREP_TIME':
+            return { ...state, prepModal: { ...state.prepModal, customTime: action.value } };
+        case 'OPEN_PRODUCT_MODAL':
+            return { ...state, productModalOrder: action.order };
+        case 'CLOSE_PRODUCT_MODAL':
+            return { ...state, productModalOrder: null };
+        case 'OPEN_ADD_TIME_MODAL':
+            return { ...state, addTimeModal: { order: action.order, amount: 10, customTime: '' } };
+        case 'CLOSE_ADD_TIME_MODAL':
+            return { ...state, addTimeModal: { ...state.addTimeModal, order: null, customTime: '' } };
+        case 'SET_ADD_TIME_AMOUNT':
+            return { ...state, addTimeModal: { ...state.addTimeModal, amount: action.amount, customTime: '' } };
+        case 'SET_CUSTOM_ADD_TIME':
+            return { ...state, addTimeModal: { ...state.addTimeModal, customTime: action.value } };
+        case 'OPEN_REMOVE_ITEM_MODAL':
+            return { ...state, removeItemModal: { data: action.data, reason: '' } };
+        case 'CLOSE_REMOVE_ITEM_MODAL':
+            return { ...state, removeItemModal: { data: null, reason: '' } };
+        case 'SET_REMOVE_ITEM_REASON':
+            return { ...state, removeItemModal: { ...state.removeItemModal, reason: action.reason } };
+        case 'TOGGLE_COMPLETED':
+            return { ...state, completedView: { show: !state.completedView.show, page: !state.completedView.show ? 0 : state.completedView.page } };
+        case 'SET_COMPLETED_PAGE':
+            return { ...state, completedView: { ...state.completedView, page: action.page } };
+        default:
+            return state;
+    }
+}
+
 export default function OrdersScreen() {
     const { t } = useTranslation();
     const apolloClient = useApolloClient();
     const { user } = useAuthStore();
     const isMarket = user?.business?.businessType === 'MARKET';
-    const [etaModalVisible, setEtaModalVisible] = useState(false);
-    const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-    const [selectedEta, setSelectedEta] = useState(10);
-    const [customEta, setCustomEta] = useState('');
     const [tick, setTick] = useState(0);
     const [expandedOrderIds, setExpandedOrderIds] = useState<Set<string>>(new Set());
-    const [storeCloseModalVisible, setStoreCloseModalVisible] = useState(false);
-    const [closingReason, setClosingReason] = useState('');
-    const [prepModalVisible, setPrepModalVisible] = useState(false);
-    const [selectedPrepTime, setSelectedPrepTime] = useState(20);
-    const [customPrepTime, setCustomPrepTime] = useState('');
+    const [screenState, dispatch] = useReducer(screenReducer, initialScreenState);
+    const { etaModal, storeCloseModal, prepModal, productModalOrder, addTimeModal, removeItemModal: removeItemModalState, completedView } = screenState;
+    const etaModalVisible = etaModal.visible;
+    const selectedOrderId = etaModal.orderId;
+    const selectedEta = etaModal.selectedEta;
+    const customEta = etaModal.customEta;
+    const storeCloseModalVisible = storeCloseModal.visible;
+    const closingReason = storeCloseModal.reason;
+    const prepModalVisible = prepModal.visible;
+    const selectedPrepTime = prepModal.selectedTime;
+    const customPrepTime = prepModal.customTime;
     const lastTapRef = useRef<Record<string, number>>({});
     const singleTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const pendingOrderIdsRef = useRef<Set<string>>(new Set());
     const soundRef = useRef<Audio.Sound | null>(null);
-    const [productModalOrder, setProductModalOrder] = useState<Order | null>(null);
-    const [addTimeModalOrder, setAddTimeModalOrder] = useState<Order | null>(null);
-    const [addTimeAmount, setAddTimeAmount] = useState(10);
-    const [customAddTime, setCustomAddTime] = useState('');
-    const [showCompleted, setShowCompleted] = useState(false);
-    const [completedPage, setCompletedPage] = useState(0);
-    const [removeItemModal, setRemoveItemModal] = useState<{ orderId: string; itemId: string; itemName: string } | null>(null);
-    const [removeItemReason, setRemoveItemReason] = useState('');
+    const addTimeModalOrder = addTimeModal.order;
+    const addTimeAmount = addTimeModal.amount;
+    const customAddTime = addTimeModal.customTime;
+    const removeItemModal = removeItemModalState.data;
+    const removeItemReason = removeItemModalState.reason;
+    const showCompleted = completedView.show;
+    const completedPage = completedView.page;
     const { width } = useWindowDimensions();
-    const isTablet = width >= 768;
+    const isTablet = useMemo(() => width >= 768, [width]);
     const businessId = user?.businessId ?? '';
 
     // Tick every 1s to keep elapsed timers fresh
@@ -218,7 +314,9 @@ export default function OrdersScreen() {
     useEffect(() => {
         Audio.Sound.createAsync(require('@/assets/beep.wav')).then(({ sound }) => {
             soundRef.current = sound;
-        }).catch(() => {});
+        }).catch(() => {
+            console.warn('[Orders] Failed to load beep sound — haptic fallback will be used');
+        });
         return () => {
             soundRef.current?.unloadAsync();
         };
@@ -226,10 +324,17 @@ export default function OrdersScreen() {
 
     // Play beep × 3 with 1000 ms gaps: beep → 1000ms → beep → 1000ms → beep
     const playBeepPeriod = useCallback(() => {
-        const beep = () => soundRef.current?.replayAsync().catch(() => {});
-        beep();
-        setTimeout(beep, 1000);
-        setTimeout(beep, 2000);
+        if (soundRef.current) {
+            const beep = () => soundRef.current?.replayAsync().catch(() => {});
+            beep();
+            setTimeout(beep, 1000);
+            setTimeout(beep, 2000);
+        } else {
+            // Sound unavailable — use haptics as fallback
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+            setTimeout(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {}), 1000);
+            setTimeout(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {}), 2000);
+        }
     }, []);
 
     // Single period is 3 beeps 2100ms apart (4200ms total); cycle = period + 15s cooldown
@@ -414,10 +519,7 @@ export default function OrdersScreen() {
                     // Market orders skip PREPARING — jump straight to READY
                     handleMarkReady(order.id);
                 } else {
-                    setSelectedOrderId(order.id);
-                    setSelectedEta(10);
-                    setCustomEta('');
-                    setEtaModalVisible(true);
+                    dispatch({ type: 'OPEN_ETA_MODAL', orderId: order.id });
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 }
             } else if (order.status === 'PREPARING') {
@@ -430,7 +532,7 @@ export default function OrdersScreen() {
             if (isMarket) {
                 singleTapTimerRef.current = setTimeout(() => {
                     singleTapTimerRef.current = null;
-                    setProductModalOrder(order);
+                    dispatch({ type: 'OPEN_PRODUCT_MODAL', order });
                 }, 420);
             }
         }
@@ -452,9 +554,7 @@ export default function OrdersScreen() {
                 variables: { id: selectedOrderId, preparationMinutes: Math.round(finalEta) },
             });
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            setEtaModalVisible(false);
-            setSelectedOrderId(null);
-            setCustomEta('');
+            dispatch({ type: 'CLOSE_ETA_MODAL' });
             refetch();
         } catch (error: any) {
             Alert.alert(t('common.error', 'Error'), error.message);
@@ -506,10 +606,7 @@ export default function OrdersScreen() {
             handleMarkReady(orderId);
             return;
         }
-        setSelectedOrderId(orderId);
-        setSelectedEta(10);
-        setCustomEta('');
-        setEtaModalVisible(true);
+        dispatch({ type: 'OPEN_ETA_MODAL', orderId: orderId });
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     };
 
@@ -526,9 +623,8 @@ export default function OrdersScreen() {
                 },
             });
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            setRemoveItemModal(null);
-            setRemoveItemReason('');
-            setProductModalOrder(null);
+            dispatch({ type: 'CLOSE_REMOVE_ITEM_MODAL' });
+            dispatch({ type: 'CLOSE_PRODUCT_MODAL' });
             refetch();
         } catch (error: any) {
             Alert.alert(t('common.error', 'Error'), error.message);
@@ -545,8 +641,7 @@ export default function OrdersScreen() {
                 variables: { id: addTimeModalOrder.id, preparationMinutes: newMinutes },
             });
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            setAddTimeModalOrder(null);
-            setCustomAddTime('');
+            dispatch({ type: 'CLOSE_ADD_TIME_MODAL' });
             refetch();
         } catch (error: any) {
             Alert.alert(t('common.error', 'Error'), error.message);
@@ -586,8 +681,7 @@ export default function OrdersScreen() {
                 },
             });
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            setStoreCloseModalVisible(false);
-            setClosingReason('');
+            dispatch({ type: 'CLOSE_STORE_CLOSE_MODAL' });
             await refetchBusinessOperations();
         } catch (error: any) {
             Alert.alert(t('common.error', 'Error'), error?.message ?? 'Failed to close store');
@@ -612,8 +706,7 @@ export default function OrdersScreen() {
                 },
             });
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            setPrepModalVisible(false);
-            setCustomPrepTime('');
+            dispatch({ type: 'CLOSE_PREP_MODAL' });
             await refetchBusinessOperations();
         } catch (error: any) {
             Alert.alert(t('common.error', 'Error'), error?.message ?? 'Failed to update prep time');
@@ -931,9 +1024,7 @@ export default function OrdersScreen() {
                                 className="py-3 flex-row items-center justify-center border-r border-gray-700"
                                 style={{ flex: 1, backgroundColor: '#f59e0b15' }}
                                 onPress={() => {
-                                    setAddTimeModalOrder(order);
-                                    setAddTimeAmount(10);
-                                    setCustomAddTime('');
+                                    dispatch({ type: 'OPEN_ADD_TIME_MODAL', order });
                                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                                 }}
                             >
@@ -972,8 +1063,7 @@ export default function OrdersScreen() {
                             if (isStoreClosed) {
                                 handleOpenStore();
                             } else {
-                                setClosingReason(storeCloseReason);
-                                setStoreCloseModalVisible(true);
+                                dispatch({ type: 'OPEN_STORE_CLOSE_MODAL', reason: storeCloseReason });
                             }
                         }}
                         disabled={updatingBusinessOps}
@@ -1011,9 +1101,7 @@ export default function OrdersScreen() {
                             borderColor: '#3b82f655',
                         }}
                         onPress={() => {
-                            setSelectedPrepTime(avgPrepTime);
-                            setCustomPrepTime('');
-                            setPrepModalVisible(true);
+                            dispatch({ type: 'OPEN_PREP_MODAL', time: avgPrepTime });
                         }}
                         disabled={updatingBusinessOps}
                     >
@@ -1077,8 +1165,7 @@ export default function OrdersScreen() {
                                         borderColor: showCompleted ? '#6b7280' : '#475569',
                                     }}
                                     onPress={() => {
-                                        setShowCompleted((prev) => !prev);
-                                        if (!showCompleted) setCompletedPage(0);
+                                        dispatch({ type: 'TOGGLE_COMPLETED' });
                                     }}
                                 >
                                     <Ionicons
@@ -1158,7 +1245,7 @@ export default function OrdersScreen() {
                                                     backgroundColor: '#374151',
                                                     marginTop: 4,
                                                 }}
-                                                onPress={() => setCompletedPage((p) => p + 1)}
+                                                onPress={() => dispatch({ type: 'SET_COMPLETED_PAGE', page: completedPage + 1 })}
                                             >
                                                 <Text style={{ color: '#9ca3af', fontWeight: '600', fontSize: 13 }}>
                                                     {t('orders.load_more', 'Load More')}
@@ -1250,12 +1337,12 @@ export default function OrdersScreen() {
                 visible={etaModalVisible}
                 transparent
                 animationType="fade"
-                onRequestClose={() => setEtaModalVisible(false)}
+                onRequestClose={() => dispatch({ type: 'CLOSE_ETA_MODAL' })}
             >
                 <Pressable
                     className="flex-1 items-center justify-center"
                     style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
-                    onPress={() => setEtaModalVisible(false)}
+                    onPress={() => dispatch({ type: 'CLOSE_ETA_MODAL' })}
                 >
                     <Pressable
                         className="bg-card rounded-3xl overflow-hidden"
@@ -1285,8 +1372,7 @@ export default function OrdersScreen() {
                                             selectedEta === option.value ? '#7C3AED' : '#374151',
                                     }}
                                     onPress={() => {
-                                        setSelectedEta(option.value);
-                                        setCustomEta('');
+                                        dispatch({ type: 'SET_ETA', eta: option.value });
                                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                                     }}
                                 >
@@ -1317,7 +1403,7 @@ export default function OrdersScreen() {
                                     value={customEta}
                                     onChangeText={(value) => {
                                         const sanitized = value.replace(/[^0-9]/g, '');
-                                        setCustomEta(sanitized);
+                                        dispatch({ type: 'SET_CUSTOM_ETA', value: sanitized });
                                     }}
                                     keyboardType="number-pad"
                                     placeholder={t('orders.write_minutes', 'Write minutes...')}
@@ -1331,7 +1417,7 @@ export default function OrdersScreen() {
                         <View className="p-6 pt-2 flex-row gap-3">
                             <TouchableOpacity
                                 className="flex-1 py-4 rounded-2xl bg-gray-700 items-center"
-                                onPress={() => setEtaModalVisible(false)}
+                                onPress={() => dispatch({ type: 'CLOSE_ETA_MODAL' })}
                             >
                                 <Text className="text-subtext font-bold text-base">{t('common.cancel', 'Cancel')}</Text>
                             </TouchableOpacity>
@@ -1361,12 +1447,12 @@ export default function OrdersScreen() {
                 visible={storeCloseModalVisible}
                 transparent
                 animationType="fade"
-                onRequestClose={() => setStoreCloseModalVisible(false)}
+                onRequestClose={() => dispatch({ type: 'CLOSE_STORE_CLOSE_MODAL' })}
             >
                 <Pressable
                     className="flex-1 items-center justify-center"
                     style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
-                    onPress={() => setStoreCloseModalVisible(false)}
+                    onPress={() => dispatch({ type: 'CLOSE_STORE_CLOSE_MODAL' })}
                 >
                     <Pressable
                         className="bg-card rounded-3xl overflow-hidden"
@@ -1388,7 +1474,7 @@ export default function OrdersScreen() {
                             </Text>
                             <TextInput
                                 value={closingReason}
-                                onChangeText={setClosingReason}
+                                onChangeText={(v) => dispatch({ type: 'SET_CLOSING_REASON', reason: v })}
                                 placeholder={t('orders.close_reason_placeholder', 'e.g. High load, kitchen maintenance...')}
                                 placeholderTextColor="#6b7280"
                                 className="bg-background text-text rounded-xl px-4 py-3 border border-gray-700"
@@ -1399,7 +1485,7 @@ export default function OrdersScreen() {
                         <View className="p-5 pt-0 flex-row gap-3">
                             <TouchableOpacity
                                 className="flex-1 py-3 rounded-xl bg-gray-700 items-center"
-                                onPress={() => setStoreCloseModalVisible(false)}
+                                onPress={() => dispatch({ type: 'CLOSE_STORE_CLOSE_MODAL' })}
                             >
                                 <Text className="text-subtext font-bold">{t('common.cancel', 'Cancel')}</Text>
                             </TouchableOpacity>
@@ -1424,12 +1510,12 @@ export default function OrdersScreen() {
                 visible={prepModalVisible}
                 transparent
                 animationType="fade"
-                onRequestClose={() => setPrepModalVisible(false)}
+                onRequestClose={() => dispatch({ type: 'CLOSE_PREP_MODAL' })}
             >
                 <Pressable
                     className="flex-1 items-center justify-center"
                     style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
-                    onPress={() => setPrepModalVisible(false)}
+                    onPress={() => dispatch({ type: 'CLOSE_PREP_MODAL' })}
                 >
                     <Pressable
                         className="bg-card rounded-3xl overflow-hidden"
@@ -1456,8 +1542,7 @@ export default function OrdersScreen() {
                                         alignItems: 'center',
                                     }}
                                     onPress={() => {
-                                        setSelectedPrepTime(option);
-                                        setCustomPrepTime('');
+                                        dispatch({ type: 'SET_PREP_TIME', time: option });
                                     }}
                                 >
                                     <Text
@@ -1477,7 +1562,7 @@ export default function OrdersScreen() {
                                     value={customPrepTime}
                                     onChangeText={(value) => {
                                         const sanitized = value.replace(/[^0-9]/g, '');
-                                        setCustomPrepTime(sanitized);
+                                        dispatch({ type: 'SET_CUSTOM_PREP_TIME', value: sanitized });
                                     }}
                                     keyboardType="number-pad"
                                     placeholder={t('orders.write_minutes', 'Write minutes...')}
@@ -1490,7 +1575,7 @@ export default function OrdersScreen() {
                         <View className="p-5 pt-2 flex-row gap-3">
                             <TouchableOpacity
                                 className="flex-1 py-3 rounded-xl bg-gray-700 items-center"
-                                onPress={() => setPrepModalVisible(false)}
+                                onPress={() => dispatch({ type: 'CLOSE_PREP_MODAL' })}
                             >
                                 <Text className="text-subtext font-bold">{t('common.cancel', 'Cancel')}</Text>
                             </TouchableOpacity>
@@ -1515,12 +1600,12 @@ export default function OrdersScreen() {
                 visible={!!addTimeModalOrder}
                 transparent
                 animationType="fade"
-                onRequestClose={() => setAddTimeModalOrder(null)}
+                onRequestClose={() => dispatch({ type: 'CLOSE_ADD_TIME_MODAL' })}
             >
                 <Pressable
                     className="flex-1 items-center justify-center"
                     style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
-                    onPress={() => setAddTimeModalOrder(null)}
+                    onPress={() => dispatch({ type: 'CLOSE_ADD_TIME_MODAL' })}
                 >
                     <Pressable
                         className="bg-card rounded-3xl overflow-hidden"
@@ -1555,8 +1640,7 @@ export default function OrdersScreen() {
                                         alignItems: 'center',
                                     }}
                                     onPress={() => {
-                                        setAddTimeAmount(preset);
-                                        setCustomAddTime('');
+                                        dispatch({ type: 'SET_ADD_TIME_AMOUNT', amount: preset });
                                     }}
                                 >
                                     <Text
@@ -1576,7 +1660,7 @@ export default function OrdersScreen() {
                                     value={customAddTime}
                                     onChangeText={(value) => {
                                         const sanitized = value.replace(/[^0-9]/g, '');
-                                        setCustomAddTime(sanitized);
+                                        dispatch({ type: 'SET_CUSTOM_ADD_TIME', value: sanitized });
                                     }}
                                     keyboardType="number-pad"
                                     placeholder={t('orders.write_minutes', 'Write minutes...')}
@@ -1589,7 +1673,7 @@ export default function OrdersScreen() {
                         <View className="p-5 pt-2 flex-row gap-3">
                             <TouchableOpacity
                                 className="flex-1 py-3 rounded-xl bg-gray-700 items-center"
-                                onPress={() => setAddTimeModalOrder(null)}
+                                onPress={() => dispatch({ type: 'CLOSE_ADD_TIME_MODAL' })}
                             >
                                 <Text className="text-subtext font-bold">{t('common.cancel', 'Cancel')}</Text>
                             </TouchableOpacity>
@@ -1610,12 +1694,12 @@ export default function OrdersScreen() {
                 visible={!!productModalOrder}
                 transparent
                 animationType="slide"
-                onRequestClose={() => setProductModalOrder(null)}
+                onRequestClose={() => dispatch({ type: 'CLOSE_PRODUCT_MODAL' })}
             >
                 <Pressable
                     className="flex-1 justify-end"
                     style={{ backgroundColor: 'rgba(0,0,0,0.75)' }}
-                    onPress={() => setProductModalOrder(null)}
+                    onPress={() => dispatch({ type: 'CLOSE_PRODUCT_MODAL' })}
                 >
                     <Pressable
                         style={{
@@ -1645,7 +1729,7 @@ export default function OrdersScreen() {
                                 </Text>
                             </View>
                             <Pressable
-                                onPress={() => setProductModalOrder(null)}
+                                onPress={() => dispatch({ type: 'CLOSE_PRODUCT_MODAL' })}
                                 hitSlop={12}
                                 style={{
                                     width: 34,
@@ -1753,8 +1837,7 @@ export default function OrdersScreen() {
                                             {productModalOrder && productModalOrder.status !== 'DELIVERED' && productModalOrder.status !== 'CANCELLED' && (
                                                 <TouchableOpacity
                                                     onPress={() => {
-                                                        setRemoveItemModal({ orderId: productModalOrder.id, itemId: item.id, itemName: item.name });
-                                                        setRemoveItemReason('');
+                                                        dispatch({ type: 'OPEN_REMOVE_ITEM_MODAL', data: { orderId: productModalOrder.id, itemId: item.id, itemName: item.name } });
                                                     }}
                                                     style={{
                                                         marginTop: 10,
@@ -1787,11 +1870,11 @@ export default function OrdersScreen() {
                 visible={!!removeItemModal}
                 transparent
                 animationType="fade"
-                onRequestClose={() => { setRemoveItemModal(null); setRemoveItemReason(''); }}
+                onRequestClose={() => { dispatch({ type: 'CLOSE_REMOVE_ITEM_MODAL' }); }}
             >
                 <Pressable
                     style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.75)', padding: 24 }}
-                    onPress={() => { setRemoveItemModal(null); setRemoveItemReason(''); }}
+                    onPress={() => { dispatch({ type: 'CLOSE_REMOVE_ITEM_MODAL' }); }}
                 >
                     <Pressable
                         style={{
@@ -1814,7 +1897,7 @@ export default function OrdersScreen() {
                             {['Out of stock', 'Item unavailable', 'Preparation issue'].map((preset) => (
                                 <TouchableOpacity
                                     key={preset}
-                                    onPress={() => setRemoveItemReason(preset)}
+                                    onPress={() => dispatch({ type: 'SET_REMOVE_ITEM_REASON', reason: preset })}
                                     style={{
                                         paddingHorizontal: 12,
                                         paddingVertical: 6,
@@ -1833,7 +1916,7 @@ export default function OrdersScreen() {
 
                         <TextInput
                             value={removeItemReason}
-                            onChangeText={setRemoveItemReason}
+                            onChangeText={(v) => dispatch({ type: 'SET_REMOVE_ITEM_REASON', reason: v })}
                             placeholder="Or type a reason…"
                             placeholderTextColor="#475569"
                             style={{
@@ -1850,7 +1933,7 @@ export default function OrdersScreen() {
 
                         <View style={{ flexDirection: 'row', gap: 12 }}>
                             <TouchableOpacity
-                                onPress={() => { setRemoveItemModal(null); setRemoveItemReason(''); }}
+                                onPress={() => { dispatch({ type: 'CLOSE_REMOVE_ITEM_MODAL' }); }}
                                 style={{
                                     flex: 1,
                                     paddingVertical: 12,

@@ -107,8 +107,8 @@ export default function Profile() {
     const { logout } = useAuth();
     const user = useAuthStore((state) => state.user);
     const { data: ordersData } = useQuery(GET_ORDERS, { fetchPolicy: 'cache-only' });
-    const orders: any[] = (ordersData as any)?.orders?.orders ?? [];
-    const deliveredOrders = orders.filter((o: any) => o.status === 'DELIVERED');
+    const orders = ordersData?.orders?.orders ?? [];
+    const deliveredOrders = orders.filter((o) => o.status === 'DELIVERED');
 
     const firstName = user?.firstName ?? '';
     const lastName = user?.lastName ?? '';
@@ -129,7 +129,7 @@ export default function Profile() {
     const updateUser = useAuthStore((state) => state.updateUser);
 
     // Email receipts toggle — local state so it reacts immediately
-    const [emailReceipts, setEmailReceipts] = useState(!((user as any)?.emailOptOut ?? false));
+    const [emailReceipts, setEmailReceipts] = useState(!(user?.emailOptOut ?? false));
 
     const [editProfileVisible, setEditProfileVisible] = useState(false);
     const [editFirstName, setEditFirstName] = useState('');
@@ -159,7 +159,7 @@ export default function Profile() {
                 },
             });
             if (result.data?.updateMyProfile && user) {
-                updateUser({ ...user, ...result.data.updateMyProfile } as any);
+                updateUser({ ...user, ...result.data.updateMyProfile });
             }
             setEditProfileVisible(false);
         } catch {
@@ -175,7 +175,7 @@ export default function Profile() {
             await deleteMyAccount();
             logout();
         } catch {
-            Alert.alert(t.common?.error || 'Error', (t.profile as any).delete_account_error || 'Failed to delete account');
+            Alert.alert(t.common?.error || 'Error', t.profile.delete_account_error || 'Failed to delete account');
         }
     };
 
@@ -304,10 +304,10 @@ export default function Profile() {
                         <Ionicons name="mail-outline" size={20} color={theme.colors.subtext} style={{ marginRight: 12 }} />
                         <View style={{ flex: 1 }}>
                             <Text style={{ color: theme.colors.text, fontSize: 15, fontWeight: '600' }}>
-                                {(t.profile as any).email_receipts || 'Email Receipts'}
+                                {t.profile.email_receipts || 'Email Receipts'}
                             </Text>
                             <Text style={{ color: theme.colors.subtext, fontSize: 12, marginTop: 2 }}>
-                                {(t.profile as any).email_receipts_desc || 'Receive an email receipt after each delivery'}
+                                {t.profile.email_receipts_desc || 'Receive an email receipt after each delivery'}
                             </Text>
                         </View>
                         <Switch
@@ -315,11 +315,11 @@ export default function Profile() {
                             onValueChange={(enabled: boolean) => {
                                 setEmailReceipts(enabled);
                                 const optOut = !enabled;
-                                if (user) updateUser({ ...user, emailOptOut: optOut } as any);
+                                if (user) updateUser({ ...user, emailOptOut: optOut });
                                 setMyEmailOptOut({ variables: { optOut } }).catch((err) => {
                                     console.error('[Profile] setMyEmailOptOut failed:', err);
                                     setEmailReceipts(!enabled);
-                                    if (user) updateUser({ ...user, emailOptOut: !optOut } as any);
+                                    if (user) updateUser({ ...user, emailOptOut: !optOut });
                                 });
                             }}
                             trackColor={{ false: '#D1D5DB', true: '#7C3AED' }}
@@ -331,7 +331,7 @@ export default function Profile() {
                 {/* ── Danger Zone ──────────────────────────────────────── */}
                 <View style={{ marginHorizontal: 16, marginBottom: 14, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#EF444430', backgroundColor: theme.colors.card }}>
                     <ProfileRow
-                        title={(t.profile as any).delete_account || 'Delete Account'}
+                        title={t.profile.delete_account || 'Delete Account'}
                         icon="trash-outline"
                         onPress={handleDeleteAccount}
                         showDivider={false}

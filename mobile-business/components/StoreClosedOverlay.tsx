@@ -192,7 +192,7 @@ export default function StoreClosedOverlay() {
                     alignItems: 'center',
                     paddingHorizontal: 32,
                 }}
-                pointerEvents="box-none"
+                pointerEvents="none"
             >
                 {/* Icon */}
                 <View

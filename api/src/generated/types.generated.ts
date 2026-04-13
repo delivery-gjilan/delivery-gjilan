@@ -132,6 +132,7 @@ export type ApprovalReason =
   | 'OUT_OF_ZONE';
 
 export type AssignPromotionToUserInput = {
+  audienceGroupIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   expiresAt?: InputMaybe<Scalars['String']['input']>;
   promotionId: Scalars['ID']['input'];
   userIds: Array<Scalars['ID']['input']>;
@@ -584,6 +585,13 @@ export type CreateProductVariantGroupInput = {
   name: Scalars['String']['input'];
 };
 
+export type CreatePromotionAudienceGroupInput = {
+  description?: InputMaybe<Scalars['String']['input']>;
+  isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  name: Scalars['String']['input'];
+  userIds: Array<Scalars['ID']['input']>;
+};
+
 export type CreatePromotionInput = {
   code?: InputMaybe<Scalars['String']['input']>;
   creatorId?: InputMaybe<Scalars['ID']['input']>;
@@ -605,6 +613,7 @@ export type CreatePromotionInput = {
   spendThreshold?: InputMaybe<Scalars['Float']['input']>;
   startsAt?: InputMaybe<Scalars['String']['input']>;
   target: PromotionTarget;
+  targetAudienceGroupIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   targetUserIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   thresholdReward?: InputMaybe<Scalars['String']['input']>;
   type: PromotionType;
@@ -1106,6 +1115,7 @@ export type Mutation = {
   createProductSubcategory: ProductSubcategory;
   createProductVariantGroup: ProductVariantGroup;
   createPromotion: Promotion;
+  createPromotionAudienceGroup: PromotionAudienceGroup;
   /** Admin creates a settlement request, notifying the business or driver via push. */
   createSettlementRequest: SettlementRequest;
   createSettlementRule: SettlementRule;
@@ -1125,6 +1135,7 @@ export type Mutation = {
   deleteProductSubcategory: Scalars['Boolean']['output'];
   deleteProductVariantGroup: Scalars['Boolean']['output'];
   deletePromotion: Scalars['Boolean']['output'];
+  deletePromotionAudienceGroup: Scalars['Boolean']['output'];
   deleteSettlementRule: Scalars['Boolean']['output'];
   deleteUser: Scalars['Boolean']['output'];
   deleteUserAddress: Scalars['Boolean']['output'];
@@ -1217,6 +1228,7 @@ export type Mutation = {
   updateProductSubcategory: ProductSubcategory;
   updateProductsOrder: Scalars['Boolean']['output'];
   updatePromotion: Promotion;
+  updatePromotionAudienceGroup: PromotionAudienceGroup;
   updateSettlementRule: SettlementRule;
   updateStoreStatus: StoreStatus;
   updateUser: User;
@@ -1404,6 +1416,11 @@ export type MutationcreatePromotionArgs = {
 };
 
 
+export type MutationcreatePromotionAudienceGroupArgs = {
+  input: CreatePromotionAudienceGroupInput;
+};
+
+
 export type MutationcreateSettlementRequestArgs = {
   amount: Scalars['Float']['input'];
   businessId?: InputMaybe<Scalars['ID']['input']>;
@@ -1483,6 +1500,11 @@ export type MutationdeleteProductVariantGroupArgs = {
 
 
 export type MutationdeletePromotionArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type MutationdeletePromotionAudienceGroupArgs = {
   id: Scalars['ID']['input'];
 };
 
@@ -1906,6 +1928,11 @@ export type MutationupdateProductsOrderArgs = {
 
 export type MutationupdatePromotionArgs = {
   input: UpdatePromotionInput;
+};
+
+
+export type MutationupdatePromotionAudienceGroupArgs = {
+  input: UpdatePromotionAudienceGroupInput;
 };
 
 
@@ -2346,6 +2373,18 @@ export type PromotionApplyMethod =
   | 'AUTO'
   | 'CODE_REQUIRED';
 
+export type PromotionAudienceGroup = {
+  __typename?: 'PromotionAudienceGroup';
+  createdAt: Scalars['String']['output'];
+  description?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  isActive: Scalars['Boolean']['output'];
+  memberCount: Scalars['Int']['output'];
+  members: Array<User>;
+  name: Scalars['String']['output'];
+  updatedAt: Scalars['String']['output'];
+};
+
 export type PromotionCreatorType =
   | 'BUSINESS'
   | 'PLATFORM';
@@ -2480,6 +2519,7 @@ export type Query = {
   getBanners: Array<Banner>;
   getPromotion?: Maybe<Promotion>;
   getPromotionAnalytics: PromotionAnalyticsResult;
+  getPromotionAudienceGroups: Array<PromotionAudienceGroup>;
   getPromotionThresholds: Array<PromotionThreshold>;
   getPromotionUsage: Array<PromotionUsage>;
   getRecoveryPromotions: Array<Promotion>;
@@ -2691,6 +2731,12 @@ export type QuerygetPromotionArgs = {
 
 export type QuerygetPromotionAnalyticsArgs = {
   promotionId: Scalars['ID']['input'];
+};
+
+
+export type QuerygetPromotionAudienceGroupsArgs = {
+  isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -3426,6 +3472,14 @@ export type UpdateProductSubcategoryInput = {
   name?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type UpdatePromotionAudienceGroupInput = {
+  description?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['ID']['input'];
+  isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  name?: InputMaybe<Scalars['String']['input']>;
+  userIds?: InputMaybe<Array<Scalars['ID']['input']>>;
+};
+
 export type UpdatePromotionInput = {
   code?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
@@ -3724,6 +3778,7 @@ export type ResolversTypes = {
   CreateProductInput: CreateProductInput;
   CreateProductSubcategoryInput: CreateProductSubcategoryInput;
   CreateProductVariantGroupInput: CreateProductVariantGroupInput;
+  CreatePromotionAudienceGroupInput: CreatePromotionAudienceGroupInput;
   CreatePromotionInput: CreatePromotionInput;
   CreateSettlementRuleInput: CreateSettlementRuleInput;
   CreateUserInput: CreateUserInput;
@@ -3807,6 +3862,7 @@ export type ResolversTypes = {
   PromotionAnalyticsResult: ResolverTypeWrapper<Omit<PromotionAnalyticsResult, 'promotion'> & { promotion: ResolversTypes['Promotion'] }>;
   PromotionAppliesTo: ResolverTypeWrapper<'PRICE' | 'DELIVERY'>;
   PromotionApplyMethod: ResolverTypeWrapper<'AUTO' | 'CODE_REQUIRED'>;
+  PromotionAudienceGroup: ResolverTypeWrapper<Omit<PromotionAudienceGroup, 'members'> & { members: Array<ResolversTypes['User']> }>;
   PromotionCreatorType: ResolverTypeWrapper<'PLATFORM' | 'BUSINESS'>;
   PromotionResult: ResolverTypeWrapper<Omit<PromotionResult, 'promotions'> & { promotions: Array<ResolversTypes['ApplicablePromotion']> }>;
   PromotionTarget: ResolverTypeWrapper<'ALL_USERS' | 'SPECIFIC_USERS' | 'FIRST_ORDER' | 'CONDITIONAL'>;
@@ -3862,6 +3918,7 @@ export type ResolversTypes = {
   UpdateProductCategoryInput: UpdateProductCategoryInput;
   UpdateProductInput: UpdateProductInput;
   UpdateProductSubcategoryInput: UpdateProductSubcategoryInput;
+  UpdatePromotionAudienceGroupInput: UpdatePromotionAudienceGroupInput;
   UpdatePromotionInput: UpdatePromotionInput;
   UpdateSettlementRuleInput: UpdateSettlementRuleInput;
   UpdateStoreStatusInput: UpdateStoreStatusInput;
@@ -3932,6 +3989,7 @@ export type ResolversParentTypes = {
   CreateProductInput: CreateProductInput;
   CreateProductSubcategoryInput: CreateProductSubcategoryInput;
   CreateProductVariantGroupInput: CreateProductVariantGroupInput;
+  CreatePromotionAudienceGroupInput: CreatePromotionAudienceGroupInput;
   CreatePromotionInput: CreatePromotionInput;
   CreateSettlementRuleInput: CreateSettlementRuleInput;
   CreateUserInput: CreateUserInput;
@@ -4002,6 +4060,7 @@ export type ResolversParentTypes = {
   ProductVariantGroup: ProductVariantGroup;
   Promotion: Omit<Promotion, 'assignedUsers' | 'eligibleBusinesses'> & { assignedUsers?: Maybe<Array<ResolversParentTypes['UserPromotion']>>, eligibleBusinesses?: Maybe<Array<ResolversParentTypes['Business']>> };
   PromotionAnalyticsResult: Omit<PromotionAnalyticsResult, 'promotion'> & { promotion: ResolversParentTypes['Promotion'] };
+  PromotionAudienceGroup: Omit<PromotionAudienceGroup, 'members'> & { members: Array<ResolversParentTypes['User']> };
   PromotionResult: Omit<PromotionResult, 'promotions'> & { promotions: Array<ResolversParentTypes['ApplicablePromotion']> };
   PromotionThreshold: PromotionThreshold;
   PromotionUsage: Omit<PromotionUsage, 'order' | 'promotion' | 'user'> & { order?: Maybe<ResolversParentTypes['Order']>, promotion?: Maybe<ResolversParentTypes['Promotion']>, user?: Maybe<ResolversParentTypes['User']> };
@@ -4042,6 +4101,7 @@ export type ResolversParentTypes = {
   UpdateProductCategoryInput: UpdateProductCategoryInput;
   UpdateProductInput: UpdateProductInput;
   UpdateProductSubcategoryInput: UpdateProductSubcategoryInput;
+  UpdatePromotionAudienceGroupInput: UpdatePromotionAudienceGroupInput;
   UpdatePromotionInput: UpdatePromotionInput;
   UpdateSettlementRuleInput: UpdateSettlementRuleInput;
   UpdateStoreStatusInput: UpdateStoreStatusInput;
@@ -4659,6 +4719,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   createProductSubcategory?: Resolver<ResolversTypes['ProductSubcategory'], ParentType, ContextType, RequireFields<MutationcreateProductSubcategoryArgs, 'input'>>;
   createProductVariantGroup?: Resolver<ResolversTypes['ProductVariantGroup'], ParentType, ContextType, RequireFields<MutationcreateProductVariantGroupArgs, 'input'>>;
   createPromotion?: Resolver<ResolversTypes['Promotion'], ParentType, ContextType, RequireFields<MutationcreatePromotionArgs, 'input'>>;
+  createPromotionAudienceGroup?: Resolver<ResolversTypes['PromotionAudienceGroup'], ParentType, ContextType, RequireFields<MutationcreatePromotionAudienceGroupArgs, 'input'>>;
   createSettlementRequest?: Resolver<ResolversTypes['SettlementRequest'], ParentType, ContextType, RequireFields<MutationcreateSettlementRequestArgs, 'amount'>>;
   createSettlementRule?: Resolver<ResolversTypes['SettlementRule'], ParentType, ContextType, RequireFields<MutationcreateSettlementRuleArgs, 'input'>>;
   createTestOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType>;
@@ -4677,6 +4738,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   deleteProductSubcategory?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteProductSubcategoryArgs, 'id'>>;
   deleteProductVariantGroup?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteProductVariantGroupArgs, 'id'>>;
   deletePromotion?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeletePromotionArgs, 'id'>>;
+  deletePromotionAudienceGroup?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeletePromotionAudienceGroupArgs, 'id'>>;
   deleteSettlementRule?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteSettlementRuleArgs, 'id'>>;
   deleteUser?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteUserArgs, 'id'>>;
   deleteUserAddress?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationdeleteUserAddressArgs, 'id'>>;
@@ -4751,6 +4813,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   updateProductSubcategory?: Resolver<ResolversTypes['ProductSubcategory'], ParentType, ContextType, RequireFields<MutationupdateProductSubcategoryArgs, 'id' | 'input'>>;
   updateProductsOrder?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationupdateProductsOrderArgs, 'businessId' | 'products'>>;
   updatePromotion?: Resolver<ResolversTypes['Promotion'], ParentType, ContextType, RequireFields<MutationupdatePromotionArgs, 'input'>>;
+  updatePromotionAudienceGroup?: Resolver<ResolversTypes['PromotionAudienceGroup'], ParentType, ContextType, RequireFields<MutationupdatePromotionAudienceGroupArgs, 'input'>>;
   updateSettlementRule?: Resolver<ResolversTypes['SettlementRule'], ParentType, ContextType, RequireFields<MutationupdateSettlementRuleArgs, 'id' | 'input'>>;
   updateStoreStatus?: Resolver<ResolversTypes['StoreStatus'], ParentType, ContextType, RequireFields<MutationupdateStoreStatusArgs, 'input'>>;
   updateUser?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationupdateUserArgs, 'input'>>;
@@ -5126,6 +5189,18 @@ export type PromotionAppliesToResolvers = EnumResolverSignature<{ DELIVERY?: any
 
 export type PromotionApplyMethodResolvers = EnumResolverSignature<{ AUTO?: any, CODE_REQUIRED?: any }, ResolversTypes['PromotionApplyMethod']>;
 
+export type PromotionAudienceGroupResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['PromotionAudienceGroup'] = ResolversParentTypes['PromotionAudienceGroup']> = {
+  createdAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  description?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  isActive?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  memberCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  members?: Resolver<Array<ResolversTypes['User']>, ParentType, ContextType>;
+  name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  updatedAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
 export type PromotionCreatorTypeResolvers = EnumResolverSignature<{ BUSINESS?: any, PLATFORM?: any }, ResolversTypes['PromotionCreatorType']>;
 
 export type PromotionResultResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['PromotionResult'] = ResolversParentTypes['PromotionResult']> = {
@@ -5234,6 +5309,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   getBanners?: Resolver<Array<ResolversTypes['Banner']>, ParentType, ContextType, Partial<QuerygetBannersArgs>>;
   getPromotion?: Resolver<Maybe<ResolversTypes['Promotion']>, ParentType, ContextType, RequireFields<QuerygetPromotionArgs, 'id'>>;
   getPromotionAnalytics?: Resolver<ResolversTypes['PromotionAnalyticsResult'], ParentType, ContextType, RequireFields<QuerygetPromotionAnalyticsArgs, 'promotionId'>>;
+  getPromotionAudienceGroups?: Resolver<Array<ResolversTypes['PromotionAudienceGroup']>, ParentType, ContextType, Partial<QuerygetPromotionAudienceGroupsArgs>>;
   getPromotionThresholds?: Resolver<Array<ResolversTypes['PromotionThreshold']>, ParentType, ContextType, RequireFields<QuerygetPromotionThresholdsArgs, 'cart'>>;
   getPromotionUsage?: Resolver<Array<ResolversTypes['PromotionUsage']>, ParentType, ContextType, RequireFields<QuerygetPromotionUsageArgs, 'promotionId'>>;
   getRecoveryPromotions?: Resolver<Array<ResolversTypes['Promotion']>, ParentType, ContextType>;
@@ -5691,6 +5767,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   PromotionAnalyticsResult?: PromotionAnalyticsResultResolvers<ContextType>;
   PromotionAppliesTo?: PromotionAppliesToResolvers;
   PromotionApplyMethod?: PromotionApplyMethodResolvers;
+  PromotionAudienceGroup?: PromotionAudienceGroupResolvers<ContextType>;
   PromotionCreatorType?: PromotionCreatorTypeResolvers;
   PromotionResult?: PromotionResultResolvers<ContextType>;
   PromotionTarget?: PromotionTargetResolvers;

@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useBusinesses } from "@/lib/hooks/useBusinesses";
 import { useAuth } from "@/lib/auth-context";
+import { getAuthToken } from "@/lib/utils/auth";
 import {
     useCategories,
     useCreateCategory,
@@ -1430,7 +1431,7 @@ function ProductModal({
         formData.append('image', file);
         formData.append('folder', 'products');
 
-        const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+        const token = getAuthToken();
         try {
             const response = await fetch(`${apiBase}/api/upload/image`, {
                 method: 'POST',
@@ -1451,7 +1452,7 @@ function ProductModal({
 
     const deleteImage = async (imageUrl: string): Promise<void> => {
         const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/graphql').replace(/\/graphql$/, '');
-        const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+        const token = getAuthToken();
         try {
             await fetch(`${apiBase}/api/upload/image`, {
                 method: 'DELETE',
