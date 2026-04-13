@@ -28,6 +28,7 @@ type Business {
     ratingAverage: Float!
     ratingCount: Int!
     activePromotion: BusinessPromotion
+    activePromotionsDisplay: [BusinessPromotionDisplay!]!
     createdAt: Date!
     updatedAt: Date!
 }
@@ -41,6 +42,25 @@ type BusinessPromotion {
     creatorType: PromotionCreatorType!
     discountValue: Float
     spendThreshold: Float
+}
+
+enum PromotionApplyMethod {
+    AUTO
+    CODE_REQUIRED
+}
+
+type BusinessPromotionDisplay {
+    id: ID!
+    name: String!
+    description: String
+    code: String
+    type: PromotionType!
+    creatorType: PromotionCreatorType!
+    discountValue: Float
+    spendThreshold: Float
+    priority: Int!
+    requiresCode: Boolean!
+    applyMethod: PromotionApplyMethod!
 }
 
 type Query {

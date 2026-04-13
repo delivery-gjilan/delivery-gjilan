@@ -252,6 +252,7 @@ Links orders to applied promotions:
 - Promotions with a `code` are manual-entry promotions: the customer must enter the code in checkout to activate them.
 - Promotions without a `code` are auto-applicable promotions: they are evaluated automatically when eligibility rules match.
 - Business promo badges (`Business.activePromotion`) and global promo banners (`getActiveGlobalPromotions`) include only code-less auto-applicable promotions.
+- Business page promo chips are powered by `Business.activePromotionsDisplay` and expose the top active auto-applicable promotions (typically up to 3 rendered by mobile UI).
 - Recovery/compensation promotions are currently created without a code, assigned to specific users, and auto-applied only for those assigned users.
 - The admin Promotions page includes a dedicated Promo Codes tab for group-style assignment (for example friends/VIP groups), where a code-based promotion is selected and assigned to chosen users in bulk.
 - The Promo Codes tab also supports creating and assigning a new code promotion in one flow, including promo kind (fixed/percentage/free-delivery/spend-threshold), limits, stacking, priority, and driver payout for delivery-fee promotions.
@@ -262,7 +263,7 @@ Recovery/compensation promotions can use internal names for operations (for exam
 Customer-facing surfaces should present a clean label and strip internal recovery/compensation prefixes before rendering.
 The mobile-customer cart auto-apply notifier presents recovery promotions as type-based labels (for example free-delivery compensation promo) instead of exposing internal naming prefixes.
 The same notifier also normalizes regular promotion names/codes (removes technical prefixes/tokens) and falls back to friendly type labels when names are not customer-friendly.
-On the mobile-customer business page, business-created active promotions are shown as a tappable promo card that opens an offer-details modal explaining how the promo applies, minimum spend (when present), and that the discount auto-applies at checkout.
+On the mobile-customer business page, active promotions are shown in a horizontal chip row; each chip opens a shared offer-details modal explaining value, conditions, apply method, and optional description.
 Promotion descriptions can be edited from the admin Promotions edit modal and are shown in the business promo offer-details modal; when empty, the modal shows fallback explanatory copy.
 The business promo card/modal now follows a structured Wolt-style presentation: value headline, condition line, apply-method badge (auto or code), and details sections (what you get, conditions, how it works).
 When checkout order creation fails because a selected promotion is invalid/expired/not combinable, mobile-customer shows a dedicated promotion modal with clear guidance and a one-tap action to remove the promo and continue.
@@ -482,17 +483,22 @@ Called on order cancellation:
 
 ---
 
-## Business Card Promotion Badges
+## Business Promotion Surfaces
 
-The `Business.activePromotion` field resolver (`api/src/models/Business/resolvers/Business.ts`) determines which promotion badge appears on each business card in mobile-customer.
+The `Business.activePromotion` and `Business.activePromotionsDisplay` field resolvers (`api/src/models/Business/resolvers/Business.ts`) determine which promotions are shown on business cards and on the business page in mobile-customer.
 
 ### Resolver Logic
 
-Returns the single highest-priority active promotion for a business:
+Returns promotion data from one shared visibility pipeline:
 1. Query promotions where `isActive = true`, `isDeleted = false`, within time window
 2. Eligibility: promotion is either explicitly linked via `promotion_business_eligibility` OR has no eligibility entries (global promo applying to all businesses)
-3. Order by `priority DESC`, limit 1
-4. Returns `BusinessPromotion { id, name, description, type, discountValue, spendThreshold }`
+3. Display filter: business/public surfaces include code-less promotions only (`code IS NULL`)
+4. For `SPECIFIC_USERS`, include only promos assigned to the current user and still under usage limits
+5. Order by `priority DESC`
+
+Field outputs:
+- `activePromotion`: first visible promo for compact card/list surfaces
+- `activePromotionsDisplay`: visible promo list for business-page chips/details (`id`, `name`, `description`, `code`, `type`, `creatorType`, `discountValue`, `spendThreshold`, `priority`, `requiresCode`, `applyMethod`)
 
 ### Customer-Facing Labels (mobile-customer)
 
@@ -511,10 +517,11 @@ Returns the single highest-priority active promotion for a business:
 
 | File | Purpose |
 |------|---------|
-| `api/src/models/Business/resolvers/Business.ts` | `activePromotion` field resolver |
-| `api/src/models/Business/Business.graphql` | `BusinessPromotion` type definition |
+| `api/src/models/Business/resolvers/Business.ts` | `activePromotion` + `activePromotionsDisplay` field resolvers |
+| `api/src/models/Business/Business.graphql` | `BusinessPromotion` + `BusinessPromotionDisplay` type definitions |
 | `mobile-customer/modules/business/components/RestaurantCard.tsx` | Full business card with promotion badge |
 | `mobile-customer/modules/business/components/CompactRestaurantCard.tsx` | Compact card with abbreviated badge |
+| `mobile-customer/modules/business/BusinessScreen.tsx` | Business-page promo chips row and promo details modal |
 | `mobile-customer/localization/schema.ts` | Locale keys: `business.item_discount`, `flat_discount`, `free_delivery`, `free_delivery_over`, `percent_off_over`, `flat_off_over` |
 
 ---

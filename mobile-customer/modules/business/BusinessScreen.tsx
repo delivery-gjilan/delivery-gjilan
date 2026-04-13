@@ -35,11 +35,17 @@ interface BusinessScreenProps {
 }
 
 type PromoLike = {
+    id?: string | null;
     name?: string | null;
     code?: string | null;
     type?: string | null;
+    creatorType?: string | null;
     discountValue?: number | null;
     spendThreshold?: number | null;
+    priority?: number | null;
+    requiresCode?: boolean | null;
+    applyMethod?: string | null;
+    description?: string | null;
 };
 
 // ─── Category Tabs (Underline style) ────────────────────────
@@ -202,6 +208,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
     const [showStickySearch, setShowStickySearch] = useState(false);
     const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
     const [showPromoDetails, setShowPromoDetails] = useState(false);
+    const [selectedPromoId, setSelectedPromoId] = useState<string | null>(null);
     const searchInputRef = useRef<TextInput>(null);
     const showStickySearchRef = useRef(false);
     const searchVisibilityProgress = useSharedValue(0);
@@ -489,6 +496,32 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
         searchInputRef.current?.blur();
     }, []);
 
+    const promoList = ((business as any)?.activePromotionsDisplay ?? []) as PromoLike[];
+    const promoChips = promoList.slice(0, 3);
+
+    useEffect(() => {
+        if (promoChips.length === 0) {
+            if (selectedPromoId !== null) {
+                setSelectedPromoId(null);
+            }
+            return;
+        }
+        const exists = promoChips.some((promo) => promo.id === selectedPromoId);
+        if (!exists) {
+            setSelectedPromoId(String(promoChips[0].id));
+        }
+    }, [promoChips, selectedPromoId]);
+
+    const selectedPromo = useMemo(() => {
+        if (promoChips.length === 0) return null;
+        const found = promoChips.find((promo) => promo.id === selectedPromoId);
+        return found ?? promoChips[0];
+    }, [promoChips, selectedPromoId]);
+
+    const selectedPromoLabel = selectedPromo ? formatPromotionLabel(selectedPromo) : null;
+    const selectedPromoCondition = selectedPromo ? formatPromotionCondition(selectedPromo) : null;
+    const promoRequiresCode = Boolean(selectedPromo?.requiresCode ?? selectedPromo?.code);
+
     // ─── Loading / Error States ─────────────────────────────
     const isLoading = businessLoading || productsLoading;
     const error = businessError || productsError;
@@ -539,11 +572,6 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
     const scheduleLabel = todaySchedule.length > 0
         ? todaySchedule.map((s) => `${s.opensAt}–${s.closesAt}`).join(', ')
         : null;
-    const activePromotion = (business as any)?.activePromotion as (PromoLike & { creatorType?: string | null; description?: string | null; code?: string | null }) | null;
-    const businessPromo = activePromotion?.creatorType === 'BUSINESS' ? activePromotion : null;
-    const businessPromoLabel = businessPromo ? formatPromotionLabel(businessPromo) : null;
-    const businessPromoCondition = businessPromo ? formatPromotionCondition(businessPromo) : null;
-    const promoRequiresCode = Boolean(businessPromo?.code);
 
     // ─── Render ─────────────────────────────────────────────
     return (<SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['bottom']}>
@@ -708,77 +736,94 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                             </Animated.View>
                         )}
 
-                        {businessPromo && (
+                        {promoChips.length > 0 && (
                             <Animated.View
                                 entering={FadeInDown.delay(380).duration(350).springify().damping(28).stiffness(140)}
                                 style={{ width: '100%', marginTop: 8 }}
                             >
-                                <TouchableOpacity
-                                    activeOpacity={0.9}
-                                    onPress={() => setShowPromoDetails(true)}
-                                    style={{
-                                        borderRadius: 12,
-                                        borderWidth: 1,
-                                        borderColor: theme.colors.primary + '40',
-                                        backgroundColor: theme.colors.primary + '12',
-                                        paddingHorizontal: 12,
-                                        paddingVertical: 10,
-                                        flexDirection: 'row',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                    }}
-                                >
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 10 }}>
-                                        <View
-                                            style={{
-                                                width: 28,
-                                                height: 28,
-                                                borderRadius: 14,
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                backgroundColor: theme.colors.primary + '22',
-                                                marginRight: 8,
-                                            }}
-                                        >
-                                            <Ionicons name="pricetag" size={14} color={theme.colors.primary} />
-                                        </View>
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={{ color: theme.colors.text, fontSize: 13, fontWeight: '700' }} numberOfLines={1}>
-                                                {businessPromoLabel}
-                                            </Text>
-                                            <Text style={{ color: theme.colors.subtext, fontSize: 11, marginTop: 2 }} numberOfLines={1}>
-                                                {businessPromoCondition}
-                                            </Text>
-                                            {!!businessPromo?.description && (
-                                                <Text style={{ color: theme.colors.subtext, fontSize: 11, marginTop: 2 }} numberOfLines={1}>
-                                                    {businessPromo.description}
-                                                </Text>
-                                            )}
-                                            {!businessPromo?.description && (
-                                                <Text style={{ color: theme.colors.subtext, fontSize: 11, marginTop: 2 }} numberOfLines={1}>
-                                                    {t.business.promo_tap_for_details}
-                                                </Text>
-                                            )}
-                                        </View>
-                                    </View>
-                                    <View style={{ alignItems: 'flex-end', gap: 6 }}>
-                                        <View
-                                            style={{
-                                                borderRadius: 999,
-                                                borderWidth: 1,
-                                                borderColor: theme.colors.primary + '55',
-                                                backgroundColor: theme.colors.primary + '18',
-                                                paddingHorizontal: 8,
-                                                paddingVertical: 3,
-                                            }}
-                                        >
-                                            <Text style={{ color: theme.colors.primary, fontSize: 10, fontWeight: '700' }}>
-                                                {promoRequiresCode ? t.business.promo_badge_code : t.business.promo_badge_auto}
-                                            </Text>
-                                        </View>
-                                        <Ionicons name="chevron-forward" size={15} color={theme.colors.subtext} />
-                                    </View>
-                                </TouchableOpacity>
+                                <RNScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 4 }}>
+                                    {promoChips.map((promo, idx) => {
+                                        const isSelected = (promo.id ?? null) === (selectedPromo?.id ?? null);
+                                        const promoLabel = formatPromotionLabel(promo);
+                                        const promoCondition = formatPromotionCondition(promo);
+                                        const isCodePromo = Boolean(promo.requiresCode ?? promo.code);
+
+                                        return (
+                                            <TouchableOpacity
+                                                key={promo.id ?? `promo-${idx}`}
+                                                activeOpacity={0.9}
+                                                onPress={() => {
+                                                    setSelectedPromoId(String(promo.id));
+                                                    setShowPromoDetails(true);
+                                                }}
+                                                style={{
+                                                    width: 258,
+                                                    marginRight: idx === promoChips.length - 1 ? 0 : 10,
+                                                    borderRadius: 12,
+                                                    borderWidth: 1,
+                                                    borderColor: isSelected ? theme.colors.primary + '55' : theme.colors.border,
+                                                    backgroundColor: isSelected ? theme.colors.primary + '12' : theme.colors.card,
+                                                    paddingHorizontal: 12,
+                                                    paddingVertical: 10,
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                }}
+                                            >
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 10 }}>
+                                                    <View
+                                                        style={{
+                                                            width: 28,
+                                                            height: 28,
+                                                            borderRadius: 14,
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            backgroundColor: theme.colors.primary + '22',
+                                                            marginRight: 8,
+                                                        }}
+                                                    >
+                                                        <Ionicons name="pricetag" size={14} color={theme.colors.primary} />
+                                                    </View>
+                                                    <View style={{ flex: 1 }}>
+                                                        <Text style={{ color: theme.colors.text, fontSize: 13, fontWeight: '700' }} numberOfLines={1}>
+                                                            {promoLabel}
+                                                        </Text>
+                                                        <Text style={{ color: theme.colors.subtext, fontSize: 11, marginTop: 2 }} numberOfLines={1}>
+                                                            {promoCondition}
+                                                        </Text>
+                                                        {!!promo.description && (
+                                                            <Text style={{ color: theme.colors.subtext, fontSize: 11, marginTop: 2 }} numberOfLines={1}>
+                                                                {promo.description}
+                                                            </Text>
+                                                        )}
+                                                        {!promo.description && (
+                                                            <Text style={{ color: theme.colors.subtext, fontSize: 11, marginTop: 2 }} numberOfLines={1}>
+                                                                {t.business.promo_tap_for_details}
+                                                            </Text>
+                                                        )}
+                                                    </View>
+                                                </View>
+                                                <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                                                    <View
+                                                        style={{
+                                                            borderRadius: 999,
+                                                            borderWidth: 1,
+                                                            borderColor: theme.colors.primary + '55',
+                                                            backgroundColor: theme.colors.primary + '18',
+                                                            paddingHorizontal: 8,
+                                                            paddingVertical: 3,
+                                                        }}
+                                                    >
+                                                        <Text style={{ color: theme.colors.primary, fontSize: 10, fontWeight: '700' }}>
+                                                            {isCodePromo ? t.business.promo_badge_code : t.business.promo_badge_auto}
+                                                        </Text>
+                                                    </View>
+                                                    <Ionicons name="chevron-forward" size={15} color={theme.colors.subtext} />
+                                                </View>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </RNScrollView>
                             </Animated.View>
                         )}
                     </View>
@@ -1151,7 +1196,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                             </TouchableOpacity>
                         </View>
 
-                        {businessPromoLabel && (
+                        {selectedPromoLabel && (
                             <View
                                 style={{
                                     marginTop: 12,
@@ -1165,14 +1210,14 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                                 }}
                             >
                                 <Text style={{ color: theme.colors.primary, fontSize: 13, fontWeight: '700' }}>
-                                    {businessPromoLabel}
+                                    {selectedPromoLabel}
                                 </Text>
                             </View>
                         )}
 
-                        {businessPromoCondition && (
+                        {selectedPromoCondition && (
                             <Text style={{ color: theme.colors.subtext, fontSize: 12, marginTop: 10 }}>
-                                {businessPromoCondition}
+                                {selectedPromoCondition}
                             </Text>
                         )}
 
@@ -1182,7 +1227,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                                     {t.business.promo_section_value_title}
                                 </Text>
                                 <Text style={{ color: theme.colors.subtext, fontSize: 12, marginTop: 5, lineHeight: 18 }}>
-                                    {businessPromoLabel || t.business.promo_auto_apply_hint}
+                                    {selectedPromoLabel || t.business.promo_auto_apply_hint}
                                 </Text>
                             </View>
 
@@ -1195,11 +1240,11 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                                         <Text style={{ color: theme.colors.subtext, fontSize: 12 }}>{t.business.promo_scope_label}</Text>
                                         <Text style={{ color: theme.colors.text, fontSize: 12, fontWeight: '600' }}>{t.business.promo_scope_business}</Text>
                                     </View>
-                                    {typeof businessPromo?.spendThreshold === 'number' && businessPromo.spendThreshold > 0 && (
+                                    {typeof selectedPromo?.spendThreshold === 'number' && selectedPromo.spendThreshold > 0 && (
                                         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                                             <Text style={{ color: theme.colors.subtext, fontSize: 12 }}>{t.business.promo_minimum_label}</Text>
                                             <Text style={{ color: theme.colors.text, fontSize: 12, fontWeight: '600' }}>
-                                                €{Number(businessPromo.spendThreshold).toFixed(2)}
+                                                €{Number(selectedPromo.spendThreshold).toFixed(2)}
                                             </Text>
                                         </View>
                                     )}
@@ -1212,7 +1257,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                                 </View>
                             </View>
 
-                            {promoRequiresCode && businessPromo?.code && (
+                            {promoRequiresCode && selectedPromo?.code && (
                                 <View
                                     style={{
                                         borderRadius: 10,
@@ -1225,18 +1270,18 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                                 >
                                     <Text style={{ color: theme.colors.subtext, fontSize: 11 }}>{t.business.promo_code_label}</Text>
                                     <Text style={{ color: theme.colors.text, fontSize: 13, fontWeight: '800', marginTop: 2 }}>
-                                        {businessPromo.code}
+                                        {selectedPromo.code}
                                     </Text>
                                 </View>
                             )}
 
-                            {!!businessPromo?.description && (
+                            {!!selectedPromo?.description && (
                                 <View>
                                     <Text style={{ color: theme.colors.text, fontSize: 12, fontWeight: '700' }}>
                                         {t.business.promo_section_details_title}
                                     </Text>
                                     <Text style={{ color: theme.colors.subtext, fontSize: 12, marginTop: 5, lineHeight: 18 }}>
-                                        {businessPromo.description}
+                                        {selectedPromo.description}
                                     </Text>
                                 </View>
                             )}

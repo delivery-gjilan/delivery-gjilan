@@ -49,6 +49,7 @@
 | M9 | [MOBILE/MOBILE_ADMIN_DEEP_DIVE.md](MOBILE/MOBILE_ADMIN_DEEP_DIVE.md) | Mobile | Mobile-admin deep-dive: all screens, GraphQL ops, real-time arch, theme, i18n, refactor candidates |
 | M10 | [MOBILE/REALTIME_SUBSCRIPTIONS_CUSTOMER.md](MOBILE/REALTIME_SUBSCRIPTIONS_CUSTOMER.md) | Mobile | Subscription topology audit, connection count, payload sizing, duplicate subscriptions, optimization roadmap |
 | M11 | [MOBILE/PUSH_AND_LIVE_ACTIVITY_REFACTOR_PLAN.md](MOBILE/PUSH_AND_LIVE_ACTIVITY_REFACTOR_PLAN.md) | Mobile | Full audit of all push notifications and Live Activity; copy refinements; Android notification icon wiring; brand logo in Lock Screen widget; Albanian copy corrections |
+| M12 | [MOBILE/CUSTOMER_APP.md](MOBILE/CUSTOMER_APP.md) | Mobile | Customer app deep-dive: all 20+ screens, 78+ GraphQL ops, 18 hooks, 11+4 stores, 35 shared components, 5 domain modules (auth/business/cart/orders/product), 3-step checkout, live tracking pipeline, embedded admin panel, localization, config, optimization candidates |
 | O1 | [OPERATIONS/MONITORING.md](OPERATIONS/MONITORING.md) | Operations | Health endpoints, Prometheus, Grafana phases |
 | O2 | [OPERATIONS/OBSERVABILITY.md](OPERATIONS/OBSERVABILITY.md) | Operations | Loki, Promtail, structured logging, runbooks |
 | O3 | [OPERATIONS/NOTIFICATIONS.md](OPERATIONS/NOTIFICATIONS.md) | Operations | Query builder, campaigns, payload fields |
@@ -84,7 +85,7 @@
 | P2 | [../.github/copilot-instructions.md](../.github/copilot-instructions.md) | Prompts | API repository-first rule, soft-delete enforcement for AI agents |
 | PKG1 | [../admin-panel/README.md](../admin-panel/README.md) | Package | Admin panel structure, realtime model |
 | PKG2 | [../mobile-business/README.md](../mobile-business/README.md) | Package | Business app features, GraphQL ops, structure |
-| PKG3 | [../mobile-customer/README.md](../mobile-customer/README.md) | Package | Mobile customer app module structure |
+| PKG3 | [../mobile-customer/README.md](../mobile-customer/README.md) | Package | Mobile customer app module structure (see M12 for deep-dive) |
 | PKG4 | [../mobile-driver/README.md](../mobile-driver/README.md) | Package | Mobile driver app module structure (see M8 for deep-dive) |
 | PKG5 | [../observability/README.md](../observability/README.md) | Package | Observability stack setup, alerts, scaling |
 
@@ -120,6 +121,7 @@ ARCHITECTURE (A1)
 │   ├── MOBILE/ORDER_SUBSCRIPTION_SYNC_MB (M7) → A1, BL3
 │   ├── MOBILE/REALTIME_SUBSCRIPTIONS_CUSTOMER (M10) → A1, B1, B4, M7, BL3
 │   ├── MOBILE/DRIVER_APP (M8) → A1, B1, B4, B5, B7, BL1
+│   ├── MOBILE/CUSTOMER_APP (M12) → A1, B1, B2, B5, B6, BL1, BL3, BL5, M1, M2, M3, M10
 │   └── BUSINESS_LOGIC/CART_ACTIVE_ORDER_FLOW_RECOMMENDATIONS (BL3)
 │       └── BACKEND/ORDER_CREATION (B2)
 │

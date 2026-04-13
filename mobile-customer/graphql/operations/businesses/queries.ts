@@ -89,6 +89,19 @@ export const GET_BUSINESS = gql`
                 discountValue
                 spendThreshold
             }
+            activePromotionsDisplay {
+                id
+                name
+                description
+                code
+                type
+                creatorType
+                discountValue
+                spendThreshold
+                priority
+                requiresCode
+                applyMethod
+            }
             minOrderAmount
             createdAt
             updatedAt

@@ -14,6 +14,88 @@ function parseTimeToMinutes(t: string): number {
     return h * 60 + m;
 }
 
+type BusinessPromoRow = {
+    id: string;
+    name: string;
+    description: string | null;
+    code: string | null;
+    type: any;
+    creatorType: any;
+    discountValue: number | null;
+    spendThreshold: number | null;
+    priority: number;
+    target: any;
+    maxUsagePerUser: number | null;
+};
+
+async function getVisibleBusinessPromotions(
+    businessId: string,
+    userId?: string,
+): Promise<BusinessPromoRow[]> {
+    const db = await getDB();
+    const now = new Date().toISOString();
+
+    const activePromotions = await db
+        .select({
+            id: promotions.id,
+            name: promotions.name,
+            description: promotions.description,
+            code: promotions.code,
+            type: promotions.type,
+            creatorType: promotions.creatorType,
+            discountValue: promotions.discountValue,
+            spendThreshold: promotions.spendThreshold,
+            priority: promotions.priority,
+            target: promotions.target,
+            maxUsagePerUser: promotions.maxUsagePerUser,
+        })
+        .from(promotions)
+        .where(
+            and(
+                eq(promotions.isActive, true),
+                eq(promotions.isDeleted, false),
+                // Business/public promo badges should only show auto-applicable promos.
+                isNull(promotions.code),
+                or(isNull(promotions.startsAt), lte(promotions.startsAt, now)),
+                or(isNull(promotions.endsAt), gte(promotions.endsAt, now)),
+                or(
+                    sql`EXISTS (SELECT 1 FROM promotion_business_eligibility WHERE promotion_id = ${promotions.id} AND business_id = ${businessId})`,
+                    sql`NOT EXISTS (SELECT 1 FROM promotion_business_eligibility WHERE promotion_id = ${promotions.id})`,
+                ),
+            ),
+        )
+        .orderBy(sql`${promotions.priority} DESC`);
+
+    if (activePromotions.length === 0) {
+        return [];
+    }
+
+    const specificUserPromos = activePromotions.filter((p) => p.target === 'SPECIFIC_USERS');
+    let userAssignmentsByPromoId = new Map<string, { usageCount: number }>();
+
+    if (specificUserPromos.length > 0 && userId) {
+        const assignmentRows = await db
+            .select({ promotionId: userPromotions.promotionId, usageCount: userPromotions.usageCount })
+            .from(userPromotions)
+            .where(
+                and(
+                    inArray(userPromotions.promotionId, specificUserPromos.map((p) => p.id)),
+                    eq(userPromotions.userId, userId),
+                ),
+            );
+        userAssignmentsByPromoId = new Map(assignmentRows.map((r) => [r.promotionId, { usageCount: r.usageCount }]));
+    }
+
+    return activePromotions.filter((p) => {
+        if (p.target !== 'SPECIFIC_USERS') return true;
+        if (!userId) return false;
+        const assignment = userAssignmentsByPromoId.get(p.id);
+        if (!assignment) return false;
+        if (p.maxUsagePerUser && assignment.usageCount >= p.maxUsagePerUser) return false;
+        return true;
+    }) as BusinessPromoRow[];
+}
+
 export const Business: BusinessResolvers = {
     isOpen: (parent) => {
         if (parent.isActive === false) {
@@ -55,83 +137,14 @@ export const Business: BusinessResolvers = {
     },
 
     activePromotion: async (parent, _args, ctx) => {
-        const db = await getDB();
-        const now = new Date().toISOString();
         const userId = (ctx as any)?.userData?.userId as string | undefined;
+        const visiblePromotions = await getVisibleBusinessPromotions(String(parent.id), userId);
 
-        // Find active promotions for this business.
-        // A promotion applies if it is explicitly linked to this business
-        // OR has no business eligibility entries (applies to all businesses).
-        // SPECIFIC_USERS promos are excluded here — they only show if assigned to and unused by this user.
-        const activePromotions = await db
-            .select({
-                id: promotions.id,
-                name: promotions.name,
-                description: promotions.description,
-                code: promotions.code,
-                type: promotions.type,
-                creatorType: promotions.creatorType,
-                discountValue: promotions.discountValue,
-                spendThreshold: promotions.spendThreshold,
-                priority: promotions.priority,
-                target: promotions.target,
-                maxUsagePerUser: promotions.maxUsagePerUser,
-            })
-            .from(promotions)
-            .where(
-                and(
-                    eq(promotions.isActive, true),
-                    eq(promotions.isDeleted, false),
-                    // Business/public promo badges should only show auto-applicable promos.
-                    isNull(promotions.code),
-                    or(
-                        isNull(promotions.startsAt),
-                        lte(promotions.startsAt, now)
-                    ),
-                    or(
-                        isNull(promotions.endsAt),
-                        gte(promotions.endsAt, now)
-                    ),
-                    or(
-                        // Explicitly linked to this business
-                        sql`EXISTS (SELECT 1 FROM promotion_business_eligibility WHERE promotion_id = ${promotions.id} AND business_id = ${parent.id})`,
-                        // No business restrictions → applies to all
-                        sql`NOT EXISTS (SELECT 1 FROM promotion_business_eligibility WHERE promotion_id = ${promotions.id})`
-                    )
-                )
-            )
-            .orderBy(sql`${promotions.priority} DESC`);
-
-        if (activePromotions.length === 0) {
+        if (visiblePromotions.length === 0) {
             return null;
         }
 
-        // Filter out SPECIFIC_USERS promos that aren't assigned to or have been fully used by this user.
-        const specificUserPromos = activePromotions.filter((p) => p.target === 'SPECIFIC_USERS');
-        let userAssignmentsByPromoId = new Map<string, { usageCount: number }>();
-
-        if (specificUserPromos.length > 0 && userId) {
-            // Single batch query instead of one per promo.
-            const assignmentRows = await db
-                .select({ promotionId: userPromotions.promotionId, usageCount: userPromotions.usageCount })
-                .from(userPromotions)
-                .where(
-                    and(
-                        inArray(userPromotions.promotionId, specificUserPromos.map((p) => p.id)),
-                        eq(userPromotions.userId, userId),
-                    ),
-                );
-            userAssignmentsByPromoId = new Map(assignmentRows.map((r) => [r.promotionId, { usageCount: r.usageCount }]));
-        }
-
-        const promo = activePromotions.find((p) => {
-            if (p.target !== 'SPECIFIC_USERS') return true;
-            if (!userId) return false;
-            const assignment = userAssignmentsByPromoId.get(p.id);
-            if (!assignment) return false;
-            if (p.maxUsagePerUser && assignment.usageCount >= p.maxUsagePerUser) return false;
-            return true;
-        });
+        const promo = visiblePromotions[0];
         if (!promo) return null;
         return {
             id: promo.id,
@@ -143,6 +156,25 @@ export const Business: BusinessResolvers = {
             discountValue: promo.discountValue ?? null,
             spendThreshold: promo.spendThreshold ?? null,
         };
+    },
+
+    activePromotionsDisplay: async (parent, _args, ctx) => {
+        const userId = (ctx as any)?.userData?.userId as string | undefined;
+        const visiblePromotions = await getVisibleBusinessPromotions(String(parent.id), userId);
+
+        return visiblePromotions.map((promo) => ({
+            id: promo.id,
+            name: promo.name,
+            description: promo.description ?? null,
+            code: promo.code,
+            type: promo.type,
+            creatorType: promo.creatorType,
+            discountValue: promo.discountValue ?? null,
+            spendThreshold: promo.spendThreshold ?? null,
+            priority: promo.priority,
+            requiresCode: Boolean(promo.code),
+            applyMethod: promo.code ? 'CODE_REQUIRED' : 'AUTO',
+        }));
     },
 
     ratingAverage: async (parent) => {
