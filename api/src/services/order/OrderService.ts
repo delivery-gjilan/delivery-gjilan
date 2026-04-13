@@ -155,6 +155,9 @@ export class OrderService implements IOrderService {
     adminCancelOrder(id: string, reason: string, settleDriver = false, settleBusiness = false): Promise<Order> {
         return this.lifecycle.adminCancelOrder(id, reason, settleDriver, settleBusiness);
     }
+    removeOrderItem(orderId: string, orderItemId: string, reason: string): Promise<Order> {
+        return this.lifecycle.removeOrderItem(orderId, orderItemId, reason);
+    }
 
     // ── User behavior ──
     updateUserBehaviorOnStatusChange(userId: string, fromStatus: OrderStatus, toStatus: OrderStatus, orderTotal: number, orderDate: string | null): Promise<void> {

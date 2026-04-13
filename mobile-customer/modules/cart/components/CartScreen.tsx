@@ -118,6 +118,7 @@ export const CartScreen = () => {
     });
     const [promoResult, setPromoResult] = useState<{
         promotionId: string | null;
+        promotionIds: string[];
         code: string;
         discountAmount: number;
         freeDeliveryApplied: boolean;
@@ -360,6 +361,10 @@ export const CartScreen = () => {
 
     // Auto-apply the highest-priority eligible promotion.
     useEffect(() => {
+        if (promoResult?.source === 'manual') {
+            return;
+        }
+
         if (!selectedEligiblePromotion) {
             if (promoResult?.source === 'eligible') {
                 setPromoResult(null);
@@ -392,6 +397,9 @@ export const CartScreen = () => {
 
                 setPromoResult({
                     promotionId: selectedEligiblePromotion.id,
+                    promotionIds: (result.promotions ?? [])
+                        .map((promo: any) => String(promo?.id ?? ''))
+                        .filter(Boolean),
                     code: selectedEligiblePromotion.code,
                     discountAmount: Number(result.totalDiscount ?? 0),
                     freeDeliveryApplied: result.freeDeliveryApplied ?? false,
@@ -714,6 +722,9 @@ export const CartScreen = () => {
 
             setPromoResult({
                 promotionId: result.promotions?.[0]?.id ?? null,
+                promotionIds: (result.promotions ?? [])
+                    .map((promo: any) => String(promo?.id ?? ''))
+                    .filter(Boolean),
                 code: couponCode.trim(),
                 discountAmount: Number(result.totalDiscount ?? 0),
                 freeDeliveryApplied: result.freeDeliveryApplied ?? false,
@@ -997,6 +1008,7 @@ export const CartScreen = () => {
                 apiDeliveryPrice,
                 finalTotal,
                 promoResult?.promotionId ?? null,
+                promoResult?.promotionIds ?? null,
                 driverNotes,
                 prioritySurcharge,
                 userContextLocation,
@@ -1188,7 +1200,6 @@ export const CartScreen = () => {
                     isPriority={isPriority}
                     serverPrioritySurcharge={serverPrioritySurcharge}
                     prioritySurcharge={prioritySurcharge}
-                    hasEligiblePromotion={hasEligiblePromotion}
                     couponCode={couponCode}
                     promoResult={promoResult}
                     promoError={promoError}

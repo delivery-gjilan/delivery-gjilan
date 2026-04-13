@@ -26,7 +26,6 @@ interface OrderReviewProps {
     serverPrioritySurcharge: number;
     prioritySurcharge: number;
     /** Promo */
-    hasEligiblePromotion: boolean;
     couponCode: string;
     promoResult: any | null;
     promoError: string | null;
@@ -68,7 +67,6 @@ export function OrderReview({
     isPriority,
     serverPrioritySurcharge,
     prioritySurcharge,
-    hasEligiblePromotion,
     couponCode,
     promoResult,
     promoError,
@@ -209,23 +207,21 @@ export function OrderReview({
                 <View style={[styles.sectionDivider, { backgroundColor: theme.colors.border }]} />
 
                 {/* ── Promo Code ───────────────────── */}
-                {!hasEligiblePromotion && (
-                    <>
-                        <View style={styles.section}>
-                            <PromoCodeSection
-                                flat
-                                couponCode={couponCode}
-                                onChangeCoupon={onChangeCoupon}
-                                promoResult={promoResult}
-                                promoError={promoError}
-                                loading={manualPromoLoading}
-                                onApply={onApplyCoupon}
-                                formatCurrency={formatCurrency}
-                            />
-                        </View>
-                        <View style={[styles.sectionDivider, { backgroundColor: theme.colors.border }]} />
-                    </>
-                )}
+                <>
+                    <View style={styles.section}>
+                        <PromoCodeSection
+                            flat
+                            couponCode={couponCode}
+                            onChangeCoupon={onChangeCoupon}
+                            promoResult={promoResult}
+                            promoError={promoError}
+                            loading={manualPromoLoading}
+                            onApply={onApplyCoupon}
+                            formatCurrency={formatCurrency}
+                        />
+                    </View>
+                    <View style={[styles.sectionDivider, { backgroundColor: theme.colors.border }]} />
+                </>
 
                 {/* ── Price Breakdown ──────────────── */}
                 <View style={styles.section}>

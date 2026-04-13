@@ -151,6 +151,39 @@ export default function PromotionsPage() {
     const filteredBusinesses = businesses.filter((b: any) => b.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const promotions = useMemo(() => data?.getAllPromotions ?? [], [data?.getAllPromotions]);
+    const stackingGuidance = useMemo(() => {
+        const isDeliveryType = formData.type === "FREE_DELIVERY" || formData.type === "SPEND_X_GET_FREE";
+        const isPriceType = !isDeliveryType;
+        const canStack = formData.isStackable === "true";
+
+        const canStackWith: string[] = [];
+        const cannotStackWith: string[] = [];
+        const notes: string[] = [];
+
+        if (!canStack) {
+            cannotStackWith.push("All promotions (exclusive)");
+            notes.push("This promotion is treated as exclusive and blocks other promotions at checkout.");
+        } else {
+            if (isPriceType) {
+                canStackWith.push("Stackable free-delivery promotions");
+                canStackWith.push("Other stackable price promotions");
+            }
+            if (isDeliveryType) {
+                canStackWith.push("Stackable order-discount promotions (fixed/percentage)");
+                cannotStackWith.push("Another free-delivery promotion in the same order");
+            }
+
+            if (formData.target === "FIRST_ORDER") {
+                notes.push("First-order targeting still applies; stacking does not bypass target eligibility.");
+            }
+            if (formData.target === "SPECIFIC_USERS") {
+                notes.push("User assignment and usage limits still gate eligibility before stacking.");
+            }
+            notes.push("Higher priority promotions are evaluated first.");
+        }
+
+        return { canStack, canStackWith, cannotStackWith, notes };
+    }, [formData.type, formData.isStackable, formData.target]);
 
     const handleOpenCreate = () => {
         setEditingPromotion(null);
@@ -1051,6 +1084,45 @@ export default function PromotionsPage() {
                                     <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-zinc-800 pb-2">
                                         Priority &amp; Stacking
                                     </h3>
+                                    <div className="bg-zinc-800/30 border border-zinc-700/40 rounded-lg p-4 space-y-3">
+                                        <div className="text-sm text-zinc-200 font-medium">Compatibility guidance</div>
+                                        <div className="text-xs text-zinc-400">
+                                            Use this preview to understand what this promotion can combine with once created.
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                                            <div className="rounded-md border border-emerald-700/30 bg-emerald-900/10 p-3">
+                                                <div className="text-emerald-300 font-medium mb-1">Can stack with</div>
+                                                {stackingGuidance.canStackWith.length === 0 ? (
+                                                    <div className="text-zinc-500">No combinations</div>
+                                                ) : (
+                                                    <div className="space-y-1 text-zinc-300">
+                                                        {stackingGuidance.canStackWith.map((item) => (
+                                                            <div key={item}>• {item}</div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="rounded-md border border-rose-700/30 bg-rose-900/10 p-3">
+                                                <div className="text-rose-300 font-medium mb-1">Cannot stack with</div>
+                                                {stackingGuidance.cannotStackWith.length === 0 ? (
+                                                    <div className="text-zinc-500">No explicit restrictions from this setup</div>
+                                                ) : (
+                                                    <div className="space-y-1 text-zinc-300">
+                                                        {stackingGuidance.cannotStackWith.map((item) => (
+                                                            <div key={item}>• {item}</div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        {stackingGuidance.notes.length > 0 && (
+                                            <div className="text-xs text-zinc-400 space-y-1">
+                                                {stackingGuidance.notes.map((note) => (
+                                                    <div key={note}>• {note}</div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <Input

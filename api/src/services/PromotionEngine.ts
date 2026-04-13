@@ -32,7 +32,7 @@ export type ApplicablePromotion = {
     id: string;
     code: string | null;
     name: string;
-    type: 'FIXED_AMOUNT' | 'PERCENTAGE' | 'FREE_DELIVERY' | 'SPEND_X_PERCENT' | 'SPEND_X_FIXED';
+    type: 'FIXED_AMOUNT' | 'PERCENTAGE' | 'FREE_DELIVERY' | 'SPEND_X_GET_FREE' | 'SPEND_X_PERCENT' | 'SPEND_X_FIXED';
     target: 'ALL_USERS' | 'SPECIFIC_USERS' | 'FIRST_ORDER' | 'CONDITIONAL';
     discountValue?: number | null;
     maxDiscountCap?: number | null;
@@ -70,6 +70,8 @@ export class PromotionEngine {
     ): Promise<ApplicablePromotion[]> {
         const now = new Date().toISOString();
         const applicable: ApplicablePromotion[] = [];
+        const normalizedManualCode = manualPromoCode?.trim().toUpperCase();
+        let manualPromoFound = false;
 
         // 1. Check First Order Eligibility
         const [metadata] = await this.db
@@ -157,8 +159,15 @@ export class PromotionEngine {
             log.debug({ id: promo.id, name: promo.name, code: promo.code, target: promo.target, spendThreshold: promo.spendThreshold }, 'promo:checking');
             
             // If user entered a manual code, only consider that one
-            if (manualPromoCode && promo.code !== manualPromoCode.trim().toUpperCase()) {
-                log.debug({ promoCode: promo.code }, 'promo:skip:codeMismatch');
+            if (normalizedManualCode) {
+                const isManualCodePromo = promo.code === normalizedManualCode;
+                const isAutoPromotion = !promo.code;
+                if (!isManualCodePromo && !isAutoPromotion) {
+                    log.debug({ promoCode: promo.code }, 'promo:skip:codeMismatch');
+                    continue;
+                }
+            } else if (promo.code) {
+                // Promotions with codes must be explicitly selected by manual code input.
                 continue;
             }
 
@@ -232,6 +241,14 @@ export class PromotionEngine {
                 isStackable: promo.isStackable,
                 appliedAmount,
             });
+
+            if (normalizedManualCode && promo.code === normalizedManualCode) {
+                manualPromoFound = true;
+            }
+        }
+
+        if (normalizedManualCode && !manualPromoFound) {
+            return [];
         }
 
         // Sort by priority (highest first)
@@ -268,22 +285,105 @@ export class PromotionEngine {
         let totalDiscount = 0;
         let freeDeliveryApplied = false;
 
-        // First promo is always applied (highest priority)
-        const firstPromo = applicable[0];
+        const normalizedManualCode = manualPromoCode?.trim().toUpperCase();
+        const firstPromo = normalizedManualCode
+            ? applicable.find((promo) => promo.code === normalizedManualCode) ?? applicable[0]
+            : applicable[0];
+
+        if (!firstPromo) {
+            const finalSubtotal = normalizeMoney(cart.subtotal);
+            const finalDeliveryPrice = normalizeMoney(cart.deliveryPrice);
+            return {
+                promotions: [],
+                totalDiscount: 0,
+                freeDeliveryApplied: false,
+                finalSubtotal,
+                finalDeliveryPrice,
+                finalTotal: normalizeMoney(finalSubtotal + finalDeliveryPrice),
+            };
+        }
+
         applied.push(firstPromo);
         totalDiscount += firstPromo.appliedAmount;
         if (firstPromo.freeDelivery) freeDeliveryApplied = true;
 
         // If first promo is stackable, try adding more
         if (firstPromo.isStackable) {
-            for (let i = 1; i < applicable.length; i++) {
-                const promo = applicable[i];
+            for (const promo of applicable) {
+                if (promo.id === firstPromo.id) continue;
                 if (promo.isStackable) {
+                    // Multiple free-delivery effects do not stack; keep only the first one.
+                    if (promo.freeDelivery && freeDeliveryApplied) continue;
                     applied.push(promo);
                     totalDiscount += promo.appliedAmount;
                     if (promo.freeDelivery) freeDeliveryApplied = true;
                 }
             }
+        }
+
+        const finalSubtotal = normalizeMoney(Math.max(0, cart.subtotal - totalDiscount));
+        const finalDeliveryPrice = freeDeliveryApplied ? 0 : normalizeMoney(cart.deliveryPrice);
+        const finalTotal = normalizeMoney(finalSubtotal + finalDeliveryPrice);
+
+        return {
+            promotions: applied,
+            totalDiscount: normalizeMoney(totalDiscount),
+            freeDeliveryApplied,
+            finalSubtotal,
+            finalDeliveryPrice,
+            finalTotal,
+        };
+    }
+
+    async applySelectedPromotions(
+        userId: string,
+        selectedPromotionIds: string[],
+        cart: CartContext,
+    ): Promise<PromotionResult> {
+        const uniquePromotionIds = Array.from(new Set(selectedPromotionIds.filter(Boolean)));
+        if (uniquePromotionIds.length === 0) {
+            const finalSubtotal = normalizeMoney(cart.subtotal);
+            const finalDeliveryPrice = normalizeMoney(cart.deliveryPrice);
+            return {
+                promotions: [],
+                totalDiscount: 0,
+                freeDeliveryApplied: false,
+                finalSubtotal,
+                finalDeliveryPrice,
+                finalTotal: normalizeMoney(finalSubtotal + finalDeliveryPrice),
+            };
+        }
+
+        const applicable = await this.getApplicablePromotions(userId, cart);
+        const applicableById = new Map(applicable.map((promo) => [promo.id, promo]));
+        const selectedPromotions = uniquePromotionIds.map((id) => applicableById.get(id)).filter(Boolean) as ApplicablePromotion[];
+
+        if (selectedPromotions.length !== uniquePromotionIds.length) {
+            throw AppError.businessRule('One or more selected promotions are no longer valid');
+        }
+
+        const sorted = [...selectedPromotions].sort((a, b) => b.priority - a.priority);
+        const firstPromo = sorted[0];
+        if (!firstPromo) {
+            throw AppError.businessRule('No valid promotions selected');
+        }
+
+        const applied: ApplicablePromotion[] = [firstPromo];
+        let totalDiscount = firstPromo.appliedAmount;
+        let freeDeliveryApplied = firstPromo.freeDelivery;
+
+        for (let i = 1; i < sorted.length; i++) {
+            const promo = sorted[i];
+            if (!firstPromo.isStackable || !promo.isStackable) {
+                throw AppError.businessRule('Selected promotions cannot be combined');
+            }
+            if (promo.freeDelivery && freeDeliveryApplied) {
+                throw AppError.businessRule('Multiple free-delivery promotions cannot be combined');
+            }
+
+            applied.push(promo);
+            totalDiscount += promo.appliedAmount;
+            if (promo.freeDelivery) freeDeliveryApplied = true;
         }
 
         const finalSubtotal = normalizeMoney(Math.max(0, cart.subtotal - totalDiscount));

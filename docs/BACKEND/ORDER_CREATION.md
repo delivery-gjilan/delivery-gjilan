@@ -49,6 +49,30 @@ A re-export shim at `api/src/services/OrderService.ts` preserves all existing im
 14. **Post-transaction** (non-fatal): write `order_coverage_logs` + deduct `personal_inventory` quantities. Failure here never blocks order creation; the DELIVERED-time handler acts as a safety net.
 15. Return mapped GraphQL `Order` including `paymentCollection`.
 
+### Promotion input shape at checkout
+
+`CreateOrderInput` supports both promotion fields:
+
+- `promotionIds: [ID!]` for multi-promo checkout
+- `promotionId: ID` as legacy fallback
+
+When both are present, backend merges and de-duplicates IDs before validation.
+
+### Promotion enforcement during order creation
+
+Order creation validates selected promotions through `PromotionEngine.applySelectedPromotions()`.
+
+The backend:
+
+1. Loads currently applicable promotions for the user/cart.
+2. Verifies each selected promo is still eligible.
+3. Sorts selected promos by `priority` (descending).
+4. Applies stackability policy:
+   - anchor promo is always first
+   - additional promos require both anchor and candidate to be stackable
+   - multiple free-delivery effects are rejected
+5. Uses server-authoritative totals for price validation and persistence.
+
 ## Read-Path Mapping
 
 `OrderService` maps collection results through a shared batched loader instead of issuing the full supporting read set per order.

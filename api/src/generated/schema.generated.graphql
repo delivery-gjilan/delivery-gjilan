@@ -491,6 +491,7 @@ input CreateOrderInput {
   priorityRequested: Boolean
   prioritySurcharge: Float
   promotionId: ID
+  promotionIds: [ID!]
   totalPrice: Float!
   userContextLocation: LocationInput
 }
@@ -1174,6 +1175,7 @@ type Mutation {
   registerDeviceToken(input: RegisterDeviceTokenInput!): Boolean!
   registerLiveActivityToken(activityId: String!, orderId: ID!, token: String!): Boolean!
   removeInventoryItem(businessId: ID!, productId: ID!): Boolean!
+  removeOrderItem(orderId: ID!, orderItemId: ID!, reason: String!): Order!
   removeUserFromPromotion(promotionId: ID!, userId: ID!): Boolean!
 
   """Business user replies to admin"""

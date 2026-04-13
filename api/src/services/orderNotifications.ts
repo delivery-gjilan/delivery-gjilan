@@ -109,6 +109,40 @@ export function notifyCustomerOrderStatus(
 }
 
 /**
+ * Send a push notification to the customer when an item is removed from their order.
+ * Runs async (fire-and-forget) so it doesn't block the mutation response.
+ */
+export function notifyCustomerItemRemoved(
+    notificationService: NotificationService,
+    customerId: string,
+    orderId: string,
+    itemName: string,
+    reason: string,
+): void {
+    const payload: NotificationPayload = {
+        title: 'Item removed from your order',
+        body: `"${itemName}" was removed: ${reason}`,
+        localeContent: {
+            en: {
+                title: 'Item removed from your order',
+                body: `"${itemName}" was removed: ${reason}`,
+            },
+            al: {
+                title: 'Artikull i hequr nga porosia',
+                body: `"${itemName}" u hoq: ${reason}`,
+            },
+        },
+        data: { orderId, screen: 'orders/active', type: 'ORDER_ITEM_REMOVED' },
+        timeSensitive: true,
+        relevanceScore: 0.9,
+    };
+
+    notificationService
+        .sendToUser(customerId, payload, 'ORDER_STATUS')
+        .catch((err) => logger.error({ err, customerId, orderId }, 'orderNotification:notifyCustomerItemRemoved — FAILED'));
+}
+
+/**
  * Update Live Activity (Dynamic Island) with new order status and ETA.
  * This updates the Dynamic Island on iPhone 14 Pro+ and Lock Screen on iPhone 12+.
  * 

@@ -58,6 +58,7 @@ export interface IOrderService {
     assignDriverToOrder(id: string, driverId: string | null, onlyIfUnassigned?: boolean): Promise<Order | null>;
     cancelOrder(id: string): Promise<Order>;
     adminCancelOrder(id: string, reason: string, settleDriver?: boolean, settleBusiness?: boolean): Promise<Order>;
+    removeOrderItem(orderId: string, orderItemId: string, reason: string): Promise<Order>;
 
     // ── User behavior tracking ──
     updateUserBehaviorOnStatusChange(userId: string, fromStatus: OrderStatus, toStatus: OrderStatus, orderTotal: number, orderDate: string | null): Promise<void>;

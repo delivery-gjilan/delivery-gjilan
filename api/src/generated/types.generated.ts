@@ -516,6 +516,7 @@ export type CreateOrderInput = {
   priorityRequested?: InputMaybe<Scalars['Boolean']['input']>;
   prioritySurcharge?: InputMaybe<Scalars['Float']['input']>;
   promotionId?: InputMaybe<Scalars['ID']['input']>;
+  promotionIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   totalPrice: Scalars['Float']['input'];
   userContextLocation?: InputMaybe<LocationInput>;
 };
@@ -1143,6 +1144,7 @@ export type Mutation = {
   registerDeviceToken: Scalars['Boolean']['output'];
   registerLiveActivityToken: Scalars['Boolean']['output'];
   removeInventoryItem: Scalars['Boolean']['output'];
+  removeOrderItem: Order;
   removeUserFromPromotion: Scalars['Boolean']['output'];
   /** Business user replies to admin */
   replyToBusinessMessage: BusinessMessage;
@@ -1602,6 +1604,13 @@ export type MutationregisterLiveActivityTokenArgs = {
 export type MutationremoveInventoryItemArgs = {
   businessId: Scalars['ID']['input'];
   productId: Scalars['ID']['input'];
+};
+
+
+export type MutationremoveOrderItemArgs = {
+  orderId: Scalars['ID']['input'];
+  orderItemId: Scalars['ID']['input'];
+  reason: Scalars['String']['input'];
 };
 
 
@@ -4652,6 +4661,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   registerDeviceToken?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationregisterDeviceTokenArgs, 'input'>>;
   registerLiveActivityToken?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationregisterLiveActivityTokenArgs, 'activityId' | 'orderId' | 'token'>>;
   removeInventoryItem?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationremoveInventoryItemArgs, 'businessId' | 'productId'>>;
+  removeOrderItem?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationremoveOrderItemArgs, 'orderId' | 'orderItemId' | 'reason'>>;
   removeUserFromPromotion?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationremoveUserFromPromotionArgs, 'promotionId' | 'userId'>>;
   replyToBusinessMessage?: Resolver<ResolversTypes['BusinessMessage'], ParentType, ContextType, RequireFields<MutationreplyToBusinessMessageArgs, 'adminId' | 'body'>>;
   replyToDriverMessage?: Resolver<ResolversTypes['DriverMessage'], ParentType, ContextType, RequireFields<MutationreplyToDriverMessageArgs, 'adminId' | 'body'>>;

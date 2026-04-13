@@ -25,6 +25,7 @@ import {
     START_PREPARING,
     ORDERS_SUBSCRIPTION,
     UPDATE_PREPARATION_TIME,
+    REMOVE_ORDER_ITEM,
 } from '@/graphql/orders';
 import {
     GET_BUSINESS_OPERATIONS,
@@ -43,6 +44,7 @@ const UPCOMING_ORDER_STATUSES: ReadonlyArray<OrderStatus> = [
 ];
 
 interface OrderItem {
+    id: string;
     productId: string;
     name: string;
     imageUrl?: string | null;
@@ -200,6 +202,8 @@ export default function OrdersScreen() {
     const [customAddTime, setCustomAddTime] = useState('');
     const [showCompleted, setShowCompleted] = useState(false);
     const [completedPage, setCompletedPage] = useState(0);
+    const [removeItemModal, setRemoveItemModal] = useState<{ orderId: string; itemId: string; itemName: string } | null>(null);
+    const [removeItemReason, setRemoveItemReason] = useState('');
     const { width } = useWindowDimensions();
     const isTablet = width >= 768;
     const businessId = user?.businessId ?? '';
@@ -319,6 +323,7 @@ export default function OrdersScreen() {
     const [updateStatus] = useMutation(UPDATE_ORDER_STATUS);
     const [startPreparing, { loading: startingPrep }] = useMutation(START_PREPARING);
     const [updatePreparationTimeMutation] = useMutation(UPDATE_PREPARATION_TIME);
+    const [removeOrderItemMut, { loading: removingItem }] = useMutation(REMOVE_ORDER_ITEM);
     const { data: reviewsData, loading: reviewsLoading } = useQuery(GET_BUSINESS_ORDER_REVIEWS, {
         variables: { limit: 25, offset: 0 },
     });
@@ -510,8 +515,27 @@ export default function OrdersScreen() {
 
     const ADD_TIME_PRESETS = [5, 10, 15, 20, 30];
 
+    const handleRemoveItemConfirm = async () => {
+        if (!removeItemModal || !removeItemReason.trim()) return;
+        try {
+            await removeOrderItemMut({
+                variables: {
+                    orderId: removeItemModal.orderId,
+                    orderItemId: removeItemModal.itemId,
+                    reason: removeItemReason.trim(),
+                },
+            });
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            setRemoveItemModal(null);
+            setRemoveItemReason('');
+            setProductModalOrder(null);
+            refetch();
+        } catch (error: any) {
+            Alert.alert(t('common.error', 'Error'), error.message);
+        }
+    };
+
     const handleAddTime = async () => {
-        if (!addTimeModalOrder) return;
         const customVal = customAddTime.trim() ? Number(customAddTime.trim()) : NaN;
         const extra = Number.isFinite(customVal) && customVal > 0 ? customVal : addTimeAmount;
         const currentMinutes = addTimeModalOrder.preparationMinutes ?? 0;
@@ -819,6 +843,18 @@ export default function OrdersScreen() {
                                             <Text className={`text-text font-bold ml-2 ${isTablet ? 'text-base' : 'text-sm'}`}>
                                                 €{(item.unitPrice * item.quantity).toFixed(2)}
                                             </Text>
+                                            {!canAct ? null : (
+                                                <TouchableOpacity
+                                                    hitSlop={8}
+                                                    onPress={() => {
+                                                        setRemoveItemModal({ orderId: order.id, itemId: item.id, itemName: item.name });
+                                                        setRemoveItemReason('');
+                                                    }}
+                                                    style={{ marginLeft: 10, padding: 4 }}
+                                                >
+                                                    <Ionicons name="trash-outline" size={15} color="#ef4444" />
+                                                </TouchableOpacity>
+                                            )}
                                         </View>
 
                                         {item.notes && (
@@ -1714,11 +1750,131 @@ export default function OrdersScreen() {
                                                     <Text style={{ color: '#fcd34d', fontSize: 12 }}>{item.notes}</Text>
                                                 </View>
                                             ) : null}
+                                            {productModalOrder && productModalOrder.status !== 'DELIVERED' && productModalOrder.status !== 'CANCELLED' && (
+                                                <TouchableOpacity
+                                                    onPress={() => {
+                                                        setRemoveItemModal({ orderId: productModalOrder.id, itemId: item.id, itemName: item.name });
+                                                        setRemoveItemReason('');
+                                                    }}
+                                                    style={{
+                                                        marginTop: 10,
+                                                        flexDirection: 'row',
+                                                        alignItems: 'center',
+                                                        alignSelf: 'flex-start',
+                                                        backgroundColor: '#ef444418',
+                                                        borderRadius: 8,
+                                                        paddingHorizontal: 10,
+                                                        paddingVertical: 5,
+                                                        borderWidth: 1,
+                                                        borderColor: '#ef444430',
+                                                    }}
+                                                >
+                                                    <Ionicons name="trash-outline" size={13} color="#ef4444" />
+                                                    <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: '600', marginLeft: 5 }}>Remove</Text>
+                                                </TouchableOpacity>
+                                            )}
                                         </View>
                                     </View>
                                 ))
                             }
                         </ScrollView>
+                    </Pressable>
+                </Pressable>
+            </Modal>
+
+            {/* ── Remove Order Item Modal ── */}
+            <Modal
+                visible={!!removeItemModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => { setRemoveItemModal(null); setRemoveItemReason(''); }}
+            >
+                <Pressable
+                    style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.75)', padding: 24 }}
+                    onPress={() => { setRemoveItemModal(null); setRemoveItemReason(''); }}
+                >
+                    <Pressable
+                        style={{
+                            backgroundColor: '#0f172a',
+                            borderRadius: 20,
+                            padding: 20,
+                            width: '100%',
+                            borderWidth: 1,
+                            borderColor: 'rgba(255,255,255,0.08)',
+                        }}
+                        onPress={(e) => e.stopPropagation()}
+                    >
+                        <Text style={{ color: '#f1f5f9', fontSize: 17, fontWeight: '700', marginBottom: 6 }}>Remove item?</Text>
+                        <Text style={{ color: '#94a3b8', fontSize: 13, marginBottom: 16 }}>
+                            "{removeItemModal?.itemName}" will be removed and the customer will be notified.
+                        </Text>
+
+                        {/* Reason presets */}
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                            {['Out of stock', 'Item unavailable', 'Preparation issue'].map((preset) => (
+                                <TouchableOpacity
+                                    key={preset}
+                                    onPress={() => setRemoveItemReason(preset)}
+                                    style={{
+                                        paddingHorizontal: 12,
+                                        paddingVertical: 6,
+                                        borderRadius: 20,
+                                        borderWidth: 1,
+                                        borderColor: removeItemReason === preset ? '#ef4444' : 'rgba(255,255,255,0.15)',
+                                        backgroundColor: removeItemReason === preset ? '#ef444418' : 'transparent',
+                                    }}
+                                >
+                                    <Text style={{ color: removeItemReason === preset ? '#ef4444' : '#94a3b8', fontSize: 13, fontWeight: '600' }}>
+                                        {preset}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        <TextInput
+                            value={removeItemReason}
+                            onChangeText={setRemoveItemReason}
+                            placeholder="Or type a reason…"
+                            placeholderTextColor="#475569"
+                            style={{
+                                backgroundColor: '#1e293b',
+                                borderRadius: 10,
+                                padding: 12,
+                                color: '#f1f5f9',
+                                fontSize: 14,
+                                borderWidth: 1,
+                                borderColor: 'rgba(255,255,255,0.08)',
+                                marginBottom: 20,
+                            }}
+                        />
+
+                        <View style={{ flexDirection: 'row', gap: 12 }}>
+                            <TouchableOpacity
+                                onPress={() => { setRemoveItemModal(null); setRemoveItemReason(''); }}
+                                style={{
+                                    flex: 1,
+                                    paddingVertical: 12,
+                                    borderRadius: 12,
+                                    alignItems: 'center',
+                                    backgroundColor: 'rgba(255,255,255,0.07)',
+                                }}
+                            >
+                                <Text style={{ color: '#94a3b8', fontWeight: '600' }}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={handleRemoveItemConfirm}
+                                disabled={!removeItemReason.trim() || removingItem}
+                                style={{
+                                    flex: 1,
+                                    paddingVertical: 12,
+                                    borderRadius: 12,
+                                    alignItems: 'center',
+                                    backgroundColor: removeItemReason.trim() && !removingItem ? '#ef4444' : '#ef444460',
+                                }}
+                            >
+                                <Text style={{ color: '#fff', fontWeight: '700' }}>{removingItem ? 'Removing…' : 'Remove'}</Text>
+                            </TouchableOpacity>
+                        </View>
                     </Pressable>
                 </Pressable>
             </Modal>

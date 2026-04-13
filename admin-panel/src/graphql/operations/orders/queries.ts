@@ -63,6 +63,7 @@ export const GET_ORDERS = graphql(`
                         }
                     }
                     items {
+                        id
                         productId
                         name
                         imageUrl

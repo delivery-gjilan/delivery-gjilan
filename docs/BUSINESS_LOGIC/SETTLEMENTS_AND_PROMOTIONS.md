@@ -311,6 +311,24 @@ Selects the best combination and returns final totals:
 4. Sum total discount and check free delivery across all applied promos
 5. Return `PromotionResult` with `finalSubtotal`, `finalDeliveryPrice`, `finalTotal`
 
+When `manualPromoCode` is provided, manual-code matching is required; otherwise the result is empty.
+Auto (code-less) promotions can still be included if compatible with the selected manual promotion.
+
+### `applySelectedPromotions(userId, selectedPromotionIds, cart)`
+
+Used by create-order to enforce the exact promotion set selected at checkout.
+
+Flow:
+
+1. De-duplicate selected IDs.
+2. Verify each selected promotion remains applicable for the current cart.
+3. Sort selected promotions by priority.
+4. Apply stacking compatibility:
+   - first promo is anchor
+   - additional promos require both anchor and candidate to be stackable
+   - second free-delivery promotion is rejected
+5. Return authoritative final totals used by order creation.
+
 ### Discount Calculation by Type
 
 | Type | Calculation | Notes |
@@ -443,7 +461,8 @@ Final Total = Subtotal + Delivery + Priority - Discount
 
 ### Order Submission
 
-`promoResult.code` is passed to `createOrder` mutation as `promoCode`. The server re-validates the promotion during order creation via `PromotionEngine.applyPromotions()`, records usage, and creates settlements.
+`createOrder` accepts `promotionIds` (and legacy `promotionId`).
+The backend re-validates selected promotions via `PromotionEngine.applySelectedPromotions()`, then records usage and persists `order_promotions` rows.
 
 ---
 

@@ -802,4 +802,63 @@ export class OrderLifecycleModule {
             logger.error({ orderId, error }, 'order:inventory:restore-failed');
         }
     }
+
+    async removeOrderItem(orderId: string, orderItemId: string, reason: string): Promise<Order> {
+        const db = this.deps.db;
+
+        const dbOrder = await this.deps.orderRepository.findById(orderId);
+        if (!dbOrder) {
+            throw AppError.notFound('Order');
+        }
+        if (dbOrder.status === 'DELIVERED' || dbOrder.status === 'CANCELLED') {
+            throw AppError.businessRule('Cannot remove items from a completed or cancelled order');
+        }
+
+        // Load the item to remove (must belong to this order and be a top-level item)
+        const [item] = await db
+            .select()
+            .from(orderItemsTable)
+            .where(
+                and(
+                    eq(orderItemsTable.id, orderItemId),
+                    eq(orderItemsTable.orderId, orderId),
+                    isNull(orderItemsTable.parentOrderItemId),
+                ),
+            );
+
+        if (!item) {
+            throw AppError.notFound('Order item not found');
+        }
+
+        // Calculate price deltas
+        const itemTotal = Number(item.finalAppliedPrice) * item.quantity;
+        const inventoryTotal = Number(item.finalAppliedPrice) * (item.inventoryQuantity ?? 0);
+        const marketTotal = itemTotal - inventoryTotal;
+
+        // In a transaction: delete item (cascade removes children + options) and update order prices
+        const [updatedOrder] = await db.transaction(async (tx) => {
+            await tx
+                .delete(orderItemsTable)
+                .where(eq(orderItemsTable.id, orderItemId));
+
+            return tx
+                .update(ordersTable)
+                .set({
+                    basePrice: sql`${ordersTable.basePrice} - ${itemTotal}`,
+                    actualPrice: sql`${ordersTable.actualPrice} - ${itemTotal}`,
+                    businessPrice: sql`${ordersTable.businessPrice} - ${marketTotal}`,
+                    inventoryPrice: sql`${ordersTable.inventoryPrice} - ${inventoryTotal}`,
+                })
+                .where(eq(ordersTable.id, orderId))
+                .returning();
+        });
+
+        if (!updatedOrder) {
+            throw AppError.notFound('Order');
+        }
+
+        log.info({ orderId, orderItemId, reason, itemTotal }, 'order:removeOrderItem — item removed');
+
+        return this.mapping.mapToOrder(updatedOrder);
+    }
 }

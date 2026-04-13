@@ -199,6 +199,7 @@ type Mutation {
     submitOrderReview(orderId: ID!, rating: Int!, comment: String, quickFeedback: [String!]): OrderReview!
     createOrder(input: CreateOrderInput!): Order!
     createTestOrder: Order!
+    removeOrderItem(orderId: ID!, orderItemId: ID!, reason: String!): Order!
 }
 
 type Subscription {
@@ -241,6 +242,7 @@ input CreateOrderInput {
     priorityRequested: Boolean
     prioritySurcharge: Float
     paymentCollection: OrderPaymentCollection
+    promotionIds: [ID!]
     promotionId: ID
     driverNotes: String
     # Optional tip for the driver (added on top of the totalPrice)

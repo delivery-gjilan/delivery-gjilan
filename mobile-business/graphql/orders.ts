@@ -40,6 +40,7 @@ export const GET_BUSINESS_ORDERS = graphql(`
                         name
                     }
                     items {
+                        id
                         productId
                         name
                         imageUrl
@@ -139,6 +140,33 @@ export const ORDERS_SUBSCRIPTION = graphql(`
                     name
                 }
                 items {
+                    id
+                    productId
+                    name
+                    imageUrl
+                    quantity
+                    unitPrice
+                    notes
+                }
+            }
+        }
+    }
+`);
+
+export const REMOVE_ORDER_ITEM = graphql(`
+    mutation RemoveOrderItem($orderId: ID!, $orderItemId: ID!, $reason: String!) {
+        removeOrderItem(orderId: $orderId, orderItemId: $orderItemId, reason: $reason) {
+            id
+            orderPrice
+            deliveryPrice
+            totalPrice
+            businesses {
+                business {
+                    id
+                    name
+                }
+                items {
+                    id
                     productId
                     name
                     imageUrl

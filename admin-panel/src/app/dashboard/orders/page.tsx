@@ -9,7 +9,7 @@ import Input from "@/components/ui/Input";
 import { useOrders, useUpdateOrderStatus } from "@/lib/hooks/useOrders";
 import { usePrepTimeAlerts, type PrepTimeAlert } from "@/lib/hooks/usePrepTimeAlerts";
 import { useAuth } from "@/lib/auth-context";
-import { ASSIGN_DRIVER_TO_ORDER, CREATE_TEST_ORDER, START_PREPARING, UPDATE_PREPARATION_TIME, ADMIN_CANCEL_ORDER, APPROVE_ORDER } from "@/graphql/operations/orders";
+import { ASSIGN_DRIVER_TO_ORDER, CREATE_TEST_ORDER, START_PREPARING, UPDATE_PREPARATION_TIME, ADMIN_CANCEL_ORDER, APPROVE_ORDER, REMOVE_ORDER_ITEM } from "@/graphql/operations/orders";
 import { GRANT_FREE_DELIVERY } from "@/graphql/operations/promotions/mutations";
 import { UPDATE_USER_NOTE_MUTATION } from "@/graphql/operations/users/mutations";
 import { DRIVERS_QUERY } from "@/graphql/operations/users/queries";
@@ -321,6 +321,7 @@ export default function OrdersPage() {
     const [updateUserNoteMut] = useMutation(UPDATE_USER_NOTE_MUTATION, { refetchQueries: ['GetOrders'] });
     const [fetchOrderCoverage, { data: coverageData, loading: coverageLoading }] = useLazyQuery(GET_ORDER_COVERAGE, { fetchPolicy: 'network-only' });
     const [deductOrderStockMut, { loading: deductingStock }] = useMutation(DEDUCT_ORDER_STOCK);
+    const [removeOrderItemMut, { loading: removingOrderItem }] = useMutation(REMOVE_ORDER_ITEM);
 
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [detailsOpen, setDetailsOpen] = useState(false);
@@ -352,6 +353,8 @@ export default function OrdersPage() {
     const [prepTimeAlerts, setPrepTimeAlerts] = useState<PrepTimeAlert[]>([]);
     const { dismiss: dismissPrepAlert } = usePrepTimeAlerts(setPrepTimeAlerts);
     const [inventoryModalOrder, setInventoryModalOrder] = useState<Order | null>(null);
+    const [removeItemDialog, setRemoveItemDialog] = useState<{ orderId: string; itemId: string; itemName: string } | null>(null);
+    const [removeItemReason, setRemoveItemReason] = useState<string>("");
 
     // Debounce search input by 300ms
     useEffect(() => {
@@ -359,8 +362,25 @@ export default function OrdersPage() {
         return () => clearTimeout(timer);
     }, [searchQuery]);
 
-    const handleApproveConfirm = async () => {
-        if (!approvalModalOrder) return;
+    const handleRemoveItemConfirm = async () => {
+        if (!removeItemDialog || !removeItemReason.trim()) return;
+        try {
+            await removeOrderItemMut({
+                variables: {
+                    orderId: removeItemDialog.orderId,
+                    orderItemId: removeItemDialog.itemId,
+                    reason: removeItemReason.trim(),
+                },
+            });
+            toast.success(`"${removeItemDialog.itemName}" removed from order`);
+            setRemoveItemDialog(null);
+            setRemoveItemReason("");
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to remove item');
+        }
+    };
+
+    const handleApproveConfirm = async () => {        if (!approvalModalOrder) return;
         try {
             await approveOrderMut({ variables: { id: approvalModalOrder.id } });
             setDismissedApprovalOrderIds((prev) => {
@@ -1491,6 +1511,7 @@ export default function OrdersPage() {
                                                         <th className="px-3 py-2 text-left text-[10px] font-medium text-zinc-500 uppercase tracking-wider">Product</th>
                                                         <th className="px-3 py-2 text-right text-[10px] font-medium text-zinc-500 uppercase tracking-wider">Price</th>
                                                         <th className="px-3 py-2 text-right text-[10px] font-medium text-zinc-500 uppercase tracking-wider">Total</th>
+                                                        {!isCompleted && <th className="px-3 py-2 text-right text-[10px] font-medium text-zinc-500 uppercase tracking-wider w-8"></th>}
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -1547,6 +1568,20 @@ export default function OrdersPage() {
                                                                 <td className="px-3 py-2.5 text-right text-sm font-medium text-white">
                                                                     €{displayLineTotal.toFixed(2)}
                                                                 </td>
+                                                                {!isCompleted && (
+                                                                    <td className="px-2 py-2.5 text-right">
+                                                                        <button
+                                                                            title="Remove item"
+                                                                            onClick={() => {
+                                                                                setRemoveItemDialog({ orderId: selectedOrder.id, itemId: (item as any).id, itemName: item.name });
+                                                                                setRemoveItemReason("");
+                                                                            }}
+                                                                            className="p-1 rounded text-zinc-600 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                                                                        >
+                                                                            <X size={13} />
+                                                                        </button>
+                                                                    </td>
+                                                                )}
                                                             </tr>
                                                         );
                                                     })}
@@ -1848,9 +1883,54 @@ export default function OrdersPage() {
                 )}
             </Modal>
 
+            {/* ════════════════ REMOVE ORDER ITEM MODAL ════════════════ */}
+            <Modal isOpen={!!removeItemDialog} onClose={() => { setRemoveItemDialog(null); setRemoveItemReason(""); }} title="Remove Item">
+                {removeItemDialog && (
+                    <div className="space-y-4">
+                        <p className="text-sm text-zinc-300">
+                            Remove <span className="font-semibold text-white">"{removeItemDialog.itemName}"</span> from this order?
+                        </p>
+                        <p className="text-xs text-zinc-500">The customer will be notified with the reason. Order total will be updated.</p>
+                        <div className="space-y-2">
+                            <label className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Reason</label>
+                            <div className="flex flex-wrap gap-2">
+                                {["Out of stock", "Item unavailable", "Preparation issue"].map((preset) => (
+                                    <button
+                                        key={preset}
+                                        onClick={() => setRemoveItemReason(preset)}
+                                        className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${removeItemReason === preset ? "bg-rose-500/20 border-rose-500/50 text-rose-300" : "bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-zinc-500"}`}
+                                    >
+                                        {preset}
+                                    </button>
+                                ))}
+                            </div>
+                            <Input
+                                value={removeItemReason}
+                                onChange={(e) => setRemoveItemReason(e.target.value)}
+                                placeholder="Or type a custom reason…"
+                            />
+                        </div>
+                        <div className="flex gap-3 pt-2">
+                            <Button
+                                variant="secondary"
+                                onClick={() => { setRemoveItemDialog(null); setRemoveItemReason(""); }}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                variant="danger"
+                                onClick={handleRemoveItemConfirm}
+                                disabled={!removeItemReason.trim() || removingOrderItem}
+                            >
+                                {removingOrderItem ? "Removing…" : "Remove item"}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
+
             {/* ════════════════ CANCEL ORDER MODAL ════════════════ */}
-            <Modal isOpen={!!cancelModalOrder} onClose={() => { setCancelModalOrder(null); setCancelReason(""); setCancelSettleDriver(false); setCancelSettleBusiness(false); }} title="Cancel Order">                {cancelModalOrder && (() => {
-                    const preview = !isBusinessUser ? (cancelModalOrder as any).settlementPreview : null;
+            <Modal isOpen={!!cancelModalOrder} onClose={() => { setCancelModalOrder(null); setCancelReason(""); setCancelSettleDriver(false); setCancelSettleBusiness(false); }} title="Cancel Order">                {cancelModalOrder && (() => {                    const preview = !isBusinessUser ? (cancelModalOrder as any).settlementPreview : null;
                     const hasDriver = !!cancelModalOrder.driver;
                     const businessReceivable = preview
                         ? preview.lineItems.filter((li: any) => li.direction === 'RECEIVABLE' && li.businessId).reduce((s: number, li: any) => s + li.amount, 0)

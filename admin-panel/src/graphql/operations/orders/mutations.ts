@@ -167,3 +167,28 @@ export const CREATE_TEST_ORDER = graphql(`
         }
     }
 `);
+
+export const REMOVE_ORDER_ITEM = graphql(`
+    mutation RemoveOrderItem($orderId: ID!, $orderItemId: ID!, $reason: String!) {
+        removeOrderItem(orderId: $orderId, orderItemId: $orderItemId, reason: $reason) {
+            id
+            orderPrice
+            deliveryPrice
+            totalPrice
+            businesses {
+                business {
+                    id
+                    name
+                }
+                items {
+                    id
+                    productId
+                    name
+                    quantity
+                    unitPrice
+                    inventoryQuantity
+                }
+            }
+        }
+    }
+`);

@@ -758,9 +758,18 @@ export class OrderCreationModule {
             businessIds: Array.from(businessIds),
         };
 
+        const selectedPromotionIds = Array.from(
+            new Set(
+                [
+                    ...((((input as any).promotionIds as string[] | undefined) ?? []),
+                    input.promotionId ?? null,
+                ].filter(Boolean) as string[]
+            ),
+        );
+
         let promoResult: PromotionResult;
-        if (input.promotionId) {
-            promoResult = await promotionEngine.applySinglePromotion(userId, input.promotionId, cartContext);
+        if (selectedPromotionIds.length > 0) {
+            promoResult = await promotionEngine.applySelectedPromotions(userId, selectedPromotionIds, cartContext);
         } else {
             promoResult = {
                 promotions: [],
