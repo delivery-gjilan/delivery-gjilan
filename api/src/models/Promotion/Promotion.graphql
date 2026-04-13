@@ -270,7 +270,7 @@ type Query {
   # Get active global promotions visible to customers (no cart context needed)
   getActiveGlobalPromotions: [Promotion!]!
 
-  # Get active conditional promotions that have spend thresholds (for progress bars)
+  # Get active spend-threshold promotions (for progress bars)
   getPromotionThresholds(cart: CartContextInput!): [PromotionThreshold!]!
   
   # Validate and apply promotions (returns final prices)

@@ -264,7 +264,7 @@ The most complex visual page. Full-screen Mapbox GL map with driver positions, o
 
 **GraphQL:** `GET_PROMOTIONS`, `GET_RECOVERY_PROMOTIONS`, `GET_BUSINESSES`, `USERS_QUERY`, 5 mutations. `ASSIGN_PROMOTION_TO_USERS` is imported from `notifications` operations (semantic mismatch).
 
-**Key features:** Six promotion types with conditional field visibility. `driverPayoutAmount` for delivery-fee promos. `creatorType` (PLATFORM/BUSINESS). Quick-code modal. User assign flow (pick users → assign promo). Recovery promotions tab.
+**Key features:** Six promotion types with conditional field visibility. `driverPayoutAmount` for delivery-fee promos. `creatorType` (PLATFORM/BUSINESS). Quick-code modal. User assign flow (pick users → assign promo). Recovery promotions tab. Promotions list status shows global usage progress (`used/limit` + `remaining`) and marks exhausted promos as `Limit reached`.
 
 ### `/dashboard/statistics` — Statistics
 

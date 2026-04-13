@@ -25,7 +25,7 @@ export const FloatingBars = () => {
     const shouldHide = hiddenRoutes.some((route) => pathname.startsWith(route)) || pathname === '/';
 
     // Check if we're on a tab route
-    const tabRoutes = ['/market', '/home', '/profile', '/restaurants', '/analytics'];
+    const tabRoutes = ['/market', '/home', '/profile', '/restaurants'];
     const isOnTabRoute = tabRoutes.some((route) => pathname === route || pathname.startsWith(route));
 
     const bottomPosition = Platform.OS === 'ios'

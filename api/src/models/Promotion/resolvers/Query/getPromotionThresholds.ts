@@ -11,7 +11,7 @@ export const getPromotionThresholds: NonNullable<QueryResolvers['getPromotionThr
   const now = new Date().toISOString();
   const db = await getDB();
 
-  // Find active promotions with spend thresholds (CONDITIONAL or ALL_USERS)
+  // Find active promotions with spend thresholds (any target/type)
   const promos = await db
     .select()
     .from(promotions)
@@ -19,12 +19,12 @@ export const getPromotionThresholds: NonNullable<QueryResolvers['getPromotionThr
       and(
         eq(promotions.isActive, true),
         eq(promotions.isDeleted, false),
-        or(
-          eq(promotions.target, 'CONDITIONAL'),
-          eq(promotions.target, 'ALL_USERS')
-        ),
         or(isNull(promotions.startsAt), lte(promotions.startsAt, now)),
         or(isNull(promotions.endsAt), gte(promotions.endsAt, now)),
+        or(
+          isNull(promotions.maxGlobalUsage),
+          promotions.currentGlobalUsage.lt(promotions.maxGlobalUsage)
+        ),
         // only those with a spendThreshold
         isNotNull(promotions.spendThreshold)
       )

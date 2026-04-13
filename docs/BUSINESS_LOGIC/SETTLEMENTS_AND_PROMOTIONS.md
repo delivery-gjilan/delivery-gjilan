@@ -258,6 +258,13 @@ Links orders to applied promotions:
 - **Auto promos**: promotions without `code` are evaluated automatically when the user/cart/order context is eligible.
 - **Recovery promos**: compensation/recovery promotions are code-less `SPECIFIC_USERS` promos with single-use behavior (`maxUsagePerUser = 1`) and auto-apply for assigned users.
 
+### Discount amount semantics
+
+- `promotions.discount_value` stores the configured promo value.
+- `order_promotions.discount_amount` and `promotion_usage.discount_amount` store the actual applied amount for that order.
+- For fixed promos, applied amount is capped by order subtotal (`min(discountValue, subtotal)`), so a configured `€3.00` promo can apply as `€2.98` when the eligible subtotal is `€2.98`.
+- Admin order-level promotion rows therefore can show a lower number than the configured promotion value when subtotal or other constraints limit the applied discount.
+
 ### Promotion eligibility capabilities (current)
 
 - **Global eligibility**: supported. Leave `promotion_business_eligibility` empty to make a promotion valid across businesses.
@@ -276,6 +283,7 @@ Links orders to applied promotions:
 - Persistent audience groups allow reusable cohorts and membership updates without recreating promotions.
 - Business promo badges (`Business.activePromotion`) and global promo banners (`getActiveGlobalPromotions`) show code-less auto promotions.
 - Business promo chips (`Business.activePromotionsDisplay`) render top active auto promotions on the business page.
+- Promotions that reach `maxGlobalUsage` are hidden from customer-facing eligibility feeds and remain stored for analytics/history (not hard-deleted).
 
 ### Persistent audience groups (current)
 
@@ -561,7 +569,7 @@ The mobile-customer cart screen (`modules/cart/components/CartScreen.tsx`) imple
 ### Progression Bar
 
 1. **Query**: `GET_PROMOTION_THRESHOLDS` is executed with the current cart context (items, subtotal, deliveryPrice, businessIds)
-2. **API response**: Returns `PromotionThreshold[]` — active promotions with a `spendThreshold` (target = `CONDITIONAL` or `ALL_USERS` with threshold)
+2. **API response**: Returns `PromotionThreshold[]` — active promotions with a `spendThreshold` across targets/types
 3. **Filtering**: Frontend filters thresholds by business eligibility — if `eligibleBusinessIds` is empty, the promo is global
 4. **Selection**: Picks the highest-priority matching threshold
 5. **Progress calculation**:

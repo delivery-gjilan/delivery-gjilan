@@ -23,6 +23,8 @@ type BusinessPromoRow = {
     creatorType: any;
     discountValue: number | null;
     spendThreshold: number | null;
+    maxGlobalUsage: number | null;
+    currentGlobalUsage: number;
     priority: number;
     target: any;
     maxUsagePerUser: number | null;
@@ -45,6 +47,8 @@ async function getVisibleBusinessPromotions(
             creatorType: promotions.creatorType,
             discountValue: promotions.discountValue,
             spendThreshold: promotions.spendThreshold,
+            maxGlobalUsage: promotions.maxGlobalUsage,
+            currentGlobalUsage: promotions.currentGlobalUsage,
             priority: promotions.priority,
             target: promotions.target,
             maxUsagePerUser: promotions.maxUsagePerUser,
@@ -61,6 +65,10 @@ async function getVisibleBusinessPromotions(
                 or(
                     sql`EXISTS (SELECT 1 FROM promotion_business_eligibility WHERE promotion_id = ${promotions.id} AND business_id = ${businessId})`,
                     sql`NOT EXISTS (SELECT 1 FROM promotion_business_eligibility WHERE promotion_id = ${promotions.id})`,
+                ),
+                or(
+                    isNull(promotions.maxGlobalUsage),
+                    sql`${promotions.currentGlobalUsage} < ${promotions.maxGlobalUsage}`,
                 ),
             ),
         )

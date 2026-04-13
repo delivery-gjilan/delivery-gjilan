@@ -477,7 +477,7 @@ export const CartScreen = () => {
                             '{{amount}}',
                             formatCurrency(Number(selectedEligiblePromotion.spendThreshold)),
                         )
-                        : t.cart.auto_apply_reason_best_match;
+                        : t.cart.auto_apply_reason_default;
 
                 if (!mounted) return;
 
@@ -492,7 +492,7 @@ export const CartScreen = () => {
                     orderDiscountAmount,
                     deliveryDiscountAmount,
                     autoApplyReason,
-                    selectionReason: t.cart.auto_apply_best_savings,
+                    selectionReason: null,
                     discountAmount: totalDiscountAmount,
                     freeDeliveryApplied: result.freeDeliveryApplied ?? false,
                     effectiveDeliveryPrice,
@@ -807,7 +807,6 @@ export const CartScreen = () => {
 
             const result = (response?.data as any)?.validatePromotions;
             if (!result || (Array.isArray(result.promotions) && result.promotions.length === 0)) {
-                setPromoResult(null);
                 setPromoError(t.cart.promo_not_valid);
                 return;
             }

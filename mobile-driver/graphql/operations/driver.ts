@@ -122,6 +122,19 @@ export const GET_MY_SETTLEMENT_REQUESTS = gql`
     }
 `;
 
+export const GET_DRIVER_ORDER_FINANCIALS = gql`
+    query GetDriverOrderFinancials($orderId: ID!) {
+        driverOrderFinancials(orderId: $orderId) {
+            orderId
+            paymentCollection
+            amountToCollectFromCustomer
+            amountToRemitToPlatform
+            driverNetEarnings
+            driverTip
+        }
+    }
+`;
+
 export const RESPOND_TO_SETTLEMENT_REQUEST = gql`
     mutation RespondToSettlementRequest(
         $requestId: ID!

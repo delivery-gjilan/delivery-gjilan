@@ -593,6 +593,7 @@ export class PromotionEngine {
                         currentGlobalUsage: sql`${promotions.currentGlobalUsage} + 1`,
                         totalUsageCount: sql`${promotions.totalUsageCount} + 1`,
                         totalRevenue: sql`${promotions.totalRevenue} + ${orderSubtotal}`,
+                        isActive: sql`CASE WHEN ${promotions.maxGlobalUsage} IS NOT NULL AND (${promotions.currentGlobalUsage} + 1) >= ${promotions.maxGlobalUsage} THEN false ELSE ${promotions.isActive} END`,
                     })
                     .where(eq(promotions.id, promoId));
 

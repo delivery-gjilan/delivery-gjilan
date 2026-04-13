@@ -39,12 +39,11 @@ mobile-customer/
 │   ├── add-address.tsx       # Add/edit address (map + form)
 │   ├── edit-address.tsx      # Alias for add-address
 │   ├── (tabs)/               # Main tab navigator
-│   │   ├── _layout.tsx       # 4 visible tabs + 1 hidden
+│   │   ├── _layout.tsx       # 4 visible tabs
 │   │   ├── home.tsx          # Discover tab (banners, featured, categories)
 │   │   ├── restaurants.tsx   # Restaurant listing (filters, pagination)
 │   │   ├── market.tsx        # Shops/market tab (category → shop → products)
 │   │   ├── profile.tsx       # User profile (cache-only reads)
-│   │   └── analytics.tsx     # Hidden tab (admin internal)
 │   ├── business/[businessId] # Business detail + menu
 │   ├── product/[productId]   # Product detail + options + add-to-cart
 │   ├── order/[orderId]       # Deep-link alias → /orders/:id
@@ -113,8 +112,6 @@ index.tsx (Expo entry)
 | 2 | Restaurants | restaurant | `restaurants.tsx` | Status filters (all/open/promo), category filters, FlatList with mixed item types (cards, featured, promo banners), pagination. |
 | 3 | Shops | basket | `market.tsx` | State machine: DISCOVER → SHOP → SUBCATEGORY → PRODUCTS. 2x2 category grid, Wolt-style tabs, hero header with collapse. |
 | 4 | Profile | person | `profile.tsx` | Cache-only reads. Menu sections: personal info, preferences (language, notifications), settings (theme), account (slide-to-delete). |
-| — | Analytics | — | `analytics.tsx` | Hidden (`href: null`). Internal dashboard route. |
-
 Tab bar uses animated underline markers with spring physics (damping: 14, stiffness: 220).
 
 ---
@@ -315,14 +312,15 @@ Step 1: Cart Items          Step 2: Address           Step 3: Review & Confirm
 **Apply behavior (current):**
 - `CartScreen` auto-applies the highest-priority eligible promotion when no manual promo is active.
 - Manual code entry remains available even when an eligible auto-promo is active, so users can override with a code.
+- Invalid manual promo attempts show validation feedback and do not clear an already-applied promotion state.
 - Auto-applied promotions can be code-less; UI uses a safe display fallback and does not assume `Promotion.code` is always present.
-- Auto-applied state now includes an inline explanation card in checkout (for example best-savings selection and threshold unlock context) while still allowing manual code override.
+- Auto-applied state includes a neutral inline explanation in checkout while still allowing manual code override.
 
 **Applied promo UI (current):**
 - Applied promo display is lightweight and row-based.
 - Each applied promotion is rendered as one row containing coupon identity/code, promo summary, and applied amount.
 - If multiple promos are active (for example order discount + free delivery), rows are stacked one-per-promotion.
-- Auto-applied promo rows include translatable best-savings and reason labels to reduce confusion around why a promo was selected.
+- Auto-applied promo rows keep neutral explanatory copy and avoid best-savings style marketing labels.
 
 **Global promo visibility (current):**
 - Home tab includes a personalized `Your coupons` horizontal strip populated from `getUserPromotions` for the authenticated user.

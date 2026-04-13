@@ -127,7 +127,21 @@
         "you_receive": "You receive",
         "markup": "Markup",
         "priority": "Priority Fee",
-        "delivery_fee": "Delivery Fee"
+        "delivery_fee": "Delivery Fee",
+        "order_detail": "Order Detail",
+        "financial_breakdown": "Financial Breakdown",
+        "payment_method": "Payment",
+        "cash_payment": "Cash",
+        "prepaid_payment": "Prepaid",
+        "collect_from_customer": "Collect from customer",
+        "remit_to_platform": "Remit to platform",
+        "your_earnings": "Your earnings",
+        "tip_included": "Tip included",
+        "tip_label": "Tip",
+        "catalog_label": "Catalog",
+        "explain_tip": "Tips from customers — forwarded to you by the platform",
+        "explain_catalog": "Revenue from catalog products that you collected in cash",
+        "reject_submit": "Submit"
     },
     "messages": {
         "type_message": "Message",

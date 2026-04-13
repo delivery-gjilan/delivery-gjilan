@@ -7,13 +7,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
-import { useQuery, useMutation } from '@apollo/client/react';
+import { useQuery, useMutation, useLazyQuery } from '@apollo/client/react';
 import {
     GET_MY_SETTLEMENTS,
     GET_DRIVER_CASH_SUMMARY,
     GET_SETTLEMENT_BREAKDOWN,
     GET_MY_SETTLEMENT_REQUESTS,
     RESPOND_TO_SETTLEMENT_REQUEST,
+    GET_DRIVER_ORDER_FINANCIALS,
 } from '@/graphql/operations/driver';
 import { format, startOfDay, startOfMonth, startOfWeek, subMonths } from 'date-fns';
 
@@ -65,6 +66,7 @@ export default function EarningsScreen() {
     const [disputeModalRequestId, setDisputeModalRequestId] = useState<string | null>(null);
     const [rejectReason, setRejectReason] = useState('');
     const [respondingId, setRespondingId] = useState<string | null>(null);
+    const [selectedSettlement, setSelectedSettlement] = useState<any>(null);
 
     const PERIODS: { key: Period; label: string }[] = [
         { key: 'today', label: t.earnings.period_today },
@@ -98,6 +100,11 @@ export default function EarningsScreen() {
     );
 
     const [respondToRequest] = useMutation(RESPOND_TO_SETTLEMENT_REQUEST);
+
+    const [fetchFinancials, { data: financialsData, loading: financialsLoading }] = useLazyQuery(
+        GET_DRIVER_ORDER_FINANCIALS,
+        { fetchPolicy: 'network-only' },
+    );
 
     const cash = (cashData as any)?.driverCashSummary;
     const breakdownItems: any[] = (breakdownData as any)?.settlementBreakdown ?? [];
@@ -595,7 +602,13 @@ export default function EarningsScreen() {
                                 const amountColor = isPayable ? theme.colors.income : tag.color;
 
                                 return (
-                                    <View key={s.id} style={[es.historyCard, {
+                                    <Pressable
+                                        key={s.id}
+                                        onPress={() => {
+                                            setSelectedSettlement(s);
+                                            if (s.order?.id) fetchFinancials({ variables: { orderId: s.order.id } });
+                                        }}
+                                        style={[es.historyCard, {
                                         backgroundColor: theme.colors.card,
                                         borderColor: isPaid ? theme.colors.income + "25" : theme.colors.border,
                                     }]}>
@@ -649,13 +662,166 @@ export default function EarningsScreen() {
                                                 </Text>
                                             </View>
                                         </View>
-                                    </View>
+                                    </Pressable>
                                 );
                             })}
                         </View>
                     )}
                 </View>
             </ScrollView>
+
+            {/* ── Order Detail Modal ── */}
+            <Modal
+                visible={selectedSettlement !== null}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setSelectedSettlement(null)}
+            >
+                <Pressable style={es.modalBackdrop} onPress={() => setSelectedSettlement(null)} />
+                <View style={[es.modalSheet, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+                    {selectedSettlement && (() => {
+                        const s = selectedSettlement;
+                        const fin = (financialsData as any)?.driverOrderFinancials;
+                        const businessNames = s.order?.businesses?.map((b: any) => b.business?.name).filter(Boolean).join(", ") ?? "—";
+                        const tag = getSettlementTag(s);
+                        const isPayable = s.direction === "PAYABLE";
+                        const amountColor = isPayable ? theme.colors.income : tag.color;
+
+                        return (
+                            <>
+                                {/* Header */}
+                                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                                    <Text style={[es.modalTitle, { color: theme.colors.text }]}>
+                                        {(t.earnings as any).order_detail ?? "Order Detail"}
+                                    </Text>
+                                    <Pressable onPress={() => setSelectedSettlement(null)}>
+                                        <Ionicons name="close-circle" size={28} color={theme.colors.subtext} />
+                                    </Pressable>
+                                </View>
+
+                                {/* Settlement info */}
+                                <View style={[es.detailSection, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                                    <View style={es.detailRow}>
+                                        <View style={[es.historyTag, { backgroundColor: tag.color + "18" }]}>
+                                            <View style={[es.historyTagDot, { backgroundColor: tag.color }]} />
+                                            <Text style={[es.historyTagText, { color: tag.color }]}>{tag.label}</Text>
+                                        </View>
+                                        <Text style={[es.historyAmount, { color: amountColor }]}>
+                                            {isPayable ? "+" : "-"}{formatCurrency(Number(s.amount ?? 0))}
+                                        </Text>
+                                    </View>
+                                    <View style={es.detailRow}>
+                                        <Ionicons name="storefront-outline" size={14} color={theme.colors.subtext} />
+                                        <Text style={[es.detailValue, { color: theme.colors.text, flex: 1 }]} numberOfLines={1}>
+                                            {businessNames}
+                                        </Text>
+                                    </View>
+                                    {s.order?.dropOffLocation?.address && (
+                                        <View style={es.detailRow}>
+                                            <Ionicons name="location-outline" size={14} color={theme.colors.subtext} />
+                                            <Text style={[es.detailValue, { color: theme.colors.subtext, flex: 1 }]} numberOfLines={1}>
+                                                {s.order.dropOffLocation.address}
+                                            </Text>
+                                        </View>
+                                    )}
+                                    <View style={es.detailRow}>
+                                        <Ionicons name="time-outline" size={14} color={theme.colors.subtext} />
+                                        <Text style={[es.detailValue, { color: theme.colors.subtext }]}>
+                                            {formatDateTime(s.createdAt)}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                {/* Per-order financials */}
+                                {financialsLoading ? (
+                                    <ActivityIndicator color={theme.colors.primary} style={{ marginVertical: 12 }} />
+                                ) : fin ? (
+                                    <View style={[es.detailSection, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                                        <Text style={[es.detailSectionTitle, { color: theme.colors.text }]}>
+                                            {(t.earnings as any).financial_breakdown ?? "Financial Breakdown"}
+                                        </Text>
+
+                                        <View style={es.detailRow}>
+                                            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                                                <Ionicons name="card-outline" size={14} color={theme.colors.subtext} />
+                                                <Text style={[es.detailLabel, { color: theme.colors.subtext }]}>
+                                                    {(t.earnings as any).payment_method ?? "Payment"}
+                                                </Text>
+                                            </View>
+                                            <View style={[es.methodBadge, {
+                                                backgroundColor: fin.paymentCollection === "CASH" ? "#f59e0b18" : "#3b82f618",
+                                            }]}>
+                                                <Ionicons
+                                                    name={fin.paymentCollection === "CASH" ? "cash-outline" : "card-outline"}
+                                                    size={12}
+                                                    color={fin.paymentCollection === "CASH" ? "#f59e0b" : "#3b82f6"}
+                                                />
+                                                <Text style={[es.methodBadgeText, {
+                                                    color: fin.paymentCollection === "CASH" ? "#f59e0b" : "#3b82f6",
+                                                }]}>
+                                                    {fin.paymentCollection === "CASH"
+                                                        ? ((t.earnings as any).cash_payment ?? "Cash")
+                                                        : ((t.earnings as any).prepaid_payment ?? "Prepaid")}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        <View style={[es.detailDivider, { backgroundColor: theme.colors.border }]} />
+
+                                        {fin.amountToCollectFromCustomer > 0 && (
+                                            <View style={es.detailRow}>
+                                                <Text style={[es.detailLabel, { color: theme.colors.subtext }]}>
+                                                    {(t.earnings as any).collect_from_customer ?? "Collect from customer"}
+                                                </Text>
+                                                <Text style={[es.detailValue, { color: "#3b82f6", fontWeight: "700" }]}>
+                                                    {formatCurrency(fin.amountToCollectFromCustomer)}
+                                                </Text>
+                                            </View>
+                                        )}
+
+                                        {fin.amountToRemitToPlatform > 0 && (
+                                            <View style={es.detailRow}>
+                                                <Text style={[es.detailLabel, { color: theme.colors.subtext }]}>
+                                                    {(t.earnings as any).remit_to_platform ?? "Remit to platform"}
+                                                </Text>
+                                                <Text style={[es.detailValue, { color: "#ef4444", fontWeight: "700" }]}>
+                                                    -{formatCurrency(fin.amountToRemitToPlatform)}
+                                                </Text>
+                                            </View>
+                                        )}
+
+                                        <View style={es.detailRow}>
+                                            <Text style={[es.detailLabel, { color: theme.colors.text, fontWeight: "600" }]}>
+                                                {(t.earnings as any).your_earnings ?? "Your earnings"}
+                                            </Text>
+                                            <Text style={[es.detailValue, { color: theme.colors.income, fontWeight: "800", fontSize: 16 }]}>
+                                                {formatCurrency(fin.driverNetEarnings)}
+                                            </Text>
+                                        </View>
+
+                                        {fin.driverTip > 0 && (
+                                            <>
+                                                <View style={[es.detailDivider, { backgroundColor: theme.colors.border }]} />
+                                                <View style={es.detailRow}>
+                                                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                                                        <Ionicons name="heart" size={12} color="#22c55e" />
+                                                        <Text style={[es.detailLabel, { color: "#22c55e" }]}>
+                                                            {(t.earnings as any).tip_included ?? "Tip included"}
+                                                        </Text>
+                                                    </View>
+                                                    <Text style={[es.detailValue, { color: "#22c55e", fontWeight: "700" }]}>
+                                                        +{formatCurrency(fin.driverTip)}
+                                                    </Text>
+                                                </View>
+                                            </>
+                                        )}
+                                    </View>
+                                ) : null}
+                            </>
+                        );
+                    })()}
+                </View>
+            </Modal>
 
             {/* ── Dispute Modal ── */}
             <Modal
@@ -848,4 +1014,23 @@ const es = StyleSheet.create({
     modalCancelText: { fontSize: 14, fontWeight: "600" },
     modalSubmitBtn: { flex: 2, borderRadius: 12, paddingVertical: 14, alignItems: "center", backgroundColor: "#ef4444" },
     modalSubmitText: { fontSize: 14, fontWeight: "700", color: "#fff" },
+
+    /* detail modal */
+    detailSection: {
+        borderRadius: 14, padding: 14, borderWidth: 1, gap: 10,
+    },
+    detailSectionTitle: {
+        fontSize: 11, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase", marginBottom: 2,
+    },
+    detailRow: {
+        flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8,
+    },
+    detailLabel: { fontSize: 13 },
+    detailValue: { fontSize: 13, fontWeight: "500" },
+    detailDivider: { height: 1, marginVertical: 2 },
+    methodBadge: {
+        flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 8,
+        paddingHorizontal: 8, paddingVertical: 3,
+    },
+    methodBadgeText: { fontSize: 11, fontWeight: "700" },
 });

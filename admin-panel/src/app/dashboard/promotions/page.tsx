@@ -610,7 +610,10 @@ export default function PromotionsPage() {
         handleCloseModal();
     };
 
-    const getStatusBadge = (isActive: boolean) => {
+    const getStatusBadge = (isActive: boolean, isExhausted: boolean) => {
+        if (isExhausted) {
+            return "bg-rose-500/10 text-rose-400 border-rose-500/30";
+        }
         return isActive
             ? "bg-green-500/10 text-green-400 border-green-500/30"
             : "bg-neutral-500/10 text-zinc-500 border-neutral-500/30";
@@ -773,7 +776,16 @@ export default function PromotionsPage() {
                                     </Td>
                                 </tr>
                             ) : (
-                                filteredPromotions.map((promotion) => (
+                                filteredPromotions.map((promotion) => {
+                                    const maxGlobalUsage = promotion.maxGlobalUsage ?? null;
+                                    const currentGlobalUsage = promotion.currentGlobalUsage ?? 0;
+                                    const hasGlobalLimit = typeof maxGlobalUsage === "number" && maxGlobalUsage > 0;
+                                    const remainingGlobalUsage = hasGlobalLimit
+                                        ? Math.max(0, maxGlobalUsage - currentGlobalUsage)
+                                        : null;
+                                    const isExhausted = hasGlobalLimit && remainingGlobalUsage === 0;
+
+                                    return (
                                     <tr key={promotion.id}>
                                         <Td>
                                             <div className="text-white font-semibold">{promotion.name}</div>
@@ -854,10 +866,21 @@ export default function PromotionsPage() {
                                             <span
                                                 className={`inline-flex px-3 py-1 rounded-full text-xs font-medium border ${getStatusBadge(
                                                     promotion.isActive,
+                                                    isExhausted,
                                                 )}`}
                                             >
-                                                {promotion.isActive ? "Active" : "Inactive"}
+                                                {isExhausted ? "Limit reached" : promotion.isActive ? "Active" : "Inactive"}
                                             </span>
+                                            {hasGlobalLimit && (
+                                                <div className="mt-1 space-y-0.5">
+                                                    <div className="text-[11px] text-zinc-500">
+                                                        Used {currentGlobalUsage}/{maxGlobalUsage}
+                                                    </div>
+                                                    <div className={`text-[11px] ${remainingGlobalUsage === 0 ? "text-rose-400" : "text-zinc-400"}`}>
+                                                        Remaining {remainingGlobalUsage}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </Td>
                                         <Td>
                                             <div className="flex gap-2">
@@ -870,7 +893,7 @@ export default function PromotionsPage() {
                                             </div>
                                         </Td>
                                     </tr>
-                                ))
+                                );})
                             )}
                         </tbody>
                     </Table>

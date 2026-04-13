@@ -272,6 +272,19 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                 parts.push(t.business.promo_badge_auto_apply);
             }
 
+            if (typeof promotion.maxUsagePerUser === 'number' && promotion.maxUsagePerUser > 0) {
+                if (promotion.maxUsagePerUser === 1) {
+                    parts.push(t.business.promo_chip_one_time_only);
+                } else {
+                    parts.push(
+                        t.business.promo_chip_usage_per_user.replace(
+                            '{{count}}',
+                            String(promotion.maxUsagePerUser),
+                        ),
+                    );
+                }
+            }
+
             return parts.join(' • ');
         },
         [t],
@@ -305,6 +318,19 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                 );
             }
 
+            if (
+                typeof promotion.discountValue === 'number' &&
+                promotion.discountValue > 0 &&
+                (promotion.type === 'FIXED_AMOUNT' || promotion.type === 'SPEND_X_FIXED')
+            ) {
+                chips.push(
+                    t.business.promo_chip_max_discount.replace(
+                        '{{amount}}',
+                        `€${Number(promotion.discountValue).toFixed(2)}`,
+                    ),
+                );
+            }
+
             if (typeof promotion.maxUsagePerUser === 'number' && promotion.maxUsagePerUser > 0) {
                 if (promotion.maxUsagePerUser === 1) {
                     chips.push(t.business.promo_chip_one_time_only);
@@ -316,6 +342,15 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                         ),
                     );
                 }
+            }
+
+            if (typeof promotion.maxGlobalUsage === 'number' && promotion.maxGlobalUsage > 0) {
+                chips.push(
+                    t.business.promo_chip_global_limit.replace(
+                        '{{count}}',
+                        String(promotion.maxGlobalUsage),
+                    ),
+                );
             }
 
             if (promotion.endsAt) {
@@ -330,7 +365,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                 }
             }
 
-            return chips.slice(0, 4);
+            return chips.slice(0, 6);
         },
         [t],
     );

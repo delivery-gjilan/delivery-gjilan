@@ -64,7 +64,6 @@ export function PromoCodeSection({
     ].filter((item): item is { code: string; summary: string; amount: string } => Boolean(item));
     const isAutoAppliedPromo = promoResult?.source === 'eligible';
     const autoApplyReason = promoResult?.autoApplyReason?.trim() || t.cart.auto_apply_reason_default;
-    const selectionReason = promoResult?.selectionReason?.trim() || t.cart.auto_apply_best_savings;
 
     const inner = (
         <>
@@ -130,7 +129,6 @@ export function PromoCodeSection({
                     {isAutoAppliedPromo && (
                         <>
                             <View style={[styles.autoExplainCard, { backgroundColor: theme.colors.primary + '10', borderColor: theme.colors.primary + '33' }]}>
-                                <Text style={[styles.autoExplainTitle, { color: theme.colors.primary }]}>{selectionReason}</Text>
                                 <Text style={[styles.autoExplainBody, { color: theme.colors.subtext }]}>{autoApplyReason}</Text>
                             </View>
 
@@ -267,7 +265,6 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
         marginBottom: 2,
     },
-    autoExplainTitle: { fontSize: 11, fontWeight: '700', marginBottom: 2 },
     autoExplainBody: { fontSize: 11, lineHeight: 15 },
 
     inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },

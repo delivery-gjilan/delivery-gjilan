@@ -127,7 +127,21 @@
         "you_receive": "Ju merrni",
         "markup": "Marzhi",
         "priority": "Tarifa e Prioritetit",
-        "delivery_fee": "Tarifa e Dërgesës"
+        "delivery_fee": "Tarifa e Dërgesës",
+        "order_detail": "Detajet e Porosisë",
+        "financial_breakdown": "Përmbledhje Financiare",
+        "payment_method": "Pagesa",
+        "cash_payment": "Cash",
+        "prepaid_payment": "E parapaguar",
+        "collect_from_customer": "Mbledh nga klienti",
+        "remit_to_platform": "Dërgo në platformë",
+        "your_earnings": "Fitimet tuaja",
+        "tip_included": "Bakshishi i përfshirë",
+        "tip_label": "Bakshish",
+        "catalog_label": "Katalog",
+        "explain_tip": "Bakshishet nga klientët — ju përcillen nga platforma",
+        "explain_catalog": "Të ardhura nga produktet e katalogut që i keni mbledhur me cash",
+        "reject_submit": "Dërgo"
     },
     "messages": {
         "type_message": "Mesazh",
