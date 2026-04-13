@@ -719,6 +719,113 @@ Shared mapping utilities used by both `drive.tsx` and `navigation.tsx`:
 
 ---
 
+## Profile Screen (`app/(tabs)/profile.tsx`)
+
+Displays driver identity, app links, language preference, account management, and logout.
+
+**Sections:**
+1. **Avatar** — Dynamic color from hash of user ID, renders initials (e.g., "AB" from "Alice Bob"), 84×84 circle
+2. **Name + Email** — Below avatar
+3. **Links** — Contact Support (mailto:), Privacy Policy, Terms of Service (external URLs via `Linking.openURL`)
+4. **Language toggle** — EN (🇬🇧) / AL (🇦🇱) buttons. Calls `SetMyPreferredLanguage` mutation + updates `useLocaleStore`
+5. **Danger zone** — "Delete Account" row → confirmation Alert → `DeleteMyAccount` mutation → auto-logout → redirect to `/login`
+6. **Logout button** — Calls `useAuth().logout()` (clears tokens + store)
+
+---
+
+## Tab Auto-Navigation (`app/(tabs)/_layout.tsx`)
+
+On tab layout mount, a `useEffect` checks `navigationStore` to auto-restore session state:
+- If `isNavigating && !isNavigationMinimized` → `router.replace('/navigation')` (return to full-screen nav)
+- Otherwise → `router.replace('/(tabs)/drive')` (default to map)
+
+This ensures drivers who were navigating when the app was killed or backgrounded are restored to the navigation screen automatically.
+
+---
+
+## Navigation Success Animation
+
+After delivery confirmation in `navigation.tsx`, a cinematic success sequence plays:
+
+1. Map dims with animated opacity overlay
+2. Success card slides up from bottom (spring animation, scale 0.72 → 1.0)
+3. **60 confetti particles** with individual animation parameters:
+   - Random X offset (±260px), velocity (180–660px), rotation (±450°)
+   - 9 rotating colors, random aspect ratio (rectangle vs square)
+4. Auto-dismisses after **3 seconds** → navigates back to `/(tabs)/drive`
+
+---
+
+## Components Detail
+
+### DriverMessageBanner
+
+Animated overlay at top of screen for incoming admin chat alerts.
+- **Color coding:** INFO (blue), WARNING (amber), URGENT (red)
+- Animates in from top with spring + fade (200ms)
+- Auto-dismisses after 10 seconds
+- **Tap** → navigates to `/(tabs)/messages`
+- **Double-tap** → calls `MarkDriverMessagesRead` mutation, then dismisses
+- Left accent bar + icon badge + label pill + dismiss button
+
+### OrderDetailSheet
+
+Bottom-sheet order detail popup. Animated slide-up (spring, -300 offset), swipe-up to dismiss (>60px or vy < -0.4).
+
+**Sections:**
+- Status pill, order number, close button
+- Business avatar + name + customer name
+- Earnings badge (green) — delivery fee + tip
+- Prep countdown chip — "Almost ready" / "Food ready in ~X min" when PREPARING
+- Address row (pickup for READY/PREPARING; dropoff for OUT_FOR_DELIVERY)
+- ETA chips (distance km, ~X min to pickup/dropoff)
+- Collapsible items list (up to 10, "+X more" if >10)
+- CTA buttons: "Picked Up" (blue, when READY) + "Navigate" (purple)
+
+### OrderPoolFAB
+
+52×52 floating action button showing available order count. Returns `null` when count is 0. Badge shows "9+" for counts > 9. Position: absolute, bottom-right area.
+
+---
+
+## Home Screen (`app/(tabs)/home.tsx`)
+
+The home screen presents driver operational status and real-time metrics.
+
+**Data Layer:**
+- `GET_MY_DRIVER_METRICS` (30s poll interval) — active orders, delivered today, gross/net earnings, commission %
+- `useStoreStatus()` — dispatch mode, store open/closed, banner
+
+**UI Sections:**
+1. **Online/Offline toggle** — Prominent switch with optimistic update
+2. **Connection status pill** — Green (connected), amber (stale), red (lost)
+3. **Earnings hero card** — Gross vs net breakdown (commission-aware), avg delivery earnings, pull-to-refresh
+4. **Active orders capacity bar** — Color shifts: green (normal), amber (≥75%), red (100% / at `maxActiveOrders`)
+5. **Dispatch mode notice** — Amber pill: "Admin is dispatching orders — wait for assignment" (when `dispatchModeEnabled`)
+
+---
+
+## Earnings Screen (`app/(tabs)/earnings.tsx`)
+
+Settlement history display with multi-query architecture.
+
+**Period selector:** Today / This Week / This Month / Last Month / All Time (dates computed client-side via `date-fns`)
+
+**Queries (all `fetchPolicy: 'network-only'`):**
+- `GET_DRIVER_CASH_SUMMARY(startDate, endDate)` → cash totals panel
+- `GET_SETTLEMENT_BREAKDOWN(isSettled, startDate, endDate)` → settled vs unsettled breakdown
+- `GET_MY_SETTLEMENTS(startDate, endDate, limit: 50)` → itemized settlement list
+- `GET_MY_SETTLEMENT_REQUESTS(status: 'PENDING', limit: 20)` → pending settlement requests
+
+**Settlement request flow:**
+- Driver can accept or dispute settlement requests
+- Dispute modal with reason text input
+- `RESPOND_TO_SETTLEMENT_REQUEST` mutation (accept/reject with optional reason)
+
+**No subscriptions** — pull-to-refresh triggers `Promise.all()` across all queries.
+
+---
+
 ## Known Issues and Refactor Candidates
 
 These are documented for pre-refactor awareness. All are non-breaking as-is.
@@ -744,10 +851,6 @@ These are documented for pre-refactor awareness. All are non-breaking as-is.
 The 8 navigation hooks listed in the Hooks Inventory as "Unused" represent a significant amount of prepared work for a custom navigation view. They are well-written and have good test-surface. During refactoring:
 - If staying on `@badatgil/expo-mapbox-navigation`: delete or clearly mark these as pending
 - If migrating to custom `@rnmapbox/maps` navigation: wire these hooks into the new navigation screen
-
-### `GET_MY_DRIVER_METRICS` Query Unused in UI
-
-`driver.ts` exports `GET_MY_DRIVER_METRICS` (active orders, delivered today count, gross/net earnings, commission %) but there is no screen currently consuming it. The Earnings screen uses settlements instead.
 
 ---
 

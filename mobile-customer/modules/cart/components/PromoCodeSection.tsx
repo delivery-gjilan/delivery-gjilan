@@ -11,8 +11,11 @@ interface PromoCodeSectionProps {
     flat?: boolean;
     promoResult: {
         code: string;
+        promotionSummary?: string | null;
+        deliveryPromotionSummary?: string | null;
         discountAmount: number;
         freeDeliveryApplied: boolean;
+        source?: 'eligible' | 'manual';
     } | null;
     promoError: string | null;
     loading: boolean;
@@ -32,6 +35,12 @@ export function PromoCodeSection({
 }: PromoCodeSectionProps) {
     const theme = useTheme();
     const { t } = useTranslations();
+    const promoCodeLabel = (promoResult?.code || t.cart.promo_applied_title).toUpperCase();
+    const promoKindsLabel = [promoResult?.promotionSummary, promoResult?.deliveryPromotionSummary]
+        .filter((value): value is string => Boolean(value))
+        .filter((value, index, arr) => arr.indexOf(value) === index)
+        .join(' + ');
+    const isAutoAppliedPromo = promoResult?.source === 'eligible';
 
     const inner = (
         <>
@@ -62,26 +71,63 @@ export function PromoCodeSection({
 
             {promoResult ? (
                 /* Applied state */
-                <View style={[styles.appliedRow, { backgroundColor: theme.colors.income + '12', borderColor: theme.colors.income + '35' }]}>
-                    <View style={styles.appliedInfo}>
-                        <View style={[styles.codePill, { backgroundColor: theme.colors.income + '25' }]}>
-                            <Text style={[styles.codeText, { color: theme.colors.income }]}>
-                                {promoResult.code.toUpperCase()}
+                <>
+                    <View style={[styles.appliedRow, { backgroundColor: theme.colors.income + '12', borderColor: theme.colors.income + '35' }]}>
+                        <View style={styles.appliedInfo}>
+                            <View style={[styles.codePill, { backgroundColor: theme.colors.income + '25' }]}>
+                                <Text style={[styles.codeText, { color: theme.colors.income }]}>
+                                    {promoCodeLabel}
+                                </Text>
+                            </View>
+                            {promoKindsLabel ? (
+                                <Text style={[styles.promoKindsText, { color: theme.colors.income }]} numberOfLines={2}>
+                                    {promoKindsLabel}
+                                </Text>
+                            ) : null}
+                            <Text style={[styles.savings, { color: theme.colors.income }]}>
+                                {promoResult.freeDeliveryApplied && promoResult.discountAmount === 0
+                                    ? t.cart.free_delivery
+                                    : `-${formatCurrency(promoResult.discountAmount)}`}
                             </Text>
                         </View>
-                        <Text style={[styles.savings, { color: theme.colors.income }]}>
-                            {promoResult.freeDeliveryApplied && promoResult.discountAmount === 0
-                                ? t.cart.free_delivery
-                                : `-${formatCurrency(promoResult.discountAmount)}`}
-                        </Text>
+                        <TouchableOpacity
+                            onPress={() => onChangeCoupon('')}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                            <Ionicons name="close-circle" size={16} color={theme.colors.subtext} />
+                        </TouchableOpacity>
                     </View>
-                    <TouchableOpacity
-                        onPress={() => onChangeCoupon('')}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                        <Ionicons name="close-circle" size={16} color={theme.colors.subtext} />
-                    </TouchableOpacity>
-                </View>
+                    {isAutoAppliedPromo && (
+                        <View style={[styles.inputRow, { marginTop: 10 }]}>
+                            <TextInput
+                                value={couponCode}
+                                onChangeText={onChangeCoupon}
+                                placeholder={t.cart.enter_code}
+                                placeholderTextColor={theme.colors.subtext + '80'}
+                                autoCapitalize="characters"
+                                style={[
+                                    styles.input,
+                                    {
+                                        color: theme.colors.text,
+                                        backgroundColor: theme.colors.background,
+                                        borderColor: promoError ? theme.colors.expense + '70' : theme.colors.border,
+                                    },
+                                ]}
+                            />
+                            <TouchableOpacity
+                                style={[styles.applyBtn, { backgroundColor: loading ? theme.colors.border : theme.colors.primary }]}
+                                onPress={onApply}
+                                disabled={loading}
+                            >
+                                {loading ? (
+                                    <ActivityIndicator size="small" color={theme.colors.text} />
+                                ) : (
+                                    <Text style={styles.applyText}>{t.common.apply}</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                </>
             ) : (
                 /* Input state */
                 <View style={styles.inputRow}>
@@ -169,9 +215,10 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         borderWidth: StyleSheet.hairlineWidth,
     },
-    appliedInfo: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    appliedInfo: { flex: 1, gap: 6, paddingRight: 8 },
     codePill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
     codeText: { fontSize: 11, fontWeight: '700', letterSpacing: 1 },
+    promoKindsText: { fontSize: 11, fontWeight: '600' },
     savings: { fontSize: 13, fontWeight: '600' },
 
     inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },

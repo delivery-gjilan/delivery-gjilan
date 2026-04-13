@@ -385,6 +385,8 @@
         "promo_type_generic": "Special promotion",
         "promo_type_percentage": "Percentage discount",
         "promo_type_fixed": "Fixed discount",
+        "promo_summary_percent_off": "{{percent}}% off",
+        "promo_summary_fixed_off": "{{amount}} off",
         "promotion_unavailable_title": "Promotion unavailable",
         "promotion_unavailable_generic": "This promotion can no longer be applied to the current cart. Please remove it and try checkout again.",
         "promotion_unavailable_expired": "This promo code has expired. Remove it and continue checkout.",

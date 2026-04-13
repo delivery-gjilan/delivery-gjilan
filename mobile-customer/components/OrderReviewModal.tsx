@@ -8,6 +8,10 @@ import {
     TextInput,
     ScrollView,
     Animated,
+    KeyboardAvoidingView,
+    Platform,
+    Keyboard,
+    Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -122,9 +126,20 @@ export default function OrderReviewModal({
 
     return (
         <Modal visible={visible} animationType="slide" transparent onRequestClose={onDismiss}>
-            <View style={styles.overlay}>
-                <View style={[styles.sheet, { backgroundColor: theme.colors.card }]}>
-                    <View style={styles.handle} />
+            <KeyboardAvoidingView
+                style={styles.keyboardAvoid}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            >
+                <Pressable style={styles.overlay} onPress={Keyboard.dismiss}>
+                    <Pressable style={[styles.sheet, { backgroundColor: theme.colors.card }]} onPress={(e) => e.stopPropagation()}>
+                        <View style={styles.handle} />
+
+                        <ScrollView
+                            bounces={false}
+                            showsVerticalScrollIndicator={false}
+                            keyboardShouldPersistTaps="handled"
+                            contentContainerStyle={styles.sheetContent}
+                        >
 
                     <View style={styles.headerRow}>
                         <Text style={[styles.title, { color: theme.colors.text }]}>{title}</Text>
@@ -248,13 +263,19 @@ export default function OrderReviewModal({
                             {t.orders.review_modal.not_now}
                         </Text>
                     </TouchableOpacity>
-                </View>
-            </View>
+
+                        </ScrollView>
+                    </Pressable>
+                </Pressable>
+            </KeyboardAvoidingView>
         </Modal>
     );
 }
 
 const styles = StyleSheet.create({
+    keyboardAvoid: {
+        flex: 1,
+    },
     overlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.45)',
@@ -266,6 +287,10 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingTop: 10,
         paddingBottom: 32,
+        maxHeight: '85%',
+    },
+    sheetContent: {
+        flexGrow: 1,
     },
     handle: {
         width: 36,

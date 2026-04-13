@@ -226,6 +226,10 @@ This document is a fast context handoff for future UI changes across `admin-pane
 - Admin panel orders page (`/dashboard/orders`) shows completed orders in a table view (not cards).
 - Completed table supports quick status filtering with `All`, `Delivered`, and `Cancelled` filter controls.
 - Completed rows include order id/time, customer (including phone when present), business, status, total, and details action.
+- Completed rows include compact promo badges under total when promotions are present: total promo count, order-vs-delivery split, and total savings.
+- Order details panel shows promotion history metadata: total applied promo count, split counts for order vs delivery promos, split counts for code-based vs auto-applied promos, and total saved amount.
+- Applied Promotions list in order details shows each promo's target (`Order` or `Delivery`), code (or auto-applied fallback), promotion ID, and per-promo discount amount.
+- Active order cards show compact promo badges under total when promotions are present: total promo count, order-vs-delivery split, and total savings.
 
 ## Dev Workflow (Safe)
 

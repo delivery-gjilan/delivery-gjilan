@@ -236,7 +236,9 @@ export function OrderReview({
                         isPriority={isPriority}
                         prioritySurcharge={prioritySurcharge}
                         deliveryPromoDiscount={deliveryPromoDiscount}
+                        deliveryPromoSummary={promoResult?.deliveryPromotionSummary ?? null}
                         appliedDiscount={appliedDiscount}
+                        promoSummary={promoResult?.promotionSummary ?? null}
                         driverTip={driverTip}
                         finalTotal={finalTotal}
                         formatCurrency={formatCurrency}

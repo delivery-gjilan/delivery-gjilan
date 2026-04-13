@@ -122,6 +122,8 @@ export const CartScreen = () => {
         promotionId: string | null;
         promotionIds: string[];
         code: string;
+        promotionSummary: string | null;
+        deliveryPromotionSummary: string | null;
         discountAmount: number;
         freeDeliveryApplied: boolean;
         effectiveDeliveryPrice: number;
@@ -149,6 +151,55 @@ export const CartScreen = () => {
     }, [userContextLocation, selectedLocation, t.cart.use_current_address]);
 
     const formatCurrency = useCallback((value: number) => `€${value.toFixed(2)}`, []);
+
+    const buildPromotionSummary = useCallback(
+        (promotion?: { type?: string | null; discountValue?: number | null; appliedAmount?: number | null; freeDelivery?: boolean | null } | null) => {
+            if (!promotion) return null;
+
+            const type = promotion.type ?? '';
+            const rawDiscountValue = Number(promotion.discountValue ?? promotion.appliedAmount ?? NaN);
+            const hasDiscountValue = Number.isFinite(rawDiscountValue) && rawDiscountValue > 0;
+            const normalizedValue = hasDiscountValue
+                ? (Number.isInteger(rawDiscountValue) ? String(rawDiscountValue) : rawDiscountValue.toFixed(1).replace(/\.0$/, ''))
+                : null;
+
+            if (promotion.freeDelivery || type === 'FREE_DELIVERY' || type === 'SPEND_X_GET_FREE') {
+                return t.cart.free_delivery;
+            }
+
+            if (type === 'PERCENTAGE' || type === 'SPEND_X_PERCENT') {
+                const fallbackPercentFromApplied =
+                    Number.isFinite(Number(promotion.appliedAmount)) && total > 0
+                        ? (Number(promotion.appliedAmount) / total) * 100
+                        : NaN;
+                const percentValue = hasDiscountValue ? rawDiscountValue : fallbackPercentFromApplied;
+                const normalizedPercent = Number.isFinite(percentValue) && percentValue > 0
+                    ? (Number.isInteger(percentValue) ? String(percentValue) : percentValue.toFixed(1).replace(/\.0$/, ''))
+                    : null;
+                return normalizedValue
+                    ? t.cart.promo_summary_percent_off.replace('{{percent}}', normalizedPercent ?? normalizedValue)
+                    : t.cart.promo_type_percentage;
+            }
+
+            if (type === 'FIXED_AMOUNT' || type === 'SPEND_X_FIXED') {
+                return normalizedValue
+                    ? t.cart.promo_summary_fixed_off.replace('{{amount}}', formatCurrency(rawDiscountValue))
+                    : t.cart.promo_type_fixed;
+            }
+
+            return t.cart.promo_type_generic;
+        },
+        [formatCurrency, t, total],
+    );
+
+    const isFreeDeliveryPromotion = useCallback(
+        (promotion?: { type?: string | null; freeDelivery?: boolean | null } | null) => {
+            if (!promotion) return false;
+            const type = promotion.type ?? '';
+            return Boolean(promotion.freeDelivery) || type === 'FREE_DELIVERY' || type === 'SPEND_X_GET_FREE';
+        },
+        [],
+    );
 
     // Repeat-or-customize modal state for complex cart items
     const [repeatModalProductId, setRepeatModalProductId] = useState<string | null>(null);
@@ -383,17 +434,38 @@ export const CartScreen = () => {
             // Use the ref so that a delivery-price update mid-flight doesn't re-trigger
             // this effect — cartContextRef always holds the latest values.
             const ctx = cartContextRef.current;
+            const autoPromoLabel =
+                (selectedEligiblePromotion.code ?? getPromotionDisplayName(selectedEligiblePromotion) ?? '').trim() ||
+                t.cart.promo_applied_title;
             try {
                 const response = await validatePromotionsManual({
                     variables: {
                         cart: ctx,
-                        manualCode: selectedEligiblePromotion.code,
+                        manualCode: selectedEligiblePromotion.code ?? undefined,
                     },
                 });
                 const result = (response?.data as any)?.validatePromotions;
                 if (!result || (Array.isArray(result.promotions) && result.promotions.length === 0)) {
                     return;
                 }
+                const promotions = (result.promotions ?? []) as Array<{
+                    type?: string | null;
+                    discountValue?: number | null;
+                    appliedAmount?: number | null;
+                    freeDelivery?: boolean | null;
+                }>;
+                const uniqueSummary = (entries: Array<string | null>) =>
+                    Array.from(new Set(entries.filter((entry): entry is string => Boolean(entry)))).join(' + ') || null;
+                const nonDeliverySummary = uniqueSummary(
+                    promotions
+                        .filter((promotion) => !isFreeDeliveryPromotion(promotion))
+                        .map((promotion) => buildPromotionSummary(promotion)),
+                );
+                const deliverySummary = uniqueSummary(
+                    promotions
+                        .filter((promotion) => isFreeDeliveryPromotion(promotion))
+                        .map((promotion) => buildPromotionSummary(promotion)),
+                ) ?? (result.freeDeliveryApplied ? t.cart.free_delivery : null);
 
                 if (!mounted) return;
 
@@ -402,7 +474,9 @@ export const CartScreen = () => {
                     promotionIds: (result.promotions ?? [])
                         .map((promo: any) => String(promo?.id ?? ''))
                         .filter(Boolean),
-                    code: selectedEligiblePromotion.code,
+                    code: autoPromoLabel,
+                    promotionSummary: nonDeliverySummary,
+                    deliveryPromotionSummary: deliverySummary,
                     discountAmount: Number(result.totalDiscount ?? 0),
                     freeDeliveryApplied: result.freeDeliveryApplied ?? false,
                     effectiveDeliveryPrice: Number(result.finalDeliveryPrice ?? ctx.deliveryPrice),
@@ -429,7 +503,7 @@ export const CartScreen = () => {
         return () => {
             mounted = false;
         };
-    }, [getPromotionDisplayName, selectedEligiblePromotion, promoResult?.promotionId, promoResult?.source, t]);
+    }, [buildPromotionSummary, getPromotionDisplayName, isFreeDeliveryPromotion, selectedEligiblePromotion, promoResult?.promotionId, promoResult?.source, t]);
 
     // Get saved addresses sorted by priority (default first)
     const savedAddresses = useMemo(() => {
@@ -721,6 +795,24 @@ export const CartScreen = () => {
                 setPromoError(t.cart.promo_not_valid);
                 return;
             }
+            const promotions = (result.promotions ?? []) as Array<{
+                type?: string | null;
+                discountValue?: number | null;
+                appliedAmount?: number | null;
+                freeDelivery?: boolean | null;
+            }>;
+            const uniqueSummary = (entries: Array<string | null>) =>
+                Array.from(new Set(entries.filter((entry): entry is string => Boolean(entry)))).join(' + ') || null;
+            const nonDeliverySummary = uniqueSummary(
+                promotions
+                    .filter((promotion) => !isFreeDeliveryPromotion(promotion))
+                    .map((promotion) => buildPromotionSummary(promotion)),
+            );
+            const deliverySummary = uniqueSummary(
+                promotions
+                    .filter((promotion) => isFreeDeliveryPromotion(promotion))
+                    .map((promotion) => buildPromotionSummary(promotion)),
+            ) ?? (result.freeDeliveryApplied ? t.cart.free_delivery : null);
 
             setPromoResult({
                 promotionId: result.promotions?.[0]?.id ?? null,
@@ -728,6 +820,8 @@ export const CartScreen = () => {
                     .map((promo: any) => String(promo?.id ?? ''))
                     .filter(Boolean),
                 code: couponCode.trim(),
+                promotionSummary: nonDeliverySummary,
+                deliveryPromotionSummary: deliverySummary,
                 discountAmount: Number(result.totalDiscount ?? 0),
                 freeDeliveryApplied: result.freeDeliveryApplied ?? false,
                 effectiveDeliveryPrice: Number(result.finalDeliveryPrice ?? deliveryPrice),
@@ -776,10 +870,6 @@ export const CartScreen = () => {
         ? promoResult?.freeDeliveryApplied ?? false
         : false;
 
-    const appliedDiscount = manualPromoApplied
-        ? promoResult?.discountAmount ?? 0
-        : 0;
-
     const prioritySurcharge = isPriority ? serverPrioritySurcharge : 0;
 
     const effectiveDeliveryPrice = manualPromoApplied
@@ -787,13 +877,22 @@ export const CartScreen = () => {
         : deliveryPrice;
 
     const deliveryPromoDiscount = Math.max(0, deliveryPrice - effectiveDeliveryPrice);
-    const nonDeliveryPromoDiscount = Math.max(0, appliedDiscount - deliveryPromoDiscount);
+
+    const promoTotalPrice = manualPromoApplied
+        ? promoResult?.totalPrice ?? Math.max(0, total + deliveryPrice - (promoResult?.discountAmount ?? 0))
+        : total + deliveryPrice;
+
+    // Derive discount from validated totals to avoid mismatches when API's totalDiscount
+    // excludes delivery discounts while finalDeliveryPrice already includes them.
+    const totalPromoDiscount = manualPromoApplied
+        ? Math.max(0, total + deliveryPrice - promoTotalPrice)
+        : 0;
+
+    const nonDeliveryPromoDiscount = Math.max(0, totalPromoDiscount - deliveryPromoDiscount);
 
     const appliedDeliveryPrice = effectiveDeliveryPrice + prioritySurcharge;
 
-    const finalTotal = (manualPromoApplied
-        ? promoResult?.totalPrice ?? Math.max(0, total + deliveryPrice - appliedDiscount)
-        : Math.max(0, total + deliveryPrice - appliedDiscount)) + prioritySurcharge + driverTip;
+    const finalTotal = promoTotalPrice + prioritySurcharge + driverTip;
 
     /**
      * Re-fetches every product in the cart from the network and syncs unitPrice +

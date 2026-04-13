@@ -14,7 +14,9 @@ interface PriceBreakdownProps {
     isPriority: boolean;
     prioritySurcharge: number;
     deliveryPromoDiscount: number;
+    deliveryPromoSummary?: string | null;
     appliedDiscount: number;
+    promoSummary?: string | null;
     driverTip: number;
     finalTotal: number;
     formatCurrency: (value: number) => string;
@@ -32,7 +34,9 @@ export function PriceBreakdown({
     isPriority,
     prioritySurcharge,
     deliveryPromoDiscount,
+    deliveryPromoSummary,
     appliedDiscount,
+    promoSummary,
     driverTip,
     finalTotal,
     formatCurrency,
@@ -74,7 +78,11 @@ export function PriceBreakdown({
             {/* Delivery promo discount */}
             {deliveryPromoDiscount > 0 && (
                 <View style={styles.row}>
-                    <Text style={[styles.label, { color: theme.colors.subtext }]}>{t.common.delivery} {t.cart.promo}</Text>
+                    <Text style={[styles.label, { color: theme.colors.subtext }]}>
+                        {deliveryPromoSummary
+                            ? `${t.common.delivery} ${t.cart.promo} (${deliveryPromoSummary})`
+                            : `${t.common.delivery} ${t.cart.promo}`}
+                    </Text>
                     <Text style={[styles.value, { color: theme.colors.income }]}>
                         -{formatCurrency(deliveryPromoDiscount)}
                     </Text>
@@ -95,7 +103,9 @@ export function PriceBreakdown({
             {/* Promo discount */}
             {appliedDiscount > 0 && (
                 <View style={styles.row}>
-                    <Text style={[styles.label, { color: theme.colors.subtext }]}>{t.cart.promo}</Text>
+                    <Text style={[styles.label, { color: theme.colors.subtext }]}>
+                        {promoSummary ? `${t.cart.promo} (${promoSummary})` : t.cart.promo}
+                    </Text>
                     <Text style={[styles.value, { color: theme.colors.income }]}>
                         -{formatCurrency(appliedDiscount)}
                     </Text>

@@ -97,7 +97,7 @@ interface Order {
     orderPromotions?: {
         id: string;
         promotionId: string;
-        appliesTo: string;
+        appliesTo: 'PRICE' | 'DELIVERY';
         discountAmount: number;
         promoCode?: string | null;
     }[] | null;
@@ -567,6 +567,37 @@ export default function OrdersPage() {
         };
     }, [selectedOrder]);
 
+    const selectedOrderPromoSummary = useMemo(() => {
+        const promotions = selectedOrder?.orderPromotions ?? [];
+        if (!promotions.length) {
+            return {
+                totalCount: 0,
+                deliveryCount: 0,
+                orderCount: 0,
+                codeCount: 0,
+                autoCount: 0,
+                totalSavings: 0,
+            };
+        }
+
+        const deliveryCount = promotions.filter((promo) => promo.appliesTo === 'DELIVERY').length;
+        const orderCount = promotions.length - deliveryCount;
+        const codeCount = promotions.filter((promo) => (promo.promoCode || '').trim().length > 0).length;
+        const autoCount = promotions.length - codeCount;
+        const totalSavings = roundMoney(
+            promotions.reduce((sum, promo) => sum + Number(promo.discountAmount || 0), 0),
+        );
+
+        return {
+            totalCount: promotions.length,
+            deliveryCount,
+            orderCount,
+            codeCount,
+            autoCount,
+            totalSavings,
+        };
+    }, [selectedOrder]);
+
     /* ---- Handlers ---- */
 
     const handleNextStatus = async (order: Order) => {
@@ -774,6 +805,13 @@ export default function OrdersPage() {
                             const preview = !isBusinessUser ? (order as any).settlementPreview : null;
                             const marginSeverity = preview ? getMarginSeverity(preview.netMargin) : null;
                             const approvalReasons = deriveApprovalReasons(order);
+                            const promotions = order.orderPromotions ?? [];
+                            const promoCount = promotions.length;
+                            const promoDeliveryCount = promotions.filter((promo) => promo.appliesTo === 'DELIVERY').length;
+                            const promoOrderCount = promoCount - promoDeliveryCount;
+                            const promoTotalSavings = roundMoney(
+                                promotions.reduce((sum, promo) => sum + Number(promo.discountAmount || 0), 0),
+                            );
                             return (
                                 <div
                                     key={order.id}
@@ -965,6 +1003,26 @@ export default function OrdersPage() {
                                         <div className="flex items-center justify-between pt-3 border-t border-zinc-800/60">
                                             <div>
                                                 <div className="text-lg font-bold text-white">${order.totalPrice.toFixed(2)}</div>
+                                                {promoCount > 0 && (
+                                                    <div className="mt-1.5 flex flex-wrap gap-1">
+                                                        <span className="inline-flex items-center rounded-full border border-emerald-500/35 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
+                                                            Promos {promoCount}
+                                                        </span>
+                                                        {promoOrderCount > 0 && (
+                                                            <span className="inline-flex items-center rounded-full border border-zinc-600/60 bg-zinc-800/70 px-1.5 py-0.5 text-[10px] text-zinc-300">
+                                                                Order {promoOrderCount}
+                                                            </span>
+                                                        )}
+                                                        {promoDeliveryCount > 0 && (
+                                                            <span className="inline-flex items-center rounded-full border border-zinc-600/60 bg-zinc-800/70 px-1.5 py-0.5 text-[10px] text-zinc-300">
+                                                                Delivery {promoDeliveryCount}
+                                                            </span>
+                                                        )}
+                                                        <span className="inline-flex items-center rounded-full border border-emerald-500/35 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
+                                                            Saved €{promoTotalSavings.toFixed(2)}
+                                                        </span>
+                                                    </div>
+                                                )}
                                                 {preview && (
                                                     <div className="group relative">
                                                         <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
@@ -1169,6 +1227,13 @@ export default function OrdersPage() {
                                         const businessNames = getOrderBusinessesSafe(order).map((b) => b.business.name).join(", ");
                                         const preview = !isBusinessUser ? (order as any).settlementPreview : null;
                                         const marginSeverity = preview ? getMarginSeverity(preview.netMargin) : null;
+                                        const promotions = order.orderPromotions ?? [];
+                                        const promoCount = promotions.length;
+                                        const promoDeliveryCount = promotions.filter((promo) => promo.appliesTo === 'DELIVERY').length;
+                                        const promoOrderCount = promoCount - promoDeliveryCount;
+                                        const promoTotalSavings = roundMoney(
+                                            promotions.reduce((sum, promo) => sum + Number(promo.discountAmount || 0), 0),
+                                        );
                                         return (
                                             <tr key={order.id} className="border-b border-zinc-800/70 hover:bg-zinc-900/40">
                                                 <td className="px-3 py-3 align-top">
@@ -1228,6 +1293,26 @@ export default function OrdersPage() {
                                                 </td>
                                                 <td className="px-3 py-3 align-top font-semibold text-white">
                                                     ${order.totalPrice.toFixed(2)}
+                                                    {promoCount > 0 && (
+                                                        <div className="mt-1.5 flex flex-wrap gap-1">
+                                                            <span className="inline-flex items-center rounded-full border border-emerald-500/35 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
+                                                                Promos {promoCount}
+                                                            </span>
+                                                            {promoOrderCount > 0 && (
+                                                                <span className="inline-flex items-center rounded-full border border-zinc-600/60 bg-zinc-800/70 px-1.5 py-0.5 text-[10px] text-zinc-300">
+                                                                    Order {promoOrderCount}
+                                                                </span>
+                                                            )}
+                                                            {promoDeliveryCount > 0 && (
+                                                                <span className="inline-flex items-center rounded-full border border-zinc-600/60 bg-zinc-800/70 px-1.5 py-0.5 text-[10px] text-zinc-300">
+                                                                    Delivery {promoDeliveryCount}
+                                                                </span>
+                                                            )}
+                                                            <span className="inline-flex items-center rounded-full border border-emerald-500/35 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
+                                                                Saved €{promoTotalSavings.toFixed(2)}
+                                                            </span>
+                                                        </div>
+                                                    )}
                                                 </td>
                                                 {!isBusinessUser && (
                                                     <td className="px-3 py-3 align-top">
@@ -1604,7 +1689,9 @@ export default function OrdersPage() {
                                 </div>
                                 {(selectedOrderTotals?.itemsDiscount ?? 0) > 0 && (
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-zinc-500 flex items-center gap-1"><Tag size={11} /> Promotions</span>
+                                        <span className="text-zinc-500 flex items-center gap-1">
+                                            <Tag size={11} /> Promotions ({selectedOrderPromoSummary.orderCount})
+                                        </span>
                                         <span className="text-emerald-300">-€{Number(selectedOrderTotals?.itemsDiscount ?? 0).toFixed(2)}</span>
                                     </div>
                                 )}
@@ -1614,7 +1701,7 @@ export default function OrdersPage() {
                                 </div>
                                 {(selectedOrderTotals?.deliveryDiscount ?? 0) > 0 && (
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-zinc-500">Delivery Promotion</span>
+                                        <span className="text-zinc-500">Delivery Promotion ({selectedOrderPromoSummary.deliveryCount})</span>
                                         <span className="text-emerald-300">-€{Number(selectedOrderTotals?.deliveryDiscount ?? 0).toFixed(2)}</span>
                                     </div>
                                 )}
@@ -1627,19 +1714,49 @@ export default function OrdersPage() {
                             {/* ── Applied Promotions ── */}
                             {(selectedOrder.orderPromotions?.length ?? 0) > 0 && (
                                 <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3 space-y-2">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <Tag size={13} className="text-emerald-400" />
-                                        <span className="text-[10px] text-emerald-400 uppercase tracking-wider font-semibold">Applied Promotions</span>
+                                    <div className="flex items-center justify-between gap-3 mb-1">
+                                        <div className="flex items-center gap-2">
+                                            <Tag size={13} className="text-emerald-400" />
+                                            <span className="text-[10px] text-emerald-400 uppercase tracking-wider font-semibold">
+                                                Applied Promotions ({selectedOrderPromoSummary.totalCount})
+                                            </span>
+                                        </div>
+                                        <span className="text-xs font-semibold text-emerald-300">
+                                            Saved €{selectedOrderPromoSummary.totalSavings.toFixed(2)}
+                                        </span>
                                     </div>
+
+                                    <div className="flex flex-wrap gap-1.5 text-[11px]">
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
+                                            Order {selectedOrderPromoSummary.orderCount}
+                                        </span>
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
+                                            Delivery {selectedOrderPromoSummary.deliveryCount}
+                                        </span>
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-zinc-500/10 border border-zinc-500/30 text-zinc-300">
+                                            Code {selectedOrderPromoSummary.codeCount}
+                                        </span>
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-zinc-500/10 border border-zinc-500/30 text-zinc-300">
+                                            Auto {selectedOrderPromoSummary.autoCount}
+                                        </span>
+                                    </div>
+
                                     {selectedOrder.orderPromotions!.map((promo) => (
-                                        <div key={promo.id} className="flex items-center justify-between text-sm">
-                                            <div className="flex items-center gap-2">
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
-                                                    {promo.appliesTo === 'DELIVERY' ? 'Delivery' : 'Order'}
-                                                </span>
-                                                {promo.promoCode && (
-                                                    <span className="font-mono text-xs text-zinc-400">{promo.promoCode}</span>
-                                                )}
+                                        <div key={promo.id} className="flex items-center justify-between gap-2 text-sm rounded-lg border border-emerald-500/15 bg-[#0b120e] px-2.5 py-2">
+                                            <div className="min-w-0">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
+                                                        {promo.appliesTo === 'DELIVERY' ? 'Delivery' : 'Order'}
+                                                    </span>
+                                                    {promo.promoCode ? (
+                                                        <span className="font-mono text-xs text-zinc-300">{promo.promoCode}</span>
+                                                    ) : (
+                                                        <span className="text-[11px] text-zinc-500">Auto-applied</span>
+                                                    )}
+                                                </div>
+                                                <div className="mt-0.5 text-[11px] text-zinc-500 truncate">
+                                                    Promo ID: {promo.promotionId}
+                                                </div>
                                             </div>
                                             <span className="text-emerald-300 font-semibold">-€{promo.discountAmount.toFixed(2)}</span>
                                         </div>

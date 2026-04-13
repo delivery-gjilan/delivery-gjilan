@@ -325,6 +325,15 @@ Step 1: Cart Items          Step 2: Address           Step 3: Review & Confirm
 **Promotion engine:**
 - `PromotionProgressBar` shows spend-threshold progress in business detail
 - `PromoCodeSection` for manual promo codes
+- `CartScreen` auto-applies the highest-priority eligible promotion during checkout review
+- Auto-applicable promotions that do not expose a code render with a derived promo label in the applied chip
+- When an auto-applied promotion is active, `PromoCodeSection` still shows manual coupon input so users can override it
+- `PriceBreakdown` promo row shows explicit promo summary labels (for example `20% off`, `€5 off`, `Free delivery`) together with deducted amount
+- Promo summary labels are derived from existing promotion response fields (`type`, `appliedAmount`, `freeDelivery`) during checkout validation
+- When multiple promotions combine (for example item discount + free delivery), checkout displays non-delivery promo summary and delivery promo summary on separate rows with matching deducted amounts
+- Checkout computes discount split from validated totals (`subtotal + delivery - finalTotal`) and `finalDeliveryPrice` so item-discount and delivery-discount rows remain numerically consistent in combined promo cases
+- `PromoCodeSection` applied chip shows combined promo labels when multiple promo kinds are active (for example `20% off + Free delivery`)
+- Applied promo chip keeps the entered/auto code visible and renders promo-kind labels on a separate line for combined promo scenarios
 - `PromoAppliedCelebration` confetti animation on promo unlock
 - `ValidatePromotions` validates cart context → discount, free delivery, final totals
 - `PromotionIssueModal` shows why a promo failed to apply

@@ -358,6 +358,8 @@
         "promo_type_generic": "Promo speciale",
         "promo_type_percentage": "Zbritje me përqindje",
         "promo_type_fixed": "Zbritje fikse",
+        "promo_summary_percent_off": "{{percent}}% zbritje",
+        "promo_summary_fixed_off": "{{amount}} zbritje",
         "promotion_unavailable_title": "Promovimi nuk është i disponueshëm",
         "promotion_unavailable_generic": "Ky promovim nuk mund të aplikohet më në shportën aktuale. Hiqeni dhe provoni përsëri checkout.",
         "promotion_unavailable_expired": "Ky kod promo ka skaduar. Hiqeni dhe vazhdoni checkout.",
