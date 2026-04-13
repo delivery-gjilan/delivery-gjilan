@@ -66,7 +66,7 @@ export default function EarningsScreen() {
     const [disputeModalRequestId, setDisputeModalRequestId] = useState<string | null>(null);
     const [rejectReason, setRejectReason] = useState('');
     const [respondingId, setRespondingId] = useState<string | null>(null);
-    const [selectedSettlement, setSelectedSettlement] = useState<any>(null);
+    const [selectedSettlementOrder, setSelectedSettlementOrder] = useState<any>(null);
 
     const PERIODS: { key: Period; label: string }[] = [
         { key: 'today', label: t.earnings.period_today },
@@ -116,6 +116,38 @@ export default function EarningsScreen() {
         const receivable = settlements.filter((s: any) => s.direction === 'RECEIVABLE' && s.status === 'PENDING');
         const payable = settlements.filter((s: any) => s.direction === 'PAYABLE' && s.status === 'PENDING');
         return { receivable, payable };
+    }, [settlements]);
+
+    const settlementOrders = useMemo(() => {
+        const byOrder = new Map<string, any>();
+
+        settlements.forEach((settlement: any) => {
+            const orderId = String(settlement.order?.id ?? settlement.id);
+            const existing = byOrder.get(orderId);
+            if (existing) {
+                existing.settlements.push(settlement);
+                existing.totalReceivable += settlement.direction === 'RECEIVABLE' ? Number(settlement.amount ?? 0) : 0;
+                existing.totalPayable += settlement.direction === 'PAYABLE' ? Number(settlement.amount ?? 0) : 0;
+                if (new Date(settlement.createdAt).getTime() > new Date(existing.latestCreatedAt).getTime()) {
+                    existing.latestCreatedAt = settlement.createdAt;
+                }
+                return;
+            }
+
+            byOrder.set(orderId, {
+                orderId,
+                orderDisplayId: settlement.order?.displayId ?? null,
+                order: settlement.order ?? null,
+                settlements: [settlement],
+                totalReceivable: settlement.direction === 'RECEIVABLE' ? Number(settlement.amount ?? 0) : 0,
+                totalPayable: settlement.direction === 'PAYABLE' ? Number(settlement.amount ?? 0) : 0,
+                latestCreatedAt: settlement.createdAt,
+            });
+        });
+
+        return Array.from(byOrder.values()).sort(
+            (a, b) => new Date(b.latestCreatedAt).getTime() - new Date(a.latestCreatedAt).getTime(),
+        );
     }, [settlements]);
 
     const onRefresh = async () => {
@@ -576,16 +608,16 @@ export default function EarningsScreen() {
                         <Text style={[es.sectionTitle, { color: theme.colors.text }]}>
                             {t.earnings.deliveries_list}
                         </Text>
-                        {settlements.length > 0 && (
+                        {settlementOrders.length > 0 && (
                             <Text style={[es.sectionCount, { color: theme.colors.subtext }]}>
-                                {settlements.length}
+                                {settlementOrders.length}
                             </Text>
                         )}
                     </View>
 
                     {settlementsLoading ? (
                         <ActivityIndicator color={theme.colors.primary} style={{ marginTop: 16 }} />
-                    ) : settlements.length === 0 ? (
+                    ) : settlementOrders.length === 0 ? (
                         <View style={es.emptyState}>
                             <Text style={es.emptyEmoji}>💰</Text>
                             <Text style={[es.emptyTitle, { color: theme.colors.text }]}>{t.earnings.no_earnings_title}</Text>
@@ -593,39 +625,41 @@ export default function EarningsScreen() {
                         </View>
                     ) : (
                         <View style={{ gap: 10, marginTop: 12 }}>
-                            {settlements.map((s: any) => {
-                                const businessNames = s.order?.businesses?.map((b: any) => b.business?.name).filter(Boolean).join(", ") ?? "—";
-                                const isPaid = s.status === "PAID";
-                                const isPayable = s.direction === "PAYABLE";
-                                const tag = getSettlementTag(s);
-                                const reasonText = getSettlementLabel(s);
-                                const amountColor = isPayable ? theme.colors.income : tag.color;
+                            {settlementOrders.map((orderGroup: any) => {
+                                const settlementsForOrder: any[] = orderGroup.settlements;
+                                const firstSettlement = settlementsForOrder[0];
+                                const businessNames = firstSettlement?.order?.businesses?.map((b: any) => b.business?.name).filter(Boolean).join(", ") ?? "—";
+                                const hasPending = settlementsForOrder.some((s: any) => s.status !== 'PAID');
+                                const netAmount = Number(orderGroup.totalPayable ?? 0) - Number(orderGroup.totalReceivable ?? 0);
+                                const amountColor = netAmount >= 0 ? theme.colors.income : '#f59e0b';
+                                const orderLabel = orderGroup.orderDisplayId ? `#${orderGroup.orderDisplayId}` : t.earnings.delivery;
+                                const lineCount = settlementsForOrder.length;
 
                                 return (
                                     <Pressable
-                                        key={s.id}
+                                        key={orderGroup.orderId}
                                         onPress={() => {
-                                            setSelectedSettlement(s);
-                                            if (s.order?.id) fetchFinancials({ variables: { orderId: s.order.id } });
+                                            setSelectedSettlementOrder(orderGroup);
+                                            if (orderGroup.order?.id) fetchFinancials({ variables: { orderId: orderGroup.order.id } });
                                         }}
                                         style={[es.historyCard, {
                                         backgroundColor: theme.colors.card,
-                                        borderColor: isPaid ? theme.colors.income + "25" : theme.colors.border,
+                                        borderColor: hasPending ? theme.colors.border : theme.colors.income + "25",
                                     }]}>
                                         {/* Top row: tag + amount */}
                                         <View style={es.historyTopRow}>
-                                            <View style={[es.historyTag, { backgroundColor: tag.color + "18" }]}>
-                                                <View style={[es.historyTagDot, { backgroundColor: tag.color }]} />
-                                                <Text style={[es.historyTagText, { color: tag.color }]}>{tag.label}</Text>
+                                            <View style={[es.historyTag, { backgroundColor: theme.colors.primary + "18" }]}>
+                                                <View style={[es.historyTagDot, { backgroundColor: theme.colors.primary }]} />
+                                                <Text style={[es.historyTagText, { color: theme.colors.primary }]}>{orderLabel}</Text>
                                             </View>
                                             <Text style={[es.historyAmount, { color: amountColor }]}>
-                                                {isPayable ? "+" : "-"}{formatCurrency(Number(s.amount ?? 0))}
+                                                {netAmount >= 0 ? '+' : '-'}{formatCurrency(Math.abs(netAmount))}
                                             </Text>
                                         </View>
 
                                         {/* Reason / explanation */}
                                         <Text style={[es.historyReason, { color: theme.colors.text }]} numberOfLines={2}>
-                                            {reasonText}
+                                            {lineCount} settlement line{lineCount === 1 ? '' : 's'}
                                         </Text>
 
                                         {/* Business & address */}
@@ -639,7 +673,7 @@ export default function EarningsScreen() {
                                             <View style={es.historyMetaRow}>
                                                 <Ionicons name="location-outline" size={12} color={theme.colors.subtext} />
                                                 <Text style={[es.historyMetaText, { color: theme.colors.subtext }]} numberOfLines={1}>
-                                                    {s.order?.dropOffLocation?.address ?? "—"}
+                                                    {orderGroup.order?.dropOffLocation?.address ?? "—"}
                                                 </Text>
                                             </View>
                                         </View>
@@ -647,18 +681,18 @@ export default function EarningsScreen() {
                                         {/* Footer: date + status */}
                                         <View style={es.historyFooter}>
                                             <Text style={[es.historyDate, { color: theme.colors.subtext }]}>
-                                                {formatDateTime(s.createdAt)}
+                                                {formatDateTime(orderGroup.latestCreatedAt)}
                                             </Text>
                                             <View style={[es.historyStatus, {
-                                                backgroundColor: isPaid ? theme.colors.income + "18" : "#f59e0b18",
+                                                backgroundColor: hasPending ? "#f59e0b18" : theme.colors.income + "18",
                                             }]}>
                                                 <View style={[es.historyStatusDot, {
-                                                    backgroundColor: isPaid ? theme.colors.income : "#f59e0b",
+                                                    backgroundColor: hasPending ? "#f59e0b" : theme.colors.income,
                                                 }]} />
                                                 <Text style={[es.historyStatusText, {
-                                                    color: isPaid ? theme.colors.income : "#f59e0b",
+                                                    color: hasPending ? "#f59e0b" : theme.colors.income,
                                                 }]}>
-                                                    {isPaid ? t.earnings.paid : t.earnings.pending}
+                                                    {hasPending ? t.earnings.pending : t.earnings.paid}
                                                 </Text>
                                             </View>
                                         </View>
@@ -670,153 +704,388 @@ export default function EarningsScreen() {
                 </View>
             </ScrollView>
 
-            {/* ── Order Detail Modal ── */}
+            {/* ── Delivery Detail Modal ── */}
             <Modal
-                visible={selectedSettlement !== null}
+                visible={selectedSettlementOrder !== null}
                 transparent
                 animationType="slide"
-                onRequestClose={() => setSelectedSettlement(null)}
+                onRequestClose={() => setSelectedSettlementOrder(null)}
             >
-                <Pressable style={es.modalBackdrop} onPress={() => setSelectedSettlement(null)} />
-                <View style={[es.modalSheet, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-                    {selectedSettlement && (() => {
-                        const s = selectedSettlement;
+                <Pressable style={es.modalBackdrop} onPress={() => setSelectedSettlementOrder(null)} />
+                <View style={[es.detailModalSheet, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+                    {selectedSettlementOrder && (() => {
+                        const settlementsForOrder: any[] = selectedSettlementOrder.settlements ?? [];
                         const fin = (financialsData as any)?.driverOrderFinancials;
-                        const businessNames = s.order?.businesses?.map((b: any) => b.business?.name).filter(Boolean).join(", ") ?? "—";
-                        const tag = getSettlementTag(s);
-                        const isPayable = s.direction === "PAYABLE";
-                        const amountColor = isPayable ? theme.colors.income : tag.color;
+                        const ord = (financialsData as any)?.order;
+                        const totalReceivable = settlementsForOrder
+                            .filter((line: any) => line.direction === 'RECEIVABLE')
+                            .reduce((sum: number, line: any) => sum + Number(line.amount ?? 0), 0);
+                        const totalPayable = settlementsForOrder
+                            .filter((line: any) => line.direction === 'PAYABLE')
+                            .reduce((sum: number, line: any) => sum + Number(line.amount ?? 0), 0);
+                        const netAmount = totalPayable - totalReceivable;
+                        const amountColor = netAmount >= 0 ? theme.colors.income : '#f59e0b';
+                        const isCash = (fin?.paymentCollection ?? ord?.paymentCollection) === "CASH_TO_DRIVER";
 
                         return (
                             <>
                                 {/* Header */}
-                                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                                    <Text style={[es.modalTitle, { color: theme.colors.text }]}>
-                                        {(t.earnings as any).order_detail ?? "Order Detail"}
-                                    </Text>
-                                    <Pressable onPress={() => setSelectedSettlement(null)}>
+                                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingBottom: 4 }}>
+                                    <View>
+                                        <Text style={[es.modalTitle, { color: theme.colors.text }]}>
+                                            {(t.earnings as any).delivery_details ?? "Delivery Details"}
+                                        </Text>
+                                        {(ord?.displayId || selectedSettlementOrder.orderDisplayId) && (
+                                            <Text style={{ fontSize: 12, color: theme.colors.subtext, marginTop: 2 }}>
+                                                #{ord?.displayId ?? selectedSettlementOrder.orderDisplayId}
+                                            </Text>
+                                        )}
+                                    </View>
+                                    <Pressable onPress={() => setSelectedSettlementOrder(null)}>
                                         <Ionicons name="close-circle" size={28} color={theme.colors.subtext} />
                                     </Pressable>
                                 </View>
 
-                                {/* Settlement info */}
-                                <View style={[es.detailSection, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
-                                    <View style={es.detailRow}>
-                                        <View style={[es.historyTag, { backgroundColor: tag.color + "18" }]}>
-                                            <View style={[es.historyTagDot, { backgroundColor: tag.color }]} />
-                                            <Text style={[es.historyTagText, { color: tag.color }]}>{tag.label}</Text>
-                                        </View>
-                                        <Text style={[es.historyAmount, { color: amountColor }]}>
-                                            {isPayable ? "+" : "-"}{formatCurrency(Number(s.amount ?? 0))}
-                                        </Text>
-                                    </View>
-                                    <View style={es.detailRow}>
-                                        <Ionicons name="storefront-outline" size={14} color={theme.colors.subtext} />
-                                        <Text style={[es.detailValue, { color: theme.colors.text, flex: 1 }]} numberOfLines={1}>
-                                            {businessNames}
-                                        </Text>
-                                    </View>
-                                    {s.order?.dropOffLocation?.address && (
-                                        <View style={es.detailRow}>
-                                            <Ionicons name="location-outline" size={14} color={theme.colors.subtext} />
-                                            <Text style={[es.detailValue, { color: theme.colors.subtext, flex: 1 }]} numberOfLines={1}>
-                                                {s.order.dropOffLocation.address}
-                                            </Text>
-                                        </View>
-                                    )}
-                                    <View style={es.detailRow}>
-                                        <Ionicons name="time-outline" size={14} color={theme.colors.subtext} />
-                                        <Text style={[es.detailValue, { color: theme.colors.subtext }]}>
-                                            {formatDateTime(s.createdAt)}
-                                        </Text>
-                                    </View>
-                                </View>
-
-                                {/* Per-order financials */}
-                                {financialsLoading ? (
-                                    <ActivityIndicator color={theme.colors.primary} style={{ marginVertical: 12 }} />
-                                ) : fin ? (
-                                    <View style={[es.detailSection, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
-                                        <Text style={[es.detailSectionTitle, { color: theme.colors.text }]}>
-                                            {(t.earnings as any).financial_breakdown ?? "Financial Breakdown"}
-                                        </Text>
-
-                                        <View style={es.detailRow}>
-                                            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                                                <Ionicons name="card-outline" size={14} color={theme.colors.subtext} />
-                                                <Text style={[es.detailLabel, { color: theme.colors.subtext }]}>
-                                                    {(t.earnings as any).payment_method ?? "Payment"}
-                                                </Text>
-                                            </View>
-                                            <View style={[es.methodBadge, {
-                                                backgroundColor: fin.paymentCollection === "CASH" ? "#f59e0b18" : "#3b82f618",
-                                            }]}>
-                                                <Ionicons
-                                                    name={fin.paymentCollection === "CASH" ? "cash-outline" : "card-outline"}
-                                                    size={12}
-                                                    color={fin.paymentCollection === "CASH" ? "#f59e0b" : "#3b82f6"}
-                                                />
-                                                <Text style={[es.methodBadgeText, {
-                                                    color: fin.paymentCollection === "CASH" ? "#f59e0b" : "#3b82f6",
-                                                }]}>
-                                                    {fin.paymentCollection === "CASH"
-                                                        ? ((t.earnings as any).cash_payment ?? "Cash")
-                                                        : ((t.earnings as any).prepaid_payment ?? "Prepaid")}
-                                                </Text>
-                                            </View>
-                                        </View>
-
-                                        <View style={[es.detailDivider, { backgroundColor: theme.colors.border }]} />
-
-                                        {fin.amountToCollectFromCustomer > 0 && (
-                                            <View style={es.detailRow}>
-                                                <Text style={[es.detailLabel, { color: theme.colors.subtext }]}>
-                                                    {(t.earnings as any).collect_from_customer ?? "Collect from customer"}
-                                                </Text>
-                                                <Text style={[es.detailValue, { color: "#3b82f6", fontWeight: "700" }]}>
-                                                    {formatCurrency(fin.amountToCollectFromCustomer)}
-                                                </Text>
-                                            </View>
-                                        )}
-
-                                        {fin.amountToRemitToPlatform > 0 && (
-                                            <View style={es.detailRow}>
-                                                <Text style={[es.detailLabel, { color: theme.colors.subtext }]}>
-                                                    {(t.earnings as any).remit_to_platform ?? "Remit to platform"}
-                                                </Text>
-                                                <Text style={[es.detailValue, { color: "#ef4444", fontWeight: "700" }]}>
-                                                    -{formatCurrency(fin.amountToRemitToPlatform)}
-                                                </Text>
-                                            </View>
-                                        )}
-
-                                        <View style={es.detailRow}>
-                                            <Text style={[es.detailLabel, { color: theme.colors.text, fontWeight: "600" }]}>
-                                                {(t.earnings as any).your_earnings ?? "Your earnings"}
-                                            </Text>
-                                            <Text style={[es.detailValue, { color: theme.colors.income, fontWeight: "800", fontSize: 16 }]}>
-                                                {formatCurrency(fin.driverNetEarnings)}
-                                            </Text>
-                                        </View>
-
-                                        {fin.driverTip > 0 && (
-                                            <>
-                                                <View style={[es.detailDivider, { backgroundColor: theme.colors.border }]} />
+                                <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }} contentContainerStyle={{ gap: 12 }}>
+                                    {financialsLoading ? (
+                                        <ActivityIndicator color={theme.colors.primary} style={{ marginVertical: 24 }} />
+                                    ) : (
+                                        <>
+                                            {/* ── Settlement summary ── */}
+                                            <View style={[es.detailSection, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
                                                 <View style={es.detailRow}>
-                                                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                                                        <Ionicons name="heart" size={12} color="#22c55e" />
-                                                        <Text style={[es.detailLabel, { color: "#22c55e" }]}>
-                                                            {(t.earnings as any).tip_included ?? "Tip included"}
+                                                    <View style={[es.historyTag, { backgroundColor: theme.colors.primary + "18" }]}>
+                                                        <View style={[es.historyTagDot, { backgroundColor: theme.colors.primary }]} />
+                                                        <Text style={[es.historyTagText, { color: theme.colors.primary }]}>
+                                                            {selectedSettlementOrder.orderDisplayId ? `#${selectedSettlementOrder.orderDisplayId}` : t.earnings.delivery}
                                                         </Text>
                                                     </View>
-                                                    <Text style={[es.detailValue, { color: "#22c55e", fontWeight: "700" }]}>
-                                                        +{formatCurrency(fin.driverTip)}
+                                                    <Text style={[es.historyAmount, { color: amountColor }]}>
+                                                        {netAmount >= 0 ? '+' : '-'}{formatCurrency(Math.abs(netAmount))}
                                                     </Text>
                                                 </View>
-                                            </>
-                                        )}
-                                    </View>
-                                ) : null}
+                                                <View style={es.detailRow}>
+                                                    <Text style={[es.detailLabel, { color: theme.colors.subtext }]}>
+                                                        {(t.earnings as any).status ?? "Status"}
+                                                    </Text>
+                                                    <View style={[es.methodBadge, {
+                                                        backgroundColor: settlementsForOrder.some((line: any) => line.status !== 'PAID') ? '#f59e0b18' : theme.colors.income + '18',
+                                                    }]}>
+                                                        <Text style={[es.methodBadgeText, {
+                                                            color: settlementsForOrder.some((line: any) => line.status !== 'PAID') ? '#f59e0b' : theme.colors.income,
+                                                        }]}>
+                                                            {settlementsForOrder.some((line: any) => line.status !== 'PAID') ? t.earnings.pending : t.earnings.paid}
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                            </View>
+
+                                            {/* ── Settlement breakdown ── */}
+                                            <View style={[es.detailSection, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                                                <Text style={[es.detailSectionTitle, { color: theme.colors.text }]}>
+                                                    {(t.earnings as any).settlement_breakdown ?? "Settlement Breakdown"}
+                                                </Text>
+                                                {settlementsForOrder.map((line: any) => {
+                                                    const lineIsPayable = line.direction === 'PAYABLE';
+                                                    const lineTag = getSettlementTag(line);
+                                                    return (
+                                                        <View key={line.id} style={es.detailRow}>
+                                                            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1 }}>
+                                                                <View style={[es.historyTagDot, { backgroundColor: lineTag.color }]} />
+                                                                <Text style={[es.detailLabel, { color: theme.colors.subtext, flex: 1 }]} numberOfLines={1}>
+                                                                    {getSettlementLabel(line)}
+                                                                </Text>
+                                                            </View>
+                                                            <Text style={[es.detailValue, { color: lineIsPayable ? theme.colors.income : lineTag.color, fontWeight: "700" }]}>
+                                                                {lineIsPayable ? '+' : '-'}{formatCurrency(Number(line.amount ?? 0))}
+                                                            </Text>
+                                                        </View>
+                                                    );
+                                                })}
+                                                <View style={[es.detailDivider, { backgroundColor: theme.colors.border }]} />
+                                                <View style={es.detailRow}>
+                                                    <Text style={[es.detailLabel, { color: theme.colors.text, fontWeight: "700" }]}>
+                                                        {(t.earnings as any).net ?? "Net"}
+                                                    </Text>
+                                                    <Text style={[es.detailValue, { color: amountColor, fontWeight: "800", fontSize: 15 }]}>
+                                                        {netAmount >= 0 ? '+' : '-'}{formatCurrency(Math.abs(netAmount))}
+                                                    </Text>
+                                                </View>
+                                            </View>
+
+                                            {/* ── Order info ── */}
+                                            {ord && (
+                                                <View style={[es.detailSection, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                                                    <Text style={[es.detailSectionTitle, { color: theme.colors.text }]}>
+                                                        {(t.earnings as any).order_info ?? "Order Info"}
+                                                    </Text>
+                                                    <View style={es.detailRow}>
+                                                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                                                            <Ionicons name="card-outline" size={14} color={theme.colors.subtext} />
+                                                            <Text style={[es.detailLabel, { color: theme.colors.subtext }]}>
+                                                                {(t.earnings as any).payment_method ?? "Payment"}
+                                                            </Text>
+                                                        </View>
+                                                        <View style={[es.methodBadge, {
+                                                            backgroundColor: isCash ? "#f59e0b18" : "#3b82f618",
+                                                        }]}>
+                                                            <Ionicons
+                                                                name={isCash ? "cash-outline" : "card-outline"}
+                                                                size={12}
+                                                                color={isCash ? "#f59e0b" : "#3b82f6"}
+                                                            />
+                                                            <Text style={[es.methodBadgeText, {
+                                                                color: isCash ? "#f59e0b" : "#3b82f6",
+                                                            }]}>
+                                                                {isCash
+                                                                    ? ((t.earnings as any).cash_payment ?? "Cash")
+                                                                    : ((t.earnings as any).prepaid_payment ?? "Prepaid")}
+                                                            </Text>
+                                                        </View>
+                                                    </View>
+                                                    <View style={es.detailRow}>
+                                                        <Text style={[es.detailLabel, { color: theme.colors.subtext }]}>
+                                                            {(t.earnings as any).order_date ?? "Order date"}
+                                                        </Text>
+                                                        <Text style={[es.detailValue, { color: theme.colors.text }]}>
+                                                            {formatDateTime(ord.orderDate)}
+                                                        </Text>
+                                                    </View>
+                                                    {ord.dropOffLocation?.address && (
+                                                        <View style={es.detailRow}>
+                                                            <View style={{ flexDirection: "row", alignItems: "center", gap: 5, flex: 1 }}>
+                                                                <Ionicons name="location-outline" size={14} color={theme.colors.subtext} />
+                                                                <Text style={[es.detailValue, { color: theme.colors.subtext, flex: 1 }]} numberOfLines={2}>
+                                                                    {ord.dropOffLocation.address}
+                                                                </Text>
+                                                            </View>
+                                                        </View>
+                                                    )}
+                                                    {ord.pickupLocations?.length > 0 && (
+                                                        <View style={es.detailRow}>
+                                                            <View style={{ flexDirection: "row", alignItems: "center", gap: 5, flex: 1 }}>
+                                                                <Ionicons name="bag-handle-outline" size={14} color={theme.colors.subtext} />
+                                                                <Text style={[es.detailValue, { color: theme.colors.subtext, flex: 1 }]} numberOfLines={2}>
+                                                                    {ord.pickupLocations.map((l: any) => l.address).filter(Boolean).join(" → ")}
+                                                                </Text>
+                                                            </View>
+                                                        </View>
+                                                    )}
+                                                    {ord.driverNotes ? (
+                                                        <View style={es.detailRow}>
+                                                            <View style={{ flexDirection: "row", alignItems: "center", gap: 5, flex: 1 }}>
+                                                                <Ionicons name="chatbubble-outline" size={14} color={theme.colors.subtext} />
+                                                                <Text style={[es.detailValue, { color: theme.colors.subtext, flex: 1, fontStyle: "italic" }]} numberOfLines={3}>
+                                                                    "{ord.driverNotes}"
+                                                                </Text>
+                                                            </View>
+                                                        </View>
+                                                    ) : null}
+                                                </View>
+                                            )}
+
+                                            {/* ── Timeline ── */}
+                                            {ord && (
+                                                <View style={[es.detailSection, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                                                    <Text style={[es.detailSectionTitle, { color: theme.colors.text }]}>
+                                                        {(t.earnings as any).timeline ?? "Timeline"}
+                                                    </Text>
+                                                    {[
+                                                        { label: (t.earnings as any).assigned ?? "Assigned", time: ord.driverAssignedAt, icon: "person-outline" },
+                                                        { label: (t.earnings as any).preparing ?? "Preparing", time: ord.preparingAt, icon: "restaurant-outline" },
+                                                        { label: (t.earnings as any).ready ?? "Ready", time: ord.readyAt, icon: "checkmark-circle-outline" },
+                                                        { label: (t.earnings as any).picked_up ?? "Picked up", time: ord.outForDeliveryAt, icon: "bicycle-outline" },
+                                                        { label: (t.earnings as any).delivered ?? "Delivered", time: ord.deliveredAt, icon: "checkmark-done-outline" },
+                                                    ].filter((step) => step.time).map((step, idx) => (
+                                                        <View key={idx} style={es.timelineRow}>
+                                                            <View style={[es.timelineDot, { backgroundColor: step.time ? theme.colors.income + "25" : theme.colors.border }]}>
+                                                                <Ionicons name={step.icon as any} size={12} color={step.time ? theme.colors.income : theme.colors.subtext} />
+                                                            </View>
+                                                            <Text style={[es.detailLabel, { color: theme.colors.text, flex: 1 }]}>{step.label}</Text>
+                                                            <Text style={[es.detailValue, { color: theme.colors.subtext }]}>
+                                                                {formatDateTime(step.time)}
+                                                            </Text>
+                                                        </View>
+                                                    ))}
+                                                </View>
+                                            )}
+
+                                            {/* ── Items by business ── */}
+                                            {ord?.businesses?.map((biz: any) => (
+                                                <View key={biz.business?.id ?? "biz"} style={[es.detailSection, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                                                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                                                        <Ionicons name="storefront-outline" size={14} color={theme.colors.primary} />
+                                                        <Text style={[es.detailSectionTitle, { color: theme.colors.text, marginBottom: 0 }]}>
+                                                            {biz.business?.name ?? "Business"}
+                                                        </Text>
+                                                    </View>
+                                                    {biz.items?.map((item: any) => {
+                                                        const itemTotal = item.quantity * item.unitPrice;
+                                                        const optionsTotal = (item.selectedOptions ?? []).reduce((s: number, o: any) => s + (Number(o.priceAtOrder) * item.quantity), 0);
+                                                        return (
+                                                            <View key={item.id} style={es.itemRow}>
+                                                                <View style={{ flex: 1 }}>
+                                                                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                                                                        <View style={es.qtyBadge}>
+                                                                            <Text style={es.qtyText}>{item.quantity}×</Text>
+                                                                        </View>
+                                                                        <Text style={[es.itemName, { color: theme.colors.text }]} numberOfLines={1}>
+                                                                            {item.name}
+                                                                        </Text>
+                                                                    </View>
+                                                                    {item.selectedOptions?.length > 0 && (
+                                                                        <Text style={[es.itemOptions, { color: theme.colors.subtext }]} numberOfLines={2}>
+                                                                            {item.selectedOptions.map((o: any) => o.optionName).join(", ")}
+                                                                        </Text>
+                                                                    )}
+                                                                    {item.notes ? (
+                                                                        <Text style={[es.itemNotes, { color: theme.colors.subtext }]} numberOfLines={1}>
+                                                                            "{item.notes}"
+                                                                        </Text>
+                                                                    ) : null}
+                                                                    {item.childItems?.length > 0 && item.childItems.map((child: any) => (
+                                                                        <Text key={child.id} style={[es.itemOptions, { color: theme.colors.subtext }]}>
+                                                                            + {child.quantity}× {child.name}
+                                                                        </Text>
+                                                                    ))}
+                                                                    {item.inventoryQuantity > 0 && (
+                                                                        <View style={es.stockBadge}>
+                                                                            <Ionicons name="cube-outline" size={10} color="#a855f7" />
+                                                                            <Text style={es.stockText}>
+                                                                                {item.inventoryQuantity}/{item.quantity} from stock
+                                                                            </Text>
+                                                                        </View>
+                                                                    )}
+                                                                </View>
+                                                                <Text style={[es.itemPrice, { color: theme.colors.text }]}>
+                                                                    {formatCurrency(itemTotal + optionsTotal)}
+                                                                </Text>
+                                                            </View>
+                                                        );
+                                                    })}
+                                                </View>
+                                            ))}
+
+                                            {/* ── Pricing ── */}
+                                            {ord && (
+                                                <View style={[es.detailSection, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                                                    <Text style={[es.detailSectionTitle, { color: theme.colors.text }]}>
+                                                        {(t.earnings as any).pricing ?? "Pricing"}
+                                                    </Text>
+                                                    <View style={es.detailRow}>
+                                                        <Text style={[es.detailLabel, { color: theme.colors.subtext }]}>
+                                                            {(t.earnings as any).items_total ?? "Items"}
+                                                        </Text>
+                                                        <Text style={[es.detailValue, { color: theme.colors.text }]}>
+                                                            {formatCurrency(Number(ord.orderPrice ?? 0))}
+                                                        </Text>
+                                                    </View>
+                                                    <View style={es.detailRow}>
+                                                        <Text style={[es.detailLabel, { color: theme.colors.subtext }]}>
+                                                            {(t.earnings as any).delivery_fee ?? "Delivery fee"}
+                                                        </Text>
+                                                        <Text style={[es.detailValue, { color: theme.colors.text }]}>
+                                                            {formatCurrency(Number(ord.deliveryPrice ?? 0))}
+                                                        </Text>
+                                                    </View>
+                                                    {Number(ord.prioritySurcharge ?? 0) > 0 && (
+                                                        <View style={es.detailRow}>
+                                                            <Text style={[es.detailLabel, { color: theme.colors.subtext }]}>
+                                                                {(t.earnings as any).priority ?? "Priority fee"}
+                                                            </Text>
+                                                            <Text style={[es.detailValue, { color: theme.colors.text }]}>
+                                                                {formatCurrency(Number(ord.prioritySurcharge))}
+                                                            </Text>
+                                                        </View>
+                                                    )}
+                                                    {Number(ord.driverTip ?? 0) > 0 && (
+                                                        <View style={es.detailRow}>
+                                                            <Text style={[es.detailLabel, { color: "#22c55e" }]}>
+                                                                <Ionicons name="heart" size={11} color="#22c55e" /> {(t.earnings as any).tip_label ?? "Tip"}
+                                                            </Text>
+                                                            <Text style={[es.detailValue, { color: "#22c55e", fontWeight: "600" }]}>
+                                                                +{formatCurrency(Number(ord.driverTip))}
+                                                            </Text>
+                                                        </View>
+                                                    )}
+                                                    {ord.orderPromotions?.length > 0 && ord.orderPromotions.map((promo: any, idx: number) => (
+                                                        <View key={idx} style={es.detailRow}>
+                                                            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                                                                <Ionicons name="pricetag-outline" size={12} color="#a855f7" />
+                                                                <Text style={[es.detailLabel, { color: "#a855f7" }]}>
+                                                                    {promo.promoCode ?? (promo.appliesTo === "DELIVERY" ? "Delivery promo" : "Promo")}
+                                                                </Text>
+                                                            </View>
+                                                            <Text style={[es.detailValue, { color: "#a855f7", fontWeight: "600" }]}>
+                                                                -{formatCurrency(Number(promo.discountAmount ?? 0))}
+                                                            </Text>
+                                                        </View>
+                                                    ))}
+                                                    <View style={[es.detailDivider, { backgroundColor: theme.colors.border }]} />
+                                                    <View style={es.detailRow}>
+                                                        <Text style={[es.detailLabel, { color: theme.colors.text, fontWeight: "700" }]}>
+                                                            {(t.earnings as any).total ?? "Total"}
+                                                        </Text>
+                                                        <Text style={[es.detailValue, { color: theme.colors.text, fontWeight: "800", fontSize: 15 }]}>
+                                                            {formatCurrency(Number(ord.totalPrice ?? 0))}
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                            )}
+
+                                            {/* ── Your financials ── */}
+                                            {fin && (
+                                                <View style={[es.detailSection, { backgroundColor: theme.colors.income + "08", borderColor: theme.colors.income + "30" }]}>
+                                                    <Text style={[es.detailSectionTitle, { color: theme.colors.income }]}>
+                                                        {(t.earnings as any).financial_breakdown ?? "Your Financials"}
+                                                    </Text>
+                                                    {fin.amountToCollectFromCustomer > 0 && (
+                                                        <View style={es.detailRow}>
+                                                            <Text style={[es.detailLabel, { color: theme.colors.subtext }]}>
+                                                                {(t.earnings as any).collect_from_customer ?? "Collect from customer"}
+                                                            </Text>
+                                                            <Text style={[es.detailValue, { color: "#3b82f6", fontWeight: "700" }]}>
+                                                                {formatCurrency(fin.amountToCollectFromCustomer)}
+                                                            </Text>
+                                                        </View>
+                                                    )}
+                                                    {fin.amountToRemitToPlatform > 0 && (
+                                                        <View style={es.detailRow}>
+                                                            <Text style={[es.detailLabel, { color: theme.colors.subtext }]}>
+                                                                {(t.earnings as any).remit_to_platform ?? "Remit to platform"}
+                                                            </Text>
+                                                            <Text style={[es.detailValue, { color: "#ef4444", fontWeight: "700" }]}>
+                                                                -{formatCurrency(fin.amountToRemitToPlatform)}
+                                                            </Text>
+                                                        </View>
+                                                    )}
+                                                    {fin.driverTip > 0 && (
+                                                        <View style={es.detailRow}>
+                                                            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                                                                <Ionicons name="heart" size={12} color="#22c55e" />
+                                                                <Text style={[es.detailLabel, { color: "#22c55e" }]}>
+                                                                    {(t.earnings as any).tip_included ?? "Tip included"}
+                                                                </Text>
+                                                            </View>
+                                                            <Text style={[es.detailValue, { color: "#22c55e", fontWeight: "700" }]}>
+                                                                +{formatCurrency(fin.driverTip)}
+                                                            </Text>
+                                                        </View>
+                                                    )}
+                                                    <View style={[es.detailDivider, { backgroundColor: theme.colors.income + "25" }]} />
+                                                    <View style={es.detailRow}>
+                                                        <Text style={[es.detailLabel, { color: theme.colors.income, fontWeight: "700" }]}>
+                                                            {(t.earnings as any).your_earnings ?? "Your earnings"}
+                                                        </Text>
+                                                        <Text style={[es.detailValue, { color: theme.colors.income, fontWeight: "900", fontSize: 18 }]}>
+                                                            {formatCurrency(fin.driverNetEarnings)}
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                            )}
+                                        </>
+                                    )}
+                                </ScrollView>
                             </>
                         );
                     })()}
@@ -1033,4 +1302,42 @@ const es = StyleSheet.create({
         paddingHorizontal: 8, paddingVertical: 3,
     },
     methodBadgeText: { fontSize: 11, fontWeight: "700" },
+
+    /* detail modal (full height) */
+    detailModalSheet: {
+        position: "absolute", bottom: 0, left: 0, right: 0,
+        borderTopLeftRadius: 24, borderTopRightRadius: 24,
+        padding: 24, paddingBottom: 40,
+        borderTopWidth: 1, gap: 12,
+        maxHeight: "85%",
+    },
+
+    /* timeline */
+    timelineRow: {
+        flexDirection: "row", alignItems: "center", gap: 8,
+    },
+    timelineDot: {
+        width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center",
+    },
+
+    /* items */
+    itemRow: {
+        flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between",
+        paddingVertical: 6, gap: 8,
+    },
+    qtyBadge: {
+        backgroundColor: "rgba(99,102,241,0.15)", borderRadius: 4,
+        paddingHorizontal: 5, paddingVertical: 1,
+    },
+    qtyText: { fontSize: 11, fontWeight: "700", color: "#6366f1" },
+    itemName: { fontSize: 13, fontWeight: "600", flexShrink: 1 },
+    itemOptions: { fontSize: 11, marginTop: 2, marginLeft: 30 },
+    itemNotes: { fontSize: 11, fontStyle: "italic", marginTop: 2, marginLeft: 30 },
+    itemPrice: { fontSize: 13, fontWeight: "600" },
+    stockBadge: {
+        flexDirection: "row", alignItems: "center", gap: 3, marginTop: 3, marginLeft: 30,
+        backgroundColor: "rgba(168,85,247,0.12)", borderRadius: 4,
+        paddingHorizontal: 5, paddingVertical: 1, alignSelf: "flex-start",
+    },
+    stockText: { fontSize: 10, fontWeight: "600", color: "#a855f7" },
 });

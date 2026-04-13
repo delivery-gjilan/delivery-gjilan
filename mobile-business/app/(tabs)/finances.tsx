@@ -11,10 +11,14 @@ import {
     KeyboardAvoidingView,
     Platform,
     Alert,
+    TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useMutation } from '@apollo/client/react';
-import { format, startOfDay, startOfMonth, startOfWeek } from 'date-fns';
+import { useRouter } from 'expo-router';
+import { format, startOfDay, startOfMonth, startOfWeek, subDays } from 'date-fns';
+import { Image } from 'expo-image';
+import { Ionicons } from '@expo/vector-icons';
 import {
     GET_MY_BUSINESS_SETTLEMENTS,
     GET_MY_BUSINESS_SETTLEMENT_SUMMARY,
@@ -23,6 +27,8 @@ import {
     RESPOND_TO_SETTLEMENT_REQUEST,
     GET_BUSINESS_SETTLEMENT_BREAKDOWN,
 } from '@/graphql/settlements';
+import { GET_BUSINESS_ORDERS, GET_BUSINESS_ORDER_REVIEWS } from '@/graphql/orders';
+import { GET_BUSINESS_PRODUCTS } from '@/graphql/products';
 import { useAuthStore } from '@/store/authStore';
 import { useTranslation } from '@/hooks/useTranslation';
 
@@ -135,7 +141,9 @@ function calculateBusinessSubtotal(items: any[]): number {
 
 export default function FinancesScreen() {
     const { t } = useTranslation();
+    const router = useRouter();
     const { user } = useAuthStore();
+    const [financeTab, setFinanceTab] = useState<'stats' | 'settlements'>('stats');
     const [period, setPeriod] = useState<Period>('month');
     const [customStart, setCustomStart] = useState('');
     const [customEnd, setCustomEnd] = useState('');
@@ -147,9 +155,108 @@ export default function FinancesScreen() {
     const [disputeModalRequestId, setDisputeModalRequestId] = useState<string | null>(null);
     const [rejectReason, setRejectReason] = useState('');
     const [respondingId, setRespondingId] = useState<string | null>(null);
-    const [selectedSettlement, setSelectedSettlement] = useState<any | null>(null);
+    const [selectedSettlementOrder, setSelectedSettlementOrder] = useState<any | null>(null);
 
     const businessId = user?.businessId ?? '';
+
+    // ── Stats tab queries ────────────────────────────────────────────────────
+    const [statsFilter, setStatsFilter] = useState<'today' | 'week' | 'month' | 'all'>('month');
+
+    const { data: ordersData, loading: ordersLoading, refetch: refetchOrders } = useQuery(GET_BUSINESS_ORDERS, {
+        pollInterval: 60000,
+        skip: financeTab !== 'stats',
+    });
+
+    const { data: productsData, refetch: refetchProducts } = useQuery(GET_BUSINESS_PRODUCTS, {
+        variables: { businessId: businessId || '' },
+        skip: !businessId || financeTab !== 'stats',
+    });
+
+    const { data: reviewsData, loading: reviewsLoading, refetch: refetchReviews } = useQuery(GET_BUSINESS_ORDER_REVIEWS, {
+        variables: { limit: 100, offset: 0 },
+        skip: financeTab !== 'stats',
+    });
+
+    const statsOrders = useMemo(() => {
+        if (!businessId) return [];
+        return ((ordersData?.orders?.orders as any[]) ?? []).filter((o: any) =>
+            (o.businesses ?? []).some((b: any) => b.business?.id === businessId),
+        );
+    }, [ordersData, businessId]);
+
+    const statsFilteredOrders = useMemo(() => {
+        const now = new Date();
+        let startDate: Date;
+        if (statsFilter === 'today') startDate = startOfDay(now);
+        else if (statsFilter === 'week') startDate = startOfWeek(now, { weekStartsOn: 1 });
+        else if (statsFilter === 'month') startDate = startOfMonth(now);
+        else return statsOrders;
+        return statsOrders.filter((o: any) => new Date(o.orderDate) >= startDate);
+    }, [statsOrders, statsFilter]);
+
+    const statsDelivered = useMemo(() => statsFilteredOrders.filter((o: any) => o.status === 'DELIVERED'), [statsFilteredOrders]);
+
+    const statsKPIs = useMemo(() => {
+        const revenue = statsDelivered.reduce((sum: number, o: any) => {
+            const chunk = (o.businesses ?? []).find((b: any) => b.business?.id === businessId);
+            return sum + (chunk?.items ?? []).reduce((s: number, i: any) => s + Number(i.unitPrice ?? 0) * Number(i.quantity ?? 0), 0);
+        }, 0);
+        const cancelled = statsFilteredOrders.filter((o: any) => o.status === 'CANCELLED').length;
+        const total = statsFilteredOrders.length;
+        return {
+            total,
+            delivered: statsDelivered.length,
+            revenue,
+            avgOrderValue: statsDelivered.length > 0 ? revenue / statsDelivered.length : 0,
+            cancelRate: total > 0 ? (cancelled / total) * 100 : 0,
+        };
+    }, [statsDelivered, statsFilteredOrders, businessId]);
+
+    // Top products by quantity sold
+    const topProducts = useMemo(() => {
+        const agg = new Map<string, { productId: string; name: string; quantity: number; revenue: number; imageUrl?: string | null }>();
+        statsDelivered.forEach((order: any) => {
+            (order.businesses ?? [])
+                .filter((b: any) => b.business?.id === businessId)
+                .forEach((chunk: any) => {
+                    (chunk.items ?? []).forEach((item: any) => {
+                        const key = item.productId || item.name;
+                        const cur = agg.get(key) ?? { productId: key, name: item.name ?? 'Unknown', quantity: 0, revenue: 0, imageUrl: item.imageUrl ?? null };
+                        cur.quantity += Number(item.quantity ?? 0);
+                        cur.revenue += Number(item.unitPrice ?? 0) * Number(item.quantity ?? 0);
+                        if (!cur.imageUrl && item.imageUrl) cur.imageUrl = item.imageUrl;
+                        agg.set(key, cur);
+                    });
+                });
+        });
+        return Array.from(agg.values()).sort((a, b) => b.quantity - a.quantity).slice(0, 8);
+    }, [statsDelivered, businessId]);
+
+    // Last 7 days revenue chart
+    const revenueChart = useMemo(() => {
+        const days = Array.from({ length: 7 }, (_, i) => {
+            const d = subDays(new Date(), 6 - i);
+            return { date: d, label: format(d, 'EEE'), dayStart: startOfDay(d), revenue: 0 };
+        });
+        statsOrders
+            .filter((o: any) => o.status === 'DELIVERED')
+            .forEach((order: any) => {
+                const orderDate = new Date(order.orderDate);
+                const day = days.find((d) => {
+                    const next = subDays(d.dayStart, -1);
+                    return orderDate >= d.dayStart && orderDate < next;
+                });
+                if (day) {
+                    const chunk = (order.businesses ?? []).find((b: any) => b.business?.id === businessId);
+                    day.revenue += (chunk?.items ?? []).reduce((s: number, i: any) => s + Number(i.unitPrice ?? 0) * Number(i.quantity ?? 0), 0);
+                }
+            });
+        const max = Math.max(...days.map((d) => d.revenue), 1);
+        return days.map((d) => ({ ...d, height: Math.max(4, (d.revenue / max) * 80) }));
+    }, [statsOrders, businessId]);
+
+    const reviewsList = useMemo(() => (reviewsData?.businessOrderReviews as any[]) ?? [], [reviewsData]);
+    const avgRating = reviewsList.length > 0 ? reviewsList.reduce((s: number, r: any) => s + Number(r.rating ?? 0), 0) / reviewsList.length : 0;
 
     // Fetch last paid settlement to support "From Last Settlement" period
     const { data: lastPaidData, refetch: refetchLastPaid } = useQuery(
@@ -259,23 +366,65 @@ export default function FinancesScreen() {
 
     const filteredSettlements = useMemo(() => settlements, [settlements]);
 
-    const totalPages = Math.max(1, Math.ceil(filteredSettlements.length / PAGE_SIZE));
+    // Group settlements by order
+    const settlementOrders = useMemo(() => {
+        const grouped: Record<string, any> = {};
+        filteredSettlements.forEach((s: any) => {
+            const orderId = String(s.order?.id ?? s.id);
+            if (!grouped[orderId]) {
+                const businessOrder = (s.order?.businesses ?? []).find(
+                    (entry: any) => entry?.business?.id === businessId,
+                );
+                const items = businessOrder?.items ?? [];
+                grouped[orderId] = {
+                    orderId,
+                    orderDisplayId: s.order?.displayId ?? s.order?.id?.slice(-6) ?? '—',
+                    order: s.order,
+                    settlements: [],
+                    totalGross: calculateBusinessSubtotal(items),
+                    totalReceivable: 0,
+                    totalPayable: 0,
+                    latestCreatedAt: s.createdAt,
+                };
+            }
+            grouped[orderId].settlements.push(s);
+            const amount = Number(s.amount ?? 0);
+            if (s.direction === 'RECEIVABLE') {
+                grouped[orderId].totalReceivable += amount;
+            } else {
+                grouped[orderId].totalPayable += amount;
+            }
+            if (new Date(s.createdAt) > new Date(grouped[orderId].latestCreatedAt)) {
+                grouped[orderId].latestCreatedAt = s.createdAt;
+            }
+        });
 
-    const paginatedSettlements = useMemo(() => {
+        return Object.values(grouped).sort(
+            (a, b) => new Date(b.latestCreatedAt).getTime() - new Date(a.latestCreatedAt).getTime(),
+        );
+    }, [filteredSettlements, businessId]);
+
+    const totalPages = Math.max(1, Math.ceil(settlementOrders.length / PAGE_SIZE));
+
+    const paginatedOrders = useMemo(() => {
         const start = (currentPage - 1) * PAGE_SIZE;
-        return filteredSettlements.slice(start, start + PAGE_SIZE);
-    }, [filteredSettlements, currentPage]);
+        return settlementOrders.slice(start, start + PAGE_SIZE);
+    }, [settlementOrders, currentPage]);
 
     const onRefresh = async () => {
         setRefreshing(true);
         setCurrentPage(1);
-        await Promise.all([
-            refetchSummary(),
-            refetchSettlements(),
-            refetchLastPaid(),
-            refetchRequests(),
-            refetchBreakdown(),
-        ]);
+        if (financeTab === 'stats') {
+            await Promise.all([refetchOrders(), refetchProducts(), refetchReviews()]);
+        } else {
+            await Promise.all([
+                refetchSummary(),
+                refetchSettlements(),
+                refetchLastPaid(),
+                refetchRequests(),
+                refetchBreakdown(),
+            ]);
+        }
         setRefreshing(false);
     };
 
@@ -371,6 +520,188 @@ export default function FinancesScreen() {
 
     return (
         <SafeAreaView className="flex-1 bg-[#0a0f1a]">
+            {/* ── Tab Switcher ── */}
+            <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4, gap: 8 }}>
+                {([
+                    { key: 'stats' as const, label: t('finances.tab_stats', 'Statistics'), icon: 'bar-chart' as const },
+                    { key: 'settlements' as const, label: t('finances.tab_settlements', 'Settlements'), icon: 'cash-outline' as const },
+                ] as const).map((tab) => (
+                    <TouchableOpacity
+                        key={tab.key}
+                        onPress={() => setFinanceTab(tab.key)}
+                        style={{
+                            flex: 1,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            paddingVertical: 10,
+                            borderRadius: 14,
+                            gap: 6,
+                            backgroundColor: financeTab === tab.key ? '#7C3AED' : '#1a2233',
+                            borderWidth: 1,
+                            borderColor: financeTab === tab.key ? '#7C3AED' : '#263145',
+                        }}
+                    >
+                        <Ionicons name={tab.icon} size={16} color={financeTab === tab.key ? '#fff' : '#9ca3af'} />
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: financeTab === tab.key ? '#fff' : '#9ca3af' }}>
+                            {tab.label}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
+
+            {/* ── Statistics Tab ── */}
+            {financeTab === 'stats' ? (
+                <ScrollView
+                    className="flex-1"
+                    contentContainerStyle={{ paddingBottom: 40 }}
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#7C3AED" />}
+                >
+                    {/* Period filter */}
+                    <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                            {([
+                                { key: 'today' as const, label: t('finances.today', 'Today') },
+                                { key: 'week' as const, label: t('finances.this_week', 'This Week') },
+                                { key: 'month' as const, label: t('finances.this_month', 'This Month') },
+                                { key: 'all' as const, label: t('finances.all_time', 'All Time') },
+                            ] as const).map((p) => (
+                                <Pressable
+                                    key={p.key}
+                                    onPress={() => setStatsFilter(p.key)}
+                                    style={{
+                                        paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999,
+                                        backgroundColor: statsFilter === p.key ? '#7C3AED' : '#1a2233',
+                                        borderWidth: 1,
+                                        borderColor: statsFilter === p.key ? '#7C3AED' : '#263145',
+                                    }}
+                                >
+                                    <Text style={{ fontSize: 13, fontWeight: '600', color: statsFilter === p.key ? '#fff' : '#8899aa' }}>
+                                        {p.label}
+                                    </Text>
+                                </Pressable>
+                            ))}
+                        </ScrollView>
+                    </View>
+
+                    {ordersLoading && !ordersData ? (
+                        <View style={{ paddingVertical: 60, alignItems: 'center' }}>
+                            <ActivityIndicator color="#7C3AED" size="large" />
+                        </View>
+                    ) : (
+                        <>
+                            {/* KPI cards 2×2 */}
+                            <View style={{ paddingHorizontal: 16, paddingTop: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                                {[
+                                    { label: t('dashboard.today_orders', 'Total Orders'), value: String(statsKPIs.total), icon: 'receipt-outline' as const, color: '#7C3AED' },
+                                    { label: t('orders.delivered', 'Delivered'), value: String(statsKPIs.delivered), icon: 'checkmark-circle-outline' as const, color: '#22c55e' },
+                                    { label: t('dashboard.today_revenue', 'Revenue'), value: `€${statsKPIs.revenue.toFixed(2)}`, icon: 'cash-outline' as const, color: '#3b82f6' },
+                                    { label: 'Avg Order', value: `€${statsKPIs.avgOrderValue.toFixed(2)}`, icon: 'trending-up-outline' as const, color: '#f59e0b' },
+                                    { label: 'Cancel Rate', value: `${statsKPIs.cancelRate.toFixed(1)}%`, icon: 'close-circle-outline' as const, color: '#ef4444' },
+                                    { label: 'Reviews', value: reviewsList.length > 0 ? `${avgRating.toFixed(1)}★ (${reviewsList.length})` : '—', icon: 'star-outline' as const, color: '#eab308' },
+                                ].map((kpi) => (
+                                    <View
+                                        key={kpi.label}
+                                        style={{
+                                            width: '47%',
+                                            backgroundColor: '#1a2233',
+                                            borderRadius: 18,
+                                            padding: 16,
+                                            borderWidth: 1,
+                                            borderColor: '#263145',
+                                            flexGrow: 0,
+                                        }}
+                                    >
+                                        <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: `${kpi.color}25`, alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                                            <Ionicons name={kpi.icon} size={16} color={kpi.color} />
+                                        </View>
+                                        <Text style={{ color: '#64748b', fontSize: 11, marginBottom: 4 }}>{kpi.label}</Text>
+                                        <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800' }}>{kpi.value}</Text>
+                                    </View>
+                                ))}
+                            </View>
+
+                            {/* Last 7 days bar chart */}
+                            <View style={{ marginHorizontal: 16, marginTop: 16, backgroundColor: '#1a2233', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#263145' }}>
+                                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700', marginBottom: 16 }}>
+                                    Revenue — Last 7 Days
+                                </Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', height: 96 }}>
+                                    {revenueChart.map((day, i) => (
+                                        <View key={i} style={{ alignItems: 'center', flex: 1 }}>
+                                            <Text style={{ color: '#64748b', fontSize: 9, marginBottom: 4 }}>
+                                                {day.revenue > 0 ? `€${day.revenue < 10 ? day.revenue.toFixed(1) : Math.round(day.revenue)}` : ''}
+                                            </Text>
+                                            <View
+                                                style={{
+                                                    width: 28, height: day.height, borderRadius: 6,
+                                                    backgroundColor: i === 6 ? '#7C3AED' : '#334155',
+                                                }}
+                                            />
+                                            <Text style={{ color: '#64748b', fontSize: 10, marginTop: 6 }}>{day.label}</Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            </View>
+
+                            {/* Top products */}
+                            {topProducts.length > 0 && (
+                                <View style={{ marginHorizontal: 16, marginTop: 14, backgroundColor: '#1a2233', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#263145' }}>
+                                    <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700', marginBottom: 12 }}>
+                                        Most Ordered
+                                    </Text>
+                                    {topProducts.map((product, idx) => (
+                                        <View
+                                            key={product.productId}
+                                            style={{ flexDirection: 'row', alignItems: 'center', marginBottom: idx < topProducts.length - 1 ? 10 : 0 }}
+                                        >
+                                            <Text style={{ color: '#475569', fontSize: 12, fontWeight: '700', width: 20 }}>{idx + 1}</Text>
+                                            <View style={{ width: 38, height: 38, borderRadius: 10, overflow: 'hidden', backgroundColor: '#7C3AED1a', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                                                {product.imageUrl ? (
+                                                    <Image source={{ uri: product.imageUrl }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+                                                ) : (
+                                                    <Ionicons name="fast-food-outline" size={16} color="#7C3AED" />
+                                                )}
+                                            </View>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={{ color: '#e2e8f0', fontSize: 13, fontWeight: '600' }} numberOfLines={1}>{product.name}</Text>
+                                                <Text style={{ color: '#64748b', fontSize: 11 }}>{product.quantity} sold</Text>
+                                            </View>
+                                            <Text style={{ color: '#22c55e', fontSize: 13, fontWeight: '700' }}>€{product.revenue.toFixed(2)}</Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            )}
+
+                            {/* Reviews summary card */}
+                            <TouchableOpacity
+                                onPress={() => router.push('/reviews' as any)}
+                                style={{ marginHorizontal: 16, marginTop: 14, backgroundColor: '#1a2233', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#263145', flexDirection: 'row', alignItems: 'center' }}
+                            >
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>Customer Reviews</Text>
+                                    {reviewsLoading ? (
+                                        <ActivityIndicator size="small" color="#7C3AED" style={{ marginTop: 4 }} />
+                                    ) : reviewsList.length > 0 ? (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 6 }}>
+                                            <Text style={{ color: '#eab308', fontSize: 18, fontWeight: '800' }}>{avgRating.toFixed(1)}</Text>
+                                            <View style={{ flexDirection: 'row', gap: 2 }}>
+                                                {[1,2,3,4,5].map((s) => (
+                                                    <Ionicons key={s} name={s <= Math.round(avgRating) ? 'star' : 'star-outline'} size={13} color="#eab308" />
+                                                ))}
+                                            </View>
+                                            <Text style={{ color: '#64748b', fontSize: 12 }}>({reviewsList.length})</Text>
+                                        </View>
+                                    ) : (
+                                        <Text style={{ color: '#64748b', fontSize: 12, marginTop: 4 }}>No reviews yet</Text>
+                                    )}
+                                </View>
+                                <Ionicons name="chevron-forward" size={20} color="#475569" />
+                            </TouchableOpacity>
+                        </>
+                    )}
+                </ScrollView>
+            ) : (
             <ScrollView
                 className="flex-1"
                 contentContainerStyle={{ paddingBottom: 40 }}
@@ -427,8 +758,8 @@ export default function FinancesScreen() {
                                     {formatCurrency(computed.totalGross)}
                                 </Text>
                                 <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
-                                    {filteredSettlements.length}{' '}
-                                    {filteredSettlements.length === 1 ? t('finances.record', 'record') : t('finances.records', 'records')}
+                                    {settlementOrders.length}{' '}
+                                    {settlementOrders.length === 1 ? t('finances.order', 'order') : t('finances.orders', 'orders')}
                                 </Text>
                             </View>
 
@@ -849,17 +1180,17 @@ export default function FinancesScreen() {
                         <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>
                             {t('finances.settlements', 'Settlements')}
                         </Text>
-                        {filteredSettlements.length > 0 && (
+                        {settlementOrders.length > 0 && (
                             <Text style={{ fontSize: 12, color: '#6b7280' }}>
-                                {filteredSettlements.length}{' '}
-                                {filteredSettlements.length === 1 ? t('finances.record', 'record') : t('finances.records', 'records')}
+                                {settlementOrders.length}{' '}
+                                {settlementOrders.length === 1 ? t('finances.order', 'order') : t('finances.orders', 'orders')}
                             </Text>
                         )}
                     </View>
 
                     {settlementsLoading ? (
                         <ActivityIndicator color="#7C3AED" style={{ marginTop: 16 }} />
-                    ) : filteredSettlements.length === 0 ? (
+                    ) : settlementOrders.length === 0 ? (
                         <View
                             style={{
                                 alignItems: 'center',
@@ -927,59 +1258,50 @@ export default function FinancesScreen() {
                                         ))}
                                     </View>
 
-                                    {/* Table rows */}
-                                    {paginatedSettlements.map((s: any, idx: number) => {
-                                        const businessOrder = (s.order?.businesses ?? []).find(
-                                            (entry: any) => entry?.business?.id === businessId,
-                                        );
-                                        const items = businessOrder?.items ?? [];
-                                        const grossFromItems = calculateBusinessSubtotal(items);
-                                        const settlementAmount = Number(s.amount ?? 0);
-                                        const isReceivable = s.direction === 'RECEIVABLE';
-
-                                        // RECEIVABLE: business owes platform (commission = amount, net = gross - amount)
-                                        // PAYABLE: platform pays business (commission = gross - amount, net = amount)
-                                        const commissionAmount = isReceivable
-                                            ? settlementAmount
-                                            : Math.max(0, grossFromItems - settlementAmount);
-                                        const netAmount = isReceivable
-                                            ? Math.max(0, grossFromItems - settlementAmount)
-                                            : settlementAmount;
-
-                                        const isPayable = s.direction === 'PAYABLE';
-                                        const rowBg = isPayable
+                                    {/* Table rows — grouped by order */}
+                                    {paginatedOrders.map((orderGroup: any, idx: number) => {
+                                        const netAmount = orderGroup.totalPayable - orderGroup.totalReceivable;
+                                        const hasPayable = orderGroup.totalPayable > 0;
+                                        const rowBg = hasPayable
                                             ? '#071a0f'
                                             : idx % 2 === 0 ? '#0d1421' : '#0a0f1a';
 
                                         return (
                                             <Pressable
-                                                key={s.id}
-                                                onPress={() => setSelectedSettlement(s)}
+                                                key={orderGroup.orderId}
+                                                onPress={() => setSelectedSettlementOrder(orderGroup)}
                                                 style={{
                                                     flexDirection: 'row',
                                                     borderBottomWidth: 1,
                                                     borderBottomColor: '#1a2233',
                                                     backgroundColor: rowBg,
-                                                    borderLeftWidth: isPayable ? 3 : 0,
+                                                    borderLeftWidth: hasPayable ? 3 : 0,
                                                     borderLeftColor: '#22c55e',
                                                 }}
                                             >
                                                 {/* Order */}
-                                                <Text
+                                                <View
                                                     style={{
                                                         width: 100,
                                                         paddingHorizontal: 12,
                                                         paddingVertical: 12,
-                                                        fontSize: 12,
-                                                        fontWeight: '700',
-                                                        color: '#fff',
                                                     }}
                                                 >
-                                                    #
-                                                    {s.order?.displayId ??
-                                                        s.order?.id?.slice(-6) ??
-                                                        '—'}
-                                                </Text>
+                                                    <Text
+                                                        style={{
+                                                            fontSize: 12,
+                                                            fontWeight: '700',
+                                                            color: '#fff',
+                                                        }}
+                                                    >
+                                                        #{orderGroup.orderDisplayId}
+                                                    </Text>
+                                                    {orderGroup.settlements.length > 1 && (
+                                                        <Text style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>
+                                                            {orderGroup.settlements.length} lines
+                                                        </Text>
+                                                    )}
+                                                </View>
 
                                                 {/* Date */}
                                                 <Text
@@ -992,7 +1314,7 @@ export default function FinancesScreen() {
                                                     }}
                                                 >
                                                     {formatDateTime(
-                                                        s.order?.orderDate ?? s.createdAt,
+                                                        orderGroup.order?.orderDate ?? orderGroup.latestCreatedAt,
                                                     )}
                                                 </Text>
 
@@ -1007,7 +1329,7 @@ export default function FinancesScreen() {
                                                         textAlign: 'right',
                                                     }}
                                                 >
-                                                    {formatCurrency(grossFromItems)}
+                                                    {formatCurrency(orderGroup.totalGross)}
                                                 </Text>
 
                                                 {/* Commission */}
@@ -1021,7 +1343,7 @@ export default function FinancesScreen() {
                                                         textAlign: 'right',
                                                     }}
                                                 >
-                                                    {formatCurrency(commissionAmount)}
+                                                    {formatCurrency(orderGroup.totalReceivable)}
                                                 </Text>
 
                                                 {/* Net */}
@@ -1032,11 +1354,11 @@ export default function FinancesScreen() {
                                                         paddingVertical: 12,
                                                         fontSize: 12,
                                                         fontWeight: '700',
-                                                        color: '#22c55e',
+                                                        color: netAmount >= 0 ? '#22c55e' : '#ef4444',
                                                         textAlign: 'right',
                                                     }}
                                                 >
-                                                    {formatCurrency(netAmount)}
+                                                    {netAmount >= 0 ? '+' : ''}{formatCurrency(netAmount)}
                                                 </Text>
                                             </Pressable>
                                         );
@@ -1047,7 +1369,7 @@ export default function FinancesScreen() {
                     )}
 
                     {/* ── Pagination ── */}
-                    {filteredSettlements.length > PAGE_SIZE && (
+                    {settlementOrders.length > PAGE_SIZE && (
                         <View
                             style={{
                                 flexDirection: 'row',
@@ -1092,6 +1414,7 @@ export default function FinancesScreen() {
                     )}
                 </View>
             </ScrollView>
+            )}
 
             {/* ── Custom Range Modal ── */}
             <Modal
@@ -1206,14 +1529,14 @@ export default function FinancesScreen() {
 
             {/* ── Order Detail Modal ── */}
             <Modal
-                visible={selectedSettlement !== null}
+                visible={selectedSettlementOrder !== null}
                 transparent
                 animationType="slide"
-                onRequestClose={() => setSelectedSettlement(null)}
+                onRequestClose={() => setSelectedSettlementOrder(null)}
             >
                 <Pressable
                     style={{ flex: 1, backgroundColor: '#00000090', justifyContent: 'flex-end' }}
-                    onPress={() => setSelectedSettlement(null)}
+                    onPress={() => setSelectedSettlementOrder(null)}
                 >
                     <Pressable
                         onPress={(e) => e.stopPropagation()}
@@ -1227,25 +1550,18 @@ export default function FinancesScreen() {
                         }}
                     >
                         {(() => {
-                            const s = selectedSettlement;
-                            if (!s) return null;
+                            const og = selectedSettlementOrder;
+                            if (!og) return null;
 
-                            const businessOrder = (s.order?.businesses ?? []).find(
+                            const settlementsForOrder: any[] = og.settlements ?? [];
+                            const businessOrder = (og.order?.businesses ?? []).find(
                                 (e: any) => e?.business?.id === businessId,
                             );
                             const items: any[] = businessOrder?.items ?? [];
-                            const isPayable = s.direction === 'PAYABLE';
-                            const isReceivable = !isPayable;
-                            const settlementAmount = Number(s.amount ?? 0);
-                            const grossFromItems = calculateBusinessSubtotal(items);
-                            const commissionAmount = isReceivable
-                                ? settlementAmount
-                                : Math.max(0, grossFromItems - settlementAmount);
-                            const netAmount = isReceivable
-                                ? Math.max(0, grossFromItems - settlementAmount)
-                                : settlementAmount;
+                            const grossFromItems = og.totalGross;
+                            const netAmount = og.totalPayable - og.totalReceivable;
 
-                            const promotions: any[] = s.order?.orderPromotions ?? [];
+                            const promotions: any[] = og.order?.orderPromotions ?? [];
                             const itemDiscounts = promotions
                                 .filter((p: any) => p.appliesTo === 'PRICE')
                                 .reduce((acc: number, p: any) => acc + Number(p.discountAmount ?? 0), 0);
@@ -1253,8 +1569,6 @@ export default function FinancesScreen() {
                                 .filter((p: any) => p.appliesTo === 'DELIVERY')
                                 .reduce((acc: number, p: any) => acc + Number(p.discountAmount ?? 0), 0);
                             const totalDiscounts = itemDiscounts + deliveryDiscounts;
-
-                            const orderId = s.order?.displayId ?? s.order?.id?.slice(-6) ?? '—';
 
                             return (
                                 <ScrollView
@@ -1266,44 +1580,97 @@ export default function FinancesScreen() {
                                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
                                         <View>
                                             <Text style={{ fontSize: 22, fontWeight: '800', color: '#fff' }}>
-                                                Order #{orderId}
+                                                Order #{og.orderDisplayId}
                                             </Text>
                                             <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 3 }}>
-                                                {formatDateTime(s.order?.orderDate ?? s.createdAt)}
+                                                {formatDateTime(og.order?.orderDate ?? og.latestCreatedAt)}
                                             </Text>
                                         </View>
                                         <View style={{
                                             paddingHorizontal: 12,
                                             paddingVertical: 6,
                                             borderRadius: 10,
-                                            backgroundColor: isPayable ? '#22c55e20' : '#ef444420',
+                                            backgroundColor: netAmount >= 0 ? '#22c55e20' : '#ef444420',
                                             borderWidth: 1,
-                                            borderColor: isPayable ? '#22c55e40' : '#ef444440',
+                                            borderColor: netAmount >= 0 ? '#22c55e40' : '#ef444440',
                                         }}>
-                                            <Text style={{ fontSize: 11, fontWeight: '700', color: isPayable ? '#22c55e' : '#ef4444' }}>
-                                                {isPayable ? 'PAYOUT TO ME' : 'OWES PLATFORM'}
+                                            <Text style={{ fontSize: 11, fontWeight: '700', color: netAmount >= 0 ? '#22c55e' : '#ef4444' }}>
+                                                {netAmount >= 0 ? 'NET PAYOUT' : 'OWES PLATFORM'}
                                             </Text>
                                         </View>
                                     </View>
 
-                                    {/* Settlement status pill */}
-                                    <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
-                                        {[{ label: 'Status', value: s.status },
-                                          s.paidAt ? { label: 'Paid at', value: formatDateTime(s.paidAt) } : null,
-                                          s.paymentMethod ? { label: 'Method', value: s.paymentMethod } : null,
-                                        ].filter(Boolean).map((chip: any) => (
-                                            <View key={chip.label} style={{
-                                                paddingHorizontal: 10,
-                                                paddingVertical: 5,
-                                                borderRadius: 8,
-                                                backgroundColor: '#1a2233',
-                                                borderWidth: 1,
-                                                borderColor: '#263145',
+                                    {/* Settlement status pills */}
+                                    <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+                                        <View style={{
+                                            paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8,
+                                            backgroundColor: '#1a2233', borderWidth: 1, borderColor: '#263145',
+                                        }}>
+                                            <Text style={{ fontSize: 9, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.6 }}>Lines</Text>
+                                            <Text style={{ fontSize: 12, fontWeight: '600', color: '#e2e8f0' }}>{settlementsForOrder.length}</Text>
+                                        </View>
+                                        <View style={{
+                                            paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8,
+                                            backgroundColor: '#1a2233', borderWidth: 1, borderColor: '#263145',
+                                        }}>
+                                            <Text style={{ fontSize: 9, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.6 }}>Status</Text>
+                                            <Text style={{ fontSize: 12, fontWeight: '600', color: settlementsForOrder.some((l: any) => l.status !== 'PAID') ? '#f59e0b' : '#22c55e' }}>
+                                                {settlementsForOrder.some((l: any) => l.status !== 'PAID') ? 'Pending' : 'Paid'}
+                                            </Text>
+                                        </View>
+                                        {settlementsForOrder[0]?.paymentMethod && (
+                                            <View style={{
+                                                paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8,
+                                                backgroundColor: '#1a2233', borderWidth: 1, borderColor: '#263145',
                                             }}>
-                                                <Text style={{ fontSize: 9, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.6 }}>{chip.label}</Text>
-                                                <Text style={{ fontSize: 12, fontWeight: '600', color: '#e2e8f0' }}>{chip.value}</Text>
+                                                <Text style={{ fontSize: 9, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.6 }}>Method</Text>
+                                                <Text style={{ fontSize: 12, fontWeight: '600', color: '#e2e8f0' }}>{settlementsForOrder[0].paymentMethod}</Text>
                                             </View>
-                                        ))}
+                                        )}
+                                    </View>
+
+                                    {/* Settlement Breakdown */}
+                                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>
+                                        Settlement Breakdown
+                                    </Text>
+                                    <View style={{ borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: '#263145', marginBottom: 16 }}>
+                                        {settlementsForOrder.map((line: any, i: number) => {
+                                            const isPayable = line.direction === 'PAYABLE';
+                                            const lineLabel = line.rule?.category
+                                                ? `${line.rule.category}${line.rule.subcategory ? ` · ${line.rule.subcategory}` : ''}`
+                                                : (isPayable ? 'Payout' : 'Commission');
+                                            return (
+                                                <View key={line.id} style={{
+                                                    flexDirection: 'row',
+                                                    justifyContent: 'space-between',
+                                                    paddingHorizontal: 14,
+                                                    paddingVertical: 11,
+                                                    backgroundColor: i % 2 === 0 ? '#0d1421' : '#0a0f1a',
+                                                }}>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                                                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isPayable ? '#22c55e' : '#ef4444' }} />
+                                                        <Text style={{ fontSize: 13, color: '#6b7280', flex: 1 }} numberOfLines={1}>{lineLabel}</Text>
+                                                    </View>
+                                                    <Text style={{ fontSize: 13, fontWeight: '700', color: isPayable ? '#22c55e' : '#ef4444' }}>
+                                                        {isPayable ? '+' : '-'}{formatCurrency(Number(line.amount ?? 0))}
+                                                    </Text>
+                                                </View>
+                                            );
+                                        })}
+                                        <View style={{
+                                            flexDirection: 'row',
+                                            justifyContent: 'space-between',
+                                            paddingHorizontal: 14,
+                                            paddingVertical: 11,
+                                            borderTopWidth: 1,
+                                            borderTopColor: '#263145',
+                                            backgroundColor: '#0d1421',
+                                        }}>
+                                            <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>Net</Text>
+                                            <Text style={{ fontSize: 15, fontWeight: '800', color: netAmount >= 0 ? '#22c55e' : '#ef4444' }}>
+                                                {netAmount >= 0 ? '+' : ''}{formatCurrency(netAmount)}
+                                            </Text>
+                                        </View>
                                     </View>
 
                                     {/* Items */}
@@ -1344,7 +1711,6 @@ export default function FinancesScreen() {
                                                         {formatCurrency(Number(item.unitPrice) * Number(item.quantity))}
                                                     </Text>
                                                 </View>
-                                                {/* Child items (modifiers shown as sub-rows) */}
                                                 {(item.childItems ?? []).map((child: any, ci: number) => (
                                                     <View key={ci} style={{
                                                         flexDirection: 'row',
@@ -1369,22 +1735,16 @@ export default function FinancesScreen() {
                                     <View style={{ borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: '#263145', marginBottom: 16 }}>
                                         {[
                                             { label: 'Items subtotal', value: formatCurrency(grossFromItems), color: '#e2e8f0' },
-                                            s.order?.originalPrice && s.order.originalPrice !== s.order.orderPrice
-                                                ? { label: 'Original price', value: formatCurrency(s.order.originalPrice), color: '#6b7280' }
-                                                : null,
-                                            { label: 'Delivery fee', value: formatCurrency(Number(s.order?.deliveryPrice ?? 0)), color: '#e2e8f0' },
-                                            s.order?.originalDeliveryPrice && s.order.originalDeliveryPrice !== s.order.deliveryPrice
-                                                ? { label: 'Original delivery', value: formatCurrency(s.order.originalDeliveryPrice), color: '#6b7280' }
-                                                : null,
+                                            { label: 'Delivery fee', value: formatCurrency(Number(og.order?.deliveryPrice ?? 0)), color: '#e2e8f0' },
                                             itemDiscounts > 0
                                                 ? { label: 'Item discount', value: `−${formatCurrency(itemDiscounts)}`, color: '#22c55e' }
                                                 : null,
                                             deliveryDiscounts > 0
                                                 ? { label: 'Delivery discount', value: `−${formatCurrency(deliveryDiscounts)}`, color: '#22c55e' }
                                                 : null,
-                                            { label: 'Order total', value: formatCurrency(Number(s.order?.totalPrice ?? 0)), color: '#fff', bold: true },
-                                            { label: 'Platform commission', value: `−${formatCurrency(commissionAmount)}`, color: '#f59e0b', bold: false },
-                                            { label: isPayable ? 'Payout to you' : 'Net (after commission)', value: formatCurrency(netAmount), color: isPayable ? '#22c55e' : '#e2e8f0', bold: true },
+                                            { label: 'Order total', value: formatCurrency(Number(og.order?.totalPrice ?? 0)), color: '#fff', bold: true },
+                                            { label: 'Platform commission', value: `−${formatCurrency(og.totalReceivable)}`, color: '#f59e0b', bold: false },
+                                            { label: 'Net', value: `${netAmount >= 0 ? '+' : ''}${formatCurrency(netAmount)}`, color: netAmount >= 0 ? '#22c55e' : '#ef4444', bold: true },
                                         ].filter(Boolean).map((row: any, i: number) => (
                                             <View key={i} style={{
                                                 flexDirection: 'row',
@@ -1426,7 +1786,7 @@ export default function FinancesScreen() {
 
                                     {/* Close button */}
                                     <Pressable
-                                        onPress={() => setSelectedSettlement(null)}
+                                        onPress={() => setSelectedSettlementOrder(null)}
                                         style={{
                                             borderRadius: 14,
                                             paddingVertical: 14,

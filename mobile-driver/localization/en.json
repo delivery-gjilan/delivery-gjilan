@@ -141,7 +141,20 @@
         "catalog_label": "Catalog",
         "explain_tip": "Tips from customers — forwarded to you by the platform",
         "explain_catalog": "Revenue from catalog products that you collected in cash",
-        "reject_submit": "Submit"
+        "reject_submit": "Submit",
+        "delivery_details": "Delivery Details",
+        "order_info": "Order Info",
+        "order_date": "Order date",
+        "timeline": "Timeline",
+        "assigned": "Assigned",
+        "preparing": "Preparing",
+        "ready": "Ready",
+        "picked_up": "Picked up",
+        "delivered": "Delivered",
+        "pricing": "Pricing",
+        "items_total": "Items",
+        "total": "Total",
+        "status": "Status"
     },
     "messages": {
         "type_message": "Message",

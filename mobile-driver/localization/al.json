@@ -141,7 +141,20 @@
         "catalog_label": "Katalog",
         "explain_tip": "Bakshishet nga klientët — ju përcillen nga platforma",
         "explain_catalog": "Të ardhura nga produktet e katalogut që i keni mbledhur me cash",
-        "reject_submit": "Dërgo"
+        "reject_submit": "Dërgo",
+        "delivery_details": "Detajet e Dërgesës",
+        "order_info": "Info e Porosisë",
+        "order_date": "Data e porosisë",
+        "timeline": "Koha",
+        "assigned": "I caktuar",
+        "preparing": "Duke u përgatitur",
+        "ready": "Gati",
+        "picked_up": "I marrë",
+        "delivered": "I dorëzuar",
+        "pricing": "Çmimet",
+        "items_total": "Artikujt",
+        "total": "Totali",
+        "status": "Statusi"
     },
     "messages": {
         "type_message": "Mesazh",

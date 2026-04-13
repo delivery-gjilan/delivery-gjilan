@@ -346,6 +346,21 @@ export default function SettingsScreen() {
                     />
                 </SettingSection>
 
+                <SettingSection title={t('settings.quick_access', 'Quick Access')}>
+                    <SettingRow
+                        icon="star"
+                        label={t('reviews.title', 'Customer Reviews')}
+                        value={t('settings.reviews_hint', 'See what customers say about you')}
+                        onPress={() => router.push('/reviews' as any)}
+                    />
+                    <SettingRow
+                        icon="chatbubbles"
+                        label={t('tabs.messages', 'Messages')}
+                        value={t('settings.messages_hint', 'Chat with customers')}
+                        onPress={() => router.push('/(tabs)/messages' as any)}
+                    />
+                </SettingSection>
+
                 <SettingSection title={t('settings.notifications', 'Notifications')}>
                     <SettingRow
                         icon="notifications"

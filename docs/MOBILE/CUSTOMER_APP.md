@@ -314,7 +314,7 @@ Step 1: Cart Items          Step 2: Address           Step 3: Review & Confirm
 - Manual code entry remains available even when an eligible auto-promo is active, so users can override with a code.
 - Invalid manual promo attempts show validation feedback and do not clear an already-applied promotion state.
 - Auto-applied promotions can be code-less; UI uses a safe display fallback and does not assume `Promotion.code` is always present.
-- Auto-applied state includes a neutral inline explanation in checkout while still allowing manual code override.
+- Auto-applied state shows an inline explanation only when a specific reason exists (for example min-spend unlock); the generic auto-selected sentence is not shown.
 
 **Applied promo UI (current):**
 - Applied promo display is lightweight and row-based.

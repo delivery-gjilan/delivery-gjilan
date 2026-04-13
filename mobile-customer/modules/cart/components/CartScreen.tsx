@@ -477,7 +477,7 @@ export const CartScreen = () => {
                             '{{amount}}',
                             formatCurrency(Number(selectedEligiblePromotion.spendThreshold)),
                         )
-                        : t.cart.auto_apply_reason_default;
+                        : null;
 
                 if (!mounted) return;
 

@@ -63,7 +63,7 @@ export function PromoCodeSection({
             : null,
     ].filter((item): item is { code: string; summary: string; amount: string } => Boolean(item));
     const isAutoAppliedPromo = promoResult?.source === 'eligible';
-    const autoApplyReason = promoResult?.autoApplyReason?.trim() || t.cart.auto_apply_reason_default;
+    const autoApplyReason = promoResult?.autoApplyReason?.trim() || null;
 
     const inner = (
         <>
@@ -126,7 +126,7 @@ export function PromoCodeSection({
                             </View>
                         ))}
                     </View>
-                    {isAutoAppliedPromo && (
+                    {isAutoAppliedPromo && autoApplyReason && (
                         <>
                             <View style={[styles.autoExplainCard, { backgroundColor: theme.colors.primary + '10', borderColor: theme.colors.primary + '33' }]}>
                                 <Text style={[styles.autoExplainBody, { color: theme.colors.subtext }]}>{autoApplyReason}</Text>

@@ -132,6 +132,62 @@ export const GET_DRIVER_ORDER_FINANCIALS = gql`
             driverNetEarnings
             driverTip
         }
+        order(id: $orderId) {
+            id
+            displayId
+            status
+            paymentCollection
+            orderDate
+            deliveryPrice
+            totalPrice
+            prioritySurcharge
+            driverTip
+            orderPrice
+            preparingAt
+            readyAt
+            outForDeliveryAt
+            deliveredAt
+            driverAssignedAt
+            dropOffLocation {
+                address
+                latitude
+                longitude
+            }
+            pickupLocations {
+                address
+            }
+            driverNotes
+            businesses {
+                business {
+                    id
+                    name
+                }
+                items {
+                    id
+                    name
+                    quantity
+                    unitPrice
+                    notes
+                    inventoryQuantity
+                    selectedOptions {
+                        optionGroupName
+                        optionName
+                        priceAtOrder
+                    }
+                    childItems {
+                        id
+                        name
+                        quantity
+                        unitPrice
+                    }
+                }
+            }
+            orderPromotions {
+                appliesTo
+                discountAmount
+                promoCode
+            }
+        }
     }
 `;
 

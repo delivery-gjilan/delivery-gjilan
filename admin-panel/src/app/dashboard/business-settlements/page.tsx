@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useLazyQuery } from '@apollo/client/react';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/hooks/use-toast';
@@ -69,7 +69,7 @@ export default function BusinessSettlementsPage() {
   const [reqSubmitting, setReqSubmitting] = useState(false);
 
   // Order detail dialog
-  const [selectedSettlement, setSelectedSettlement] = useState<SettlementRecord | null>(null);
+  const [selectedOrderGroup, setSelectedOrderGroup] = useState<any>(null);
   const [fetchFinancials, { data: financialsData, loading: financialsLoading }] = useLazyQuery(
     GET_BUSINESS_ORDER_FINANCIALS,
     { fetchPolicy: 'network-only' },
@@ -112,6 +112,48 @@ export default function BusinessSettlementsPage() {
       .filter(Boolean)
       .some((v) => v!.toString().toLowerCase().includes(normalized));
   });
+
+  // Group filtered settlements by order
+  const orderGroups = useMemo(() => {
+    const grouped: Record<string, {
+      orderId: string;
+      orderDisplayId: string;
+      order: any;
+      settlements: SettlementRecord[];
+      totalReceivable: number;
+      totalPayable: number;
+      latestCreatedAt: string;
+    }> = {};
+
+    filtered.forEach((s) => {
+      const orderId = s.order?.id ?? s.id;
+      if (!grouped[orderId]) {
+        grouped[orderId] = {
+          orderId,
+          orderDisplayId: s.order?.displayId ?? s.order?.id?.slice(0, 8) ?? '—',
+          order: s.order,
+          settlements: [],
+          totalReceivable: 0,
+          totalPayable: 0,
+          latestCreatedAt: s.createdAt as string,
+        };
+      }
+      grouped[orderId].settlements.push(s);
+      const amount = Number(s.amount ?? 0);
+      if (s.direction === SettlementDirection.Receivable) {
+        grouped[orderId].totalReceivable += amount;
+      } else {
+        grouped[orderId].totalPayable += amount;
+      }
+      if (new Date(s.createdAt as string) > new Date(grouped[orderId].latestCreatedAt)) {
+        grouped[orderId].latestCreatedAt = s.createdAt as string;
+      }
+    });
+
+    return Object.values(grouped).sort(
+      (a, b) => new Date(b.latestCreatedAt).getTime() - new Date(a.latestCreatedAt).getTime(),
+    );
+  }, [filtered]);
 
   const handleRefresh = async () => {
     await Promise.all([refetch(), refetchBalance(), refetchRequests()]);
@@ -292,11 +334,11 @@ export default function BusinessSettlementsPage() {
             <TableHeader>
               <TableRow className="border-gray-800">
                 <TableHead className="text-gray-400">Order</TableHead>
-                <TableHead className="text-gray-400">Direction</TableHead>
-                <TableHead className="text-gray-400">Amount</TableHead>
+                <TableHead className="text-gray-400">Lines</TableHead>
+                <TableHead className="text-gray-400">Receivable</TableHead>
+                <TableHead className="text-gray-400">Payable</TableHead>
+                <TableHead className="text-gray-400">Net</TableHead>
                 <TableHead className="text-gray-400">Status</TableHead>
-                <TableHead className="text-gray-400">Payment Method</TableHead>
-                <TableHead className="text-gray-400">Paid At</TableHead>
                 <TableHead className="text-gray-400">Date</TableHead>
               </TableRow>
             </TableHeader>
@@ -309,41 +351,47 @@ export default function BusinessSettlementsPage() {
                     ))}
                   </TableRow>
                 ))
-              ) : filtered.length === 0 ? (
+              ) : orderGroups.length === 0 ? (
                 <TableRow className="border-gray-800">
                   <TableCell colSpan={7} className="text-center text-gray-500 py-10">
                     No settlements found.
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((s) => (
-                  <TableRow
-                    key={s.id}
-                    className="border-gray-800 hover:bg-gray-800/40 cursor-pointer"
-                    onClick={() => {
-                      setSelectedSettlement(s);
-                      if (s.order?.id) {
-                        fetchFinancials({ variables: { orderId: s.order.id, businessId } });
-                      }
-                    }}
-                  >
-                    <TableCell className="font-mono text-xs text-gray-300">
-                      {s.order?.displayId ?? s.order?.id?.slice(0, 8) ?? '—'}
-                    </TableCell>
-                    <TableCell>{directionBadge(s.direction)}</TableCell>
-                    <TableCell className="font-semibold text-white">
-                      €{Number(s.amount ?? 0).toFixed(2)}
-                    </TableCell>
-                    <TableCell>{statusBadge(!!s.isSettled)}</TableCell>
-                    <TableCell className="text-gray-400 text-sm">{(s as any).paymentMethod ?? '—'}</TableCell>
-                    <TableCell className="text-gray-400 text-sm">
-                      {(s as any).paidAt ? new Date((s as any).paidAt as string).toLocaleDateString() : '—'}
-                    </TableCell>
-                    <TableCell className="text-gray-400 text-sm">
-                      {s.createdAt ? new Date(s.createdAt as string).toLocaleDateString() : '—'}
-                    </TableCell>
-                  </TableRow>
-                ))
+                orderGroups.map((og) => {
+                  const netAmount = og.totalPayable - og.totalReceivable;
+                  const allSettled = og.settlements.every((s: SettlementRecord) => !!s.isSettled);
+                  return (
+                    <TableRow
+                      key={og.orderId}
+                      className="border-gray-800 hover:bg-gray-800/40 cursor-pointer"
+                      onClick={() => {
+                        setSelectedOrderGroup(og);
+                        if (og.order?.id) {
+                          fetchFinancials({ variables: { orderId: og.order.id, businessId } });
+                        }
+                      }}
+                    >
+                      <TableCell className="font-mono text-xs text-gray-300">
+                        {og.orderDisplayId}
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-400">{og.settlements.length}</TableCell>
+                      <TableCell className="text-sm font-medium text-red-400">
+                        {og.totalReceivable > 0 ? `€${og.totalReceivable.toFixed(2)}` : '—'}
+                      </TableCell>
+                      <TableCell className="text-sm font-medium text-green-400">
+                        {og.totalPayable > 0 ? `€${og.totalPayable.toFixed(2)}` : '—'}
+                      </TableCell>
+                      <TableCell className={cn('text-sm font-semibold', netAmount >= 0 ? 'text-green-400' : 'text-red-400')}>
+                        {netAmount >= 0 ? '+' : ''}€{netAmount.toFixed(2)}
+                      </TableCell>
+                      <TableCell>{statusBadge(allSettled)}</TableCell>
+                      <TableCell className="text-gray-400 text-sm">
+                        {og.latestCreatedAt ? new Date(og.latestCreatedAt).toLocaleDateString() : '—'}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
@@ -395,40 +443,64 @@ export default function BusinessSettlementsPage() {
       </Dialog>
 
       {/* Order Financial Breakdown Dialog */}
-      <Dialog open={selectedSettlement !== null} onOpenChange={(open) => { if (!open) setSelectedSettlement(null); }}>
+      <Dialog open={selectedOrderGroup !== null} onOpenChange={(open) => { if (!open) setSelectedOrderGroup(null); }}>
         <DialogContent className="bg-gray-900 border-gray-700 text-white max-w-md">
           <DialogHeader>
             <DialogTitle>Order Financial Breakdown</DialogTitle>
           </DialogHeader>
-          {selectedSettlement && (() => {
-            const s = selectedSettlement;
+          {selectedOrderGroup && (() => {
+            const og = selectedOrderGroup;
             const fin = financialsData?.businessOrderFinancials;
+            const netAmount = og.totalPayable - og.totalReceivable;
+            const allSettled = og.settlements.every((s: SettlementRecord) => !!s.isSettled);
             return (
               <div className="space-y-4 mt-2">
                 {/* Order info */}
                 <div className="rounded-lg bg-gray-800 border border-gray-700 p-3 space-y-1.5">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Order</span>
-                    <span className="font-mono text-gray-200">{s.order?.displayId ?? s.order?.id?.slice(0, 8) ?? '—'}</span>
+                    <span className="font-mono text-gray-200">{og.orderDisplayId}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Date</span>
-                    <span className="text-gray-200">{s.createdAt ? new Date(s.createdAt as string).toLocaleDateString() : '—'}</span>
+                    <span className="text-gray-200">{og.latestCreatedAt ? new Date(og.latestCreatedAt).toLocaleDateString() : '—'}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-400">Settlement</span>
-                    <div className="flex items-center gap-2">
-                      {directionBadge(s.direction)}
-                      <span className="font-semibold text-white">€{Number(s.amount ?? 0).toFixed(2)}</span>
-                    </div>
+                    <span className="text-gray-400">Net</span>
+                    <span className={cn('font-semibold', netAmount >= 0 ? 'text-green-400' : 'text-red-400')}>
+                      {netAmount >= 0 ? '+' : ''}€{netAmount.toFixed(2)}
+                    </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Status</span>
-                    {statusBadge(!!s.isSettled)}
+                    {statusBadge(allSettled)}
                   </div>
                 </div>
 
-                {/* Financial breakdown */}
+                {/* Settlement lines */}
+                <div className="rounded-lg bg-gray-800 border border-gray-700 p-3 space-y-2">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Settlement Lines</p>
+                  {og.settlements.map((s: SettlementRecord) => (
+                    <div key={s.id} className="flex justify-between text-sm items-center">
+                      <div className="flex items-center gap-2">
+                        {directionBadge(s.direction)}
+                        {statusBadge(!!s.isSettled)}
+                      </div>
+                      <span className={cn('font-medium', s.direction === SettlementDirection.Payable ? 'text-green-400' : 'text-red-400')}>
+                        {s.direction === SettlementDirection.Payable ? '+' : '-'}€{Number(s.amount ?? 0).toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="h-px bg-gray-700 my-1" />
+                  <div className="flex justify-between text-sm font-semibold">
+                    <span className="text-white">Net</span>
+                    <span className={netAmount >= 0 ? 'text-green-400' : 'text-red-400'}>
+                      {netAmount >= 0 ? '+' : ''}€{netAmount.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Financial breakdown from API */}
                 {financialsLoading ? (
                   <div className="flex justify-center py-6">
                     <Skeleton className="h-24 w-full bg-gray-800 rounded-lg" />
@@ -490,7 +562,7 @@ export default function BusinessSettlementsPage() {
                       </span>
                     </div>
                   </div>
-                ) : s.order?.id ? (
+                ) : og.order?.id ? (
                   <p className="text-sm text-gray-500 text-center py-4">No financial data available for this order.</p>
                 ) : null}
               </div>

@@ -90,7 +90,7 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="dashboard"
                 options={{
-                    href: canViewAnalytics ? undefined : null,
+                    href: null,
                     title: t('tabs.dashboard', 'Dashboard'),
                     tabBarIcon: ({ color }) => (
                         <Ionicons name="analytics" size={26} color={color} />
