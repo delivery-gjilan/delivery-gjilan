@@ -3,6 +3,8 @@ export const PROD_ENV = 'production';
 
 export const SUPPORTED_LANGUAGES = ['en', 'al'] as const;
 
+export const ADMIN_ROLES = ['ADMIN', 'SUPER_ADMIN', 'BUSINESS_OWNER', 'BUSINESS_EMPLOYEE'] as const;
+
 export const ORDER_STATUS_COLORS: Record<string, string> = {
     PENDING: '#f59e0b',
     AWAITING_APPROVAL: '#f97316',

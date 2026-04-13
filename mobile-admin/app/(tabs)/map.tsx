@@ -192,6 +192,7 @@ export default function MapScreen() {
     const [approveOrder] = useMutation(APPROVE_ORDER);
 
     useEffect(() => {
+        const debounceTimer = setTimeout(() => {
         const calcRoutes = async () => {
             for (const order of activeOrders) {
                 const cacheKey = `${order.id}-${order.driver?.id || 'none'}-${order.status}`;
@@ -240,6 +241,8 @@ export default function MapScreen() {
         };
 
         calcRoutes();
+        }, 1500); // 1.5 s debounce — prevent hammering directions proxy on burst subscription updates
+        return () => clearTimeout(debounceTimer);
     }, [activeOrders.map((o: any) => `${o.id}-${o.driver?.id || 'none'}-${o.status}`).join(','), drivers]);
 
     useEffect(() => {

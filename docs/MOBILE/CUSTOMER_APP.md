@@ -3,11 +3,11 @@
 <!-- MDS:M12 | Domain: Mobile | Updated: 2026-04-13 -->
 <!-- Depends-On: A1, B1, B2, B5, B6, BL1, BL3, BL5, M1, M2, M3, M10 -->
 <!-- Depended-By: (none yet) -->
-<!-- Nav: Customer app architecture, all screens, all hooks/stores, all GraphQL ops, i18n, admin-in-customer, config, and optimization candidates. -->
+<!-- Nav: Customer app architecture, all screens, all hooks/stores, all GraphQL ops, i18n, config, and optimization candidates. -->
 
 ## Overview
 
-`mobile-customer` is the consumer-facing app in the Zipp Go platform. It lets customers browse businesses (restaurants, shops, pharmacies), build a cart, place orders, and track deliveries in real-time. It also embeds a full admin panel (role-gated) for operational management.
+`mobile-customer` is the consumer-facing app in the Zipp Go platform. It lets customers browse businesses (restaurants, shops, pharmacies), build a cart, place orders, and track deliveries in real-time.
 
 - **App Name:** Zipp Go
 - **Bundle ID:** `com.artshabani.mobilecustomer` (iOS + Android)
@@ -53,28 +53,13 @@ mobile-customer/
 │   │   ├── active.tsx        # Active orders list
 │   │   ├── history.tsx       # Order history (paginated, grouped by month)
 │   │   └── [orderId].tsx     # Order detail (map + tracking + timeline)
-│   └── admin/                # Admin panel (role-gated)
-│       ├── _layout.tsx       # ADMIN/SUPER_ADMIN guard
-│       ├── index.tsx          # Redirect to admin/(tabs)
-│       ├── (tabs)/           # Admin tab navigator
-│       │   ├── orders.tsx    # All orders + status filters
-│       │   ├── dashboard.tsx # Stats, revenue, driver counts
-│       │   └── more.tsx      # Navigation hub + store toggle
-│       ├── order/[orderId]   # Order management (assign, prep, cancel)
-│       ├── drivers.tsx       # Driver list
-│       ├── driver/[driverId] # Driver detail + toggle online
-│       ├── businesses.tsx    # Business list
-│       ├── business/[businessId] # Business detail
-│       ├── users.tsx         # User list + behavior analytics
-│       ├── settlements.tsx   # Settlement list + mark paid
-│       └── notifications.tsx # Campaign list + send
 ├── modules/                  # Domain modules
 │   ├── auth/hooks/           # useAuth (signup/login flow)
 │   ├── business/             # BusinessScreen, hooks, 13 components
 │   ├── cart/                 # CartScreen, 14 components, 4 hooks, 3 stores
 │   ├── orders/               # 5 components, 3 hooks, 1 store
 │   └── product/              # ProductScreen, 4 components, 4 hooks
-├── components/               # 35 shared UI components
+├── components/               # Shared UI components
 ├── hooks/                    # 18 app-level hooks
 ├── store/                    # 11 Zustand stores
 ├── graphql/operations/       # 78+ GraphQL operations
@@ -128,7 +113,7 @@ index.tsx (Expo entry)
 | 2 | Restaurants | restaurant | `restaurants.tsx` | Status filters (all/open/promo), category filters, FlatList with mixed item types (cards, featured, promo banners), pagination. |
 | 3 | Shops | basket | `market.tsx` | State machine: DISCOVER → SHOP → SUBCATEGORY → PRODUCTS. 2x2 category grid, Wolt-style tabs, hero header with collapse. |
 | 4 | Profile | person | `profile.tsx` | Cache-only reads. Menu sections: personal info, preferences (language, notifications), settings (theme), account (slide-to-delete). |
-| — | Analytics | — | `analytics.tsx` | Hidden (`href: null`). Admin-only internal dashboard. |
+| — | Analytics | — | `analytics.tsx` | Hidden (`href: null`). Internal dashboard route. |
 
 Tab bar uses animated underline markers with spring physics (damping: 14, stiffness: 220).
 
@@ -433,29 +418,9 @@ After DELIVERED status, a review prompt is queued:
 
 ---
 
-## Admin Panel (Embedded)
+## Admin Surface
 
-The customer app embeds a full admin panel accessible only to ADMIN and SUPER_ADMIN roles. Gated in `app/admin/_layout.tsx` with `useEffect` role check → redirect to profile if unauthorized.
-
-### Admin Screens
-| Screen | Key Features |
-|--------|-------------|
-| **Dashboard** | Today's orders, active orders, revenue, online/total drivers, status breakdown, recent 10 orders |
-| **Orders** | Status filter tabs (7 statuses), order count badges, FlatList with cards |
-| **Order Detail** | Status management, prep time (10/15/20/30/45/60 min), driver assignment (bottom sheet), cancel |
-| **Drivers** | Online/offline status, active order count, tap for detail |
-| **Driver Detail** | Profile, call button, toggle online/offline, active orders, earnings |
-| **Businesses** | Open/closed status, tap for detail |
-| **Business Detail** | Profile, location, contact actions |
-| **Users** | Role badges, behavior analytics query (total orders, spend, cancellation rate) |
-| **Settlements** | Type/status filters, mark-as-paid with confirmation |
-| **Notifications** | Campaign cards, send draft campaigns |
-| **More** | Navigation hub, store status toggle, theme/language settings |
-
-### Admin Subscriptions
-- `AdminAllOrdersUpdated` — order stream for real-time order list
-- `AdminDriversUpdated` — driver connection stream
-- `useAdminOrdersSubscription` hook — isolated from customer subscriptions, 1200ms throttled refetch
+The customer app route tree is customer-only. Admin routes and admin helper modules are not part of this package.
 
 ---
 
@@ -464,7 +429,7 @@ The customer app embeds a full admin panel accessible only to ADMIN and SUPER_AD
 - **Languages:** English (`en.json`) + Albanian (`al.json`)
 - **Key count:** 500+ strings
 - **Validation:** `localization/schema.ts` defines Zod schema; `localization/validate.ts` enforces parity at build time (`npm run prestart` → `validate:translations`)
-- **Coverage:** Auth, cart, orders, product, business, profile, home, admin, error messages, status badges, CTAs, modal copy
+- **Coverage:** Auth, cart, orders, product, business, profile, home, error messages, status badges, CTAs, modal copy
 - **Usage:** `useTranslations()` hook returns `{ t, language }`. All user-visible strings go through `t.section.key`.
 
 ---
@@ -550,7 +515,7 @@ Profile tab uses `fetchPolicy: 'cache-only'` — zero network calls. The root-le
 5. **Image optimization** — `expo-image` (used for business/product images) should leverage blur hash placeholders if not already. Check CDN-side image resizing for thumbnails vs detail views.
 
 ### Code Quality
-6. **Admin panel coupling** — The embedded admin is a significant code surface (17 queries, 11 mutations, 3 subscriptions, ~10 screens) inside a customer app. Consider extracting to a shared module or lazy-loading the admin route group to reduce initial bundle.
+6. **Feature boundary discipline** — Keep this package customer-focused and avoid adding role-specific operational surfaces directly into the app router.
 7. **Store naming inconsistency** — Some stores use `useXStore` naming (e.g., `useThemeStore`), others don't (e.g., `authStore`, `storeStatusStore`). Standardize to one convention.
 8. **Module cross-imports** — The README states "modules do not import from each other," but cart hooks reference business hooks (e.g., `useProductInCart` lives in business module but manipulates cart). Consider clarifying which module owns product-cart interactions.
 9. **Profile `as any` cleanup** — OrderDetails previously had `as any` workarounds for translation keys that have been partially cleaned up. Audit for any remaining type assertions.

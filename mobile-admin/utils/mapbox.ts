@@ -4,6 +4,10 @@ export const MAPBOX_TOKEN =
     process.env.EXPO_PUBLIC_MAPBOX_TOKEN ??
     '';
 
+if (__DEV__ && !process.env.EXPO_PUBLIC_MAPBOX_TOKEN) {
+    console.error('[Mapbox] EXPO_PUBLIC_MAPBOX_TOKEN is not set — map will render blank.');
+}
+
 const API_BASE = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/graphql$/, '');
 
 /**

@@ -51,7 +51,7 @@
 | M11 | [MOBILE/PUSH_AND_LIVE_ACTIVITY_REFACTOR_PLAN.md](MOBILE/PUSH_AND_LIVE_ACTIVITY_REFACTOR_PLAN.md) | Mobile | Full audit of all push notifications and Live Activity; copy refinements; Android notification icon wiring; brand logo in Lock Screen widget; Albanian copy corrections |
 | M12 | [MOBILE/CUSTOMER_APP.md](MOBILE/CUSTOMER_APP.md) | Mobile | Customer app deep-dive: all 20+ screens, 78+ GraphQL ops, 18 hooks, 11+4 stores, 35 shared components, 5 domain modules (auth/business/cart/orders/product), 3-step checkout, live tracking pipeline, embedded admin panel, localization, config, optimization candidates |
 | M13 | [MOBILE/BUSINESS_APP.md](MOBILE/BUSINESS_APP.md) | Mobile | Business app deep-dive: 7 tabs (orders/products/dashboard/finances/messages/settlement-history/settings), 36 GraphQL ops (12q/22m/2s), 3 Zustand stores (auth/locale/notifSettings), 4 hooks (authInit/deviceMonitoring/notifications/translation), 3 global components (BusinessMessageBanner/InfoBanner/StoreClosedOverlay), RBAC (3 permissions), device health telemetry, order subscription sync, audio beep alerts, EN/AL i18n, full finances+settlements UI, 18 optimization candidates |
-| M14 | [MOBILE/ADMIN_APP.md](MOBILE/ADMIN_APP.md) | Mobile | Admin app deep-dive: 3 tabs (map/orders/ops) + order detail modal + notification campaigns, 38+ GraphQL ops (11q/28m/3s), 4 Zustand stores (auth/locale/map/theme), 10 hooks (useAdminPtt/useAppSetup/useAuth/useAuthInit/useNotifications/useOperationalOrderAlerts/useSyncTheme/useTheme/useTranslations/useInitializeTranslation), PTT bidirectional Agora RTC, live Mapbox map (driver tracking + route polylines + order pins), operational alerts (new order + late-pending), apollo3-cache-persist configured, typed i18n schema, EN/AL, React Compiler enabled, 19 optimization candidates |
+| M14 | [MOBILE/ADMIN_APP.md](MOBILE/ADMIN_APP.md) | Mobile | Admin app deep-dive: 3 tabs (map/orders/ops) + order detail modal + notification campaigns, 38+ GraphQL ops (11q/28m/3s), 4 Zustand stores (auth/locale/map/theme), 10 hooks (useAdminPtt/useAppSetup/useAuth/useAuthInit/useNotifications/useOperationalOrderAlerts/useSyncTheme/useTheme/useTranslations/useInitializeTranslation), PTT bidirectional Agora RTC, live Mapbox map (driver tracking + route polylines + order pins), operational alerts (new order + late-pending), apollo3-cache-persist configured, typed i18n schema, EN/AL, React Compiler enabled, 19 optimization candidates; optimizations applied: persistCache blank-screen fix (#11/#12), useTranslations English fallback (#10), LoginResult+OrdersQueryResult types removing as-any (#7/#14), route-calc 1.5 s debounce (#3), ADMIN_ROLES extracted to utils/constants.ts (#6), Mapbox token dev warning (#15) |
 | O1 | [OPERATIONS/MONITORING.md](OPERATIONS/MONITORING.md) | Operations | Health endpoints, Prometheus, Grafana phases |
 | O2 | [OPERATIONS/OBSERVABILITY.md](OPERATIONS/OBSERVABILITY.md) | Operations | Loki, Promtail, structured logging, runbooks |
 | O3 | [OPERATIONS/NOTIFICATIONS.md](OPERATIONS/NOTIFICATIONS.md) | Operations | Query builder, campaigns, payload fields |
@@ -74,8 +74,8 @@
 | O20 | [OPERATIONS/DEPLOYMENT_GUIDE.md](OPERATIONS/DEPLOYMENT_GUIDE.md) | Operations | Hetzner production deployment runbook: server bootstrap, Docker stack, Caddy TLS on api.zippgo.uk, health verification, and GHCR deploy flow |
 | O16 | [DEMO_MODE_PLAN.md](DEMO_MODE_PLAN.md) | Operations | Apple review demo-account flow, auto-progression behavior, reviewer credentials strategy, and admin-panel demo-account operations |
 | O21 | [OPERATIONS/OPTIMIZATION_TRACKER.md](OPERATIONS/OPTIMIZATION_TRACKER.md) | Operations | Per-project optimization recommendations tracker — performance, code quality, reliability, and future considerations with priority and status. Covers: mobile-customer (16 items), mobile-driver (15 items), mobile-business (18 items), mobile-admin (19 items), admin-panel/web (21 items), web-customer (21 items) |
-| W1 | [WEB/ADMIN_PANEL_APP.md](WEB/ADMIN_PANEL_APP.md) | Web | Admin panel deep-dive: Next.js 16 App Router, 21 dashboard routes + 6 admin-only routes, 138 GraphQL ops (51q/82m/5s), role system (SUPER_ADMIN/ADMIN/BUSINESS_OWNER/BUSINESS_EMPLOYEE), Mapbox live map + Agora PTT, Apollo 3 + graphql-ws, 9 custom hooks, drag-and-drop (dnd-kit), push campaign query builder, ops-wall REST monitor, audit logs, settlements, inventory, all known issues and tech debt. Optimizations applied: `getAuthToken()` util (#1/#2), BannerType enum casts in topbar (#5), businesses/[id] businessType pre-fill bug (#7), ScheduleEditor UTF-8 arrow (#8), debug logs removed (#15), categories GET_BUSINESSES skip (#17) |
-| W2 | [WEB/WEB_CUSTOMER_APP.md](WEB/WEB_CUSTOMER_APP.md) | Web | Web customer deep-dive: Next.js 16 / React 19, 11 routes (home/business/market/product/orders/profile/addresses/checkout), 6 Zustand stores, ~43 GraphQL ops (20q/20m/3s), Mapbox address picker + live order tracking, 5-step signup, animated driver map with cinematic approach, i18n (en/al), Apollo 4 + graphql-ws, all known bugs (market qty stepper, cancelled-order delivered modal, N+1 home load) |
+| W1 | [WEB/ADMIN_PANEL_APP.md](WEB/ADMIN_PANEL_APP.md) | Web | Admin panel deep-dive: Next.js 16 App Router, 21 dashboard routes + 6 admin-only routes, 138 GraphQL ops (51q/82m/5s), role system (SUPER_ADMIN/ADMIN/BUSINESS_OWNER/BUSINESS_EMPLOYEE), Mapbox live map + Agora PTT, Apollo 3 + graphql-ws, 9 custom hooks, drag-and-drop (dnd-kit), push campaign query builder, ops-wall REST monitor, audit logs, settlements, inventory, all known issues and tech debt. Optimizations applied: `getAuthToken()` util (#1/#2), BannerType enum casts in topbar (#5), businesses/[id] businessType pre-fill bug (#7), ScheduleEditor UTF-8 arrow (#8), debug logs removed (#15), categories GET_BUSINESSES skip (#17), duplicate constants extracted to `lib/constants/orderHelpers.ts` (#9), `@ts-nocheck` removed from 7 files — businesses, promotions, notifications, business-settlements, orders/cancelled, admin/banners, SubcategoriesBlock — tsc clean (#4) |
+| W2 | [WEB/WEB_CUSTOMER_APP.md](WEB/WEB_CUSTOMER_APP.md) | Web | Web customer deep-dive: Next.js 16 / React 19, 11 routes (home/business/market/product/orders/profile/addresses/checkout), 6 Zustand stores, ~43 GraphQL ops (20q/20m/3s), Mapbox address picker + live order tracking, 5-step signup, animated driver map with cinematic approach, i18n (en/al), Apollo 4 + graphql-ws. Fixed: market qty stepper (#1), cancelled-order delivered modal (#2), N+1 GET_BUSINESSES (#6), ME_QUERY token validation on mount (#10), Orders tab added to mobile bottom nav (#13) |
 | UI1 | [ADMIN_MOBILEBUSINESS_UI_CONTEXT.md](ADMIN_MOBILEBUSINESS_UI_CONTEXT.md) | UI | Product types, variant groups, admin/mobile-business UX |
 | UI2 | [ADMIN_PANEL_BUSINESS_SETTLEMENTS.md](ADMIN_PANEL_BUSINESS_SETTLEMENTS.md) | UI | Business-facing settlements semantics, filters, lazy order details |
 
@@ -421,13 +421,24 @@ ARCHITECTURE (A1)
 | `graphql/auth.ts` | M13 — `GET_ME` query (GetMeBusiness) added |
 | `app/(tabs)/index.tsx` | M13 — 17 modal/view `useState` consolidated to `useReducer` (`screenReducer`); `isTablet` wrapped in `useMemo`; beep haptic fallback added |
 
+### Web Customer (web-customer/)
+| File | Referenced By |
+|------|--------------|
+| `src/hooks/useHydratedBusinesses.ts` | W2 — single `useQuery(GET_BUSINESSES)` (was N+1 per-business hydration loop) |
+| `src/graphql/operations/businesses/queries.ts` | W2 — `GET_BUSINESSES` includes full business fields |
+| `src/app/(main)/market/page.tsx` | W2 — qty stepper fixed: finds cart item by `productId` before calling `updateQuantity` |
+| `src/components/layout/ActiveOrderBanner.tsx` | W2 — delivered modal only fires when `found?.status === "DELIVERED"` (not on disappear) |
+| `src/lib/auth-context.tsx` | W2 — `ME_QUERY` called on mount to validate stored token; stale token clears auth |
+| `src/components/layout/Header.tsx` | W2 — Orders tab added to mobile bottom nav (authenticated only) |
+| `src/lib/constants/orderHelpers.ts` | W1 — shared `TRUSTED_CUSTOMER_MARKER`, `APPROVAL_MODAL_SUPPRESS_MARKER`, `getMarginSeverity` |
+
 ---
 
 ## Versioning
 
 | Field | Value |
 |-------|-------|
-| Last full scan | 2026-04-13 (mobile-business M13 optimizations complete: apollo3-cache-persist wired, useReducer for orders screen, locale onRehydrateStorage, UNAUTHENTICATED logout, resolveDeviceId extracted, setNotificationHandler moved, StoreClosedOverlay pointer fix, me query on startup, beep haptic fallback, Reanimated banner migration) |
+| Last full scan | 2026-04-13 (M13 optimizations complete; W1: @ts-nocheck removed × 7 files tsc-clean, duplicate constants extracted; W2: market qty stepper, cancelled-order delivered modal, N+1 home load, ME_QUERY validation, mobile Orders tab) |
 | Total MDS files | 50 |
 | Total docs/ files | 35 |
 | Broken links found | 0 |

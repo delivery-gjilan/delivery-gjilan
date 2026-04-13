@@ -163,7 +163,6 @@ export function PromoCodeSection({
                                 </TouchableOpacity>
                             </View>
                         </>
-                        </View>
                     )}
                 </>
             ) : (

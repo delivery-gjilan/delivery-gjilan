@@ -14,7 +14,12 @@ export default function Providers({ children }: ProvidersProps) {
     const [cacheRestored, setCacheRestored] = useState(false);
 
     useEffect(() => {
-        cacheReady.then(() => setCacheRestored(true));
+        cacheReady
+            .then(() => setCacheRestored(true))
+            .catch((err) => {
+                console.warn('[ApolloCache] Cache restore failed, continuing without cache:', err);
+                setCacheRestored(true);
+            });
     }, []);
 
     if (!cacheRestored) return null;

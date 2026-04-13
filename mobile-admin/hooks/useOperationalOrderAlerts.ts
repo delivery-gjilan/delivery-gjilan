@@ -6,6 +6,18 @@ import { useAuthStore } from '@/store/authStore';
 
 const LATE_PENDING_MINUTES = 15;
 
+type OrdersQueryResult = {
+    orders: {
+        orders: Array<{
+            id: string;
+            displayId?: string | null;
+            status: string;
+            orderDate: string;
+            businesses?: Array<{ business?: { name?: string } | null }> | null;
+        }>;
+    };
+};
+
 export function useOperationalOrderAlerts() {
     const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
@@ -14,7 +26,7 @@ export function useOperationalOrderAlerts() {
     const latePendingNotifiedRef = useRef<Set<string>>(new Set());
     const ordersRef = useRef<any[]>([]);
 
-    const { data } = useQuery(GET_ORDERS, {
+    const { data } = useQuery<OrdersQueryResult>(GET_ORDERS, {
         variables: { limit: 200, offset: 0 },
         skip: !isAuthenticated,
         fetchPolicy: 'network-only',
@@ -70,7 +82,7 @@ export function useOperationalOrderAlerts() {
             return;
         }
 
-        const orders = Array.isArray((data as any)?.orders?.orders) ? (data as any).orders.orders : [];
+        const orders = Array.isArray(data?.orders?.orders) ? data.orders.orders : [];
         ordersRef.current = orders;
 
         if (!initializedRef.current && orders.length > 0) {
@@ -85,12 +97,12 @@ export function useOperationalOrderAlerts() {
         if (initializedRef.current) {
             void evaluateLatePending(orders);
         }
-    }, [(data as any)?.orders?.orders, evaluateLatePending, isAuthenticated]);
+    }, [data?.orders?.orders, evaluateLatePending, isAuthenticated]);
 
     useSubscription(ALL_ORDERS_SUBSCRIPTION, {
         skip: !isAuthenticated,
         onData: ({ data: subData }) => {
-            const incoming = (subData.data as any)?.allOrdersUpdated as any[] | undefined;
+            const incoming = (subData.data as { allOrdersUpdated?: any[] } | null)?.allOrdersUpdated;
             if (!incoming || incoming.length === 0) return;
 
             incoming.forEach((order) => {

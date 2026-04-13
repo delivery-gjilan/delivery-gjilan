@@ -122,8 +122,9 @@ export const cacheReady: Promise<void> = persistCache({
     maxSize: 5 * 1024 * 1024,
     debug: __DEV__,
 }).catch((err) => {
-    console.warn('[ApolloCache] Failed to persist cache:', err);
-});
+    console.warn('[ApolloCache] Failed to persist cache, starting fresh:', err);
+    // Resolve (not reject) so Providers can always proceed
+}) as Promise<void>;
 
 const client = new ApolloClient({
     link: ApolloLink.from([logLink, splitLink]),

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/store/authStore';
 import { getValidAccessToken } from '@/lib/graphql/authSession';
+import { ADMIN_ROLES } from '@/utils/constants';
 
 /**
  * Hook to initialize authentication state on app startup
@@ -65,8 +66,7 @@ export function useAuthInitialization() {
                 }
 
                 // Validate admin user role
-                const ADMIN_ROLES = ['ADMIN', 'SUPER_ADMIN', 'BUSINESS_OWNER', 'BUSINESS_EMPLOYEE'];
-                if (!ADMIN_ROLES.includes(user.role)) {
+                if (!ADMIN_ROLES.includes(user.role as (typeof ADMIN_ROLES)[number])) {
                     console.log('[AuthInit] Invalid role for admin app, logging out');
                     await logout();
                     router.replace('/login');

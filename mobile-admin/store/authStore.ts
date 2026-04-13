@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { deleteTokens } from '@/utils/secureTokenStore';
+import { ADMIN_ROLES } from '@/utils/constants';
 
 export type UserRole = 'ADMIN' | 'SUPER_ADMIN' | 'BUSINESS_OWNER' | 'BUSINESS_EMPLOYEE';
 
@@ -30,8 +31,6 @@ interface AuthState {
     login: (token: string, user: AuthUser) => void;
     logout: () => void;
 }
-
-const ADMIN_ROLES: UserRole[] = ['ADMIN', 'SUPER_ADMIN', 'BUSINESS_OWNER', 'BUSINESS_EMPLOYEE'];
 
 const calculateIsAuthenticated = (token: string | null, user: AuthUser | null): boolean => {
     return !!(token && user && ADMIN_ROLES.includes(user.role));

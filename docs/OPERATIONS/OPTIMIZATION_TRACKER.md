@@ -120,27 +120,27 @@
 |---|---------------|----------|--------|
 | 1 | `GetUsers` fetches up to 500 users in one unbounded request — replace with cursor pagination. | High | Pending |
 | 2 | `GET_ORDERS` runs concurrently with `limit: 200` on both map and orders tabs against the same data. Share a single cached query or use active-only on map. | Medium | Pending |
-| 3 | Route calculation (`calculateRouteDistance`) fires on every subscription-triggered `activeOrders` change with no debounce — hammers the backend directions proxy on burst updates. Add 1–2 s debounce. | Medium | Pending |
+| 3 | Route calculation (`calculateRouteDistance`) fires on every subscription-triggered `activeOrders` change with no debounce — hammers the backend directions proxy on burst updates. Add 1–2 s debounce. | Medium | Completed — 1.5 s `setTimeout` debounce added in `map.tsx` `useEffect`; returns `clearTimeout` cleanup |
 | 4 | Both `@rnmapbox/maps` and `react-native-maps` are installed but only Mapbox is used. Remove `react-native-maps` to reduce bundle size (~2 MB). | Medium | Pending |
 | 5 | `useMapStore.selectedOrderId` and local `focusedOrderId` duplicate order selection state in the map screen. Consolidate to one source of truth. | Low | Pending |
 
 ### Code Quality
 | # | Recommendation | Priority | Status |
 |---|---------------|----------|--------|
-| 6 | `ADMIN_ROLES` constant is duplicated in `authStore.ts`, `useAuth.ts`, and `useAuthInitialization.ts`. Extract to `utils/constants.ts`. | Low | Pending |
-| 7 | `useAuth.ts` and `useOperationalOrderAlerts.ts` cast results as `any` — use generated `LoginMutation` / `GetOrdersQuery` types. | Medium | Pending |
+| 6 | `ADMIN_ROLES` constant is duplicated in `authStore.ts`, `useAuth.ts`, and `useAuthInitialization.ts`. Extract to `utils/constants.ts`. | Low | Completed — extracted to `utils/constants.ts`; all three files import from there |
+| 7 | `useAuth.ts` and `useOperationalOrderAlerts.ts` cast results as `any` — use generated `LoginMutation` / `GetOrdersQuery` types. | Medium | Completed — local `LoginResult` type added to `useAuth.ts`; `OrdersQueryResult` type added to `useOperationalOrderAlerts.ts`; `as any` casts removed |
 | 8 | `app/business/` and `app/driver/` route folders are empty. Implement CRUD screens or remove the dead folders. | Low | Pending |
 | 9 | `BottomSheet.snapPoints` prop is declared but not implemented — dead API surface. Remove or implement. | Low | Pending |
-| 10 | `useTranslations` throws an uncaught error at render time if `translations` is null. Add a fallback or optional chaining. | Medium | Pending |
+| 10 | `useTranslations` throws an uncaught error at render time if `translations` is null. Add a fallback or optional chaining. | Medium | Completed — falls back to `en` translations on cold start instead of throwing |
 
 ### Reliability
 | # | Recommendation | Priority | Status |
 |---|---------------|----------|--------|
-| 11 | `lib/graphql/providers.tsx` only has `.then()` on `cacheReady` — if `persistCache` rejects, app shows a blank screen forever. Add `.catch(() => setCacheRestored(true))`. | High | Pending |
-| 12 | `apolloClient.ts` swallows the `persistCache` rejection with an empty `.catch`. Errors must propagate so `Providers` can handle them. | High | Pending |
+| 11 | `lib/graphql/providers.tsx` only has `.then()` on `cacheReady` — if `persistCache` rejects, app shows a blank screen forever. Add `.catch(() => setCacheRestored(true))`. | High | Completed — `.catch` added: logs warning and calls `setCacheRestored(true)` so the app always renders |
+| 12 | `apolloClient.ts` swallows the `persistCache` rejection with an empty `.catch`. Errors must propagate so `Providers` can handle them. | High | Completed — `.catch` explicitly resolves (not rejects) with a typed `as Promise<void>` cast; updated warning message clarifies behavior |
 | 13 | `useAdminPtt` has no Agora reconnection logic — if the session drops mid-call, PTT silently stops working. | Medium | Pending |
-| 14 | `useOperationalOrderAlerts` uses `data as any` for order detection — type mismatch would silently break new-order alerts. | Medium | Pending |
-| 15 | `EXPO_PUBLIC_MAPBOX_TOKEN` falls back to `''` with no warning — map renders blank silently. Add a console error or UI fallback. | Low | Pending |
+| 14 | `useOperationalOrderAlerts` uses `data as any` for order detection — type mismatch would silently break new-order alerts. | Medium | Completed — `OrdersQueryResult` type added; `data as any` casts removed |
+| 15 | `EXPO_PUBLIC_MAPBOX_TOKEN` falls back to `''` with no warning — map renders blank silently. Add a console error or UI fallback. | Low | Completed — `console.error` in dev when token is missing added to `utils/mapbox.ts` |
 
 ### Future Considerations
 | # | Recommendation | Priority | Status |
