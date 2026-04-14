@@ -1,0 +1,69 @@
+# Dev server docker-compose — runs on the dev Hetzner box
+# No Caddy / TLS — API exposed directly on port 4000
+#
+# Usage:
+#   IMAGE_TAG=<git-sha> docker compose -f docker-compose.dev-server.yml up -d
+#
+# On first deploy, run migrations after containers are up:
+#   docker compose -f docker-compose.dev-server.yml run --rm api node dist/migrate.js
+
+services:
+  # ── PostgreSQL ─────────────────────────────────────────────
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: zippgo-dev-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-zippgo}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      POSTGRES_DB: ${DB_NAME:-zippgo}
+      PGUSER: ${DB_USER:-zippgo}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-zippgo}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ──────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: zippgo-dev-redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy noeviction
+    volumes:
+      - redis_data:/data
+
+  # ── API ────────────────────────────────────────────────────
+  api:
+    image: ghcr.io/${GITHUB_REPO:-delivery-gjilan/delivery-gjilan}/api:${IMAGE_TAG:-dev-latest}
+    container_name: zippgo-dev-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    env_file: .env.dev
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://${DB_USER:-zippgo}:${DB_PASSWORD}@db:5432/${DB_NAME:-zippgo}
+      REDIS_URL: redis://redis:6379
+      REDIS_REQUIRED: "false"
+    volumes:
+      - api_logs:/app/logs
+    ports:
+      - "4000:4000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  db_data:
+  redis_data:
+  api_logs:
