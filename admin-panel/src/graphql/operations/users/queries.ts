@@ -9,6 +9,8 @@ export const USERS_QUERY = graphql(`
       firstName
       lastName
       isDemoAccount
+      isBanned
+      isTrustedCustomer
       role
       phoneNumber
       address

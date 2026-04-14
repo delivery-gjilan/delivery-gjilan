@@ -255,11 +255,17 @@ The most complex visual page. Full-screen Mapbox GL map with driver positions, o
 
 ### `/dashboard/users` — Customer Management
 
-**State:** Multiple modals (edit, note, delete, order history, order detail). `roleFilter` and `searchQuery`. `USER_BEHAVIOR_QUERY` is lazy (loads on history modal open).
+**Layout:** Master-detail split-pane. Left panel shows a searchable customer list with avatar initials (flag-color-ringed when flagged), status icons (banned/trusted/demo), and flag dots. Clicking a user opens a right-side detail panel; the list shrinks to 380 px. The selected user is derived from live query data so the panel auto-refreshes after mutations.
 
-**GraphQL:** `USERS_QUERY`, `GET_BUSINESSES`, `GET_ORDERS` (history), `USER_BEHAVIOR_QUERY`, 4 mutations.
+**Detail panel tabs:**
+- **Overview:** Flag & Notes card (5-level color picker: none/green/yellow/orange/red with inline edit), Customer Info card (email, phone, address, user ID).
+- **Orders & Stats:** Behavior Summary stats grid (total/delivered/cancelled orders, total spend, avg order, last delivered — super-admin only), clickable order list opening an Order Details modal.
 
-**Key features:** Flag color system. `USER_BEHAVIOR_QUERY` returns spend/cancellation stats. Order history modal. All mutations refetch — no cache updates.
+**Actions bar:** Edit (opens create/edit modal), Ban/Unban (confirmation modal), Delete (confirmation modal). All super-admin only.
+
+**GraphQL:** `USERS_QUERY`, `GET_ORDERS` (lazy, loads on Orders tab), `USER_BEHAVIOR_QUERY` (lazy, super-admin only), 5 mutations (`createUser`, `updateUser`, `deleteUser`, `updateUserNote`, `banUser`). All mutations refetch — no cache updates.
+
+**Key features:** 5-color flag system with inline note editing. `isBanned` column blocks ordering (backend). `isTrustedCustomer` skips FIRST_ORDER and HIGH_VALUE approval. Ban/unban with confirmation. Search by name, email, or phone. Only CUSTOMER-role users shown (drivers managed separately).
 
 ### `/dashboard/promotions` — Promotion Management
 

@@ -3,7 +3,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useLazyQuery } from '@apollo/client/react';
 import { ME_QUERY } from '@/graphql/operations/auth';
 import { useRouter } from 'expo-router';
-import { AppLanguage, SignupStep } from '@/gql/graphql';
+import { AppLanguage, SignupStep, type User } from '@/gql/graphql';
 import { useLocaleStore } from '@/store/useLocaleStore';
 import { getValidAccessToken } from '@/lib/graphql/authSession';
 
@@ -100,7 +100,7 @@ export function useAuthInitialization() {
         // Successfully fetched user data
         if (data?.me) {
             console.log('[AuthInit] ME query successful, user:', data.me.email, 'step:', data.me.signupStep);
-            setUser(data.me as any);
+            setUser(data.me as User);
             if (data.me.preferredLanguage === AppLanguage.Al) {
                 setLanguageChoice('al');
             } else {

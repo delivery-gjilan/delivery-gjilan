@@ -3,10 +3,11 @@ import { useTranslations } from '@/hooks/useTranslations';
 import { useTheme } from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import { getEffectiveProductPrice, getPreDiscountProductPrice } from '@/modules/product/utils/pricing';
+import type { FullProduct, ProductOrVariant } from '../hooks/useProductActions';
 
 interface ProductDetailsProps {
-    product: any;
-    activeProduct: any;
+    product: FullProduct;
+    activeProduct: ProductOrVariant;
     selectedVariantId: string | null;
     setSelectedVariantId: (id: string) => void;
     selectedOptions: Record<string, string[]>;
@@ -22,7 +23,7 @@ export function ProductDetails({
     setSelectedOptions,
 }: ProductDetailsProps) {
     const selectableVariants = [product, ...(product.variants ?? [])].filter(
-        (v: any, idx: number, arr: any[]) => arr.findIndex((x) => x.id === v.id) === idx,
+        (v, idx, arr) => arr.findIndex((x) => x.id === v.id) === idx,
     );
 
     const optionGroupsForSelection =
@@ -101,7 +102,7 @@ export function ProductDetails({
                         theme={theme}
                     />
                     <View style={{ flexDirection: 'row', paddingHorizontal: 20, gap: 10 }}>
-                        {selectableVariants.map((v: any) => {
+                        {selectableVariants.map((v) => {
                             const isActive = selectedVariantId === v.id;
                             const variantPrice = getEffectiveProductPrice(v);
                             return (
@@ -165,7 +166,7 @@ export function ProductDetails({
             )}
 
             {/* ── Option Groups ── */}
-            {optionGroupsForSelection.map((group: any) => {
+            {optionGroupsForSelection.map((group) => {
                 const isRequired = group.minSelections > 0;
                 const isSingleSelect = group.maxSelections === 1;
                 const count = selectedCount(group.id);
@@ -197,7 +198,7 @@ export function ProductDetails({
                         />
 
                         <View style={{ paddingHorizontal: 20, gap: 6 }}>
-                            {group.options.map((option: any, idx: number) => {
+                            {group.options.map((option, idx: number) => {
                                 const isSelected = selectedOptions[group.id]?.includes(option.id);
                                 const isFirst = idx === 0;
                                 const isLast = idx === group.options.length - 1;
@@ -316,7 +317,7 @@ function SectionHeader({
     badge?: string;
     badgeColor?: string;
     subtitle?: string;
-    theme: any;
+    theme: ReturnType<typeof useTheme>;
 }) {
     return (
         <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>

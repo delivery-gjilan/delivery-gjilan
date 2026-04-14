@@ -35,6 +35,7 @@ export const users = pgTable('users', {
     adminNote: text('admin_note'),
     flagColor: text('flag_color').default('yellow'),
     isDemoAccount: boolean('is_demo_account').default(false).notNull(),
+    isBanned: boolean('is_banned').default(false).notNull(),
     imageUrl: text('image_url'),
     passwordResetToken: text('password_reset_token'),
     passwordResetExpiresAt: timestamp('password_reset_expires_at', { withTimezone: true, mode: 'string' }),

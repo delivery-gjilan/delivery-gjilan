@@ -20,19 +20,22 @@ import { useTranslations } from '@/hooks/useTranslations';
 import { useProducts } from '@/modules/product/hooks/useProducts';
 import { getEffectiveProductPrice } from '@/modules/product/utils/pricing';
 
+import type { GetBusinessesQuery } from '@/gql/graphql';
+
 type FilterOption = 'all' | 'open' | 'promo';
+type BusinessItem = GetBusinessesQuery['businesses'][number];
 
 type ListItem = 
-    | { type: 'restaurant'; data: any }
+    | { type: 'restaurant'; data: BusinessItem }
     | { type: 'promo-banner'; data: { id: string; title: string; subtitle?: string; price?: string; imageUrl: string; businessLogo?: string | null; businessName?: string } }
     | { type: 'featured'; data: { id: string; name: string; logoUrl?: string; menuItems: Array<{ name: string; price: string; imageUrl: string }> } };
 
-function selectPromoRestaurant(restaurants: any[]) {
+function selectPromoRestaurant(restaurants: BusinessItem[]) {
     if (restaurants.length === 0) return null;
-    return restaurants.find((r) => Boolean((r as any).activePromotion)) ?? restaurants[0];
+    return restaurants.find((r) => Boolean(r.activePromotion)) ?? restaurants[0];
 }
 
-function selectFeaturedRestaurant(restaurants: any[], excludedBusinessIds: Set<string>) {
+function selectFeaturedRestaurant(restaurants: BusinessItem[], excludedBusinessIds: Set<string>) {
     const candidates = restaurants.filter((r) => !excludedBusinessIds.has(r.id));
     if (candidates.length === 0) return null;
     const openCandidate = candidates.find((r) => Boolean(r.isOpen));
@@ -119,7 +122,7 @@ export default function Restaurants() {
         if (activeFilter === 'open') {
             result = result.filter((r) => r.isOpen);
         } else if (activeFilter === 'promo') {
-            result = result.filter((r) => (r as any).activePromotion);
+            result = result.filter((r) => r.activePromotion);
         }
 
         return result;
@@ -145,7 +148,7 @@ export default function Restaurants() {
             // Insert promotional banner after selected promo restaurant.
             if (promoRestaurant && restaurant.id === promoRestaurant.id && promoProducts.length > 0) {
                 const products = promoProducts
-                    .filter((p: any) => p.imageUrl || p.product?.imageUrl || p.variants?.[0]?.imageUrl)
+                    .filter((p) => p.imageUrl || p.product?.imageUrl || p.variants?.[0]?.imageUrl)
                     .slice(0, 2);
                 if (products.length > 0) {
                     const promoPriceValue = getEffectiveProductPrice(
@@ -376,13 +379,13 @@ export default function Restaurants() {
                                         imageUrl={restaurant.imageUrl}
                                         isOpen={restaurant.isOpen}
                                         onPress={handleBusinessPress}
-                                        locationLat={(restaurant as any).location?.latitude || 42.4635}
-                                        locationLng={(restaurant as any).location?.longitude || 21.4694}
-                                        avgPrepTimeMinutes={(restaurant as any).avgPrepTimeMinutes}
-                                        prepTimeOverrideMinutes={(restaurant as any).prepTimeOverrideMinutes}
-                                        rating={(restaurant as any).ratingAverage ?? undefined}
-                                        category={(restaurant as any).category ?? null}
-                                        activePromotion={(restaurant as any).activePromotion}
+                                    locationLat={restaurant.location?.latitude || 42.4635}
+                                    locationLng={restaurant.location?.longitude || 21.4694}
+                                    avgPrepTimeMinutes={restaurant.avgPrepTimeMinutes}
+                                    prepTimeOverrideMinutes={restaurant.prepTimeOverrideMinutes}
+                                    rating={restaurant.ratingAverage ?? undefined}
+                                    category={restaurant.category ?? null}
+                                    activePromotion={restaurant.activePromotion}
                                         isSponsored={restaurant.id === promoRestaurant?.id}
                                     />
                                 </Animated.View>

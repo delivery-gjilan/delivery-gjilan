@@ -1,19 +1,30 @@
 ﻿"use client";
 
-import { useState, FormEvent, useMemo } from "react";
+import { useState, FormEvent, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@apollo/client/react";
 import { USERS_QUERY, USER_BEHAVIOR_QUERY } from "@/graphql/operations/users/queries";
-import { CREATE_USER_MUTATION, UPDATE_USER_MUTATION, DELETE_USER_MUTATION, UPDATE_USER_NOTE_MUTATION } from "@/graphql/operations/users/mutations";
-import { GET_BUSINESSES } from "@/graphql/operations/businesses/queries";
+import {
+    CREATE_USER_MUTATION,
+    UPDATE_USER_MUTATION,
+    DELETE_USER_MUTATION,
+    UPDATE_USER_NOTE_MUTATION,
+    BAN_USER_MUTATION,
+} from "@/graphql/operations/users/mutations";
 import { GET_ORDERS } from "@/graphql/operations/orders/queries";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
-import Select from "@/components/ui/Select";
-import { Table, Th, Td } from "@/components/ui/Table";
 import Modal from "@/components/ui/Modal";
 import { useAuth } from "@/lib/auth-context";
-import { Pencil, Trash2, Flag, AlertCircle } from "lucide-react";
-import { toast } from 'sonner';
+import {
+    Pencil, Trash2, AlertCircle, ShieldBan, ShieldCheck, BadgeCheck,
+    Search, X, Plus, User, Phone, Mail, MapPin, MessageSquare,
+    ChevronRight, Clock, Package, CircleDollarSign,
+} from "lucide-react";
+import { toast } from "sonner";
+
+/* ---------------------------------------------------------
+   Types
+--------------------------------------------------------- */
 
 interface UserItem {
     id: string;
@@ -21,28 +32,18 @@ interface UserItem {
     firstName: string;
     lastName: string;
     isDemoAccount?: boolean;
+    isBanned?: boolean;
+    isTrustedCustomer?: boolean;
     role: string;
     phoneNumber?: string;
     address?: string;
     adminNote?: string;
     flagColor?: string;
-    business?: {
-        id: string;
-        name: string;
-    };
-}
-
-interface BusinessItem {
-    id: string;
-    name: string;
+    business?: { id: string; name: string };
 }
 
 interface UsersResponse {
     users: UserItem[];
-}
-
-interface BusinessesResponse {
-    businesses: BusinessItem[];
 }
 
 interface CreateUserResponse {
@@ -77,13 +78,9 @@ interface OrderItem {
     updatedAt: string;
     status: string;
     totalPrice: number;
-    dropOffLocation: {
-        address: string;
-    };
+    dropOffLocation: { address: string };
     businesses: OrderBusinessItem[];
-    user?: {
-        id: string;
-    };
+    user?: { id: string };
     driver?: {
         id: string;
         firstName: string;
@@ -112,528 +109,710 @@ interface UserBehaviorResponse {
     userBehavior: UserBehaviorItem | null;
 }
 
+/* ---------------------------------------------------------
+   Flag colour system
+--------------------------------------------------------- */
+
+type FlagColor = "none" | "green" | "yellow" | "orange" | "red";
+
+const FLAG_COLORS: {
+    value: FlagColor;
+    label: string;
+    description: string;
+    dot: string;
+    bg: string;
+    border: string;
+    text: string;
+    ring: string;
+}[] = [
+    { value: "none",   label: "No flag",  description: "Remove flag",                dot: "bg-zinc-600",    bg: "",                  border: "border-zinc-700",       text: "text-zinc-400",    ring: "ring-zinc-600"    },
+    { value: "green",  label: "Trusted",  description: "Verified, skip approval",    dot: "bg-emerald-500", bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-400", ring: "ring-emerald-500" },
+    { value: "yellow", label: "Watch",    description: "Minor concern",              dot: "bg-amber-400",   bg: "bg-amber-500/10",   border: "border-amber-500/30",   text: "text-amber-400",   ring: "ring-amber-400"   },
+    { value: "orange", label: "Warning",  description: "Repeated issues",            dot: "bg-orange-500",  bg: "bg-orange-500/10",  border: "border-orange-500/30",  text: "text-orange-400",  ring: "ring-orange-500"  },
+    { value: "red",    label: "Critical", description: "Serious ï¿½ consider banning", dot: "bg-red-500",     bg: "bg-red-500/10",     border: "border-red-500/30",     text: "text-red-400",     ring: "ring-red-500"     },
+];
+
+const FLAG_MAP = Object.fromEntries(FLAG_COLORS.map((f) => [f.value, f])) as Record<FlagColor, (typeof FLAG_COLORS)[number]>;
+const getFlag = (c?: string | null) => FLAG_MAP[(c as FlagColor) || "none"] ?? FLAG_MAP.none;
+
+/* ---------------------------------------------------------
+   Helpers
+--------------------------------------------------------- */
+
+function initials(first: string, last: string) {
+    return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase();
+}
+
+function formatDate(v?: string | null) {
+    if (!v) return "ï¿½";
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? "ï¿½" : d.toLocaleString();
+}
+
+function formatCurrency(v?: number | null) {
+    if (v == null) return "ï¿½";
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR", minimumFractionDigits: 2 }).format(v);
+}
+
+function formatDuration(ms: number) {
+    if (!Number.isFinite(ms) || ms <= 0) return "0m";
+    const total = Math.floor(ms / 60000);
+    const d = Math.floor(total / 1440);
+    const h = Math.floor((total % 1440) / 60);
+    const m = total % 60;
+    const p: string[] = [];
+    if (d) p.push(`${d}d`);
+    if (h) p.push(`${h}h`);
+    if (m || !p.length) p.push(`${m}m`);
+    return p.join(" ");
+}
+
+function orderDuration(o: OrderItem) {
+    const s = new Date(o.orderDate).getTime();
+    if (Number.isNaN(s)) return "ï¿½";
+    const e = o.status === "DELIVERED" ? new Date(o.updatedAt).getTime() : Date.now();
+    if (Number.isNaN(e)) return "ï¿½";
+    return formatDuration(Math.max(0, e - s));
+}
+
+function statusColor(s: string) {
+    switch (s) {
+        case "DELIVERED":        return "bg-emerald-500/10 text-emerald-400 border-emerald-500/30";
+        case "CANCELLED":        return "bg-red-500/10 text-red-400 border-red-500/30";
+        case "OUT_FOR_DELIVERY": return "bg-blue-500/10 text-blue-400 border-blue-500/30";
+        case "READY":            return "bg-amber-500/10 text-amber-400 border-amber-500/30";
+        default:                 return "bg-zinc-500/10 text-zinc-400 border-zinc-500/30";
+    }
+}
+
+/* ---------------------------------------------------------
+   Component
+--------------------------------------------------------- */
+
 export default function UsersPage() {
     const { admin } = useAuth();
     const isSuperAdmin = admin?.role === "SUPER_ADMIN";
 
-
+    /* --- data --- */
     const { data, loading, error, refetch } = useQuery<UsersResponse>(USERS_QUERY);
-    const { data: businessesData } = useQuery<BusinessesResponse>(GET_BUSINESSES);
-    const [createUser, { loading: creating }] = useMutation<CreateUserResponse>(CREATE_USER_MUTATION, {
-        onCompleted: () => {
-            refetch();
-        },
-    });
-    
-    const [updateUser, { loading: updating }] = useMutation(UPDATE_USER_MUTATION, {
-        onCompleted: () => {
-            refetch();
-        },
-    });
-    
-    const [deleteUser, { loading: deleting }] = useMutation(DELETE_USER_MUTATION, {
-        onCompleted: () => {
-            refetch();
-        },
-    });
 
-    const [updateUserNote] = useMutation(UPDATE_USER_NOTE_MUTATION, {
-        onCompleted: () => {
-            refetch();
-        },
-    });
+    const [createUser, { loading: creating }] = useMutation<CreateUserResponse>(CREATE_USER_MUTATION, { onCompleted: () => refetch() });
+    const [updateUser, { loading: updating }] = useMutation(UPDATE_USER_MUTATION, { onCompleted: () => refetch() });
+    const [deleteUser, { loading: deleting }] = useMutation(DELETE_USER_MUTATION, { onCompleted: () => refetch() });
+    const [updateUserNote] = useMutation(UPDATE_USER_NOTE_MUTATION, { onCompleted: () => refetch() });
+    const [banUser, { loading: banning }] = useMutation(BAN_USER_MUTATION, { onCompleted: () => refetch() });
 
-    const [showModal, setShowModal] = useState(false);
-    const [showNoteModal, setShowNoteModal] = useState(false);
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [showHistoryModal, setShowHistoryModal] = useState(false);
-    const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
-    const [selectedUserForNote, setSelectedUserForNote] = useState<UserItem | null>(null);
-    const [selectedUserForDelete, setSelectedUserForDelete] = useState<UserItem | null>(null);
-    const [selectedUserForHistory, setSelectedUserForHistory] = useState<UserItem | null>(null);
-    const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<OrderItem | null>(null);
+    /* --- panel state --- */
+    const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+    const [panelTab, setPanelTab] = useState<"overview" | "orders">("overview");
+
+    /* --- flag/note editing --- */
+    const [isEditingNote, setIsEditingNote] = useState(false);
     const [noteInput, setNoteInput] = useState("");
-    const [flagColor, setFlagColor] = useState("yellow");
+    const [selectedFlag, setSelectedFlag] = useState<FlagColor>("none");
+
+    /* --- modals --- */
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [showBanModal, setShowBanModal] = useState(false);
     const [editingUser, setEditingUser] = useState<UserItem | null>(null);
+    const [userToDelete, setUserToDelete] = useState<UserItem | null>(null);
+    const [userToBan, setUserToBan] = useState<UserItem | null>(null);
+    const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
+
+    /* --- search & form --- */
     const [searchTerm, setSearchTerm] = useState("");
     const [formData, setFormData] = useState({
-        email: "",
-        password: "",
-        firstName: "",
-        lastName: "",
-        role: "CUSTOMER",
-        businessId: "",
-        isDemoAccount: false,
+        email: "", password: "", firstName: "", lastName: "", role: "CUSTOMER", businessId: "", isDemoAccount: false,
     });
     const [formError, setFormError] = useState("");
     const [formSuccess, setFormSuccess] = useState("");
 
+    /* --- derived: selected user from live data --- */
+    const selectedUser = useMemo(() => {
+        if (!selectedUserId) return null;
+        return data?.users?.find((u) => u.id === selectedUserId) || null;
+    }, [data?.users, selectedUserId]);
+
+    /* --- lazy queries for panel --- */
     const { data: ordersData, loading: ordersLoading, error: ordersError } = useQuery<OrdersResponse>(GET_ORDERS, {
-        skip: !showHistoryModal,
+        skip: !selectedUser || panelTab !== "orders",
     });
 
-    const handleEdit = (user: UserItem) => {
-        setEditingUser(user);
-        setFormData({
-            email: user.email,
-            password: "",
-            firstName: user.firstName,
-            lastName: user.lastName,
-            role: user.role,
-            businessId: user.business?.id || "",
-            isDemoAccount: Boolean(user.isDemoAccount),
+    const { data: behaviorData, loading: behaviorLoading, error: behaviorError } = useQuery<UserBehaviorResponse>(
+        USER_BEHAVIOR_QUERY,
+        {
+            variables: { userId: selectedUser?.id || "" },
+            skip: !selectedUser || panelTab !== "orders" || !isSuperAdmin,
+        },
+    );
+
+    /* --- derived: filtered users & orders --- */
+    const search = searchTerm.trim().toLowerCase();
+
+    const filteredUsers = useMemo(() => {
+        const customers = data?.users?.filter((u) => u.role === "CUSTOMER") || [];
+        if (!search) return customers;
+        return customers.filter((u) => {
+            const name = `${u.firstName} ${u.lastName}`.toLowerCase();
+            return name.includes(search) || u.email.toLowerCase().includes(search) || (u.phoneNumber || "").toLowerCase().includes(search);
         });
-        setShowModal(true);
-    };
+    }, [data?.users, search]);
 
-    const handleDelete = async (user: UserItem) => {
-        setSelectedUserForDelete(user);
-        setShowDeleteModal(true);
-    };
+    const userOrders = useMemo(() => {
+        if (!selectedUser) return [];
+        return (ordersData?.orders || [])
+            .filter((o) => o.user?.id === selectedUser.id)
+            .sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
+    }, [ordersData?.orders, selectedUser]);
 
-    const confirmDelete = async () => {
-        if (!selectedUserForDelete) return;
+    /* --- handlers --- */
 
+    const selectUser = useCallback((u: UserItem) => {
+        setSelectedUserId(u.id);
+        setPanelTab("overview");
+        setIsEditingNote(false);
+    }, []);
+
+    const closePanel = useCallback(() => {
+        setSelectedUserId(null);
+        setIsEditingNote(false);
+    }, []);
+
+    const startEditNote = useCallback(() => {
+        if (!selectedUser) return;
+        setNoteInput(selectedUser.adminNote || "");
+        setSelectedFlag((selectedUser.flagColor as FlagColor) || "none");
+        setIsEditingNote(true);
+    }, [selectedUser]);
+
+    const cancelEditNote = useCallback(() => setIsEditingNote(false), []);
+
+    const saveNote = useCallback(async () => {
+        if (!selectedUser) return;
+        const note = noteInput.trim() || null;
+        const color = note ? selectedFlag : null;
         try {
-            await deleteUser({ variables: { id: selectedUserForDelete.id } });
-            setFormSuccess("User deleted successfully");
-            setTimeout(() => setFormSuccess(""), 3000);
-            setShowDeleteModal(false);
-            setSelectedUserForDelete(null);
+            await updateUserNote({ variables: { userId: selectedUser.id, note, flagColor: color } });
+            setIsEditingNote(false);
+            toast.success("Note updated");
         } catch (err) {
-            setFormError(err instanceof Error ? err.message : "Failed to delete user");
-            setTimeout(() => setFormError(""), 3000);
+            toast.error(err instanceof Error ? err.message : "Failed to save note");
         }
-    };
+    }, [selectedUser, noteInput, selectedFlag, updateUserNote]);
 
-    const handleCloseModal = () => {
-        setShowModal(false);
+    const openCreateModal = useCallback(() => {
         setEditingUser(null);
         setFormData({ email: "", password: "", firstName: "", lastName: "", role: "CUSTOMER", businessId: "", isDemoAccount: false });
         setFormError("");
         setFormSuccess("");
-    };
+        setShowCreateModal(true);
+    }, []);
 
-    const handleOpenNoteModal = (user: UserItem) => {
-        setSelectedUserForNote(user);
-        setNoteInput(user.adminNote || "");
-        setFlagColor(user.flagColor || "yellow");
-        setShowNoteModal(true);
-    };
+    const openEditModal = useCallback((u: UserItem) => {
+        setEditingUser(u);
+        setFormData({
+            email: u.email, password: "", firstName: u.firstName, lastName: u.lastName,
+            role: u.role, businessId: u.business?.id || "", isDemoAccount: Boolean(u.isDemoAccount),
+        });
+        setFormError("");
+        setFormSuccess("");
+        setShowCreateModal(true);
+    }, []);
 
-    const handleCloseNoteModal = () => {
-        setShowNoteModal(false);
-        setSelectedUserForNote(null);
-        setNoteInput("");
-    };
-
-    const handleOpenHistoryModal = (user: UserItem) => {
-        setSelectedUserForHistory(user);
-        setShowHistoryModal(true);
-    };
-
-    const handleCloseHistoryModal = () => {
-        setShowHistoryModal(false);
-        setSelectedUserForHistory(null);
-        setShowOrderDetailsModal(false);
-        setSelectedOrderForDetails(null);
-    };
-
-    const handleOpenOrderDetails = (order: OrderItem) => {
-        setSelectedOrderForDetails(order);
-        setShowOrderDetailsModal(true);
-    };
-
-    const handleCloseOrderDetails = () => {
-        setShowOrderDetailsModal(false);
-        setSelectedOrderForDetails(null);
-    };
-
-    const handleSaveNote = async () => {
-        if (!selectedUserForNote) return;
-
-        try {
-            await updateUserNote({
-                variables: {
-                    userId: selectedUserForNote.id,
-                    note: noteInput.trim() || null,
-                    flagColor: noteInput.trim() ? flagColor : null,
-                },
-            });
-            handleCloseNoteModal();
-        } catch (err) {
-            toast.error(err instanceof Error ? err.message : "Failed to update note");
-        }
-    };
+    const closeCreateModal = useCallback(() => {
+        setShowCreateModal(false);
+        setEditingUser(null);
+    }, []);
 
     const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setFormError("");
         setFormSuccess("");
-
         try {
             if (editingUser) {
-                // Update existing user
                 await updateUser({
                     variables: {
-                        id: editingUser.id,
-                        firstName: formData.firstName,
-                        lastName: formData.lastName,
-                        role: formData.role as any,
-                        businessId: formData.businessId || null,
-                        isDemoAccount: formData.isDemoAccount,
+                        id: editingUser.id, firstName: formData.firstName, lastName: formData.lastName,
+                        role: formData.role as any, businessId: formData.businessId || null, isDemoAccount: formData.isDemoAccount,
                     },
                 });
-                setFormSuccess("User updated successfully");
-                setTimeout(() => {
-                    handleCloseModal();
-                }, 1000);
+                setFormSuccess("Updated");
+                setTimeout(closeCreateModal, 800);
             } else {
-                // Create new user
                 const { data: created } = await createUser({
                     variables: {
-                        email: formData.email,
-                        password: formData.password,
-                        firstName: formData.firstName,
-                        lastName: formData.lastName,
-                        role: formData.role,
-                        businessId: formData.businessId || null,
+                        email: formData.email, password: formData.password, firstName: formData.firstName,
+                        lastName: formData.lastName, role: formData.role, businessId: formData.businessId || null,
                         isDemoAccount: formData.isDemoAccount,
                     },
                 });
-
-                if (created && created.createUser) {
-                    setFormSuccess(created.createUser.message || "User created successfully");
-                    handleCloseModal();
+                if (created?.createUser) {
+                    setFormSuccess(created.createUser.message || "Created");
+                    closeCreateModal();
                 }
             }
         } catch (err) {
-            setFormError(err instanceof Error ? err.message : "Failed to " + (editingUser ? "update" : "create") + " user");
+            setFormError(err instanceof Error ? err.message : "Failed");
         }
     };
 
-    const getRoleBadgeColor = (role: string) => {
-        switch (role) {
-            case 'SUPER_ADMIN':
-                return 'bg-purple-500/10 text-purple-400 border-purple-500/30';
-            case 'BUSINESS_OWNER':
-            case 'BUSINESS_EMPLOYEE':
-                return 'bg-violet-500/10 text-violet-400 border-violet-500/30';
-            case 'DRIVER':
-                return 'bg-amber-500/10 text-amber-400 border-amber-500/30';
-            case 'CUSTOMER':
-                return 'bg-green-500/10 text-green-400 border-green-500/30';
-            default:
-                return 'bg-gray-500/10 text-gray-400 border-gray-500/30';
+    const confirmDelete = async () => {
+        if (!userToDelete) return;
+        try {
+            await deleteUser({ variables: { id: userToDelete.id } });
+            toast.success("User deleted");
+            setShowDeleteModal(false);
+            setUserToDelete(null);
+            if (selectedUserId === userToDelete.id) closePanel();
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Delete failed");
+        }
+    };
+
+    const confirmBan = async () => {
+        if (!userToBan) return;
+        const ban = !userToBan.isBanned;
+        try {
+            await banUser({ variables: { userId: userToBan.id, banned: ban } });
+            toast.success(ban ? "User banned" : "User unbanned");
+            setShowBanModal(false);
+            setUserToBan(null);
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Failed");
         }
     };
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        setFormData({
-            ...formData,
-            [e.target.name]: e.target.value,
-        });
+        setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    const formatDate = (value?: string | null) => {
-        if (!value) return "-";
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return "-";
-        return date.toLocaleString();
-    };
-
-    const formatCurrency = (value?: number | null) => {
-        if (value === null || value === undefined) return "-";
-        return new Intl.NumberFormat("en-US", {
-            style: "currency",
-            currency: "EUR",
-            minimumFractionDigits: 2,
-        }).format(value);
-    };
-
-    const formatDuration = (ms: number) => {
-        if (!Number.isFinite(ms) || ms <= 0) return "0m";
-        const totalMinutes = Math.floor(ms / 60000);
-        const days = Math.floor(totalMinutes / 1440);
-        const hours = Math.floor((totalMinutes % 1440) / 60);
-        const minutes = totalMinutes % 60;
-        const parts = [] as string[];
-        if (days > 0) parts.push(`${days}d`);
-        if (hours > 0) parts.push(`${hours}h`);
-        if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`);
-        return parts.join(" ");
-    };
-
-    const getOrderDuration = (order: OrderItem) => {
-        const start = new Date(order.orderDate).getTime();
-        if (Number.isNaN(start)) return "-";
-        const end = order.status === "DELIVERED" ? new Date(order.updatedAt).getTime() : Date.now();
-        if (Number.isNaN(end)) return "-";
-        const ms = Math.max(0, end - start);
-        return formatDuration(ms);
-    };
-
-    const getStatusBadgeColor = (status: string) => {
-        switch (status) {
-            case "DELIVERED":
-                return "bg-green-500/10 text-green-400 border-green-500/30";
-            case "CANCELLED":
-                return "bg-red-500/10 text-red-400 border-red-500/30";
-            case "OUT_FOR_DELIVERY":
-                return "bg-blue-500/10 text-blue-400 border-blue-500/30";
-            case "READY":
-                return "bg-amber-500/10 text-amber-400 border-amber-500/30";
-            default:
-                return "bg-gray-500/10 text-gray-400 border-gray-500/30";
-        }
-    };
-
-    const normalizedSearch = searchTerm.trim().toLowerCase();
-
-    // Filter to show only customers (drivers are managed in Drivers section)
-    const filteredUsers = useMemo(() => {
-        const customers = data?.users?.filter(user => user.role === 'CUSTOMER') || [];
-        if (!normalizedSearch) return customers;
-        return customers.filter((user) => {
-            const fullName = `${user.firstName} ${user.lastName}`.toLowerCase();
-            return (
-                fullName.includes(normalizedSearch) ||
-                user.email.toLowerCase().includes(normalizedSearch) ||
-                (user.phoneNumber || "").toLowerCase().includes(normalizedSearch)
-            );
-        });
-    }, [data?.users, normalizedSearch]);
-
-    const { data: behaviorData, loading: behaviorLoading, error: behaviorError } = useQuery<UserBehaviorResponse>(
-        USER_BEHAVIOR_QUERY,
-        {
-            variables: { userId: selectedUserForHistory?.id || "" },
-            skip: !showHistoryModal || !selectedUserForHistory || !isSuperAdmin,
-        },
-    );
-
-    const userOrders = useMemo(() => {
-        if (!selectedUserForHistory) return [];
-        const orders = ordersData?.orders || [];
-        return orders
-            .filter((order) => order.user?.id === selectedUserForHistory.id)
-            .sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
-    }, [ordersData?.orders, selectedUserForHistory]);
+    /* =========================================================
+       RENDER
+    ========================================================= */
 
     return (
         <div className="text-white">
-            <div className="mb-6 flex items-center justify-between">
+            {/* Header */}
+            <div className="mb-5 flex items-center justify-between">
                 <div>
-                    <h1 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Users</h1>
-                    <p className="text-gray-400 mt-1">Manage customer accounts. To manage drivers, go to the Drivers section.</p>
+                    <h1 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Customers</h1>
+                    <p className="text-zinc-500 text-sm mt-0.5">Manage customer accounts, flags, notes &amp; history.</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <div className="w-64">
-                        <Input
-                            name="search"
+                    <div className="relative">
+                        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                        <input
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder="Search users by name, email, phone"
+                            placeholder="Search name, email, phoneï¿½"
+                            className="w-64 bg-zinc-900 border border-zinc-800 rounded-lg pl-9 pr-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-violet-500/50 focus:border-violet-500/50"
                         />
+                        {searchTerm && (
+                            <button onClick={() => setSearchTerm("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300">
+                                <X size={14} />
+                            </button>
+                        )}
                     </div>
                     {isSuperAdmin && (
-                        <Button onClick={() => {setShowModal(true); console.log("qap")}} className="bg-blue-600 hover:bg-blue-700">
-                            Create Customer
+                        <Button onClick={openCreateModal}>
+                            <Plus size={15} />
+                            New Customer
                         </Button>
                     )}
                 </div>
             </div>
 
             {error && (
-                <div className="bg-red-900/20 border border-red-800 rounded-lg p-4 text-red-300 text-sm mb-4">
-                    {error.message}
-                </div>
+                <div className="bg-red-900/20 border border-red-800 rounded-lg p-4 text-red-300 text-sm mb-4">{error.message}</div>
             )}
 
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-                {loading ? (
-                    <p className="text-gray-400 p-6">Loading users...</p>
-                ) : (
-                    <Table>
-                        <thead>
-                            <tr>
-                                <Th>Name</Th>
-                                <Th>Email</Th>
-                                <Th>Review</Th>
-                                <Th>Phone Number</Th>
-                                <Th>Address</Th>
-                                <Th>Flag/Note</Th>
-                                <Th>Actions</Th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredUsers.map((user) => (
-                                <tr key={user.id} className={user.adminNote ? (user.flagColor === 'red' ? 'bg-red-900/10' : 'bg-amber-900/10') : ''}>
-                                    <Td>
-                                        <div className="font-medium text-white">
-                                            {`${user.firstName} ${user.lastName}`}
-                                        </div>
-                                    </Td>
-                                    <Td>
-                                        <div className="text-gray-300">{user.email}</div>
-                                    </Td>
-                                    <Td>
-                                        {user.isDemoAccount ? (
-                                            <span className="inline-flex items-center rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-1 text-xs font-medium text-sky-300">
-                                                Demo / Review
-                                            </span>
-                                        ) : (
-                                            <span className="text-gray-500">-</span>
-                                        )}
-                                    </Td>
-                                    <Td>
-                                        <div className="text-gray-300">{user.phoneNumber || '-'}</div>
-                                    </Td>
-                                    <Td>
-                                        <div className="text-gray-300 max-w-xs truncate">{user.address || '-'}</div>
-                                    </Td>
-                                    <Td>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => handleOpenNoteModal(user)}
-                                            className={`${
-                                                user.adminNote 
-                                                    ? (user.flagColor === 'red' ? "text-red-400 hover:text-red-300 border-red-500/30" : "text-amber-400 hover:text-amber-300 border-amber-500/30")
-                                                    : "text-gray-400 hover:text-gray-300"
+            {/* Main layout: list + detail panel */}
+            <div className="flex gap-0 min-h-[calc(100vh-180px)]">
+
+                {/* ---- User list ---- */}
+                <div className={`transition-all duration-200 ${selectedUser ? "w-[380px] flex-shrink-0" : "w-full"}`}>
+                    <div className={`bg-zinc-900/60 border border-zinc-800 rounded-xl overflow-hidden ${selectedUser ? "rounded-r-none border-r-0" : ""}`}>
+                        {loading ? (
+                            <div className="p-8 text-center text-zinc-500">Loadingï¿½</div>
+                        ) : !filteredUsers.length ? (
+                            <div className="p-8 text-center text-zinc-500">No customers found.</div>
+                        ) : (
+                            <div className="divide-y divide-zinc-800/60 max-h-[calc(100vh-220px)] overflow-y-auto">
+                                {filteredUsers.map((u) => {
+                                    const flag = getFlag(u.flagColor);
+                                    const isActive = selectedUser?.id === u.id;
+                                    return (
+                                        <button
+                                            key={u.id}
+                                            onClick={() => selectUser(u)}
+                                            className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
+                                                isActive
+                                                    ? "bg-violet-500/10 border-l-2 border-l-violet-500"
+                                                    : u.isBanned
+                                                        ? "bg-red-500/5 hover:bg-zinc-800/60 border-l-2 border-l-transparent"
+                                                        : "hover:bg-zinc-800/60 border-l-2 border-l-transparent"
                                             }`}
                                         >
-                                            {user.adminNote ? (
-                                                <>
-                                                    <AlertCircle size={14} className="mr-1" />
-                                                    Flagged
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Flag size={14} className="mr-1" />
-                                                    Add Note
-                                                </>
+                                            {/* Avatar */}
+                                            <div className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold ${
+                                                u.flagColor && u.flagColor !== "none"
+                                                    ? `${flag.bg} ${flag.text} ring-2 ${flag.ring}`
+                                                    : "bg-zinc-800 text-zinc-300"
+                                            }`}>
+                                                {initials(u.firstName, u.lastName)}
+                                            </div>
+
+                                            {/* Info */}
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-medium text-zinc-100 truncate">
+                                                        {u.firstName} {u.lastName}
+                                                    </span>
+                                                    {u.isBanned && <ShieldBan size={13} className="text-red-400 flex-shrink-0" />}
+                                                    {u.isTrustedCustomer && !u.isBanned && <BadgeCheck size={13} className="text-emerald-400 flex-shrink-0" />}
+                                                    {u.isDemoAccount && (
+                                                        <span className="text-[10px] font-medium bg-sky-500/15 text-sky-400 px-1.5 py-0.5 rounded">DEMO</span>
+                                                    )}
+                                                </div>
+                                                <div className="text-xs text-zinc-500 truncate">{u.email}</div>
+                                            </div>
+
+                                            {/* Flag dot */}
+                                            {u.flagColor && u.flagColor !== "none" && (
+                                                <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${flag.dot}`} title={flag.label} />
                                             )}
-                                        </Button>
-                                    </Td>
-                                    <Td>
-                                        <div className="flex items-center gap-2">
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => handleOpenHistoryModal(user)}
-                                                className="text-blue-400 hover:text-blue-300"
-                                            >
-                                                View History
-                                            </Button>
-                                            {isSuperAdmin && (
-                                                <>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() => handleEdit(user)}
-                                                        disabled={updating}
-                                                        className="text-violet-400 hover:text-violet-300"
-                                                    >
-                                                        <Pencil size={14} className="mr-1" />
-                                                        Edit
-                                                    </Button>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() => handleDelete(user)}
-                                                        disabled={deleting}
-                                                        className="text-red-400 hover:text-red-300"
-                                                    >
-                                                        <Trash2 size={14} className="mr-1" />
-                                                        Delete
-                                                    </Button>
-                                                </>
-                                            )}
+
+                                            {!selectedUser && <ChevronRight size={14} className="text-zinc-600 flex-shrink-0" />}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* ---- Detail panel ---- */}
+                {selectedUser && (
+                    <div className="flex-1 bg-zinc-900/40 border border-zinc-800 border-l-zinc-800 rounded-xl rounded-l-none overflow-hidden flex flex-col min-w-0">
+                        {/* Panel header */}
+                        <div className="flex items-start justify-between p-5 pb-4 border-b border-zinc-800/60">
+                            <div className="flex items-center gap-4">
+                                {(() => {
+                                    const flag = getFlag(selectedUser.flagColor);
+                                    return (
+                                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-base font-bold ${
+                                            selectedUser.flagColor && selectedUser.flagColor !== "none"
+                                                ? `${flag.bg} ${flag.text} ring-2 ${flag.ring}`
+                                                : "bg-zinc-800 text-zinc-200"
+                                        }`}>
+                                            {initials(selectedUser.firstName, selectedUser.lastName)}
                                         </div>
-                                    </Td>
-                                </tr>
-                            ))}
-                            {!filteredUsers.length && (
-                                <tr>
-                                    <Td colSpan={7}>
-                                        <div className="text-center text-gray-500 py-8">
-                                            No users found.
+                                    );
+                                })()}
+                                <div>
+                                    <h2 className="text-base font-semibold text-zinc-100">
+                                        {selectedUser.firstName} {selectedUser.lastName}
+                                    </h2>
+                                    <div className="flex items-center gap-3 mt-1 text-xs text-zinc-400">
+                                        <span className="flex items-center gap-1"><Mail size={12} />{selectedUser.email}</span>
+                                        {selectedUser.phoneNumber && (
+                                            <span className="flex items-center gap-1"><Phone size={12} />{selectedUser.phoneNumber}</span>
+                                        )}
+                                    </div>
+                                    {selectedUser.address && (
+                                        <div className="flex items-center gap-1 mt-1 text-xs text-zinc-500">
+                                            <MapPin size={12} />{selectedUser.address}
                                         </div>
-                                    </Td>
-                                </tr>
+                                    )}
+                                </div>
+                            </div>
+                            <button onClick={closePanel} className="text-zinc-500 hover:text-zinc-300 p-1 rounded hover:bg-zinc-800/60">
+                                <X size={16} />
+                            </button>
+                        </div>
+
+                        {/* Status + actions bar */}
+                        <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-800/40 bg-zinc-900/30">
+                            <div className="flex items-center gap-2">
+                                {selectedUser.isBanned && (
+                                    <span className="inline-flex items-center gap-1 rounded-full border border-red-500/40 bg-red-500/15 px-2.5 py-0.5 text-xs font-semibold text-red-300">
+                                        <ShieldBan size={12} /> Banned
+                                    </span>
+                                )}
+                                {selectedUser.isTrustedCustomer && !selectedUser.isBanned && (
+                                    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-0.5 text-xs font-semibold text-emerald-300">
+                                        <BadgeCheck size={12} /> Trusted
+                                    </span>
+                                )}
+                                {selectedUser.isDemoAccount && (
+                                    <span className="inline-flex items-center rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-0.5 text-xs font-medium text-sky-300">Demo</span>
+                                )}
+                                {!selectedUser.isBanned && !selectedUser.isTrustedCustomer && !selectedUser.isDemoAccount && (
+                                    <span className="text-xs text-zinc-500">Active customer</span>
+                                )}
+                            </div>
+                            {isSuperAdmin && (
+                                <div className="flex items-center gap-2">
+                                    <Button size="sm" variant="ghost" onClick={() => openEditModal(selectedUser)}>
+                                        <Pencil size={13} /> Edit
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => { setUserToBan(selectedUser); setShowBanModal(true); }}
+                                        className={selectedUser.isBanned ? "text-emerald-400 hover:text-emerald-300" : "text-red-400 hover:text-red-300"}
+                                    >
+                                        {selectedUser.isBanned ? <><ShieldCheck size={13} /> Unban</> : <><ShieldBan size={13} /> Ban</>}
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => { setUserToDelete(selectedUser); setShowDeleteModal(true); }}
+                                        className="text-red-400 hover:text-red-300"
+                                    >
+                                        <Trash2 size={13} />
+                                    </Button>
+                                </div>
                             )}
-                        </tbody>
-                    </Table>
+                        </div>
+
+                        {/* Tab bar */}
+                        <div className="flex border-b border-zinc-800/40">
+                            {(["overview", "orders"] as const).map((tab) => (
+                                <button
+                                    key={tab}
+                                    onClick={() => setPanelTab(tab)}
+                                    className={`px-5 py-2.5 text-sm font-medium transition-colors ${
+                                        panelTab === tab
+                                            ? "text-violet-400 border-b-2 border-violet-400"
+                                            : "text-zinc-500 hover:text-zinc-300"
+                                    }`}
+                                >
+                                    {tab === "overview" ? "Overview" : "Orders & Stats"}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Tab content */}
+                        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+                            {panelTab === "overview" && (
+                                <>
+                                    {/* Flag & Notes card */}
+                                    <div className={`rounded-lg border p-4 ${
+                                        selectedUser.flagColor && selectedUser.flagColor !== "none"
+                                            ? `${getFlag(selectedUser.flagColor).bg} ${getFlag(selectedUser.flagColor).border}`
+                                            : "border-zinc-800 bg-zinc-900/60"
+                                    }`}>
+                                        <div className="flex items-center justify-between mb-3">
+                                            <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-2">
+                                                <MessageSquare size={14} /> Flag &amp; Notes
+                                            </h3>
+                                            {!isEditingNote && (
+                                                <Button size="sm" variant="ghost" onClick={startEditNote}>
+                                                    <Pencil size={12} /> {selectedUser.adminNote ? "Edit" : "Add"}
+                                                </Button>
+                                            )}
+                                        </div>
+
+                                        {isEditingNote ? (
+                                            <div className="space-y-3">
+                                                {/* Color picker */}
+                                                <div>
+                                                    <label className="text-xs text-zinc-400 mb-2 block">Flag Level</label>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {FLAG_COLORS.map((fc) => (
+                                                            <button
+                                                                key={fc.value}
+                                                                onClick={() => setSelectedFlag(fc.value)}
+                                                                className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
+                                                                    selectedFlag === fc.value
+                                                                        ? `${fc.border} ${fc.bg} ring-1 ${fc.ring}`
+                                                                        : "border-zinc-700 hover:border-zinc-600 bg-zinc-800/40"
+                                                                }`}
+                                                                title={fc.description}
+                                                            >
+                                                                <div className={`w-3 h-3 rounded-full ${fc.dot}`} />
+                                                                <span className={`text-xs font-medium ${selectedFlag === fc.value ? fc.text : "text-zinc-400"}`}>
+                                                                    {fc.label}
+                                                                </span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                {/* Note textarea */}
+                                                <div>
+                                                    <label className="text-xs text-zinc-400 mb-2 block">Note</label>
+                                                    <textarea
+                                                        value={noteInput}
+                                                        onChange={(e) => setNoteInput(e.target.value)}
+                                                        placeholder="Add a note about this customerï¿½"
+                                                        className="w-full bg-zinc-800/60 border border-zinc-700 rounded-lg p-3 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-violet-500/50 min-h-[100px] resize-y"
+                                                        rows={4}
+                                                    />
+                                                    {!noteInput.trim() && selectedFlag !== "none" && (
+                                                        <p className="text-xs text-zinc-500 mt-1">A flag without a note will be removed on save.</p>
+                                                    )}
+                                                </div>
+
+                                                {/* Save / Cancel */}
+                                                <div className="flex justify-end gap-2">
+                                                    <Button size="sm" variant="outline" onClick={cancelEditNote}>Cancel</Button>
+                                                    <Button size="sm" onClick={saveNote}>
+                                                        {noteInput.trim() ? "Save Flag & Note" : "Remove Flag"}
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ) : selectedUser.adminNote ? (
+                                            <div className="flex items-start gap-2">
+                                                <div className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${getFlag(selectedUser.flagColor).dot}`} />
+                                                <div>
+                                                    <span className={`text-xs font-semibold ${getFlag(selectedUser.flagColor).text}`}>
+                                                        {getFlag(selectedUser.flagColor).label}
+                                                    </span>
+                                                    <p className="text-sm text-zinc-300 mt-1">{selectedUser.adminNote}</p>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-zinc-500">No flag or note set for this customer.</p>
+                                        )}
+                                    </div>
+
+                                    {/* Customer info card */}
+                                    <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
+                                        <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-2 mb-3">
+                                            <User size={14} /> Customer Info
+                                        </h3>
+                                        <div className="grid grid-cols-2 gap-3 text-sm">
+                                            <div>
+                                                <span className="text-zinc-500">Email</span>
+                                                <div className="text-zinc-200 mt-0.5">{selectedUser.email}</div>
+                                            </div>
+                                            <div>
+                                                <span className="text-zinc-500">Phone</span>
+                                                <div className="text-zinc-200 mt-0.5">{selectedUser.phoneNumber || "ï¿½"}</div>
+                                            </div>
+                                            <div>
+                                                <span className="text-zinc-500">Address</span>
+                                                <div className="text-zinc-200 mt-0.5">{selectedUser.address || "ï¿½"}</div>
+                                            </div>
+                                            <div>
+                                                <span className="text-zinc-500">User ID</span>
+                                                <div className="text-zinc-200 mt-0.5 font-mono text-xs">{selectedUser.id}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            {panelTab === "orders" && (
+                                <>
+                                    {/* Behavior summary */}
+                                    {isSuperAdmin && (
+                                        <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
+                                            <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-2 mb-3">
+                                                <CircleDollarSign size={14} /> Behavior Summary
+                                            </h3>
+                                            {behaviorError && <p className="text-sm text-red-300">{behaviorError.message}</p>}
+                                            {behaviorLoading ? (
+                                                <p className="text-sm text-zinc-500">Loadingï¿½</p>
+                                            ) : behaviorData?.userBehavior ? (
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    {[
+                                                        { label: "Total Orders", value: behaviorData.userBehavior.totalOrders },
+                                                        { label: "Delivered", value: behaviorData.userBehavior.deliveredOrders },
+                                                        { label: "Cancelled", value: behaviorData.userBehavior.cancelledOrders },
+                                                        { label: "Total Spend", value: formatCurrency(behaviorData.userBehavior.totalSpend) },
+                                                        { label: "Avg Order", value: formatCurrency(behaviorData.userBehavior.avgOrderValue) },
+                                                        { label: "Last Delivered", value: formatDate(behaviorData.userBehavior.lastDeliveredAt) },
+                                                    ].map((s) => (
+                                                        <div key={s.label} className="bg-zinc-800/50 rounded-lg p-3">
+                                                            <div className="text-xs text-zinc-500">{s.label}</div>
+                                                            <div className="text-sm text-zinc-100 font-semibold mt-0.5">{s.value}</div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="text-sm text-zinc-500">No behavior data yet.</p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Orders list */}
+                                    <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 overflow-hidden">
+                                        <div className="px-4 py-3 border-b border-zinc-800/60 flex items-center justify-between">
+                                            <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-2">
+                                                <Package size={14} /> Orders ({userOrders.length})
+                                            </h3>
+                                        </div>
+                                        {ordersError && <p className="p-4 text-sm text-red-300">{ordersError.message}</p>}
+                                        {ordersLoading ? (
+                                            <p className="p-4 text-sm text-zinc-500">Loading ordersï¿½</p>
+                                        ) : userOrders.length ? (
+                                            <div className="divide-y divide-zinc-800/40 max-h-[400px] overflow-y-auto">
+                                                {userOrders.map((order) => (
+                                                    <button
+                                                        key={order.id}
+                                                        onClick={() => setSelectedOrder(order)}
+                                                        className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/40 transition-colors text-left"
+                                                    >
+                                                        <div className="min-w-0">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] border ${statusColor(order.status)}`}>
+                                                                    {order.status}
+                                                                </span>
+                                                                <span className="text-sm text-zinc-100 font-medium">{formatCurrency(order.totalPrice)}</span>
+                                                            </div>
+                                                            <div className="text-xs text-zinc-500 mt-1 flex items-center gap-3">
+                                                                <span className="flex items-center gap-1"><Clock size={11} />{formatDate(order.orderDate)}</span>
+                                                                <span>{order.businesses.map((b) => b.business.name).join(", ")}</span>
+                                                            </div>
+                                                        </div>
+                                                        <ChevronRight size={14} className="text-zinc-600 flex-shrink-0" />
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="p-4 text-sm text-zinc-500">No orders found.</p>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
                 )}
             </div>
 
-            {showModal && isSuperAdmin && (
-                <Modal
-                    isOpen={showModal}
-                    onClose={handleCloseModal}
-                    title={editingUser ? "Edit User" : "Create Customer"}
-                >
+            {/* ============ MODALS ============ */}
+
+            {/* Create / Edit Modal */}
+            {showCreateModal && isSuperAdmin && (
+                <Modal isOpen={showCreateModal} onClose={closeCreateModal} title={editingUser ? "Edit Customer" : "New Customer"}>
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <input type="hidden" name="role" value="CUSTOMER" />
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">First Name *</label>
-                                <Input
-                                    type="text"
-                                    name="firstName"
-                                    value={formData.firstName}
-                                    onChange={handleInputChange}
-                                    placeholder="John"
-                                    required
-                                />
+                                <label className="block text-sm font-medium text-zinc-300 mb-1.5">First Name *</label>
+                                <Input type="text" name="firstName" value={formData.firstName} onChange={handleInputChange} placeholder="John" required />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">Last Name *</label>
-                                <Input
-                                    type="text"
-                                    name="lastName"
-                                    value={formData.lastName}
-                                    onChange={handleInputChange}
-                                    placeholder="Doe"
-                                    required
-                                />
+                                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Last Name *</label>
+                                <Input type="text" name="lastName" value={formData.lastName} onChange={handleInputChange} placeholder="Doe" required />
                             </div>
                         </div>
-
                         <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">Email *</label>
-                            <Input
-                                type="email"
-                                name="email"
-                                value={formData.email}
-                                onChange={handleInputChange}
-                                placeholder="user@example.com"
-                                required
-                                disabled={!!editingUser}
-                            />
-                            {editingUser && (
-                                <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
-                            )}
+                            <label className="block text-sm font-medium text-zinc-300 mb-1.5">Email *</label>
+                            <Input type="email" name="email" value={formData.email} onChange={handleInputChange} placeholder="user@example.com" required disabled={!!editingUser} />
+                            {editingUser && <p className="text-xs text-zinc-500 mt-1">Email cannot be changed</p>}
                         </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                                Password {editingUser ? "(leave blank to keep current)" : "*"}
-                            </label>
-                            <Input
-                                type="password"
-                                name="password"
-                                value={formData.password}
-                                onChange={handleInputChange}
-                                placeholder="Password"
-                                required={!editingUser}
-                                minLength={6}
-                            />
-                            <p className="text-xs text-gray-500 mt-1">Minimum 6 characters</p>
-                        </div>
-
+                        {!editingUser && (
+                            <div>
+                                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Password *</label>
+                                <Input type="password" name="password" value={formData.password} onChange={handleInputChange} placeholder="Password" required minLength={6} />
+                                <p className="text-xs text-zinc-500 mt-1">Minimum 6 characters</p>
+                            </div>
+                        )}
                         <div className="rounded-lg border border-sky-900/50 bg-sky-950/20 p-4">
                             <label className="flex items-start gap-3 cursor-pointer">
                                 <input
@@ -644,308 +823,72 @@ export default function UsersPage() {
                                 />
                                 <div>
                                     <div className="text-sm font-medium text-sky-200">Demo / App Review account</div>
-                                    <p className="mt-1 text-xs text-sky-100/70">
-                                        Enable only for review or internal demo users. Demo customer orders auto-progress through the delivery lifecycle.
-                                    </p>
+                                    <p className="mt-1 text-xs text-sky-100/70">Orders auto-progress through delivery lifecycle.</p>
                                 </div>
                             </label>
                         </div>
-
-                        {formError && (
-                            <div className="bg-red-900/20 border border-red-800 rounded-lg p-3 text-red-300 text-sm">
-                                {formError}
-                            </div>
-                        )}
-
-                        {formSuccess && (
-                            <div className="bg-green-900/20 border border-green-800 rounded-lg p-3 text-green-300 text-sm">
-                                {formSuccess}
-                            </div>
-                        )}
-
+                        {formError && <div className="bg-red-900/20 border border-red-800 rounded-lg p-3 text-red-300 text-sm">{formError}</div>}
+                        {formSuccess && <div className="bg-emerald-900/20 border border-emerald-800 rounded-lg p-3 text-emerald-300 text-sm">{formSuccess}</div>}
                         <div className="flex gap-3 justify-end pt-2">
-                            <Button
-                                type="button"
-                                onClick={handleCloseModal}
-                                variant="outline"
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="submit"
-                                disabled={creating || updating}
-                            >
-                                {(creating || updating) ? (editingUser ? "Updating..." : "Creating...") : (editingUser ? "Update Customer" : "Create Customer")}
+                            <Button type="button" onClick={closeCreateModal} variant="outline">Cancel</Button>
+                            <Button type="submit" disabled={creating || updating}>
+                                {(creating || updating) ? "Savingï¿½" : editingUser ? "Update" : "Create"}
                             </Button>
                         </div>
                     </form>
                 </Modal>
             )}
 
-            {/* Note Modal */}
-            {showNoteModal && selectedUserForNote && (
-                <Modal 
-                    isOpen={showNoteModal} 
-                    onClose={handleCloseNoteModal} 
-                    title={`Flag/Note for ${selectedUserForNote.firstName} ${selectedUserForNote.lastName}`}
-                >
+            {/* Delete Modal */}
+            {showDeleteModal && userToDelete && (
+                <Modal isOpen={showDeleteModal} onClose={() => { setShowDeleteModal(false); setUserToDelete(null); }} title="Delete Customer">
                     <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                                Admin Note
-                            </label>
-                            <textarea
-                                value={noteInput}
-                                onChange={(e) => setNoteInput(e.target.value)}
-                                placeholder="Add a note about this user (e.g., bad behavior, warnings, etc.)"
-                                className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 min-h-[120px]"
-                                rows={5}
-                            />
-                            <p className="text-xs text-gray-500 mt-2">
-                                {noteInput.trim() ? "This user will be flagged with your note." : "Leave blank to remove flag."}
-                            </p>
-                        </div>
-
-                        {noteInput.trim() && (
+                        <div className="bg-red-900/20 border border-red-800 rounded-lg p-4 flex items-start gap-3">
+                            <AlertCircle size={22} className="text-red-400 flex-shrink-0 mt-0.5" />
                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">
-                                    Highlight Color
-                                </label>
-                                <div className="flex gap-3">
-                                    <button
-                                        type="button"
-                                        onClick={() => setFlagColor('yellow')}
-                                        className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all ${
-                                            flagColor === 'yellow'
-                                                ? 'border-amber-500 bg-amber-900/30'
-                                                : 'border-gray-700 bg-gray-800 hover:border-amber-500/50'
-                                        }`}
-                                    >
-                                        <div className="w-4 h-4 rounded-full bg-amber-500"></div>
-                                        <span className="text-sm text-gray-300">Yellow (Warning)</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setFlagColor('red')}
-                                        className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all ${
-                                            flagColor === 'red'
-                                                ? 'border-red-500 bg-red-900/30'
-                                                : 'border-gray-700 bg-gray-800 hover:border-red-500/50'
-                                        }`}
-                                    >
-                                        <div className="w-4 h-4 rounded-full bg-red-500"></div>
-                                        <span className="text-sm text-gray-300">Red (Critical)</span>
-                                    </button>
-                                </div>
+                                <p className="text-sm text-zinc-300">
+                                    Delete <strong>{userToDelete.firstName} {userToDelete.lastName}</strong> ({userToDelete.email})?
+                                </p>
+                                <p className="text-xs text-zinc-500 mt-1">This cannot be undone.</p>
                             </div>
-                        )}
-
-                        {selectedUserForNote.adminNote && (
-                            <div className={`${selectedUserForNote.flagColor === 'red' ? 'bg-red-900/20 border-red-800' : 'bg-amber-900/20 border-amber-800'} border rounded-lg p-3`}>
-                                <div className="flex items-start gap-2">
-                                    <AlertCircle size={16} className={`${selectedUserForNote.flagColor === 'red' ? 'text-red-400' : 'text-amber-400'} mt-0.5 flex-shrink-0`} />
-                                    <div className={`text-sm ${selectedUserForNote.flagColor === 'red' ? 'text-red-300' : 'text-amber-300'}`}>
-                                        <strong>Current Note:</strong>
-                                        <p className="mt-1">{selectedUserForNote.adminNote}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="flex gap-3 justify-end pt-2">
-                            <Button
-                                type="button"
-                                onClick={handleCloseNoteModal}
-                                variant="outline"
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="button"
-                                onClick={handleSaveNote}
-                                className={noteInput.trim() ? "bg-amber-600 hover:bg-amber-700" : ""}
-                            >
-                                {noteInput.trim() ? "Save Flag" : "Remove Flag"}
+                        </div>
+                        <div className="flex gap-3 justify-end">
+                            <Button type="button" onClick={() => { setShowDeleteModal(false); setUserToDelete(null); }} variant="outline">Cancel</Button>
+                            <Button type="button" onClick={confirmDelete} disabled={deleting} variant="danger">
+                                {deleting ? "Deletingï¿½" : "Delete"}
                             </Button>
                         </div>
                     </div>
                 </Modal>
             )}
 
-            {/* Delete Confirmation Modal */}
-            {showDeleteModal && selectedUserForDelete && (
-                <Modal 
-                    isOpen={showDeleteModal} 
-                    onClose={() => setShowDeleteModal(false)} 
-                    title="Confirm Delete"
-                >
+            {/* Ban Modal */}
+            {showBanModal && userToBan && (
+                <Modal isOpen={showBanModal} onClose={() => { setShowBanModal(false); setUserToBan(null); }} title={userToBan.isBanned ? "Unban Customer" : "Ban Customer"}>
                     <div className="space-y-4">
-                        <div className="bg-red-900/20 border border-red-800 rounded-lg p-4">
-                            <div className="flex items-start gap-3">
-                                <AlertCircle size={24} className="text-red-400 flex-shrink-0 mt-0.5" />
-                                <div>
-                                    <h3 className="text-red-300 font-semibold mb-2">Are you sure?</h3>
-                                    <p className="text-gray-300 text-sm">
-                                        You are about to delete <strong>{selectedUserForDelete.firstName} {selectedUserForDelete.lastName}</strong> ({selectedUserForDelete.email}).
-                                    </p>
-                                    <p className="text-gray-400 text-sm mt-2">
-                                        This action cannot be undone.
-                                    </p>
-                                </div>
+                        <div className={`${userToBan.isBanned ? "bg-emerald-900/20 border-emerald-800" : "bg-red-900/20 border-red-800"} border rounded-lg p-4 flex items-start gap-3`}>
+                            {userToBan.isBanned
+                                ? <ShieldCheck size={22} className="text-emerald-400 flex-shrink-0 mt-0.5" />
+                                : <ShieldBan size={22} className="text-red-400 flex-shrink-0 mt-0.5" />
+                            }
+                            <div>
+                                <p className="text-sm text-zinc-300">
+                                    {userToBan.isBanned ? "Unban" : "Ban"} <strong>{userToBan.firstName} {userToBan.lastName}</strong>?
+                                </p>
+                                <p className="text-xs text-zinc-500 mt-1">
+                                    {userToBan.isBanned ? "They will be able to place orders again." : "They will not be able to place new orders."}
+                                </p>
                             </div>
                         </div>
-
-                        <div className="flex gap-3 justify-end pt-2">
+                        <div className="flex gap-3 justify-end">
+                            <Button type="button" onClick={() => { setShowBanModal(false); setUserToBan(null); }} variant="outline">Cancel</Button>
                             <Button
                                 type="button"
-                                onClick={() => setShowDeleteModal(false)}
-                                variant="outline"
+                                onClick={confirmBan}
+                                disabled={banning}
+                                variant={userToBan.isBanned ? "success" : "danger"}
                             >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="button"
-                                onClick={confirmDelete}
-                                disabled={deleting}
-                                className="bg-red-600 hover:bg-red-700"
-                            >
-                                {deleting ? "Deleting..." : "Delete User"}
-                            </Button>
-                        </div>
-                    </div>
-                </Modal>
-            )}
-
-            {/* User History Modal */}
-            {showHistoryModal && selectedUserForHistory && (
-                <Modal
-                    isOpen={showHistoryModal}
-                    onClose={handleCloseHistoryModal}
-                    title={`Order history for ${selectedUserForHistory.firstName} ${selectedUserForHistory.lastName}`}
-                >
-                    <div className="space-y-6">
-                        {isSuperAdmin ? (
-                            <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
-                                <h3 className="text-sm font-semibold text-gray-200 mb-3">Behavior Summary</h3>
-                                {behaviorError && (
-                                    <div className="text-sm text-red-300">{behaviorError.message}</div>
-                                )}
-                                {behaviorLoading ? (
-                                    <div className="text-sm text-gray-400">Loading behavior...</div>
-                                ) : behaviorData?.userBehavior ? (
-                                    <div className="grid grid-cols-2 gap-3 text-sm">
-                                        <div className="bg-gray-800/60 rounded-lg p-3">
-                                            <div className="text-gray-400">Total Orders</div>
-                                            <div className="text-white font-semibold">
-                                                {behaviorData.userBehavior.totalOrders}
-                                            </div>
-                                        </div>
-                                        <div className="bg-gray-800/60 rounded-lg p-3">
-                                            <div className="text-gray-400">Delivered Orders</div>
-                                            <div className="text-white font-semibold">
-                                                {behaviorData.userBehavior.deliveredOrders}
-                                            </div>
-                                        </div>
-                                        <div className="bg-gray-800/60 rounded-lg p-3">
-                                            <div className="text-gray-400">Cancelled Orders</div>
-                                            <div className="text-white font-semibold">
-                                                {behaviorData.userBehavior.cancelledOrders}
-                                            </div>
-                                        </div>
-                                        <div className="bg-gray-800/60 rounded-lg p-3">
-                                            <div className="text-gray-400">Total Spend</div>
-                                            <div className="text-white font-semibold">
-                                                {formatCurrency(behaviorData.userBehavior.totalSpend)}
-                                            </div>
-                                        </div>
-                                        <div className="bg-gray-800/60 rounded-lg p-3">
-                                            <div className="text-gray-400">Avg Order Value</div>
-                                            <div className="text-white font-semibold">
-                                                {formatCurrency(behaviorData.userBehavior.avgOrderValue)}
-                                            </div>
-                                        </div>
-                                        <div className="bg-gray-800/60 rounded-lg p-3">
-                                            <div className="text-gray-400">Last Delivered</div>
-                                            <div className="text-white font-semibold">
-                                                {formatDate(behaviorData.userBehavior.lastDeliveredAt)}
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="text-sm text-gray-400">No behavior data yet.</div>
-                                )}
-                            </div>
-                        ) : (
-                            <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 text-sm text-gray-400">
-                                Behavior summary is only available for super admins.
-                            </div>
-                        )}
-
-                        <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
-                            <div className="px-4 py-3 border-b border-gray-800 text-sm font-semibold text-gray-200">
-                                Orders ({userOrders.length})
-                            </div>
-                            {ordersError && (
-                                <div className="p-4 text-sm text-red-300">{ordersError.message}</div>
-                            )}
-                            {ordersLoading ? (
-                                <div className="p-4 text-sm text-gray-400">Loading orders...</div>
-                            ) : userOrders.length ? (
-                                <div className="max-h-[360px] overflow-y-auto">
-                                    <Table>
-                                        <thead>
-                                            <tr>
-                                                <Th>Date</Th>
-                                                <Th>Status</Th>
-                                                <Th>Total</Th>
-                                                <Th>Businesses</Th>
-                                                <Th>Dropoff</Th>
-                                                <Th>Actions</Th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {userOrders.map((order) => (
-                                                <tr key={order.id}>
-                                                    <Td>{formatDate(order.orderDate)}</Td>
-                                                    <Td>
-                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs border ${getStatusBadgeColor(order.status)}`}>
-                                                            {order.status}
-                                                        </span>
-                                                    </Td>
-                                                    <Td>{formatCurrency(order.totalPrice)}</Td>
-                                                    <Td>
-                                                        <div className="text-gray-300">
-                                                            {order.businesses.map((b) => b.business.name).join(", ") || "-"}
-                                                        </div>
-                                                    </Td>
-                                                    <Td>
-                                                        <div className="text-gray-400 max-w-xs truncate">
-                                                            {order.dropOffLocation?.address || "-"}
-                                                        </div>
-                                                    </Td>
-                                                    <Td>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() => handleOpenOrderDetails(order)}
-                                                            className="text-blue-400 hover:text-blue-300"
-                                                        >
-                                                            View Details
-                                                        </Button>
-                                                    </Td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </Table>
-                                </div>
-                            ) : (
-                                <div className="p-4 text-sm text-gray-400">No orders found for this user.</div>
-                            )}
-                        </div>
-
-                        <div className="flex justify-end">
-                            <Button type="button" variant="outline" onClick={handleCloseHistoryModal}>
-                                Close
+                                {banning ? (userToBan.isBanned ? "Unbanningâ€¦" : "Banningâ€¦") : (userToBan.isBanned ? "Unban" : "Ban")}
                             </Button>
                         </div>
                     </div>
@@ -953,101 +896,51 @@ export default function UsersPage() {
             )}
 
             {/* Order Details Modal */}
-            {showOrderDetailsModal && selectedOrderForDetails && (
-                <Modal
-                    isOpen={showOrderDetailsModal}
-                    onClose={handleCloseOrderDetails}
-                    title="Order Details"
-                >
+            {selectedOrder && (
+                <Modal isOpen={!!selectedOrder} onClose={() => setSelectedOrder(null)} title="Order Details" size="lg">
                     <div className="space-y-5">
-                        <div className="flex items-center justify-between pb-4 border-b border-gray-800">
+                        <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
                             <div>
-                                <div className="text-xs text-gray-400">Order ID</div>
-                                <div className="font-mono text-sm text-white">{selectedOrderForDetails.id}</div>
-                                <div className="text-xs text-gray-500 mt-1">{formatDate(selectedOrderForDetails.orderDate)}</div>
+                                <div className="text-xs text-zinc-500">Order ID</div>
+                                <div className="font-mono text-sm text-zinc-100">{selectedOrder.id}</div>
+                                <div className="text-xs text-zinc-500 mt-1">{formatDate(selectedOrder.orderDate)}</div>
                             </div>
-                            <div className={`px-3 py-1 rounded-full text-xs border ${getStatusBadgeColor(selectedOrderForDetails.status)}`}>
-                                {selectedOrderForDetails.status}
-                            </div>
+                            <span className={`px-3 py-1 rounded-full text-xs border ${statusColor(selectedOrder.status)}`}>
+                                {selectedOrder.status}
+                            </span>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
-                                <div className="text-xs text-gray-400 mb-2">Assigned Driver</div>
-                                {selectedOrderForDetails.driver ? (
-                                    <>
-                                        <div className="text-white font-medium">
-                                            {selectedOrderForDetails.driver.firstName} {selectedOrderForDetails.driver.lastName}
-                                        </div>
-                                        <div className="text-sm text-gray-400 mt-1">
-                                            {selectedOrderForDetails.driver.email}
-                                        </div>
-                                    </>
-                                ) : (
-                                    <div className="text-zinc-600">No driver assigned</div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 space-y-2 text-sm">
+                                <div className="flex justify-between"><span className="text-zinc-500">Order Price</span><span className="text-zinc-200">{formatCurrency(selectedOrder.orderPrice)}</span></div>
+                                <div className="flex justify-between"><span className="text-zinc-500">Delivery</span><span className="text-zinc-200">{formatCurrency(selectedOrder.deliveryPrice)}</span></div>
+                                <div className="flex justify-between border-t border-zinc-800 pt-2 font-semibold"><span className="text-zinc-300">Total</span><span className="text-zinc-100">{formatCurrency(selectedOrder.totalPrice)}</span></div>
+                            </div>
+                            <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 space-y-2 text-sm">
+                                <div><span className="text-zinc-500">Dropoff</span><div className="text-zinc-200 mt-0.5">{selectedOrder.dropOffLocation?.address || "â€”"}</div></div>
+                                <div><span className="text-zinc-500">Duration</span><div className="text-zinc-200 mt-0.5">{orderDuration(selectedOrder)}</div></div>
+                                {selectedOrder.driver && (
+                                    <div><span className="text-zinc-500">Driver</span><div className="text-zinc-200 mt-0.5">{selectedOrder.driver.firstName} {selectedOrder.driver.lastName}</div></div>
                                 )}
                             </div>
-
-                            <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
-                                <div className="text-xs text-gray-400 mb-2">Delivery</div>
-                                <div className="text-sm text-white">
-                                    {selectedOrderForDetails.dropOffLocation?.address || "-"}
-                                </div>
-                                <div className="text-xs text-gray-500 mt-2">
-                                    {selectedOrderForDetails.status === "DELIVERED" ? "Delivery time" : "Elapsed"}: {getOrderDuration(selectedOrderForDetails)}
-                                </div>
-                            </div>
                         </div>
 
-                        <div className="space-y-4">
-                            {selectedOrderForDetails.businesses.map((biz, idx) => (
-                                <div key={`${biz.business.id}-${idx}`} className="bg-gray-900 border border-gray-800 rounded-lg p-4">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <div className="text-sm font-semibold text-white">{biz.business.name}</div>
-                                            {biz.business.businessType && (
-                                                <div className="text-xs text-gray-500">{biz.business.businessType}</div>
-                                            )}
+                        {selectedOrder.businesses.map((b, i) => (
+                            <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
+                                <div className="px-4 py-2.5 border-b border-zinc-800 text-sm font-medium text-zinc-200">{b.business.name}</div>
+                                <div className="divide-y divide-zinc-800/40">
+                                    {b.items.map((item, j) => (
+                                        <div key={j} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                                            <div className="text-zinc-300">{item.name} <span className="text-zinc-500">Ã—{item.quantity}</span></div>
+                                            <div className="text-zinc-200">{formatCurrency(item.price * item.quantity)}</div>
                                         </div>
-                                        {biz.business.phoneNumber && (
-                                            <div className="text-xs text-gray-400">{biz.business.phoneNumber}</div>
-                                        )}
-                                    </div>
-                                    <div className="mt-3 space-y-2">
-                                        {biz.items.map((item) => (
-                                            <div key={item.productId} className="flex items-center justify-between text-sm">
-                                                <div className="text-gray-200">
-                                                    {item.quantity}x {item.name}
-                                                </div>
-                                                <div className="text-gray-400">
-                                                    {formatCurrency(item.price * item.quantity)}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    ))}
                                 </div>
-                            ))}
-                        </div>
-
-                        <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 space-y-2">
-                            <div className="flex justify-between text-sm">
-                                <span className="text-gray-400">Subtotal</span>
-                                <span className="text-white">{formatCurrency(selectedOrderForDetails.orderPrice)}</span>
                             </div>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-gray-400">Delivery Fee</span>
-                                <span className="text-white">{formatCurrency(selectedOrderForDetails.deliveryPrice)}</span>
-                            </div>
-                            <div className="flex justify-between text-sm font-semibold pt-2 border-t border-gray-800">
-                                <span className="text-white">Total</span>
-                                <span className="text-blue-300">{formatCurrency(selectedOrderForDetails.totalPrice)}</span>
-                            </div>
-                        </div>
+                        ))}
 
                         <div className="flex justify-end">
-                            <Button type="button" variant="outline" onClick={handleCloseOrderDetails}>
-                                Close
-                            </Button>
+                            <Button type="button" variant="outline" onClick={() => setSelectedOrder(null)}>Close</Button>
                         </div>
                     </div>
                 </Modal>

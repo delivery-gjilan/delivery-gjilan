@@ -182,11 +182,11 @@ export default function AddressPicker({
     });
 
     const activeZones = useMemo(
-        () => ((zonesData as any)?.deliveryZones ?? []).filter((z: any) => z.isActive),
+        () => (zonesData?.deliveryZones ?? []).filter((z) => z.isActive),
         [zonesData],
     );
     const serviceZones = useMemo(
-        () => activeZones.filter((z: any) => z.isServiceZone === true),
+        () => activeZones.filter((z) => z.isServiceZone === true),
         [activeZones],
     );
     const effectiveZones = serviceZones.length > 0 ? serviceZones : activeZones;
@@ -195,8 +195,8 @@ export default function AddressPicker({
         if (effectiveZones.length === 0) return null;
 
         const rings = effectiveZones
-            .map((zone: any) =>
-                ((zone.polygon ?? []) as Array<{ lat: number; lng: number }>)
+            .map((zone) =>
+                (zone.polygon ?? [])
                     .map((p) => [p.lng, p.lat] as [number, number])
             )
             .filter((ring: Array<[number, number]>) => ring.length >= 3)
@@ -239,8 +239,8 @@ export default function AddressPicker({
         if (effectiveZones.length === 0) return null;
 
         const features = effectiveZones
-            .map((zone: any) => {
-                const ring = ((zone.polygon ?? []) as Array<{ lat: number; lng: number }>)
+            .map((zone) => {
+                const ring = (zone.polygon ?? [])
                     .map((p) => [p.lng, p.lat] as [number, number]);
                 if (ring.length < 3) return null;
 
@@ -269,8 +269,8 @@ export default function AddressPicker({
     const zoneBounds = useMemo(() => {
         if (effectiveZones.length === 0) return null;
 
-        const points = effectiveZones.flatMap((zone: any) =>
-            ((zone.polygon ?? []) as Array<{ lat: number; lng: number }>).map((p) => ({ lng: p.lng, lat: p.lat })),
+        const points = effectiveZones.flatMap((zone) =>
+            (zone.polygon ?? []).map((p) => ({ lng: p.lng, lat: p.lat })),
         );
         if (points.length === 0) return null;
 
@@ -327,10 +327,10 @@ export default function AddressPicker({
         if (!pinLocation) return false;
         if (effectiveZones.length === 0) return true;
 
-        return effectiveZones.some((zone: any) =>
+        return effectiveZones.some((zone) =>
             isPointInPolygon(
                 { lat: pinLocation.latitude, lng: pinLocation.longitude },
-                zone.polygon as Array<{ lat: number; lng: number }>,
+                zone.polygon,
             ),
         );
     }, [pinLocation, effectiveZones]);

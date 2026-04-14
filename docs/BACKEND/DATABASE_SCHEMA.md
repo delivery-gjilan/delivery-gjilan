@@ -43,7 +43,8 @@ npm run db:studio     # open Drizzle Studio at https://local.drizzle.studio
 | `signup_step` | INITIAL → EMAIL_SENT → EMAIL_VERIFIED → PHONE_SENT → COMPLETED |
 | `role` | CUSTOMER, DRIVER, BUSINESS_OWNER, BUSINESS_EMPLOYEE, ADMIN, SUPER_ADMIN |
 | `business_id` | FK to businesses; required for BUSINESS_* roles |
-| `flag_color` | Admin moderation flag (yellow default) |
+| `flag_color` | Admin moderation flag (none/green/yellow/orange/red) |
+| `is_banned` | Boolean, default false. Banned users cannot place new orders |
 | `deleted_at` | Soft delete timestamp |
 
 ---

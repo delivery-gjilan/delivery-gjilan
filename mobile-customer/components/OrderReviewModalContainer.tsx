@@ -26,7 +26,7 @@ export default function OrderReviewModalContainer() {
 
     const [submitOrderReview, { loading: submitting }] = useMutation(SUBMIT_ORDER_REVIEW);
 
-    const order = (data as any)?.order;
+    const order = data?.order;
     const business = useMemo(() => order?.businesses?.[0]?.business, [order]);
     const businessId = business?.id ? String(business.id) : null;
     const businessName = business?.name ? String(business.name) : undefined;

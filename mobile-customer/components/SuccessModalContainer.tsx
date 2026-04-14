@@ -60,7 +60,7 @@ export default function SuccessModalContainer() {
                 const targetOrderId = pendingTrackOrderIdRef.current;
                 pendingTrackOrderIdRef.current = null;
                 setTimeout(() => {
-                    router.push(`/orders/${targetOrderId}` as any);
+                    router.push({ pathname: '/orders/[orderId]', params: { orderId: targetOrderId } } as never);
                 }, MODAL_FADE_MS);
             }
 

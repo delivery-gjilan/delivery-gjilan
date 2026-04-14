@@ -53,6 +53,7 @@ type User {
     emailOptOut: Boolean!
     totalOrders: Int!
     isTrustedCustomer: Boolean!
+    isBanned: Boolean!
     isDemoAccount: Boolean!
     permissions: [UserPermission!]!
 }
@@ -169,6 +170,7 @@ type Mutation {
     setMyEmailOptOut(optOut: Boolean!): User!
     changeMyPassword(currentPassword: String!, newPassword: String!): Boolean!
     updateMyProfile(input: UpdateMyProfileInput!): User!
+    banUser(userId: ID!, banned: Boolean!): User!
     requestPasswordReset(email: String!): Boolean! @skipAuth
     resetPassword(token: String!, newPassword: String!): Boolean! @skipAuth
 }

@@ -123,10 +123,10 @@ export default function Discover() {
         skip: !userId,
         fetchPolicy: 'cache-and-network',
     });
-    const featuredBusinesses = useMemo(() => (featuredData as any)?.featuredBusinesses ?? [], [featuredData]);
+    const featuredBusinesses = useMemo(() => featuredData?.featuredBusinesses ?? [], [featuredData]);
 
     const personalizedCoupons = useMemo(() => {
-        const rows = ((userPromotionsData as any)?.getUserPromotions ?? []) as Array<any>;
+        const rows = userPromotionsData?.getUserPromotions ?? [];
         return rows
             .filter((row) => row?.promotion?.isActive)
             .filter((row) => {
@@ -138,7 +138,7 @@ export default function Discover() {
             .slice(0, 6);
     }, [userPromotionsData]);
 
-    const formatUserCouponValue = useCallback((promotion: any) => {
+    const formatUserCouponValue = useCallback((promotion: { type?: string; discountValue?: number | null }) => {
         const type = promotion?.type;
         const discountValue = Number(promotion?.discountValue ?? 0);
         if (type === 'FREE_DELIVERY' || type === 'SPEND_X_GET_FREE') {
@@ -163,7 +163,7 @@ export default function Discover() {
 
     // Section: Restaurants with active promotions
     const promoRestaurants = useMemo(
-        () => restaurants.filter((r) => (r as any).activePromotion),
+        () => restaurants.filter((r) => r.activePromotion),
         [restaurants],
     );
 
@@ -175,10 +175,10 @@ export default function Discover() {
 
     // Map API banners to PromoSlider format
     const promoBanners = useMemo(() => {
-        const apiBanners = (bannersData as any)?.getActiveBanners || [];
+        const apiBanners = bannersData?.getActiveBanners || [];
         
         if (apiBanners.length > 0) {
-            return apiBanners.map((banner: any) => ({
+            return apiBanners.map((banner) => ({
                 id: banner.id,
                 imageUrl: banner.imageUrl || null,
                 type: 'image' as const,
@@ -212,7 +212,7 @@ export default function Discover() {
         router.push('/(tabs)/restaurants');
     };
 
-    const getPrepTimeLabel = (item: any) => {
+    const getPrepTimeLabel = (item: { prepTimeOverrideMinutes?: number | null; avgPrepTimeMinutes?: number }) => {
         const base =
             typeof item.prepTimeOverrideMinutes === 'number' && item.prepTimeOverrideMinutes > 0
                 ? item.prepTimeOverrideMinutes
@@ -224,8 +224,8 @@ export default function Discover() {
 
     const renderCards = (items: typeof restaurants) =>
         items.map((item, index) => {
-            const lat = (item as any).location?.latitude || 42.4635;
-            const lng = (item as any).location?.longitude || 21.4694;
+            const lat = item.location?.latitude || 42.4635;
+            const lng = item.location?.longitude || 21.4694;
             const fee = estimateDeliveryPrice(lat, lng);
 
             return (
@@ -237,13 +237,13 @@ export default function Discover() {
                         id={item.id}
                         name={item.name}
                         imageUrl={item.imageUrl}
-                        description={(item as any).description}
+                        description={item.description}
                         isOpen={item.isOpen}
                         onPress={handleBusinessPress}
                         deliveryFee={fee}
                         deliveryTime={getPrepTimeLabel(item)}
-                        rating={(item as any).ratingAverage ?? undefined}
-                        activePromotion={(item as any).activePromotion}
+                        rating={item.ratingAverage ?? undefined}
+                        activePromotion={item.activePromotion}
                     />
                 </Animated.View>
             );

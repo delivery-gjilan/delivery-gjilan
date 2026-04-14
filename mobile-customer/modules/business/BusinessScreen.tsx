@@ -167,13 +167,13 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
     const applicableThreshold = useMemo(() => {
         const list = thresholdsData?.getPromotionThresholds;
         if (!list || list.length === 0) return null;
-        const matching = list.filter((p: any) => {
+        const matching = list.filter((p) => {
             if (!p || !p.spendThreshold) return false;
             const ids = p.eligibleBusinessIds || [];
             return ids.length === 0 || ids.includes(businessId);
         });
         if (matching.length === 0) return null;
-        matching.sort((a: any, b: any) => (b.priority || 0) - (a.priority || 0));
+        matching.sort((a, b) => (b.priority || 0) - (a.priority || 0));
         return matching[0];
     }, [thresholdsData, businessId]);
 
@@ -183,7 +183,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
     const formatCurrency = (value: number) => `€${Number(value).toFixed(2)}`;
 
     // Minimum order progress
-    const minOrderAmount = Number((business as any)?.minOrderAmount ?? 0);
+    const minOrderAmount = Number(business?.minOrderAmount ?? 0);
     const minimumMet = minOrderAmount <= 0 || businessCartTotal >= minOrderAmount;
     const minOrderProgress = minOrderAmount > 0 ? Math.min(businessCartTotal / minOrderAmount, 1) : 1;
     const amountUntilMinimum = Math.max(0, minOrderAmount - businessCartTotal);
@@ -373,7 +373,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
     // ─── Derived Data ───────────────────────────────────────
     const categories = useMemo(() => {
         return (categoriesData?.productCategories ?? [])
-            .map((c: any) => ({ id: c.id, name: c.name }));
+            .map((c) => ({ id: c.id, name: c.name }));
     }, [categoriesData]);
 
     const productsByCategory = useMemo(() => {
@@ -398,7 +398,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
         });
 
         // Uncategorized
-        const categorizedIds = new Set(categories.map((c: any) => c.id));
+        const categorizedIds = new Set(categories.map((c) => c.id));
         const uncategorized = nonOfferProducts.filter((p) => {
             const categoryId = p.product?.categoryId;
             return !categoryId || !categorizedIds.has(categoryId);
@@ -594,7 +594,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
         searchInputRef.current?.blur();
     }, []);
 
-    const promoList = ((business as any)?.activePromotionsDisplay ?? []) as PromoLike[];
+    const promoList = business?.activePromotionsDisplay ?? [];
     const promoChips = promoList.slice(0, 3);
 
     useEffect(() => {
@@ -660,8 +660,8 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
         );
     }
 
-    const avgPrepTime = (business as any)?.avgPrepTimeMinutes ?? null;
-    const overridePrepTime = (business as any)?.prepTimeOverrideMinutes ?? null;
+    const avgPrepTime = business?.avgPrepTimeMinutes ?? null;
+    const overridePrepTime = business?.prepTimeOverrideMinutes ?? null;
     const deliveryTimeMin = overridePrepTime ?? avgPrepTime ?? 30;
     const deliveryTimeMax = deliveryTimeMin + 10;
 
@@ -708,7 +708,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                         </Animated.Text>
 
                         {/* Description */}
-                        {(business as any).description ? (
+                        {business.description ? (
                             <Animated.Text
                                 entering={FadeInDown.delay(240).duration(400).springify().damping(28).stiffness(140)}
                                 style={{
@@ -720,7 +720,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                                 }}
                                 numberOfLines={2}
                             >
-                                {(business as any).description}
+                                {business.description}
                             </Animated.Text>
                         ) : null}
 
@@ -811,7 +811,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                         </Animated.View>
 
                         {/* Minimum order badge */}
-                        {Number((business as any)?.minOrderAmount ?? 0) > 0 && (
+                        {Number(business?.minOrderAmount ?? 0) > 0 && (
                             <Animated.View
                                 entering={FadeInDown.delay(360).duration(350).springify().damping(28).stiffness(140)}
                                 style={{
@@ -830,7 +830,7 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                             >
                                 <Ionicons name="cart-outline" size={13} color={theme.colors.subtext} />
                                 <Text style={{ fontSize: 12, color: theme.colors.subtext }}>
-                                    Min. order €{Number((business as any).minOrderAmount).toFixed(2)}
+                                    Min. order €{Number(business.minOrderAmount).toFixed(2)}
                                 </Text>
                             </Animated.View>
                         )}

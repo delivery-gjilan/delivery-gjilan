@@ -1108,6 +1108,7 @@ export type Mutation = {
   assignDriverToOrder: Order;
   assignPromotionToUsers: Array<UserPromotion>;
   backfillSettlementsForDeliveredOrders: Scalars['Int']['output'];
+  banUser: User;
   bulkSetInventory: Array<InventoryItem>;
   businessDeviceHeartbeat: Scalars['Boolean']['output'];
   businessDeviceOrderSignal: Scalars['Boolean']['output'];
@@ -1327,6 +1328,12 @@ export type MutationassignDriverToOrderArgs = {
 
 export type MutationassignPromotionToUsersArgs = {
   input: AssignPromotionToUserInput;
+};
+
+
+export type MutationbanUserArgs = {
+  banned: Scalars['Boolean']['input'];
+  userId: Scalars['ID']['input'];
 };
 
 
@@ -3588,6 +3595,7 @@ export type User = {
   hasOwnVehicle?: Maybe<Scalars['Boolean']['output']>;
   id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
+  isBanned: Scalars['Boolean']['output'];
   isDemoAccount: Scalars['Boolean']['output'];
   isOnline: Scalars['Boolean']['output'];
   isTrustedCustomer: Scalars['Boolean']['output'];
@@ -4758,6 +4766,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   assignDriverToOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationassignDriverToOrderArgs, 'id'>>;
   assignPromotionToUsers?: Resolver<Array<ResolversTypes['UserPromotion']>, ParentType, ContextType, RequireFields<MutationassignPromotionToUsersArgs, 'input'>>;
   backfillSettlementsForDeliveredOrders?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  banUser?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationbanUserArgs, 'banned' | 'userId'>>;
   bulkSetInventory?: Resolver<Array<ResolversTypes['InventoryItem']>, ParentType, ContextType, RequireFields<MutationbulkSetInventoryArgs, 'input'>>;
   businessDeviceHeartbeat?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationbusinessDeviceHeartbeatArgs, 'input'>>;
   businessDeviceOrderSignal?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationbusinessDeviceOrderSignalArgs, 'deviceId'>>;
@@ -5662,6 +5671,7 @@ export type UserResolvers<ContextType = GraphQLContext, ParentType extends Resol
   hasOwnVehicle?: Resolver<Maybe<ResolversTypes['Boolean']>, ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  isBanned?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   isDemoAccount?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   isOnline?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   isTrustedCustomer?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;

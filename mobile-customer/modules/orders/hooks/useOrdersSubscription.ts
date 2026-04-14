@@ -2,7 +2,7 @@ import { useApolloClient, useSubscription } from '@apollo/client/react';
 import { useEffect, useRef } from 'react';
 import { GET_ORDERS, GET_ORDER } from '@/graphql/operations/orders';
 import { USER_ORDERS_UPDATED } from '@/graphql/operations/orders/subscriptions';
-import { useActiveOrdersStore } from '../store/activeOrdersStore';
+import { useActiveOrdersStore, type ActiveOrder } from '../store/activeOrdersStore';
 import { useAuthStore } from '@/store/authStore';
 import { addWsReconnectListener } from '@/lib/graphql/apolloClient';
 
@@ -31,7 +31,7 @@ export function useOrdersSubscription() {
 
     const isActiveStatus = (status?: string | null) => status !== 'DELIVERED' && status !== 'CANCELLED';
 
-    const isActiveOrderForUser = (order: any) =>
+    const isActiveOrderForUser = (order: ActiveOrder | null | undefined) =>
         Boolean(userId) &&
         String(order?.userId) === String(userId) &&
         typeof order?.status === 'string' &&
@@ -44,14 +44,14 @@ export function useOrdersSubscription() {
             variables: GET_ORDERS_VARIABLES,
             fetchPolicy: 'network-only',
         });
-        const orders = (data as any)?.orders?.orders ?? [];
+        const orders = data?.orders?.orders ?? [];
         const activeOrders = orders.filter(
-            (order: any) =>
+            (order) =>
                 order.userId === userId &&
                 order.status !== 'DELIVERED' &&
                 order.status !== 'CANCELLED',
         );
-        setActiveOrders(activeOrders as unknown as any);
+        setActiveOrders(activeOrders);
     };
 
     const scheduleFallbackRefetch = (client: any, force = false) => {
@@ -75,10 +75,10 @@ export function useOrdersSubscription() {
             return false;
         }
 
-        client.cache.updateQuery({ query: GET_ORDERS, variables: GET_ORDERS_VARIABLES }, (existing: any) => {
+        client.cache.updateQuery({ query: GET_ORDERS, variables: GET_ORDERS_VARIABLES }, (existing) => {
             const currentOrders = Array.isArray(existing?.orders?.orders) ? existing.orders.orders : [];
             const existingIndex = currentOrders.findIndex(
-                (order: any) => String(order?.id) === String(nextOrder.id),
+                (order) => String(order?.id) === String(nextOrder.id),
             );
 
             let updatedOrders = currentOrders;
@@ -105,7 +105,7 @@ export function useOrdersSubscription() {
         });
 
         if (isActiveOrderForUser(nextOrder)) {
-            updateOrder(nextOrder as unknown as any);
+            updateOrder(nextOrder);
         } else if (String(nextOrder?.userId) === String(userId)) {
             removeOrder(String(nextOrder.id));
         }
@@ -118,10 +118,10 @@ export function useOrdersSubscription() {
             return false;
         }
 
-        client.cache.updateQuery({ query: GET_ORDERS, variables: GET_ORDERS_VARIABLES }, (existing: any) => {
+        client.cache.updateQuery({ query: GET_ORDERS, variables: GET_ORDERS_VARIABLES }, (existing) => {
             const currentOrders = Array.isArray(existing?.orders?.orders) ? existing.orders.orders : [];
-            const byId = new Map(currentOrders.map((o: any) => [String(o?.id), o]));
-            nextOrders.forEach((o: any) => {
+            const byId = new Map(currentOrders.map((o) => [String(o?.id), o]));
+            nextOrders.forEach((o) => {
                 if (o?.id) byId.set(String(o.id), o);
             });
             return {
@@ -144,7 +144,7 @@ export function useOrdersSubscription() {
             });
 
             if (isActiveOrderForUser(order)) {
-                updateOrder(order as unknown as any);
+                updateOrder(order);
             } else if (String(order?.userId) === String(userId)) {
                 removeOrder(String(order.id));
             }
@@ -156,7 +156,7 @@ export function useOrdersSubscription() {
     const { loading, error } = useSubscription(USER_ORDERS_UPDATED, {
         skip: !shouldSubscribe,
         onData: ({ client, data }) => {
-            const payload = (data?.data as any)?.userOrdersUpdated;
+            const payload = data?.data?.userOrdersUpdated;
 
             try {
                 const didApply = Array.isArray(payload)

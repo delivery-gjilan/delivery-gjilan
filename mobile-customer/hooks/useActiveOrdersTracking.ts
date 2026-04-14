@@ -61,7 +61,7 @@ export function useActiveOrdersTracking() {
         if (!isAuthenticated || !userId) return;
 
         const nextStatuses: Record<string, string> = {};
-        const userOrders = (orders as any[]).filter((order) => order?.userId === userId);
+        const userOrders = orders.filter((order) => order?.userId === userId);
 
         for (const order of userOrders) {
             if (!order?.id || !order?.status) continue;

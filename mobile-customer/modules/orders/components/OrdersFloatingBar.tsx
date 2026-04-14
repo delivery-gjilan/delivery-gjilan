@@ -26,7 +26,7 @@ export const OrdersFloatingBar = () => {
 
     // Auto-open is now handled centrally in AwaitingApprovalModalContainer.
 
-    const activeOrder = activeOrders[0] as any;
+    const activeOrder = activeOrders[0];
     const activeOrderId = activeOrder?.id === null || activeOrder?.id === undefined ? null : String(activeOrder.id);
     const customerVisibleStatus = activeOrder?.status === 'READY' ? 'PREPARING' : activeOrder?.status;
     const isAwaitingApproval = activeOrder?.status === 'AWAITING_APPROVAL';
@@ -98,7 +98,7 @@ export const OrdersFloatingBar = () => {
     // Get business names
     const orderBusinesses = Array.isArray(activeOrder?.businesses) ? activeOrder.businesses : [];
     const businessNames = orderBusinesses
-        .map((b: any) => (typeof b?.business?.name === 'string' ? b.business.name : ''))
+        .map((b) => (typeof b?.business?.name === 'string' ? b.business.name : ''))
         .filter(Boolean)
         .join(', ');
     const displayBusinessName = businessNames

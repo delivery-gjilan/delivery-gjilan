@@ -96,6 +96,15 @@ export const UPDATE_USER_NOTE_MUTATION = graphql(`
   }
 `);
 
+export const BAN_USER_MUTATION = graphql(`
+  mutation BanUser($userId: ID!, $banned: Boolean!) {
+    banUser(userId: $userId, banned: $banned) {
+      id
+      isBanned
+    }
+  }
+`);
+
 export const ADMIN_UPDATE_DRIVER_LOCATION = graphql(`
   mutation AdminUpdateDriverLocation($driverId: ID!, $latitude: Float!, $longitude: Float!) {
     adminUpdateDriverLocation(driverId: $driverId, latitude: $latitude, longitude: $longitude) {

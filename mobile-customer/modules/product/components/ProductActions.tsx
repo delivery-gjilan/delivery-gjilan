@@ -6,14 +6,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useProductActions } from '../hooks/useProductActions';
+import type { ProductOrVariant, FullProduct } from '../hooks/useProductActions';
 import { getEffectiveProductPrice } from '../utils/pricing';
 
 const AnimatedTouchable = Reanimated.createAnimatedComponent(TouchableOpacity);
 
 interface ProductActionsProps {
-    product: any;
+    product: ProductOrVariant;
     selectedOptions: Record<string, string[]>;
-    parentProduct?: any;
+    parentProduct?: FullProduct;
     editingCartItemId?: string;
 }
 
@@ -42,7 +43,7 @@ export function ProductActions({ product, selectedOptions, parentProduct, editin
             product.optionGroups && product.optionGroups.length > 0
                 ? product.optionGroups
                 : (parentProduct?.optionGroups ?? []);
-        return optionGroups.every((og: any) => {
+        return optionGroups.every((og) => {
             const selected = selectedOptions[og.id] || [];
             return selected.length >= og.minSelections;
         });

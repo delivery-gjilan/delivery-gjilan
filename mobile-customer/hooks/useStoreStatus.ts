@@ -30,13 +30,13 @@ export const useStoreStatusInit = () => {
     useEffect(() => {
         const unsubscribe = subscribeToMore({
             document: STORE_STATUS_UPDATED,
-            updateQuery: (prev: any, { subscriptionData }: any) => {
+            updateQuery: (prev, { subscriptionData }) => {
                 const next = subscriptionData.data?.storeStatusUpdated;
                 if (!next) return prev;
                 update(next);
                 return { ...prev, getStoreStatus: next };
             },
-        } as any);
+        });
         return unsubscribe;
     }, [subscribeToMore, update]);
 };

@@ -40,9 +40,9 @@ export default function AddEditAddressScreen() {
 
     // Pre-fill form fields when editing an existing address
     useEffect(() => {
-        const savedAddresses = (addressesData as any)?.myAddresses;
+        const savedAddresses = addressesData?.myAddresses;
         if (!isEdit || !savedAddresses) return;
-        const address = savedAddresses.find((a: any) => String(a.id) === String(id));
+        const address = savedAddresses.find((a) => String(a.id) === String(id));
         if (address) {
             setAddressName(address.addressName || '');
             setDisplayName(address.displayName || '');

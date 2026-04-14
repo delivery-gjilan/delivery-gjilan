@@ -18,7 +18,9 @@ import { useBusinesses } from '@/modules/business/hooks/useBusinesses';
 import { useProducts } from '@/modules/product/hooks/useProducts';
 import { useProductCategories, useProductSubcategoriesByBusiness } from '@/modules/product/hooks/useProductCategories';
 import { MarketProductCard } from '@/modules/business/components/MarketProductCard';
-import { BusinessType } from '@/gql/graphql';
+import { BusinessType, type GetProductsQuery } from '@/gql/graphql';
+
+type MarketProduct = GetProductsQuery['products'][number];
 
 const HERO_HEIGHT = 200;
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -295,7 +297,7 @@ export default function Market() {
     const allProducts = useMemo(() => products ?? [], [products]);
 
     const categoryList = useMemo(() => {
-        return categories.map((c: any) => ({ id: c.id, name: c.name }));
+        return categories.map((c) => ({ id: c.id, name: c.name }));
     }, [categories]);
 
     // Tabs: actual categories only
@@ -309,7 +311,7 @@ export default function Market() {
         const byCategory = new Map<string, { id: string; name: string; categoryId: string }[]>();
         const byId = new Map<string, { id: string; name: string; categoryId: string }>();
 
-        subcategories.forEach((sub: any) => {
+        subcategories.forEach((sub) => {
             byId.set(sub.id, sub);
             if (!byCategory.has(sub.categoryId)) byCategory.set(sub.categoryId, []);
             byCategory.get(sub.categoryId)!.push(sub);
@@ -322,7 +324,7 @@ export default function Market() {
     // Products for active category
     const activeCategoryProducts = useMemo(() => {
         if (isDiscover) return [];
-        const filtered = allProducts.filter((p: any) => p.product?.categoryId === activeTabId);
+        const filtered = allProducts.filter((p) => p.product?.categoryId === activeTabId);
         return filtered;
     }, [allProducts, activeTabId, isDiscover]);
 
@@ -340,7 +342,7 @@ export default function Market() {
     // Sections for active category (filtered by active subcategory)
     const categorySections = useMemo(() => {
         if (isDiscover) return [];
-        const result: { subcategoryId: string; subcategoryName: string; products: any[] }[] = [];
+        const result: { subcategoryId: string; subcategoryName: string; products: MarketProduct[] }[] = [];
 
         if (activeSubcategories.length > 0) {
             // If a subcategory is selected, show only that subcategory's products
@@ -348,8 +350,8 @@ export default function Market() {
                 const activeSub = activeSubcategories.find((sub) => sub.id === activeSubcategoryId);
                 if (activeSub) {
                     const prods = activeCategoryProducts
-                        .filter((p: any) => p.product?.subcategoryId === activeSub.id)
-                        .sort((a: any, b: any) => (a.product?.sortOrder ?? 0) - (b.product?.sortOrder ?? 0));
+                        .filter((p) => p.product?.subcategoryId === activeSub.id)
+                        .sort((a, b) => (a.product?.sortOrder ?? 0) - (b.product?.sortOrder ?? 0));
                     if (prods.length > 0) {
                         result.push({ subcategoryId: activeSub.id, subcategoryName: activeSub.name, products: prods });
                     }
@@ -359,8 +361,8 @@ export default function Market() {
                 const firstSub = activeSubcategories[0];
                 if (firstSub) {
                     const prods = activeCategoryProducts
-                        .filter((p: any) => p.product?.subcategoryId === firstSub.id)
-                        .sort((a: any, b: any) => (a.product?.sortOrder ?? 0) - (b.product?.sortOrder ?? 0));
+                        .filter((p) => p.product?.subcategoryId === firstSub.id)
+                        .sort((a, b) => (a.product?.sortOrder ?? 0) - (b.product?.sortOrder ?? 0));
                     if (prods.length > 0) {
                         result.push({ subcategoryId: firstSub.id, subcategoryName: firstSub.name, products: prods });
                     }
@@ -369,7 +371,7 @@ export default function Market() {
         } else {
             // No subcategories — show all category products
             const activeCatName = categoryList.find((c) => c.id === activeTabId)?.name ?? '';
-            const sorted = activeCategoryProducts.sort((a: any, b: any) => (a.product?.sortOrder ?? 0) - (b.product?.sortOrder ?? 0));
+            const sorted = activeCategoryProducts.sort((a, b) => (a.product?.sortOrder ?? 0) - (b.product?.sortOrder ?? 0));
             if (sorted.length > 0) {
                 result.push({ subcategoryId: `__all_${activeTabId}`, subcategoryName: activeCatName, products: sorted });
             }
@@ -382,22 +384,22 @@ export default function Market() {
     const stagingCategorySections = useMemo(() => {
         if (!stagingTabId && !stagingSubcategoryId) return [];
         const tabId = stagingTabId ?? activeTabId;
-        const catProds = allProducts.filter((p: any) => p.product?.categoryId === tabId);
+        const catProds = allProducts.filter((p) => p.product?.categoryId === tabId);
         const catSubs = subcategoryMap.byCategory.get(tabId) ?? [];
-        const result: { subcategoryId: string; subcategoryName: string; products: any[] }[] = [];
+        const result: { subcategoryId: string; subcategoryName: string; products: MarketProduct[] }[] = [];
 
         if (catSubs.length > 0) {
             const subId = stagingSubcategoryId ?? catSubs[0]?.id;
             const sub = catSubs.find((s) => s.id === subId);
             if (sub) {
                 const prods = catProds
-                    .filter((p: any) => p.product?.subcategoryId === sub.id)
-                    .sort((a: any, b: any) => (a.product?.sortOrder ?? 0) - (b.product?.sortOrder ?? 0));
+                    .filter((p) => p.product?.subcategoryId === sub.id)
+                    .sort((a, b) => (a.product?.sortOrder ?? 0) - (b.product?.sortOrder ?? 0));
                 if (prods.length > 0) result.push({ subcategoryId: sub.id, subcategoryName: sub.name, products: prods });
             }
         } else {
             const catName = categoryList.find((c) => c.id === tabId)?.name ?? '';
-            const sorted = catProds.sort((a: any, b: any) => (a.product?.sortOrder ?? 0) - (b.product?.sortOrder ?? 0));
+            const sorted = catProds.sort((a, b) => (a.product?.sortOrder ?? 0) - (b.product?.sortOrder ?? 0));
             if (sorted.length > 0) result.push({ subcategoryId: `__all_${tabId}`, subcategoryName: catName, products: sorted });
         }
         return result;
@@ -406,7 +408,7 @@ export default function Market() {
     const visibleSubcategoryPills = useMemo(
         () => subcategoryPillList.filter((sub) => {
             // Show all subcategories that have products in the active category
-            const hasProducts = activeCategoryProducts.some((p: any) => p.product?.subcategoryId === sub.id);
+            const hasProducts = activeCategoryProducts.some((p) => p.product?.subcategoryId === sub.id);
             return hasProducts;
         }),
         [subcategoryPillList, activeCategoryProducts],
@@ -417,7 +419,7 @@ export default function Market() {
         if (!searchQuery.trim()) return [];
         const q = searchQuery.toLowerCase().trim();
         return allProducts.filter(
-            (p: any) => p.name?.toLowerCase().includes(q) || (p.product?.description ?? '').toLowerCase().includes(q),
+            (p) => p.name?.toLowerCase().includes(q) || (p.product?.description ?? '').toLowerCase().includes(q),
         );
     }, [allProducts, searchQuery]);
 
@@ -427,8 +429,8 @@ export default function Market() {
     const categoryImages = useMemo(() => {
         const map = new Map<string, string | null>();
         categoryList.forEach((cat) => {
-            const catProds = allProducts.filter((p: any) => p.product?.categoryId === cat.id);
-            map.set(cat.id, catProds.find((p: any) => p.imageUrl)?.imageUrl ?? null);
+            const catProds = allProducts.filter((p) => p.product?.categoryId === cat.id);
+            map.set(cat.id, catProds.find((p) => p.imageUrl)?.imageUrl ?? null);
         });
         return map;
     }, [categoryList, allProducts]);
@@ -847,10 +849,10 @@ export default function Market() {
 
     // ─── Schedule ───────────────────────────────────────────
     const today = new Date().getDay();
-    const todaySchedule = marketBusiness?.schedule?.filter((s: any) => s.dayOfWeek === today) ?? [];
+    const todaySchedule = marketBusiness?.schedule?.filter((s) => s.dayOfWeek === today) ?? [];
     const scheduleLabel =
         todaySchedule.length > 0
-            ? todaySchedule.map((s: any) => `${s.opensAt}–${s.closesAt}`).join(', ')
+            ? todaySchedule.map((s) => `${s.opensAt}–${s.closesAt}`).join(', ')
             : null;
 
     // ─── Loading ────────────────────────────────────────────
@@ -1058,7 +1060,7 @@ export default function Market() {
                                         onLayout={(e) => handleSectionLayout(section.subcategoryId, e)}
                                     >
                                         <View style={{ paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingTop: idx === 0 ? 16 : 0 }}>
-                                            {section.products.map((product: any) => (
+                                            {section.products.map((product) => (
                                                 <View key={product.id} style={{ width: (SCREEN_WIDTH - 44) / 2 }}>
                                                     <MarketProductCard
                                                         product={product.product ?? product}
@@ -1089,7 +1091,7 @@ export default function Market() {
                                 {stagingCategorySections.map((section, idx) => (
                                     <View key={section.subcategoryId}>
                                         <View style={{ paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingTop: idx === 0 ? 16 : 0 }}>
-                                            {section.products.map((product: any) => (
+                                            {section.products.map((product) => (
                                                 <View key={product.id} style={{ width: (SCREEN_WIDTH - 44) / 2 }}>
                                                     <MarketProductCard
                                                         product={product.product ?? product}
@@ -1135,7 +1137,7 @@ export default function Market() {
                             </View>
                         ) : (
                             <View style={{ paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-                                {searchResults.map((product: any) => (
+                                {searchResults.map((product) => (
                                     <View key={product.id} style={{ width: (SCREEN_WIDTH - 44) / 2 }}>
                                         <MarketProductCard
                                             product={product.product ?? product}

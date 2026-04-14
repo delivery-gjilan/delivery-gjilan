@@ -6,5 +6,5 @@ export default function OrderDetailsScreen() {
     const normalizedOrderId = Array.isArray(orderId) ? orderId[0] : orderId;
     const { order, loading } = useOrder(normalizedOrderId || '');
 
-    return <SafeOrderDetails order={order as any} loading={loading} />;
+    return <SafeOrderDetails order={order} loading={loading} />;
 }

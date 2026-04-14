@@ -1,5 +1,7 @@
 import { create } from 'zustand';
-import { Order } from '@/gql/graphql';
+import type { GetOrdersQuery, OrderStatus } from '@/gql/graphql';
+
+export type ActiveOrder = GetOrdersQuery['orders']['orders'][number];
 
 interface DriverConnectionPatch {
     activeOrderId?: string | null;
@@ -9,7 +11,7 @@ interface DriverConnectionPatch {
 }
 
 interface OrderLifecyclePatch {
-    status?: string;
+    status?: OrderStatus;
     updatedAt?: string;
     preparingAt?: string | null;
     estimatedReadyAt?: string | null;
@@ -20,12 +22,12 @@ interface OrderLifecyclePatch {
 }
 
 interface ActiveOrdersState {
-    activeOrders: Order[];
+    activeOrders: ActiveOrder[];
     hasActiveOrders: boolean;
 
     // Actions
-    setActiveOrders: (orders: Order[]) => void;
-    updateOrder: (order: Order) => void;
+    setActiveOrders: (orders: ActiveOrder[]) => void;
+    updateOrder: (order: ActiveOrder) => void;
     removeOrder: (orderId: string) => void;
     clearActiveOrders: () => void;
     /** Patch driver.driverConnection on an existing order (e.g. from live-tracking subscription). */
@@ -64,7 +66,7 @@ export const useActiveOrdersStore = create<ActiveOrdersState>()((set) => ({
         // so a stale Apollo cache backfill cannot revive a delivered/cancelled order.
         const filtered = orders.filter(
             (o) =>
-                !TERMINAL_STATUSES.includes(o.status as string) &&
+                !TERMINAL_STATUSES.includes(o.status) &&
                 !isRecentlyRemoved(String(o.id)),
         );
         set({
@@ -77,7 +79,7 @@ export const useActiveOrdersStore = create<ActiveOrdersState>()((set) => ({
         set((state) => {
             const existingIndex = state.activeOrders.findIndex((order) => order.id === updatedOrder.id);
 
-            let newOrders: Order[];
+            let newOrders: ActiveOrder[];
 
             // If order is completed (DELIVERED or CANCELLED), remove it
             if (updatedOrder.status === 'DELIVERED' || updatedOrder.status === 'CANCELLED') {
@@ -120,18 +122,18 @@ export const useActiveOrdersStore = create<ActiveOrdersState>()((set) => ({
             const idx = state.activeOrders.findIndex((o) => o.id === orderId);
             if (idx < 0) return state;
 
-            const order = state.activeOrders[idx] as any;
-            const driver = order.driver ?? {};
-            const prev = driver.driverConnection ?? {};
+            const order = state.activeOrders[idx];
+            const existingDriver = order.driver;
+            const existingConnection = existingDriver?.driverConnection;
 
             const newOrders = [...state.activeOrders];
             newOrders[idx] = {
                 ...order,
-                driver: {
-                    ...driver,
-                    driverConnection: { ...prev, ...patch },
-                },
-            };
+                driver: existingDriver ? {
+                    ...existingDriver,
+                    driverConnection: { ...(existingConnection ?? {}), ...patch },
+                } : existingDriver,
+            } as ActiveOrder;
             return { activeOrders: newOrders };
         }),
 
@@ -140,12 +142,12 @@ export const useActiveOrdersStore = create<ActiveOrdersState>()((set) => ({
             const idx = state.activeOrders.findIndex((o) => o.id === orderId);
             if (idx < 0) return state;
 
-            const order = state.activeOrders[idx] as any;
+            const order = state.activeOrders[idx];
             const newOrders = [...state.activeOrders];
             newOrders[idx] = {
                 ...order,
                 ...patch,
-            };
+            } as ActiveOrder;
 
             return { activeOrders: newOrders };
         }),

@@ -1,6 +1,7 @@
 import { useSubscription } from '@apollo/client/react';
 import { ORDER_DRIVER_LIVE_TRACKING } from '@/graphql/operations/orders/subscriptions';
 import { useActiveOrdersStore } from '@/modules/orders/store/activeOrdersStore';
+import { OrderStatus } from '@/gql/graphql';
 
 /**
  * Mounts an `orderDriverLiveTracking` subscription for the first active order
@@ -17,7 +18,7 @@ export function useGlobalDriverTracking() {
     // Using s.activeOrders directly would re-render AppContent on every patchDriverConnection
     // call (~every 5 s), causing the entire app tree to re-render unnecessarily.
     const deliveryOrderId = useActiveOrdersStore((s) => {
-        const order = (s.activeOrders as any[]).find((o) => o?.status === 'OUT_FOR_DELIVERY');
+        const order = s.activeOrders.find((o) => o?.status === OrderStatus.OutForDelivery);
         return order?.id ? String(order.id) : null;
     });
 

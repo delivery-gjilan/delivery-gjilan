@@ -185,7 +185,12 @@ export class OrderCreationModule {
             throw AppError.businessRule('User has not completed signup process');
         }
 
-        // 1b. Block if user already has an active order
+        // 1b. Block banned users
+        if (user.isBanned) {
+            throw AppError.businessRule('Your account has been suspended. Please contact support.');
+        }
+
+        // 1c. Block if user already has an active order
         const db = this.deps.db;
         const activeOrderCheck = await db
             .select({ id: ordersTable.id })
@@ -839,9 +844,11 @@ export class OrderCreationModule {
         // 4c. Determine if approval is required
         const isFirstOrder = existingOrderCheck.length === 0;
         const isHighValue = totalOrderPrice > 20;
+        const trusted = this.isTrustedCustomer(user.adminNote, user.flagColor);
         const approvalReasons: Array<'FIRST_ORDER' | 'HIGH_VALUE' | 'OUT_OF_ZONE'> = [];
-        if (isFirstOrder) approvalReasons.push('FIRST_ORDER');
-        if (isHighValue) approvalReasons.push('HIGH_VALUE');
+        // Trusted customers skip FIRST_ORDER and HIGH_VALUE checks
+        if (isFirstOrder && !trusted) approvalReasons.push('FIRST_ORDER');
+        if (isHighValue && !trusted) approvalReasons.push('HIGH_VALUE');
         if (locationFlagged) approvalReasons.push('OUT_OF_ZONE');
         const requiresApproval = approvalReasons.length > 0;
 

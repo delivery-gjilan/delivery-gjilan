@@ -17,10 +17,10 @@ export default function AwaitingApprovalModalContainer() {
     const successModalVisible = useSuccessModalStore((state) => state.visible);
 
     const modalOrder = activeOrders.find(
-        (order: any) => String(order?.id) === String(modalOrderId),
+        (order) => String(order?.id) === String(modalOrderId),
     );
-    const modalApprovalReasons = Array.isArray((modalOrder as any)?.approvalReasons)
-        ? (modalOrder as any).approvalReasons
+    const modalApprovalReasons = Array.isArray(modalOrder?.approvalReasons)
+        ? modalOrder.approvalReasons
         : undefined;
 
     // Track which orderId we've already auto-opened for,
@@ -34,8 +34,8 @@ export default function AwaitingApprovalModalContainer() {
     // effect re-fires (successModalVisible changed) and opens the modal then.
     useEffect(() => {
         const awaitingOrder = activeOrders.find(
-            (o: any) => o?.status === 'AWAITING_APPROVAL' && o?.id != null,
-        ) as any;
+            (o) => o?.status === 'AWAITING_APPROVAL' && o?.id != null,
+        );
 
         if (awaitingOrder) {
             const orderId = String(awaitingOrder.id);
@@ -54,12 +54,12 @@ export default function AwaitingApprovalModalContainer() {
     useEffect(() => {
         if (!visible || !modalOrderId) return;
         if (!modalOrder) return;
-        if ((modalOrder as any).status !== 'AWAITING_APPROVAL') {
+        if (modalOrder.status !== 'AWAITING_APPROVAL') {
             hideModal();
         }
     }, [visible, modalOrderId, modalOrder, hideModal]);
 
-    const isLocked = visible && !!modalOrder && (modalOrder as any).status === 'AWAITING_APPROVAL';
+    const isLocked = visible && !!modalOrder && modalOrder.status === 'AWAITING_APPROVAL';
 
     const handleClose = () => hideModal();
 

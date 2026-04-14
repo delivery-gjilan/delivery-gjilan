@@ -506,7 +506,7 @@ const IconStepper = ({ status, color, theme: th, t, businessType }: {
     const isMarket = isMarketType(businessType);
     const statusOrder = isMarket ? STATUS_ORDER_MARKET : STATUS_ORDER_RESTAURANT;
     const visibleStatus = getCustomerVisibleStatus(status, businessType);
-    const currentIndex = statusOrder.indexOf(visibleStatus as any);
+    const currentIndex = (statusOrder as readonly string[]).indexOf(visibleStatus);
     const isCancelled = status === 'CANCELLED';
     const activeScale = useSharedValue(1);
     const activeScaleStyle = useAnimatedStyle(() => ({ transform: [{ scale: activeScale.value }] }));
@@ -640,13 +640,13 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     });
 
     const status = order?.status ?? 'PENDING';
-    const primaryBusinessType = (order?.businesses as any)?.[0]?.business?.businessType as string | undefined;
+    const primaryBusinessType = order?.businesses?.[0]?.business?.businessType as string | undefined;
     const customerVisibleStatus = getCustomerVisibleStatus(status, primaryBusinessType);
     const isDeliveryPhase = status === 'OUT_FOR_DELIVERY';
     const isPreparingAnimationPhase = status === 'PENDING';
     const orderBusinesses = useMemo(() => {
         if (!Array.isArray(order?.businesses)) return [];
-        return order.businesses.map((biz: any) => ({
+        return order.businesses.map((biz) => ({
             ...biz,
             items: Array.isArray(biz?.items) ? biz.items : [],
         }));
@@ -703,7 +703,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
         };
     }, [stopDriverInterpolation]);
 
-    const driver = driverData?.order?.driver ?? (order as any)?.driver ?? null;
+    const driver = driverData?.order?.driver ?? order?.driver ?? null;
     const hasAssignedDriver = Boolean(driver?.id);
     const driverName = driver?.firstName ? `${driver.firstName} ${driver?.lastName || ''}`.trim() : null;
     const driverPhone = driver?.phoneNumber || null;
@@ -949,8 +949,8 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     const config = STATUS_CONFIG[customerVisibleStatus] || STATUS_CONFIG.PENDING;
     const statusKey = toText(customerVisibleStatus).toLowerCase();
     const statusMessage = isMarket
-        ? ((t.orders.status_messages_market as any)?.[statusKey] || (t.orders.status_messages as any)?.[statusKey] || '')
-        : ((t.orders.status_messages as any)?.[statusKey] || '');
+        ? ((t.orders.status_messages_market as Record<string, string>)?.[statusKey] || (t.orders.status_messages as Record<string, string>)?.[statusKey] || '')
+        : ((t.orders.status_messages as Record<string, string>)?.[statusKey] || '');
     const isCompleted = status === 'DELIVERED';
     const isCancelled = status === 'CANCELLED';
     const isPendingApproval = status === 'PENDING';
@@ -1036,12 +1036,12 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
     const elapsedMin = useMemo(() => {
         if (!order?.orderDate) return null;
         const start = new Date(order.orderDate).getTime();
-        const end = isCompleted && (order as any).deliveredAt
-            ? new Date((order as any).deliveredAt).getTime()
+        const end = isCompleted && order?.deliveredAt
+            ? new Date(order.deliveredAt).getTime()
             : Date.now();
         return Math.max(0, Math.round((end - start) / 60000));
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [order?.orderDate, order?.status, (order as any)?.deliveredAt]);
+    }, [order?.orderDate, order?.status, order?.deliveredAt]);
 
     // ─── Live Activity (Dynamic Island) ─────────────────────
     const { startLiveActivity, endLiveActivity } = useLiveActivity({
@@ -1532,7 +1532,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                             {/* Selected Options */}
                                             {item.selectedOptions && item.selectedOptions.length > 0 && (
                                                 <View style={{ marginTop: 6, gap: 2 }}>
-                                                    {item.selectedOptions.map((opt: any) => (
+                                                    {item.selectedOptions.map((opt) => (
                                                         <View key={opt.id} style={{ flexDirection: 'row', alignItems: 'center' }}>
                                                             <Ionicons name="add-circle-outline" size={12} color={theme.colors.subtext} style={{ marginRight: 4 }} />
                                                             <Text style={{ fontSize: 12, color: theme.colors.subtext }}>
@@ -1546,7 +1546,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                             {/* Child Items (Offers) */}
                                             {item.childItems && item.childItems.length > 0 && (
                                                 <View style={{ marginTop: 8, gap: 6 }}>
-                                                    {item.childItems.map((child: any) => (
+                                                    {item.childItems.map((child) => (
                                                         <View key={child.id} style={{ 
                                                             paddingLeft: 12, 
                                                             paddingVertical: 6,
@@ -1567,7 +1567,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                                             </View>
                                                             {child.selectedOptions && child.selectedOptions.length > 0 && (
                                                                 <View style={{ marginTop: 2, gap: 1 }}>
-                                                                    {child.selectedOptions.map((opt: any) => (
+                                                                    {child.selectedOptions.map((opt) => (
                                                                         <Text key={opt.id} style={{ fontSize: 11, color: theme.colors.subtext }}>
                                                                             • {opt.optionName}
                                                                         </Text>
@@ -1629,7 +1629,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
 
                         {/* Subtotal row */}
                         {(() => {
-                            const origPrice = (order as any).originalPrice;
+                            const origPrice = order?.originalPrice;
                             const hasItemDiscount = origPrice != null && origPrice > order.orderPrice;
                             return (
                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10, paddingLeft: 24, alignItems: 'center' }}>
@@ -1650,7 +1650,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
 
                         {/* Delivery fee row */}
                         {(() => {
-                            const origDelivery = (order as any).originalDeliveryPrice;
+                            const origDelivery = (order as Record<string, unknown>).originalDeliveryPrice as number | undefined;
                             const hasDeliveryDiscount = origDelivery != null && origDelivery > (order.deliveryPrice ?? 0);
                             return (
                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10, paddingLeft: 24, alignItems: 'center' }}>
@@ -1671,11 +1671,11 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
 
                         {/* Promo / coupon rows */}
                         {(() => {
-                            const promos: any[] = (order as any).orderPromotions ?? [];
+                            const promos = order?.orderPromotions ?? [];
                             if (!promos.length) return null;
                             return (
                                 <View style={{ marginBottom: 10, gap: 6 }}>
-                                    {promos.map((p: any, i: number) => {
+                                    {promos.map((p, i: number) => {
                                         const isFreeDelivery = p.appliesTo === 'DELIVERY' && p.discountAmount > 0;
                                         const label = isFreeDelivery ? 'Free delivery' : 'Discount applied';
                                         return (
@@ -1731,7 +1731,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                         </View>
 
                         {/* Payment method */}
-                        {(order as any).paymentCollection && (
+                        {order?.paymentCollection && (
                             <View style={{
                                 marginTop: 12,
                                 paddingTop: 12,
@@ -1742,12 +1742,12 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                 gap: 8,
                             }}>
                                 <Ionicons
-                                    name={(order as any).paymentCollection === 'CASH_TO_DRIVER' ? 'cash-outline' : 'card-outline'}
+                                    name={order.paymentCollection === 'CASH_TO_DRIVER' ? 'cash-outline' : 'card-outline'}
                                     size={15}
                                     color={theme.colors.subtext}
                                 />
                                 <Text style={{ fontSize: 13, color: theme.colors.subtext, fontWeight: '500' }}>
-                                    {(order as any).paymentCollection === 'CASH_TO_DRIVER' ? 'Cash on delivery' : 'Paid online'}
+                                    {order.paymentCollection === 'CASH_TO_DRIVER' ? 'Cash on delivery' : 'Paid online'}
                                 </Text>
                             </View>
                         )}
@@ -2278,7 +2278,7 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                     gap: 6,
                                 }}>
                                     {/* Promo rows inside active summary */}
-                                    {((order as any).orderPromotions ?? []).map((p: any, i: number) => {
+                                    {(order?.orderPromotions ?? []).map((p, i: number) => {
                                         const isFreeDelivery = p.appliesTo === 'DELIVERY' && p.discountAmount > 0;
                                         const label = isFreeDelivery ? 'Free delivery' : 'Discount';
                                         return (

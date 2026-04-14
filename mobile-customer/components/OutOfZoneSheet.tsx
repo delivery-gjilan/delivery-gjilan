@@ -63,17 +63,17 @@ export function OutOfZoneSheet({ visible, onDismiss }: OutOfZoneSheetProps) {
     });
     const [setDefaultAddress] = useMutation(SET_DEFAULT_ADDRESS);
 
-    const allAddresses = (addressesData as any)?.myAddresses ?? [];
-    const activeZones = ((zonesData as any)?.deliveryZones ?? []).filter((z: any) => z.isActive);
-    const serviceZones = activeZones.filter((z: any) => z.isServiceZone === true);
+    const allAddresses = addressesData?.myAddresses ?? [];
+    const activeZones = (zonesData?.deliveryZones ?? []).filter((z) => z.isActive);
+    const serviceZones = activeZones.filter((z) => z.isServiceZone === true);
     const effectiveZones = serviceZones.length > 0 ? serviceZones : activeZones;
 
     const zoneFillFeature = useMemo(() => {
         if (effectiveZones.length === 0) return null;
 
         const rings = effectiveZones
-            .map((zone: any) =>
-                ((zone.polygon ?? []) as Array<{ lat: number; lng: number }>)
+            .map((zone) =>
+                (zone.polygon ?? [])
                     .map((p) => [p.lng, p.lat] as [number, number])
             )
             .filter((ring: Array<[number, number]>) => ring.length >= 3)
@@ -117,8 +117,8 @@ export function OutOfZoneSheet({ visible, onDismiss }: OutOfZoneSheetProps) {
         if (effectiveZones.length === 0) return null;
 
         const features = effectiveZones
-            .map((zone: any) => {
-                const ring = ((zone.polygon ?? []) as Array<{ lat: number; lng: number }>)
+            .map((zone) => {
+                const ring = (zone.polygon ?? [])
                     .map((p) => [p.lng, p.lat] as [number, number]);
                 if (ring.length < 3) return null;
 
@@ -147,8 +147,8 @@ export function OutOfZoneSheet({ visible, onDismiss }: OutOfZoneSheetProps) {
     const zoneBounds = useMemo(() => {
         if (effectiveZones.length === 0) return { ne: [21.60, 42.55], sw: [21.35, 42.38] as [number, number] };
 
-        const points = effectiveZones.flatMap((zone: any) =>
-            ((zone.polygon ?? []) as Array<{ lat: number; lng: number }>).map((p) => ({ lng: p.lng, lat: p.lat })),
+        const points = effectiveZones.flatMap((zone) =>
+            (zone.polygon ?? []).map((p) => ({ lng: p.lng, lat: p.lat })),
         );
 
         if (points.length === 0) return { ne: [21.60, 42.55], sw: [21.35, 42.38] as [number, number] };
@@ -167,11 +167,11 @@ export function OutOfZoneSheet({ visible, onDismiss }: OutOfZoneSheetProps) {
 
     // Only show addresses that fall inside a service zone (if zones are configured)
     const validAddresses = effectiveZones.length > 0
-        ? allAddresses.filter((addr: any) =>
-            effectiveZones.some((zone: any) =>
+        ? allAddresses.filter((addr) =>
+            effectiveZones.some((zone) =>
                 isPointInPolygon(
                     { lat: addr.latitude, lng: addr.longitude },
-                    zone.polygon as Array<{ lat: number; lng: number }>
+                    zone.polygon
                 )
             )
         )
@@ -181,10 +181,10 @@ export function OutOfZoneSheet({ visible, onDismiss }: OutOfZoneSheetProps) {
         if (!pickedCoord) return false;
         if (effectiveZones.length === 0) return true;
 
-        return effectiveZones.some((zone: any) =>
+        return effectiveZones.some((zone) =>
             isPointInPolygon(
                 { lat: pickedCoord.latitude, lng: pickedCoord.longitude },
-                zone.polygon as Array<{ lat: number; lng: number }>,
+                zone.polygon,
             ),
         );
     }, [pickedCoord, effectiveZones]);
@@ -230,7 +230,7 @@ export function OutOfZoneSheet({ visible, onDismiss }: OutOfZoneSheetProps) {
 
     // ─── Handlers ──────────────────────────────────────────
 
-    const handleSelectSaved = (addr: any) => {
+    const handleSelectSaved = (addr: typeof allAddresses[number]) => {
         setLocation({
             latitude: addr.latitude,
             longitude: addr.longitude,
@@ -332,7 +332,7 @@ export function OutOfZoneSheet({ visible, onDismiss }: OutOfZoneSheetProps) {
                     },
                 },
             });
-            const newId = (result.data as any)?.addUserAddress?.id;
+            const newId = result.data?.addUserAddress?.id;
             if (newId) await setDefaultAddress({ variables: { id: newId } });
         } catch { /* still proceed */ }
         setLocation({
@@ -472,7 +472,7 @@ export function OutOfZoneSheet({ visible, onDismiss }: OutOfZoneSheetProps) {
                                     <Text style={{ fontSize: 12, fontWeight: '600', color: theme.colors.subtext, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}>
                                         Your saved addresses
                                     </Text>
-                                    {validAddresses.map((addr: any) => (
+                                    {validAddresses.map((addr) => (
                                         <TouchableOpacity
                                             key={addr.id}
                                             onPress={() => handleSelectSaved(addr)}

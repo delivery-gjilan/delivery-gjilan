@@ -4,15 +4,19 @@ import { router } from 'expo-router';
 import { useQuery } from '@apollo/client/react';
 import { useCart } from '@/modules/cart/hooks/useCart';
 import { useCartActions } from '@/modules/cart/hooks/useCartActions';
-import { Product } from '@/gql/graphql';
+import type { GetProductQuery } from '@/gql/graphql';
 import { GET_BUSINESS } from '@/graphql/operations/businesses';
 import { useTranslations } from '@/hooks/useTranslations';
 import { getEffectiveProductPrice, getPreDiscountProductPrice } from '@/modules/product/utils/pricing';
 
+export type FullProduct = NonNullable<GetProductQuery['product']>;
+type ProductVariant = FullProduct['variants'][number];
+export type ProductOrVariant = FullProduct | ProductVariant;
+
 export function useProductActions(
-    product: any,
+    product: ProductOrVariant,
     selectedOptions: Record<string, string[]> = {},
-    parentProduct?: any,
+    parentProduct?: FullProduct,
     editingCartItemId?: string,
 ) {
     const { items } = useCart();
@@ -71,7 +75,7 @@ export function useProductActions(
             productId: string;
             name: string;
             imageUrl?: string;
-            selectedOptions: any[]; // Nested options not fully supported in UI yet
+            selectedOptions: Array<{ optionGroupId: string; optionId: string; name: string; extraPrice: number }>;
         }[] = [];
 
         Object.entries(selectedOptions).forEach(([groupId, optionIds]) => {
@@ -79,10 +83,10 @@ export function useProductActions(
                 product.optionGroups && product.optionGroups.length > 0
                     ? product.optionGroups
                     : (parentProduct?.optionGroups ?? []);
-            const group = sourceOptionGroups.find((og: any) => og.id === groupId);
+            const group = sourceOptionGroups.find((og) => og.id === groupId);
             if (group) {
                 optionIds.forEach((oid) => {
-                    const opt = group.options.find((o: any) => o.id === oid);
+                    const opt = group.options.find((o) => o.id === oid);
                     if (opt) {
                         cartItemOptions.push({
                             optionGroupId: groupId,

@@ -1125,6 +1125,7 @@ type Mutation {
   assignDriverToOrder(driverId: ID, id: ID!): Order!
   assignPromotionToUsers(input: AssignPromotionToUserInput!): [UserPromotion!]!
   backfillSettlementsForDeliveredOrders: Int!
+  banUser(banned: Boolean!, userId: ID!): User!
   bulkSetInventory(input: BulkSetInventoryInput!): [InventoryItem!]!
   businessDeviceHeartbeat(input: BusinessDeviceHeartbeatInput!): Boolean!
   businessDeviceOrderSignal(deviceId: String!, orderId: ID): Boolean!
@@ -2398,6 +2399,7 @@ type User {
   hasOwnVehicle: Boolean
   id: ID!
   imageUrl: String
+  isBanned: Boolean!
   isDemoAccount: Boolean!
   isOnline: Boolean!
   isTrustedCustomer: Boolean!

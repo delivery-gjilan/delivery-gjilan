@@ -10,7 +10,7 @@ function isTrustedCustomer(adminNote?: string | null, flagColor?: string | null)
     return normalizedNote.includes(TRUSTED_CUSTOMER_MARKER) || normalizedFlag === 'green';
 }
 
-export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'businessId'|'driverLocation'|'driverLocationUpdatedAt'|'email'|'emailOptOut'|'emailVerified'|'firstName'|'flagColor'|'id'|'imageUrl'|'isDemoAccount'|'isOnline'|'isTrustedCustomer'|'lastName'|'permissions'|'phoneNumber'|'phoneVerified'|'preferredLanguage'|'role'|'signupStep'|'totalOrders'|'__isTypeOf'> = {
+export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'businessId'|'driverLocation'|'driverLocationUpdatedAt'|'email'|'emailOptOut'|'emailVerified'|'firstName'|'flagColor'|'id'|'imageUrl'|'isBanned'|'isDemoAccount'|'isOnline'|'isTrustedCustomer'|'lastName'|'permissions'|'phoneNumber'|'phoneVerified'|'preferredLanguage'|'role'|'signupStep'|'totalOrders'|'__isTypeOf'> = {
     permissions: async (parent) => {
         // Get permissions for this user
         const perms = await getUserPermissions({
@@ -91,5 +91,8 @@ export const User: Pick<UserResolvers, 'address'|'adminNote'|'business'|'busines
     },
     isTrustedCustomer: (parent) => {
         return isTrustedCustomer((parent as any).adminNote, (parent as any).flagColor);
+    },
+    isBanned: (parent) => {
+        return Boolean((parent as any).isBanned);
     },
 };

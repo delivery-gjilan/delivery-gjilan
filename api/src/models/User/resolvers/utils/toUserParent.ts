@@ -28,5 +28,6 @@ export function toUserParent(user: DbUser): ResolversParentTypes['User'] {
         isOnline: false,
         totalOrders: 0,
         isTrustedCustomer: false,
+        isBanned: user.isBanned ?? false,
     };
 }

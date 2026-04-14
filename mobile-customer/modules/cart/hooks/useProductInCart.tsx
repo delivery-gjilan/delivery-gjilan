@@ -24,7 +24,7 @@ export function useProductInCart(product: Partial<Product>, businessType?: Busin
         if (!id) return;
 
         if (hasActiveOrders) {
-            const activeOrderId = (activeOrders[0] as any)?.id ? String((activeOrders[0] as any).id) : null;
+            const activeOrderId = activeOrders[0]?.id ? String(activeOrders[0].id) : null;
             Alert.alert(
                 t.cart.active_order_exists_title,
                 t.cart.active_order_exists_message,

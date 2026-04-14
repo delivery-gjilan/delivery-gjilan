@@ -26,25 +26,25 @@ export function useOrders() {
         nextFetchPolicy: 'cache-first',
     });
 
-    const orders: any[] = (data as any)?.orders?.orders || [];
+    const orders = data?.orders?.orders ?? [];
 
     // Update store when query data changes (subscription updates are handled by useOrdersSubscription)
     useEffect(() => {
         if (data?.orders?.orders && userId) {
-            const activeOrders = ((data.orders as any).orders as any[]).filter(
+            const activeOrders = data.orders.orders.filter(
                 (order) => 
                     order.userId === userId && 
                     order.status !== 'DELIVERED' && 
                     order.status !== 'CANCELLED'
             );
-            setActiveOrders(activeOrders as unknown as any);
+            setActiveOrders(activeOrders);
         }
     }, [data, userId, setActiveOrders]);
 
     const loadMore = useCallback(async () => {
         await fetchMore({
             variables: { limit: ORDERS_PAGE_SIZE, offset: orders.length },
-            updateQuery: (prev: any, { fetchMoreResult }: any) => {
+            updateQuery: (prev, { fetchMoreResult }) => {
                 if (!fetchMoreResult?.orders?.orders?.length) return prev;
                 return {
                     ...prev,
@@ -87,11 +87,10 @@ export function useOrder(id: string) {
         }
 
         if (error) {
-            const graphQLErrors = (error as any)?.graphQLErrors;
             console.warn('[useOrder] error', {
                 id,
                 message: error.message,
-                graphQLErrors: graphQLErrors?.map((e: any) => e.message),
+                graphQLErrors: error.graphQLErrors?.map((e) => e.message),
             });
             return;
         }
@@ -99,7 +98,7 @@ export function useOrder(id: string) {
         console.log('[useOrder] success', {
             id,
             found: Boolean(data?.order),
-            status: (data as any)?.order?.status,
+            status: data?.order?.status,
         });
     }, [id, loading, error, data]);
 

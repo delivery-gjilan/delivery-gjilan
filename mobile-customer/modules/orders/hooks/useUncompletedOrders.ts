@@ -18,7 +18,7 @@ export function useUncompletedOrders() {
     // Update the store whenever data changes
     useEffect(() => {
         if (data?.uncompletedOrders) {
-            setActiveOrders(data.uncompletedOrders as unknown as any);
+            setActiveOrders(data.uncompletedOrders);
         }
     }, [data, setActiveOrders]);
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { AppState, AppStateStatus, NativeModules, Platform } from 'react-native';
-import { useActiveOrdersStore } from '@/modules/orders/store/activeOrdersStore';
+import { useActiveOrdersStore, type ActiveOrder } from '@/modules/orders/store/activeOrdersStore';
 import { useLiveActivity } from '@/hooks/useLiveActivity';
 import { useLocaleStore } from '@/store/useLocaleStore';
 
@@ -27,7 +27,7 @@ function toMs(dateLike?: string | null): number | null {
     return parsed;
 }
 
-function getCandidateOrder(activeOrders: any[]) {
+function getCandidateOrder(activeOrders: ActiveOrder[]) {
     const eligible = activeOrders.filter(
         (order) =>
             order &&
@@ -53,16 +53,16 @@ function mapLiveStatus(orderStatus?: string | null): LiveStatus | null {
     return null;
 }
 
-function getBusinessName(order: any): string {
+function getBusinessName(order: ActiveOrder): string {
     return (
         order?.businesses?.[0]?.business?.name ||
-        order?.businesses?.find((entry: any) => entry?.business?.name)?.business?.name ||
+        order?.businesses?.find((entry) => entry?.business?.name)?.business?.name ||
         'Your order'
     );
 }
 
 function buildStateForOrder(
-    candidateOrder: any,
+    candidateOrder: ActiveOrder,
     mappedStatus: LiveStatus | null,
     languageChoice: 'en' | 'al',
 ) {
@@ -140,7 +140,7 @@ function buildStateForOrder(
 }
 
 export function useBackgroundLiveActivity() {
-    const activeOrders = useActiveOrdersStore((state) => state.activeOrders as any[]);
+    const activeOrders = useActiveOrdersStore((state) => state.activeOrders);
     const languageChoice = useLocaleStore((state) => state.languageChoice);
 
     const candidateOrder = useMemo(() => {
@@ -169,7 +169,7 @@ export function useBackgroundLiveActivity() {
 
     const syncLiveActivity = useCallback(
         (force = false) => {
-            const storeActiveOrders = useActiveOrdersStore.getState().activeOrders as any[];
+            const storeActiveOrders = useActiveOrdersStore.getState().activeOrders;
             const currentCandidateOrder = getCandidateOrder(storeActiveOrders);
             const currentMappedStatus = mapLiveStatus(currentCandidateOrder?.status);
 

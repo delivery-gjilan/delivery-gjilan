@@ -75,7 +75,6 @@ export const GET_USER_PROMOTIONS = graphql(`
                 code
                 type
                 target
-                applyMethod
                 discountValue
                 spendThreshold
                 maxUsagePerUser

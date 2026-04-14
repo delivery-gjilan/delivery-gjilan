@@ -36,12 +36,12 @@ export function OrderSummarySheet({ orderId, onClose }: Props) {
     const { order, loading } = useOrder(orderId || '');
 
     const isCompleted = order?.status === 'DELIVERED';
-    const origPrice = (order as any)?.originalPrice;
-    const origDelivery = (order as any)?.originalDeliveryPrice;
-    const paymentCollection = (order as any)?.paymentCollection;
-    const orderPromotions: any[] = (order as any)?.orderPromotions ?? [];
+    const origPrice = order?.originalPrice;
+    const origDelivery = (order as Record<string, unknown> | null)?.originalDeliveryPrice as number | undefined;
+    const paymentCollection = order?.paymentCollection;
+    const orderPromotions = order?.orderPromotions ?? [];
     const totalDiscount = orderPromotions.reduce(
-        (sum: number, p: any) => sum + Number(p.discountAmount ?? 0),
+        (sum, p) => sum + Number(p.discountAmount ?? 0),
         0,
     );
 
@@ -168,7 +168,7 @@ export function OrderSummarySheet({ orderId, onClose }: Props) {
                                 >
                                     {t.orders.details.order_number}:{' '}
                                     #
-                                    {(order as any).displayId ||
+                                    {(order as Partial<Order>).displayId ||
                                         order.id.slice(0, 8).toUpperCase()}
                                 </Text>
                             </View>
@@ -237,12 +237,12 @@ export function OrderSummarySheet({ orderId, onClose }: Props) {
                                                 color: theme.colors.text,
                                             }}
                                         >
-                                            {(biz?.business as any)?.name || 'Restaurant'}
+                                            {biz?.business?.name || 'Restaurant'}
                                         </Text>
                                     </View>
 
                                     {/* Items */}
-                                    {(biz?.items ?? []).map((item: any, itemIdx: number) => (
+                                    {(biz?.items ?? []).map((item, itemIdx: number) => (
                                         <View
                                             key={itemIdx}
                                             style={{
@@ -306,7 +306,7 @@ export function OrderSummarySheet({ orderId, onClose }: Props) {
                                                         numberOfLines={1}
                                                     >
                                                         {item.selectedOptions
-                                                            .map((o: any) => o.optionName)
+                                                            .map((o) => o.optionName)
                                                             .join(', ')}
                                                     </Text>
                                                 )}

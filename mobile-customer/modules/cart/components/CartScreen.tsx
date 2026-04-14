@@ -11,7 +11,7 @@ import { useCart } from '../hooks/useCart';
 import { useCartActions } from '../hooks/useCartActions';
 import { useCreateOrder } from '../hooks/useCreateOrder';
 import { useSuccessModalStore } from '@/store/useSuccessModalStore';
-import { useActiveOrdersStore } from '@/modules/orders/store/activeOrdersStore';
+import { useActiveOrdersStore, type ActiveOrder } from '@/modules/orders/store/activeOrdersStore';
 import { useApolloClient, useLazyQuery, useQuery, useMutation } from '@apollo/client/react';
 import { GET_ORDERS, GET_PRIORITY_SURCHARGE_AMOUNT } from '@/graphql/operations/orders';
 import { GET_PRODUCT } from '@/graphql/operations/products';
@@ -60,7 +60,7 @@ export const CartScreen = () => {
     const updateActiveOrder = useActiveOrdersStore((state) => state.updateOrder);
     const setActiveOrders = useActiveOrdersStore((state) => state.setActiveOrders);
     const hasActiveOrders = useActiveOrdersStore((state) => state.hasActiveOrders);
-    const activeOrderForNav = useActiveOrdersStore((state) => state.activeOrders[0] as any);
+    const activeOrderForNav = useActiveOrdersStore((state) => state.activeOrders[0]);
 
     const [isProcessing, setIsProcessing] = useState(false);
     const [deliveryPrice, setDeliveryPrice] = useState(2.0); // Default; updated from API
@@ -90,8 +90,8 @@ export const CartScreen = () => {
     });
 
     const effectiveServiceZones = useMemo(() => {
-        const activeZones = ((zonesData as any)?.deliveryZones ?? []).filter((z: any) => z.isActive);
-        const serviceZones = activeZones.filter((z: any) => z.isServiceZone === true);
+        const activeZones = (zonesData?.deliveryZones ?? []).filter((z) => z.isActive);
+        const serviceZones = activeZones.filter((z) => z.isServiceZone === true);
         return serviceZones.length > 0 ? serviceZones : activeZones;
     }, [zonesData]);
 
@@ -100,10 +100,10 @@ export const CartScreen = () => {
             if (!location) return false;
             if (effectiveServiceZones.length === 0) return true;
 
-            return effectiveServiceZones.some((zone: any) =>
+            return effectiveServiceZones.some((zone) =>
                 isPointInPolygon(
                     { lat: location.latitude, lng: location.longitude },
-                    zone.polygon as Array<{ lat: number; lng: number }>,
+                    zone.polygon,
                 ),
             );
         },
@@ -228,7 +228,7 @@ export const CartScreen = () => {
                     variables: { id: item.productId },
                     fetchPolicy: 'cache-first',
                 });
-                const imageUrl: string | null = (response.data as any)?.product?.imageUrl ?? null;
+                const imageUrl: string | null = response.data?.product?.imageUrl ?? null;
                 if (imageUrl) {
                     useCartDataStore.setState((state) => ({
                         items: state.items.map((i) =>
@@ -444,7 +444,7 @@ export const CartScreen = () => {
                         manualCode: selectedEligiblePromotion.code ?? undefined,
                     },
                 });
-                const result = (response?.data as any)?.validatePromotions;
+                const result = response?.data?.validatePromotions;
                 if (!result || (Array.isArray(result.promotions) && result.promotions.length === 0)) {
                     return;
                 }
@@ -484,7 +484,7 @@ export const CartScreen = () => {
                 setPromoResult({
                     promotionId: selectedEligiblePromotion.id,
                     promotionIds: (result.promotions ?? [])
-                        .map((promo: any) => String(promo?.id ?? ''))
+                        .map((promo) => String(promo?.id ?? ''))
                         .filter(Boolean),
                     code: autoPromoLabel,
                     promotionSummary: nonDeliverySummary,
@@ -523,7 +523,7 @@ export const CartScreen = () => {
 
     // Get saved addresses sorted by priority (default first)
     const savedAddresses = useMemo(() => {
-        return ((addressesData as any)?.myAddresses ?? []) as UserAddress[];
+        return (addressesData?.myAddresses ?? []) as UserAddress[];
     }, [addressesData]);
 
     // Rehydrate checkout selection from persisted delivery location first.
@@ -753,7 +753,7 @@ export const CartScreen = () => {
                 },
             });
             
-            const newAddressId = (result.data as any)?.addUserAddress?.id;
+            const newAddressId = result.data?.addUserAddress?.id;
             if (newAddressId) {
                 await setDefaultAddress({
                     variables: { id: newAddressId },
@@ -805,7 +805,7 @@ export const CartScreen = () => {
                 },
             });
 
-            const result = (response?.data as any)?.validatePromotions;
+            const result = response?.data?.validatePromotions;
             if (!result || (Array.isArray(result.promotions) && result.promotions.length === 0)) {
                 setPromoError(t.cart.promo_not_valid);
                 return;
@@ -837,7 +837,7 @@ export const CartScreen = () => {
             setPromoResult({
                 promotionId: result.promotions?.[0]?.id ?? null,
                 promotionIds: (result.promotions ?? [])
-                    .map((promo: any) => String(promo?.id ?? ''))
+                    .map((promo) => String(promo?.id ?? ''))
                     .filter(Boolean),
                 code: couponCode.trim(),
                 promotionSummary: nonDeliverySummary,
@@ -936,7 +936,7 @@ export const CartScreen = () => {
                         variables: { id: productId },
                         fetchPolicy: 'network-only',
                     });
-                    const product = (response.data as any)?.product;
+                    const product = response.data?.product;
                     if (!product) return;
                     // effectivePrice includes markup / night-markup / sale
                     const freshPrice: number = Number(product.effectivePrice ?? product.price ?? 0);
@@ -997,7 +997,7 @@ export const CartScreen = () => {
                         fetchPolicy: 'network-only',
                     });
 
-                    const product = (response.data as any)?.product;
+                    const product = response.data?.product;
                     if (!product || product.isAvailable === false) {
                         unavailableProductIds.add(productId);
                     }
@@ -1041,12 +1041,12 @@ export const CartScreen = () => {
                         fetchPolicy: 'network-only',
                     });
 
-                    const orders = (response.data as any)?.orders ?? [];
-                    const activeOrders = (orders as any[]).filter(
+                    const orders = response.data?.orders?.orders ?? [];
+                    const activeOrders = orders.filter(
                         (order) => order?.status !== 'DELIVERED' && order?.status !== 'CANCELLED',
                     );
 
-                    setActiveOrders(activeOrders as any);
+                    setActiveOrders(activeOrders);
 
                     if (!createdOrderId) {
                         return;
@@ -1094,7 +1094,7 @@ export const CartScreen = () => {
 
         const localZoneCheck = isLocationWithinDeliveryZone(selectedLocation);
 
-        if (zonesLoading && !(zonesData as any)?.deliveryZones) {
+        if (zonesLoading && !zonesData?.deliveryZones) {
             Alert.alert(t.home.out_of_zone.title, t.cart.delivery_zone_checking);
             return;
         }
@@ -1153,7 +1153,7 @@ export const CartScreen = () => {
             // behind it; when the modal finally dismisses (auto or user action) there
             // is no underlying-screen flash.
             if (orderId) {
-                updateActiveOrder(order as any);
+                updateActiveOrder(order as ActiveOrder);
 
                 router.replace('/(tabs)/home');
 
@@ -1173,8 +1173,10 @@ export const CartScreen = () => {
 
             const errorMessage = err instanceof Error ? err.message : '';
             const graphQLErrorMessage =
-                typeof (err as any)?.graphQLErrors?.[0]?.message === 'string'
-                    ? (err as any).graphQLErrors[0].message
+                typeof (err as Record<string, unknown>)?.graphQLErrors === 'object'
+                    && Array.isArray((err as Record<string, unknown>).graphQLErrors)
+                    && typeof ((err as Record<string, unknown>).graphQLErrors as Array<Record<string, unknown>>)?.[0]?.message === 'string'
+                    ? ((err as Record<string, unknown>).graphQLErrors as Array<Record<string, string>>)[0].message
                     : null;
 
             const combinedMessage = graphQLErrorMessage || errorMessage || '';

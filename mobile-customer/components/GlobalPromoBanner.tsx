@@ -32,12 +32,12 @@ export function GlobalPromoBanner() {
     const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
     const promos = useMemo<PromoBannerInfo[]>(() => {
-        const list = (data as any)?.getActiveGlobalPromotions;
+        const list = data?.getActiveGlobalPromotions;
         if (!list || !Array.isArray(list)) return [];
 
         return list
-            .filter((p: any) => p.isActive && !dismissed.has(p.id))
-            .map((p: any): PromoBannerInfo => {
+            .filter((p) => p.isActive && !dismissed.has(p.id))
+            .map((p): PromoBannerInfo => {
                 if (p.type === 'FREE_DELIVERY') {
                     return {
                         id: p.id,
