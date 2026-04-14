@@ -106,7 +106,7 @@ export default function AddressesScreen() {
                         </Text>
                     </View>
                 ) : (
-                    addresses.map((address: any) => (
+                    addresses.map((address) => (
                         <View
                             key={address.id}
                             className="p-4 rounded-2xl mb-3"
