@@ -65,10 +65,10 @@ export function ProductOptionsModal({ productId, businessId, businessName, onClo
 
     const basePrice = useMemo(() => {
         if (selectedVariant) {
-            return parseFloat(selectedVariant.effectivePrice ?? selectedVariant.markupPrice ?? selectedVariant.price ?? "0");
+            return Number(selectedVariant.effectivePrice ?? selectedVariant.markupPrice ?? selectedVariant.price ?? 0);
         }
         if (!product) return 0;
-        return parseFloat(product.effectivePrice ?? product.markupPrice ?? product.price ?? "0");
+        return Number(product.effectivePrice ?? product.markupPrice ?? product.price ?? 0);
     }, [product, selectedVariant]);
 
     const optionsPrice = useMemo(() => {
@@ -122,7 +122,7 @@ export function ProductOptionsModal({ productId, businessId, businessName, onClo
                         optionGroupName: group.name,
                         optionId: opt.id,
                         optionName: opt.name,
-                        extraPrice: parseFloat(opt.extraPrice ?? "0"),
+                        extraPrice: Number(opt.extraPrice ?? 0),
                     });
                 }
             }
@@ -209,9 +209,9 @@ export function ProductOptionsModal({ productId, businessId, businessName, onClo
                                         <span className="text-lg font-bold text-[var(--foreground)]">
                                             {formatPrice(basePrice)}
                                         </span>
-                                        {product.isOnSale && product.price && parseFloat(product.price) > basePrice && (
+                                        {product.isOnSale && product.price && Number(product.price) > basePrice && (
                                             <span className="text-sm text-[var(--muted)] line-through">
-                                                {formatPrice(parseFloat(product.price))}
+                                                {formatPrice(Number(product.price))}
                                             </span>
                                         )}
                                     </div>
@@ -227,8 +227,8 @@ export function ProductOptionsModal({ productId, businessId, businessName, onClo
                                             </span>
                                         </p>
                                         <div className="space-y-2">
-                                            {product.variants.map((v: any) => {
-                                                const vPrice = parseFloat(v.effectivePrice ?? v.markupPrice ?? v.price ?? "0");
+                                            {product.variants.map((v: GqlVariant) => {
+                                                const vPrice = Number(v.effectivePrice ?? v.markupPrice ?? v.price ?? 0);
                                                 const isSelected = selectedVariantId === v.id;
                                                 return (
                                                     <button
@@ -276,16 +276,16 @@ export function ProductOptionsModal({ productId, businessId, businessName, onClo
                                                         {t("product.optional_badge")}
                                                     </span>
                                                 )}
-                                                {group.maxSelections > 1 && (
+                                                {(group.maxSelections ?? 0) > 1 && (
                                                     <span className="text-xs text-[var(--muted)] ml-auto">
-                                                        {t("product.select_up_to", { max: group.maxSelections })}
+                                                        {t("product.select_up_to", { max: group.maxSelections! })}
                                                     </span>
                                                 )}
                                             </div>
                                             <div className="space-y-2">
                                                 {group.options?.map((opt: any) => {
                                                     const isChecked = selected.includes(opt.id);
-                                                    const extraPrice = parseFloat(opt.extraPrice ?? "0");
+                                                    const extraPrice = Number(opt.extraPrice ?? 0);
                                                     return (
                                                         <button
                                                             key={opt.id}

@@ -11,21 +11,22 @@ import { useCartStore } from "@/store/cartStore";
 import { useSearchStore } from "@/store/searchStore";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import type { GqlProduct, GqlBusiness, GqlProductCategory, GqlProductSubcategory } from "@/types/graphql";
 
-function getEffectivePrice(product: any): number {
-    return parseFloat(product.effectivePrice ?? product.price ?? product.basePrice ?? "0");
+function getEffectivePrice(product: GqlProduct): number {
+    return Number(product.effectivePrice ?? product.price ?? product.basePrice ?? 0);
 }
 
-function getPreDiscountPrice(product: any): number | null {
+function getPreDiscountPrice(product: GqlProduct): number | null {
     if (product.isOnSale && product.price && product.effectivePrice) {
-        const orig = parseFloat(product.price);
-        const eff = parseFloat(product.effectivePrice);
+        const orig = Number(product.price);
+        const eff = Number(product.effectivePrice);
         if (orig > eff) return orig;
     }
     return null;
 }
 
-function MarketProductCard({ product, businessId, businessName }: { product: any; businessId: string; businessName: string }) {
+function MarketProductCard({ product, businessId, businessName }: { product: GqlProduct; businessId: string; businessName: string }) {
     const items = useCartStore((s) => s.items);
     const addItem = useCartStore((s) => s.addItem);
     const updateQuantity = useCartStore((s) => s.updateQuantity);

@@ -143,8 +143,8 @@ const authLink = setContext((_, { headers }) => {
 const errorLink = onError(({ error, operation }) => {
     // On auth errors, clear stored credentials but do NOT redirect.
     // Individual pages that require auth handle redirecting to /login themselves.
-    if (error && "errors" in error && Array.isArray((error as any).errors)) {
-        for (const err of (error as any).errors) {
+    if (error && "errors" in error && Array.isArray((error as { errors?: unknown[] }).errors)) {
+        for (const err of (error as { errors: Array<{ extensions?: { code?: string } }> }).errors) {
             // Only clear auth for explicit UNAUTHENTICATED errors, not all errors
             if (err.extensions?.code === "UNAUTHENTICATED" && typeof window !== "undefined") {
                 clearStoredAuth();
@@ -153,7 +153,7 @@ const errorLink = onError(({ error, operation }) => {
         }
     }
     if (error && "statusCode" in error) {
-        const statusCode = (error as any).statusCode;
+        const statusCode = (error as { statusCode?: number }).statusCode;
         // Only clear auth for 401/403, not other errors
         if ((statusCode === 401 || statusCode === 403) && typeof window !== "undefined") {
             clearStoredAuth();

@@ -22,6 +22,7 @@ import {
 import { SET_MY_PREFERRED_LANGUAGE_MUTATION } from "@/graphql/operations/auth/setMyPreferredLanguage";
 import { SET_MY_EMAIL_OPT_OUT_MUTATION } from "@/graphql/operations/auth/setMyEmailOptOut";
 import { GET_ORDERS } from "@/graphql/operations/orders";
+import type { GqlOrder } from "@/types/graphql";
 
 const ACTIVE_STATUSES = ["AWAITING_APPROVAL", "PENDING", "PREPARING", "READY", "OUT_FOR_DELIVERY"];
 
@@ -67,11 +68,11 @@ export default function ProfilePage() {
         );
     }
 
-    const ordersPayload = (ordersData as any)?.orders;
-    const allOrders: any[] = Array.isArray(ordersPayload?.orders)
-        ? ordersPayload.orders
-        : Array.isArray(ordersPayload)
+    const ordersPayload = (ordersData as { orders?: GqlOrder[] | { orders?: GqlOrder[] } } | undefined)?.orders;
+    const allOrders: GqlOrder[] = Array.isArray(ordersPayload)
         ? ordersPayload
+        : ordersPayload && typeof ordersPayload === "object" && "orders" in ordersPayload && Array.isArray(ordersPayload.orders)
+        ? ordersPayload.orders
         : [];
     const activeOrders = allOrders.filter((o: any) => ACTIVE_STATUSES.includes(o.status));
     const ordersSubtitle = ordersLoading
