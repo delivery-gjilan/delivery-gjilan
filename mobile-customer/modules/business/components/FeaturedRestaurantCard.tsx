@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, Image, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
+import { useProducts } from '@/modules/product/hooks/useProducts';
+import { getEffectiveProductPrice } from '@/modules/product/utils/pricing';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -15,7 +17,9 @@ interface FeaturedRestaurantCardProps {
     id: string;
     name: string;
     logoUrl?: string;
+    /** Provide either menuItems (pre-loaded) or businessId (self-loads). */
     menuItems?: MenuItem[];
+    businessId?: string;
     onPress: (id: string) => void;
 }
 
@@ -23,9 +27,23 @@ export function FeaturedRestaurantCard({
     id,
     name,
     logoUrl,
-    menuItems = [],
+    menuItems: menuItemsProp,
+    businessId,
     onPress,
 }: FeaturedRestaurantCardProps) {
+    const { products: rawProducts } = useProducts(businessId ?? '');
+
+    const menuItems: MenuItem[] = menuItemsProp ?? rawProducts
+        .filter((p) => {
+            const img = p.imageUrl || p.product?.imageUrl || p.variants?.[0]?.imageUrl;
+            return !!img;
+        })
+        .slice(0, 6)
+        .map((p) => ({
+            name: p.name,
+            price: `€${getEffectiveProductPrice((p.product || p.variants?.[0]) ?? { price: p.basePrice }).toFixed(2)}`,
+            imageUrl: p.imageUrl || p.product?.imageUrl || p.variants?.[0]?.imageUrl || '',
+        }));
     const theme = useTheme();
 
     return (
