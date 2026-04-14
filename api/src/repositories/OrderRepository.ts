@@ -200,7 +200,7 @@ export class OrderRepository {
         const db = await getDB();
         const result = await db.query.orders.findMany({
             where: (tbl, { and, eq, notInArray }) =>
-                and(eq(tbl.driverId, userId), notInArray(tbl.status, ['DELIVERED', 'CANCELLED'] as OrderStatus[])),
+                and(eq(tbl.userId, userId), notInArray(tbl.status, ['DELIVERED', 'CANCELLED'] as OrderStatus[])),
             orderBy: (tbl, { asc }) => [asc(tbl.createdAt)],
         });
         return result;

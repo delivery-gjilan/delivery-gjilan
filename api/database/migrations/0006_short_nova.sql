@@ -1,1 +1,0 @@
-ALTER TABLE "settlements" ADD COLUMN "reason" varchar(500);
