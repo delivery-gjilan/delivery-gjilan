@@ -24,7 +24,7 @@ type ProductCard = ProductsAndCategoriesQuery['products'][number];
 type ProductVariant = NonNullable<ProductCard['variants']>[number];
 type ProductBase = NonNullable<ProductCard['product']>;
 
-type ProductListItem = {
+export type ProductListItem = {
     id: string;
     businessId: string;
     categoryId: string;

@@ -2120,6 +2120,7 @@ export type OrderBusiness = {
   __typename?: 'OrderBusiness';
   business: Business;
   items: Array<OrderItem>;
+  removedItems: Array<RemovedOrderItem>;
 };
 
 export type OrderConnection = {
@@ -3051,6 +3052,19 @@ export type RegisterDeviceTokenInput = {
   token: Scalars['String']['input'];
 };
 
+export type RemovedOrderItem = {
+  __typename?: 'RemovedOrderItem';
+  id: Scalars['ID']['output'];
+  imageUrl?: Maybe<Scalars['String']['output']>;
+  name: Scalars['String']['output'];
+  productId: Scalars['ID']['output'];
+  reason: Scalars['String']['output'];
+  removedAt?: Maybe<Scalars['Date']['output']>;
+  /** Original quantity before removal */
+  removedQuantity: Scalars['Int']['output'];
+  unitPrice: Scalars['Float']['output'];
+};
+
 export type SendNotificationResult = {
   __typename?: 'SendNotificationResult';
   failureCount: Scalars['Int']['output'];
@@ -3926,6 +3940,7 @@ export type ResolversTypes = {
   PushTelemetrySummary: ResolverTypeWrapper<PushTelemetrySummary>;
   Query: ResolverTypeWrapper<{}>;
   RegisterDeviceTokenInput: RegisterDeviceTokenInput;
+  RemovedOrderItem: ResolverTypeWrapper<RemovedOrderItem>;
   SendNotificationResult: ResolverTypeWrapper<SendNotificationResult>;
   SendPushNotificationInput: SendPushNotificationInput;
   SetDeliveryPricingTiersInput: SetDeliveryPricingTiersInput;
@@ -4122,6 +4137,7 @@ export type ResolversParentTypes = {
   PushTelemetrySummary: PushTelemetrySummary;
   Query: {};
   RegisterDeviceTokenInput: RegisterDeviceTokenInput;
+  RemovedOrderItem: RemovedOrderItem;
   SendNotificationResult: SendNotificationResult;
   SendPushNotificationInput: SendPushNotificationInput;
   SetDeliveryPricingTiersInput: SetDeliveryPricingTiersInput;
@@ -5011,6 +5027,7 @@ export type OrderResolvers<ContextType = GraphQLContext, ParentType extends Reso
 export type OrderBusinessResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['OrderBusiness'] = ResolversParentTypes['OrderBusiness']> = {
   business?: Resolver<ResolversTypes['Business'], ParentType, ContextType>;
   items?: Resolver<Array<ResolversTypes['OrderItem']>, ParentType, ContextType>;
+  removedItems?: Resolver<Array<ResolversTypes['RemovedOrderItem']>, ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -5439,6 +5456,18 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   validatePromotions?: Resolver<ResolversTypes['PromotionResult'], ParentType, ContextType, RequireFields<QueryvalidatePromotionsArgs, 'cart'>>;
 };
 
+export type RemovedOrderItemResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['RemovedOrderItem'] = ResolversParentTypes['RemovedOrderItem']> = {
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  productId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  reason?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  removedAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
+  removedQuantity?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  unitPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
 export type SendNotificationResultResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['SendNotificationResult'] = ResolversParentTypes['SendNotificationResult']> = {
   failureCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   success?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
@@ -5861,6 +5890,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   PushTelemetryEventType?: PushTelemetryEventTypeResolvers;
   PushTelemetrySummary?: PushTelemetrySummaryResolvers<ContextType>;
   Query?: QueryResolvers<ContextType>;
+  RemovedOrderItem?: RemovedOrderItemResolvers<ContextType>;
   SendNotificationResult?: SendNotificationResultResolvers<ContextType>;
   SettleResult?: SettleResultResolvers<ContextType>;
   Settlement?: SettlementResolvers<ContextType>;

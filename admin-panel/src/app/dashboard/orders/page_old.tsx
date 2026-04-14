@@ -100,7 +100,7 @@ export default function OrdersPage() {
 
     // Sort orders once by most recent first, then filter - this prevents re-sorting on status changes
     const filteredOrders = useMemo(() => {
-        return (orders as Order[])
+        return (orders as unknown as Order[])
             .slice() // Create a copy to avoid mutating original array
             .sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime())
             .filter(order => {

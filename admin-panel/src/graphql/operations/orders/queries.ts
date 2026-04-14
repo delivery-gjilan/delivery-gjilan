@@ -71,6 +71,15 @@ export const GET_ORDERS = graphql(`
                         unitPrice
                         inventoryQuantity
                     }
+                    removedItems {
+                        id
+                        productId
+                        name
+                        removedQuantity
+                        unitPrice
+                        reason
+                        removedAt
+                    }
                 }
                 settlementPreview {
                     lineItems {

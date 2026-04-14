@@ -26,10 +26,16 @@ export const getAvatarColor = (id: string): string => {
   return AVATAR_COLORS[hash % AVATAR_COLORS.length];
 };
 
+type AvatarSubject = {
+  id: string;
+  firstName?: string | null;
+  lastName?: string | null;
+} | null | undefined;
+
 /**
  * Get safe driver name with fallback
  */
-export const getDriverName = (driver: any): string => {
+export const getDriverName = (driver: AvatarSubject): string => {
   try {
     if (!driver) return 'Unknown';
     const first = driver.firstName?.trim() || '';
@@ -44,7 +50,7 @@ export const getDriverName = (driver: any): string => {
  * Safely get avatar data - returns null if anything fails
  * This ensures drivers still show on map if avatar rendering has any issue
  */
-export const getAvatarData = (driver: any) => {
+export const getAvatarData = (driver: AvatarSubject) => {
   try {
     // Verify driver has basic data
     if (!driver?.id) return null;

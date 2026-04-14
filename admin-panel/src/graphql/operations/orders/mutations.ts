@@ -188,6 +188,15 @@ export const REMOVE_ORDER_ITEM = graphql(`
                     unitPrice
                     inventoryQuantity
                 }
+                removedItems {
+                    id
+                    productId
+                    name
+                    removedQuantity
+                    unitPrice
+                    reason
+                    removedAt
+                }
             }
         }
     }

@@ -868,19 +868,29 @@ export class OrderLifecycleModule {
         const marketPriceReduction = priceReduction - inventoryPriceReduction;
 
         const [updatedOrder] = await db.transaction(async (tx) => {
+            const now = new Date().toISOString();
             if (isFullRemoval) {
-                // Full removal: delete item (cascade removes children + options)
+                // Full removal: soft-delete (set quantity=0, record removal metadata)
                 await tx
-                    .delete(orderItemsTable)
+                    .update(orderItemsTable)
+                    .set({
+                        quantity: 0,
+                        inventoryQuantity: 0,
+                        removedQuantity: item.quantity,
+                        removedReason: reason,
+                        removedAt: now,
+                    } as any)
                     .where(eq(orderItemsTable.id, orderItemId));
             } else {
-                // Partial removal: reduce quantity
+                // Partial removal: reduce quantity, record how many were removed
                 await tx
                     .update(orderItemsTable)
                     .set({
                         quantity: item.quantity - removeQty,
                         inventoryQuantity: (item.inventoryQuantity ?? 0) - inventoryQtyReduction,
-                    })
+                        removedQuantity: removeQty,
+                        removedReason: reason,
+                    } as any)
                     .where(eq(orderItemsTable.id, orderItemId));
             }
 

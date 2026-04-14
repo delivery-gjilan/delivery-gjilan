@@ -319,6 +319,7 @@ import    { PromotionThreshold } from './../models/Promotion/resolvers/Promotion
 import    { PromotionUsage } from './../models/Promotion/resolvers/PromotionUsage';
 import    { PushTelemetryEvent } from './../models/Notification/resolvers/PushTelemetryEvent';
 import    { PushTelemetrySummary } from './../models/Notification/resolvers/PushTelemetrySummary';
+import    { RemovedOrderItem } from './../models/Order/resolvers/RemovedOrderItem';
 import    { SendNotificationResult } from './../models/Notification/resolvers/SendNotificationResult';
 import    { SettleResult } from './../models/Settlement/resolvers/SettleResult';
 import    { Settlement } from './../models/Settlement/resolvers/Settlement';
@@ -426,6 +427,7 @@ PromotionThreshold: PromotionThreshold,
 PromotionUsage: PromotionUsage,
 PushTelemetryEvent: PushTelemetryEvent,
 PushTelemetrySummary: PushTelemetrySummary,
+RemovedOrderItem: RemovedOrderItem,
 SendNotificationResult: SendNotificationResult,
 SettleResult: SettleResult,
 Settlement: Settlement,

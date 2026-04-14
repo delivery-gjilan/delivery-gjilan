@@ -32,6 +32,19 @@ enum ApprovalReason {
 type OrderBusiness {
     business: Business!
     items: [OrderItem!]!
+    removedItems: [RemovedOrderItem!]!
+}
+
+type RemovedOrderItem {
+    id: ID!
+    productId: ID!
+    name: String!
+    imageUrl: String
+    """Original quantity before removal"""
+    removedQuantity: Int!
+    unitPrice: Float!
+    reason: String!
+    removedAt: Date
 }
 
 type OrderItemOption {

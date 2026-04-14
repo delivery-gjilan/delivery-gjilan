@@ -38,17 +38,17 @@ export default function CancelOrderModal({
             title="Cancel Order"
         >
             {order && (() => {
-                const preview = !isBusinessUser ? (order as any).settlementPreview : null;
+                const preview = !isBusinessUser ? order.settlementPreview ?? null : null;
                 const hasDriver = !!order.driver;
                 const businessReceivable = preview
                     ? preview.lineItems
-                        .filter((li: any) => li.direction === "RECEIVABLE" && li.businessId)
-                        .reduce((s: number, li: any) => s + li.amount, 0)
+                        .filter((lineItem) => lineItem.direction === "RECEIVABLE" && lineItem.businessId)
+                        .reduce((sum, lineItem) => sum + lineItem.amount, 0)
                     : 0;
                 const driverPayable = preview
                     ? preview.lineItems
-                        .filter((li: any) => li.direction === "PAYABLE" && li.driverId)
-                        .reduce((s: number, li: any) => s + li.amount, 0)
+                        .filter((lineItem) => lineItem.direction === "PAYABLE" && lineItem.driverId)
+                        .reduce((sum, lineItem) => sum + lineItem.amount, 0)
                     : 0;
 
                 return (

@@ -202,6 +202,15 @@ export const GET_ORDER = graphql(`
                         }
                     }
                 }
+                removedItems {
+                    id
+                    productId
+                    name
+                    removedQuantity
+                    unitPrice
+                    reason
+                    removedAt
+                }
             }
             originalPrice
             paymentCollection

@@ -20,7 +20,20 @@ import {
     DELETE_PROMOTION_AUDIENCE_GROUP,
 } from "@/graphql/operations/promotions/mutations";
 import { ASSIGN_PROMOTION_TO_USERS } from "@/graphql/operations/notifications";
-import { PromotionType, PromotionCreatorType, type PromotionTarget, type GetPromotionsQuery, type GetRecoveryPromotionsQuery } from "@/gql/graphql";
+import {
+    PromotionType,
+    PromotionCreatorType,
+    PromotionTarget,
+    type AssignPromotionToUsersMutation,
+    type AssignPromotionToUsersMutationVariables,
+    type BusinessesQuery,
+    type CreatePromotionInput,
+    type GetPromotionAudienceGroupsQuery,
+    type GetPromotionsQuery,
+    type GetRecoveryPromotionsQuery,
+    type UpdatePromotionInput,
+    type UsersQuery,
+} from "@/gql/graphql";
 
 const promotionTypeLabels: Record<PromotionType, string> = {
     FIXED_AMOUNT: "Fixed Amount",
@@ -81,13 +94,9 @@ type PromotionFormState = {
     driverPayoutAmount: string;
 };
 
-type PromoAssignUser = {
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-    role: string;
-};
+type PromoAssignUser = UsersQuery["users"][number];
+type BusinessItem = BusinessesQuery["businesses"][number];
+type AudienceGroup = GetPromotionAudienceGroupsQuery["getPromotionAudienceGroups"][number];
 
 type QuickCodePromoFormState = {
     name: string;
@@ -205,18 +214,18 @@ export default function PromotionsPage() {
     const { data: recoveryData, loading: recoveryLoading, refetch: refetchRecovery } = useQuery<GetRecoveryPromotionsQuery>(GET_RECOVERY_PROMOTIONS, {
         fetchPolicy: "cache-and-network",
     });
-    const recoveryPromotions = useMemo(() => (recoveryData as any)?.getRecoveryPromotions ?? [], [recoveryData]);
+    const recoveryPromotions = useMemo(() => recoveryData?.getRecoveryPromotions ?? [], [recoveryData]);
 
-    const { data: businessesData, loading: businessesLoading } = useQuery(GET_BUSINESSES);
-    const { data: usersData } = useQuery(USERS_QUERY);
+    const { data: businessesData, loading: businessesLoading } = useQuery<BusinessesQuery>(GET_BUSINESSES);
+    const { data: usersData } = useQuery<UsersQuery>(USERS_QUERY);
     const {
         data: audienceGroupsData,
         loading: audienceGroupsLoading,
         refetch: refetchAudienceGroups,
-    } = useQuery(GET_PROMOTION_AUDIENCE_GROUPS, {
+    } = useQuery<GetPromotionAudienceGroupsQuery>(GET_PROMOTION_AUDIENCE_GROUPS, {
         variables: { isActive: true },
     });
-    const [assignPromotionToUsers, { loading: assigningPromo }] = useMutation(ASSIGN_PROMOTION_TO_USERS, {
+    const [assignPromotionToUsers, { loading: assigningPromo }] = useMutation<AssignPromotionToUsersMutation, AssignPromotionToUsersMutationVariables>(ASSIGN_PROMOTION_TO_USERS, {
         onCompleted: () => refetch(),
     });
     const [createAudienceGroup, { loading: creatingAudienceGroup }] = useMutation(CREATE_PROMOTION_AUDIENCE_GROUP, {
@@ -225,21 +234,21 @@ export default function PromotionsPage() {
     const [deleteAudienceGroup, { loading: deletingAudienceGroup }] = useMutation(DELETE_PROMOTION_AUDIENCE_GROUP, {
         onCompleted: () => refetchAudienceGroups(),
     });
-    const businesses = businessesData?.businesses || [];
-    const filteredBusinesses = businesses.filter((b: any) => b.name.toLowerCase().includes(businessSearchTerm.toLowerCase()));
+    const businesses = businessesData?.businesses ?? [];
+    const filteredBusinesses = businesses.filter((business) => business.name.toLowerCase().includes(businessSearchTerm.toLowerCase()));
 
     const promotions = useMemo(() => data?.getAllPromotions ?? [], [data?.getAllPromotions]);
     const businessNameById = useMemo(() => {
         const map = new Map<string, string>();
-        businesses.forEach((b: any) => map.set(b.id, b.name));
+        businesses.forEach((business) => map.set(business.id, business.name));
         return map;
     }, [businesses]);
     const filteredPromotions = useMemo(() => {
         const term = promoSearchTerm.trim().toLowerCase();
 
         return promotions.filter((promotion) => {
-            const eligibleBusinesses = (promotion as any).eligibleBusinesses ?? [];
-            const eligibleBusinessIds = eligibleBusinesses.map((b: any) => b.id);
+            const eligibleBusinesses = promotion.eligibleBusinesses ?? [];
+            const eligibleBusinessIds = eligibleBusinesses.map((business) => business.id);
             const isManual = Boolean(promotion.code);
             const isBusinessScoped = promotion.creatorType === "BUSINESS" || eligibleBusinessIds.length > 0;
             const isGlobal = promotion.creatorType !== "BUSINESS" && eligibleBusinessIds.length === 0;
@@ -275,9 +284,9 @@ export default function PromotionsPage() {
         });
     }, [promotions, promoSearchTerm, promoStatusFilter, promoModeFilter, promoTargetFilter, promoBusinessFilter]);
     const codePromotions = useMemo(() => promotions.filter((promotion) => Boolean(promotion.code)), [promotions]);
-    const audienceGroups = useMemo(() => (audienceGroupsData as any)?.getPromotionAudienceGroups ?? [], [audienceGroupsData]);
+    const audienceGroups = useMemo(() => audienceGroupsData?.getPromotionAudienceGroups ?? [], [audienceGroupsData]);
     const selectedAudienceGroup = useMemo(
-        () => audienceGroups.find((group: any) => group.id === selectedAudienceGroupId) ?? null,
+        () => audienceGroups.find((group) => group.id === selectedAudienceGroupId) ?? null,
         [audienceGroups, selectedAudienceGroupId],
     );
     const isSingleUserMode = promoAssignmentMode === "single";
@@ -288,7 +297,7 @@ export default function PromotionsPage() {
             : "selected user"
         : selectedAudienceGroup?.name || promoGroupName.trim() || "selected group";
     const quickCodeVis = typeFieldVisibility[quickCodePromoForm.type];
-    const allUsers = useMemo(() => ((usersData as any)?.users ?? []) as PromoAssignUser[], [usersData]);
+    const allUsers = useMemo<PromoAssignUser[]>(() => usersData?.users ?? [], [usersData]);
     const promoFilteredUsers = useMemo(() => {
         if (!promoUserSearch.trim()) return [];
         const term = promoUserSearch.toLowerCase();
@@ -402,7 +411,7 @@ export default function PromotionsPage() {
             },
         });
 
-        const assignedCount = ((result.data as any)?.assignPromotionToUsers ?? []).length;
+        const assignedCount = result.data?.assignPromotionToUsers.length ?? 0;
         const selectedPromo = codePromotions.find((promotion) => promotion.id === selectedCodePromotionId);
         setPromoAssignResult({
             success: true,
@@ -438,12 +447,12 @@ export default function PromotionsPage() {
             return;
         }
 
-        const createPayload: any = {
+        const createPayload: CreatePromotionInput = {
             name: quickCodePromoForm.name.trim(),
             description: quickCodePromoForm.description.trim() || undefined,
             code: quickCodePromoForm.code.trim().toUpperCase(),
             type: quickCodePromoForm.type,
-            target: "SPECIFIC_USERS",
+            target: PromotionTarget.SpecificUsers,
             discountValue: quickCodeVis.discountValue ? toOptionalNumber(quickCodePromoForm.discountValue) : undefined,
             maxDiscountCap: quickCodeVis.maxDiscountCap ? toOptionalNumber(quickCodePromoForm.maxDiscountCap) : undefined,
             minOrderAmount: toOptionalNumber(quickCodePromoForm.minOrderAmount),
@@ -457,7 +466,7 @@ export default function PromotionsPage() {
             isStackable: quickCodePromoForm.isStackable === "true",
             priority: Number(quickCodePromoForm.priority || "50"),
             isActive: true,
-            creatorType: "PLATFORM",
+            creatorType: PromotionCreatorType.Platform,
             driverPayoutAmount,
         };
 
@@ -466,7 +475,7 @@ export default function PromotionsPage() {
         }
 
         const createRes = await createPromotion({ variables: { input: createPayload } });
-        const createdPromotionId = (createRes.data as any)?.createPromotion?.id;
+        const createdPromotionId = createRes.data?.createPromotion?.id;
 
         if (!createdPromotionId) {
             return;
@@ -482,7 +491,7 @@ export default function PromotionsPage() {
             },
         });
 
-        const assignedCount = ((assignRes.data as any)?.assignPromotionToUsers ?? []).length;
+        const assignedCount = assignRes.data?.assignPromotionToUsers.length ?? 0;
         setPromoAssignResult({
             success: true,
             message: isSingleUserMode
@@ -516,7 +525,7 @@ export default function PromotionsPage() {
             },
         });
 
-        const createdGroup = (result.data as any)?.createPromotionAudienceGroup;
+        const createdGroup = result.data?.createPromotionAudienceGroup;
         if (createdGroup?.id) {
             setSelectedAudienceGroupId(createdGroup.id);
             setPromoAssignResult({
@@ -541,15 +550,14 @@ export default function PromotionsPage() {
     const handleSave = async () => {
         if (editingPromotion) {
             const code = formData.code.trim() ? formData.code.trim().toUpperCase() : null;
+            const input: UpdatePromotionInput = {
+                id: editingPromotion.id,
+                name: formData.name.trim(),
+                description: formData.description.trim() || null,
+                code,
+            };
             await updatePromotion({
-                variables: {
-                    input: {
-                        id: editingPromotion.id,
-                        name: formData.name.trim(),
-                        description: formData.description.trim() || null,
-                        code,
-                    } as any,
-                },
+                variables: { input },
             });
             handleCloseModal();
             return;
@@ -579,7 +587,7 @@ export default function PromotionsPage() {
 
         const vis = typeFieldVisibility[formData.type];
 
-        const payload = {
+        const payload: CreatePromotionInput = {
             name: formData.name.trim(),
             description: formData.description.trim() || undefined,
             code: formData.code.trim() ? formData.code.trim().toUpperCase() : undefined,
@@ -601,7 +609,7 @@ export default function PromotionsPage() {
                     : undefined,
             startsAt: formData.startsAt || undefined,
             endsAt: formData.endsAt || undefined,
-            creatorType: formData.creatorType as PromotionCreatorType,
+            creatorType: formData.creatorType === "BUSINESS" ? PromotionCreatorType.Business : PromotionCreatorType.Platform,
             creatorId: formData.creatorType === "BUSINESS" && formData.creatorId ? formData.creatorId : undefined,
             driverPayoutAmount,
         };
@@ -741,8 +749,8 @@ export default function PromotionsPage() {
                             <option value="ALL">All businesses</option>
                             <option value="GLOBAL">Global only</option>
                             <option value="TARGETED">Targeted only</option>
-                            {businesses.map((b: any) => (
-                                <option key={b.id} value={b.id}>{b.name}</option>
+                            {businesses.map((business) => (
+                                <option key={business.id} value={business.id}>{business.name}</option>
                             ))}
                         </Select>
                     </div>
@@ -819,16 +827,16 @@ export default function PromotionsPage() {
                                                 <div className="text-xs text-orange-300">
                                                     Business: {businessNameById.get(promotion.creatorId ?? "") ?? "Unknown"}
                                                 </div>
-                                            ) : ((promotion as any).eligibleBusinesses ?? []).length > 0 ? (
+                                            ) : (promotion.eligibleBusinesses ?? []).length > 0 ? (
                                                 <div className="space-y-1">
                                                     <div className="text-xs text-blue-300">Targeted businesses</div>
                                                     <div className="text-[11px] text-zinc-500">
-                                                        {((promotion as any).eligibleBusinesses ?? [])
+                                                        {(promotion.eligibleBusinesses ?? [])
                                                             .slice(0, 2)
-                                                            .map((b: any) => b.name ?? b.id)
+                                                            .map((business) => business.name ?? business.id)
                                                             .join(", ")}
-                                                        {((promotion as any).eligibleBusinesses ?? []).length > 2
-                                                            ? ` +${((promotion as any).eligibleBusinesses ?? []).length - 2} more`
+                                                        {(promotion.eligibleBusinesses ?? []).length > 2
+                                                            ? ` +${(promotion.eligibleBusinesses ?? []).length - 2} more`
                                                             : ""}
                                                     </div>
                                                 </div>
@@ -1127,7 +1135,7 @@ export default function PromotionsPage() {
                                 onChange={(e) => {
                                     const nextGroupId = e.target.value;
                                     setSelectedAudienceGroupId(nextGroupId);
-                                    const selected = audienceGroups.find((group: any) => group.id === nextGroupId);
+                                    const selected = audienceGroups.find((group) => group.id === nextGroupId);
                                     if (selected) {
                                         setPromoUsers(selected.members ?? []);
                                         setPromoUserSearch("");
@@ -1136,7 +1144,7 @@ export default function PromotionsPage() {
                                 }}
                             >
                                 <option value="">Select an audience group...</option>
-                                {audienceGroups.map((group: any) => (
+                                {audienceGroups.map((group) => (
                                     <option key={group.id} value={group.id}>
                                         {group.name} ({group.memberCount})
                                     </option>
@@ -1579,8 +1587,8 @@ export default function PromotionsPage() {
                                                         onChange={(e) => setFormData({ ...formData, creatorId: e.target.value })}
                                                     >
                                                         <option value="">Select a business...</option>
-                                                        {businesses.map((b: any) => (
-                                                            <option key={b.id} value={b.id}>{b.name}</option>
+                                                        {businesses.map((business) => (
+                                                            <option key={business.id} value={business.id}>{business.name}</option>
                                                         ))}
                                                     </Select>
                                                     <div className="text-xs text-zinc-600 mt-1">
@@ -1788,7 +1796,7 @@ export default function PromotionsPage() {
                                             Business
                                         </h3>
                                         <div className="rounded-lg border border-orange-700/40 bg-orange-900/10 p-3 text-sm text-orange-200">
-                                            This promotion is restricted to: <strong>{businesses.find((b: any) => b.id === formData.creatorId)?.name ?? formData.creatorId}</strong>.
+                                            This promotion is restricted to: <strong>{businesses.find((business) => business.id === formData.creatorId)?.name ?? formData.creatorId}</strong>.
                                             To change the business, go back to Step 1.
                                         </div>
                                     </div>
@@ -1816,20 +1824,20 @@ export default function PromotionsPage() {
                                         ) : filteredBusinesses.length === 0 ? (
                                             <div className="text-sm text-zinc-500">No businesses found</div>
                                         ) : (
-                                            filteredBusinesses.map((b: any) => (
-                                                <label key={b.id} className="flex items-center gap-2 py-1 hover:bg-gray-800 rounded px-1">
+                                            filteredBusinesses.map((business) => (
+                                                <label key={business.id} className="flex items-center gap-2 py-1 hover:bg-gray-800 rounded px-1">
                                                     <Checkbox
-                                                        checked={(formData.eligibleBusinessIds || []).includes(b.id)}
+                                                        checked={(formData.eligibleBusinessIds || []).includes(business.id)}
                                                         onChange={() => {
                                                             const current = formData.eligibleBusinessIds || [];
-                                                            if (current.includes(b.id)) {
-                                                                setFormData({ ...formData, eligibleBusinessIds: current.filter((x) => x !== b.id) });
+                                                            if (current.includes(business.id)) {
+                                                                setFormData({ ...formData, eligibleBusinessIds: current.filter((id) => id !== business.id) });
                                                             } else {
-                                                                setFormData({ ...formData, eligibleBusinessIds: [...current, b.id] });
+                                                                setFormData({ ...formData, eligibleBusinessIds: [...current, business.id] });
                                                             }
                                                         }}
                                                     />
-                                                    <span className="text-sm">{b.name}</span>
+                                                    <span className="text-sm">{business.name}</span>
                                                 </label>
                                             ))
                                         )}
@@ -2050,7 +2058,7 @@ export default function PromotionsPage() {
                                         <div className="text-zinc-500">Businesses:</div>
                                         <div className="text-white">
                                             {formData.creatorType === "BUSINESS"
-                                                ? businesses.find((b: any) => b.id === formData.creatorId)?.name ?? "1 selected"
+                                                ? businesses.find((business) => business.id === formData.creatorId)?.name ?? "1 selected"
                                                 : (formData.eligibleBusinessIds || []).length > 0
                                                     ? `${formData.eligibleBusinessIds.length} selected`
                                                     : "All businesses"}

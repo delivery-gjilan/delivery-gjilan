@@ -1,7 +1,7 @@
 # Admin Panel — Deep Dive (W1)
 
 **MDS ID:** W1  
-**Last updated:** 2026-04-13  
+**Last updated:** 2026-04-14  
 **Path:** `admin-panel/`  
 **Relates to:** M9 (mobile-admin deep dive), M6 (admin panel ↔ mobile-admin parity tracker), UI1, UI2, BL1–BL5, A1
 
@@ -213,6 +213,7 @@ The most complex page. Manages the full active + completed order pipeline.
 - Inventory coverage modal showing stock vs. market fulfillment.
 - Incident tagging (JSON stored in `adminNote`).
 - `usePrepTimeAlerts` for overrun notifications.
+- Active/completed list normalization, settlement preview rows, and inventory coverage modal props are aligned with generated GraphQL nullability through shared typed order models.
 - Order cards/tables show a compact promo-applied indicator only; detailed promotion rows and amounts are shown in the order details modal.
 
 ### `/dashboard/map` — Live Dispatching Map
@@ -288,6 +289,7 @@ The most complex visual page. Full-screen Mapbox GL map with driver positions, o
 - Bilingual fields (`titleAl`, `bodyAl` for Albanian).
 - Campaign categories: `promotion`, `general`, `order-on-the-way`, etc.
 - Recovery promotion issuance from the notifications tab.
+- Query, lazy-query, and mutation call sites consume generated GraphQL result/variable types even though the notifications operations file still uses legacy `gql` documents.
 
 ### `/dashboard/logs` — Audit Logs
 
@@ -507,23 +509,15 @@ Pure function `canAccessAdminPanelPath(role, pathname)` — defines allowed path
 | HIGH | `map/page.tsx` | `// @ts-nocheck` — most complex page has zero type safety |
 | HIGH | `businesses/page.tsx` | Auth token read directly from `localStorage` for REST upload |
 | HIGH | `ops-wall/page.tsx` | Auth token read directly from `localStorage` for REST fetch |
-| HIGH | `businesses/[id]/page.tsx` | `editForm.businessType` always defaults to `Restaurant` on modal open — clobbers existing type on save |
-| MEDIUM | `map/page.tsx`, `orders/page.tsx` | `TRUSTED_CUSTOMER_MARKER`, `APPROVAL_MODAL_SUPPRESS_MARKER`, `getMarginSeverity` duplicated verbatim in both pages — no shared constants file |
 | MEDIUM | `drivers/page.tsx` | `DRIVER_REGISTER_MUTATION` defined inline with `gql` — not in operations folder |
 | MEDIUM | `promotions/page.tsx` | `ASSIGN_PROMOTION_TO_USERS` imported from `notifications` domain — semantic mismatch |
 | MEDIUM | `business-settlements/page.tsx` | Client-side search/filter over up to 200 records — no server-side search |
-| MEDIUM | `admins/page.tsx` | `console.log('[DEBUG]…')` left in production code |
-| MEDIUM | `topbar.tsx` | `bannerType as any ?? 'INFO'` type cast could pass wrong enum value |
 | MEDIUM | `productpricing/page.tsx` | Inline `graphql()` operation definitions — inconsistent with rest of codebase |
-| MEDIUM | `categories/page.tsx` | `GET_BUSINESSES` fetched even for business users (no `skip`) — wasteful vs. `products/page.tsx` |
 | LOW | `statistics/page.tsx` | Entirely placeholder — all values hardcoded, `recharts` installed but unconnected |
-| LOW | `ScheduleEditor.tsx` | `â†'` UTF-8 mojibake in "Copy Mon → All" button label |
 | LOW | `admin/banners/page.tsx` | Native HTML5 drag API used; rest of app uses `@dnd-kit` — inconsistent |
 | LOW | `admin/promos/page.tsx` | `window.confirm()` for delete — no styled confirmation modal |
 | LOW | `app/login/page.tsx` | Does not redirect if user is already authenticated |
 | LOW | `apollo-client.ts` | `RefreshToken` mutation inlined, not exported — not accessible for testing or reuse |
-| LOW | `notifications/page.tsx` | `// @ts-nocheck` |
-| LOW | `promotions/page.tsx` | `// @ts-nocheck` |
 | LOW | `businesses/page.tsx` | `// @ts-nocheck` |
 
 ---

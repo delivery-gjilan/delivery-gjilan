@@ -1,4 +1,4 @@
-import { pgTable, uuid, integer, numeric, timestamp, index, varchar, type AnyPgColumn } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, integer, numeric, timestamp, index, varchar, type AnyPgColumn, boolean } from 'drizzle-orm/pg-core';
 
 import { orders } from './orders';
 import { products } from './products';
@@ -29,6 +29,12 @@ export const orderItems = pgTable(
         /** How many of this item's quantity came from operator's personal inventory (0 = all from market). */
         inventoryQuantity: integer('inventory_quantity').default(0).notNull(),
         notes: varchar('notes', { length: 500 }),
+        /** Quantity removed from this item (partial or full removal). Null = never removed. */
+        removedQuantity: integer('removed_quantity'),
+        /** Reason provided when item was removed. */
+        removedReason: varchar('removed_reason', { length: 500 }),
+        /** Set when item was fully removed from the order (quantity reduced to 0). */
+        removedAt: timestamp('removed_at', { withTimezone: true, mode: 'string' }),
         createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
             .default(sql`CURRENT_TIMESTAMP`)
             .notNull(),

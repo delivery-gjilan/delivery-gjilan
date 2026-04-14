@@ -15,7 +15,7 @@ import {
     getOrderBusinessesSafe,
     roundMoney,
 } from "./helpers";
-import type { Order, OrderStatus } from "./types";
+import type { Order, OrderCoverage, OrderStatus } from "./types";
 
 /* ----- Helper sub-components ----- */
 
@@ -59,7 +59,7 @@ export interface OrderDetailPanelProps {
     isBusinessUser: boolean;
     isAdmin: boolean;
     isSuperAdmin: boolean;
-    coverageData: any;
+    coverageData: OrderCoverage | null | undefined;
     coverageLoading: boolean;
     deductingStock: boolean;
     grantingFreeDelivery: boolean;
@@ -103,7 +103,7 @@ export default function OrderDetailPanel({
         (s, biz) => s + getBusinessItemsSafe(biz).reduce((ss, item) => ss + (item.quantity || 1), 0),
         0
     );
-    const preview = !isBusinessUser ? (order as any).settlementPreview : null;
+    const preview = !isBusinessUser ? order.settlementPreview ?? null : null;
 
     const orderTotals = useMemo(() => {
         const itemsSubtotal = Number(order.originalPrice ?? order.orderPrice ?? 0);
@@ -337,7 +337,7 @@ export default function OrderDetailPanel({
                                         {getBusinessItemsSafe(biz).map((item, itemIdx) => {
                                             const displayUnitPrice = Number(item.unitPrice ?? item.basePrice ?? 0);
                                             const displayLineTotal = Number(item.quantity || 0) * displayUnitPrice;
-                                            const invQty = (item as any).inventoryQuantity ?? 0;
+                                            const invQty = item.inventoryQuantity ?? 0;
                                             const marketQty = item.quantity - invQty;
                                             return (
                                                 <tr key={itemIdx} className="border-b border-zinc-800/60 hover:bg-zinc-900/30">
@@ -375,7 +375,7 @@ export default function OrderDetailPanel({
                                                                 title="Remove item"
                                                                 onClick={() => onRemoveItem({
                                                                     orderId: order.id,
-                                                                    itemId: (item as any).id,
+                                                                    itemId: item.id ?? item.productId,
                                                                     itemName: item.name,
                                                                     itemQuantity: item.quantity,
                                                                 })}
@@ -391,6 +391,34 @@ export default function OrderDetailPanel({
                                     </tbody>
                                 </table>
                             </div>
+                        {/* Removed items */}
+                        {(biz.removedItems ?? []).length > 0 && (
+                            <div className="overflow-hidden border border-rose-800/40 rounded-lg mt-2">
+                                <div className="px-3 py-1.5 bg-rose-950/40 border-b border-rose-800/40">
+                                    <span className="text-[10px] font-medium text-rose-400 uppercase tracking-wider">Removed Items</span>
+                                </div>
+                                <table className="w-full">
+                                    <tbody>
+                                        {(biz.removedItems ?? []).map((ri, riIdx) => (
+                                            <tr key={riIdx} className="border-b border-zinc-800/40 last:border-0">
+                                                <td className="px-3 py-2.5">
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="text-zinc-500 text-sm line-through truncate">{ri.name}</div>
+                                                        <div className="text-zinc-600 text-xs">×{ri.removedQuantity} removed</div>
+                                                        {ri.reason && (
+                                                            <div className="text-rose-400/70 text-xs mt-0.5">Reason: {ri.reason}</div>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="px-3 py-2.5 text-right text-sm text-zinc-600 line-through">
+                                                    €{(Number(ri.unitPrice) * ri.removedQuantity).toFixed(2)}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                         </div>
                     ))}
                 </div>
@@ -483,7 +511,7 @@ export default function OrderDetailPanel({
                                 <span>Payable <span className="text-rose-300 font-semibold">€{preview.totalPayable.toFixed(2)}</span></span>
                             </div>
                             <div className="grid grid-cols-1 gap-1.5 text-xs">
-                                {preview.lineItems.map((li: any, i: number) => (
+                                {preview.lineItems.map((li, i) => (
                                     <div key={i} className="flex items-center justify-between rounded-lg border border-zinc-700/40 bg-[#09090b]/70 px-2.5 py-1.5">
                                         <span className="text-zinc-500 truncate mr-2">{li.reason}</span>
                                         <span className={`font-semibold whitespace-nowrap ${li.direction === "RECEIVABLE" ? "text-emerald-200" : "text-rose-300"}`}>
@@ -498,7 +526,7 @@ export default function OrderDetailPanel({
 
                 {/* Inventory coverage (admin only) */}
                 {isAdmin && (() => {
-                    const coverage = coverageData?.orderCoverage;
+                    const coverage = coverageData;
                     if (coverageLoading) {
                         return (
                             <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-3">
@@ -508,9 +536,9 @@ export default function OrderDetailPanel({
                         );
                     }
                     if (!coverage || coverage.orderId !== order.id || coverage.allFromMarket) return null;
-                    const stockItems = coverage.items.filter((i: any) => i.fromStock > 0 && i.fromMarket === 0);
-                    const marketItems = coverage.items.filter((i: any) => i.fromMarket > 0 && i.fromStock === 0);
-                    const mixedItems = coverage.items.filter((i: any) => i.fromMarket > 0 && i.fromStock > 0);
+                    const stockItems = coverage.items.filter((item) => item.fromStock > 0 && item.fromMarket === 0);
+                    const marketItems = coverage.items.filter((item) => item.fromMarket > 0 && item.fromStock === 0);
+                    const mixedItems = coverage.items.filter((item) => item.fromMarket > 0 && item.fromStock > 0);
                     return (
                         <div className="bg-violet-500/5 border border-violet-500/20 rounded-xl p-3 space-y-3">
                             <div className="flex items-center justify-between">
@@ -534,7 +562,7 @@ export default function OrderDetailPanel({
                             {(stockItems.length > 0 || mixedItems.length > 0) && (
                                 <div className="space-y-1">
                                     <div className="text-[10px] text-violet-300/70 font-medium uppercase tracking-wider">📦 Pick from your stock</div>
-                                    {[...stockItems, ...mixedItems].map((item: any) => (
+                                    {[...stockItems, ...mixedItems].map((item) => (
                                         <div key={item.productId} className="flex items-center justify-between text-xs bg-violet-500/5 rounded-lg px-2 py-1.5">
                                             <span className="text-zinc-300 font-medium truncate mr-2">{item.productName}</span>
                                             <span className="text-violet-300 font-semibold whitespace-nowrap">×{item.fromStock}</span>
@@ -545,7 +573,7 @@ export default function OrderDetailPanel({
                             {(marketItems.length > 0 || mixedItems.length > 0) && (
                                 <div className="space-y-1">
                                     <div className="text-[10px] text-zinc-400/70 font-medium uppercase tracking-wider">🛒 Buy from market</div>
-                                    {[...marketItems, ...mixedItems].map((item: any) => (
+                                    {[...marketItems, ...mixedItems].map((item) => (
                                         <div key={`${item.productId}-mkt`} className="flex items-center justify-between text-xs bg-zinc-500/5 rounded-lg px-2 py-1.5">
                                             <span className="text-zinc-400 truncate mr-2">{item.productName}</span>
                                             <span className="text-zinc-300 font-semibold whitespace-nowrap">×{item.fromMarket}</span>

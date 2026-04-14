@@ -29,6 +29,7 @@ import {
     normalizeOrderBusinesses, getOrderBusinessesSafe, getBusinessItemsSafe,
     secondsSince, formatElapsed, elapsedUrgency,
 } from "@/components/orders/helpers";
+import type { DriversQuery, GetOrdersQuery, OrderCoverageQuery } from "@/gql/graphql";
 import type { Order, OrderStatus, CompletedStatusFilter } from "@/components/orders/types";
 
 /* ---------------------------------------------------------
@@ -121,6 +122,20 @@ function StatusFilterRail({
 const ORDERS_PAGE_SIZE = 100;
 const COMPLETED_PAGE_SIZE = 50;
 
+type QueryOrder = GetOrdersQuery["orders"]["orders"][number];
+
+const normalizeFetchedOrder = (order: QueryOrder): Order => ({
+    ...order,
+    businesses: normalizeOrderBusinesses(order),
+});
+
+const getErrorMessage = (error: unknown, fallback: string): string => {
+    if (error && typeof error === "object" && "message" in error && typeof error.message === "string") {
+        return error.message;
+    }
+    return fallback;
+};
+
 export default function OrdersPage() {
     const [ordersPage, setOrdersPage] = useState(0);
     const [completedPage, setCompletedPage] = useState(0);
@@ -136,7 +151,7 @@ export default function OrdersPage() {
     });
     const { update: updateStatus, loading: updateLoading } = useUpdateOrderStatus();
     const { admin } = useAuth();
-    const { data: driversData } = useQuery(DRIVERS_QUERY, { pollInterval: 10000 });
+    const { data: driversData } = useQuery<DriversQuery>(DRIVERS_QUERY, { pollInterval: 10000 });
     const [assignDriver] = useMutation(ASSIGN_DRIVER_TO_ORDER);
     const [createTestOrder, { loading: creatingTestOrder }] = useMutation(CREATE_TEST_ORDER);
     const [startPreparingMut, { loading: startPreparingLoading }] = useMutation(START_PREPARING, { refetchQueries: ["GetOrders"] });
@@ -145,7 +160,7 @@ export default function OrdersPage() {
     const [approveOrderMut, { loading: approvingOrder }] = useMutation(APPROVE_ORDER, { refetchQueries: ["GetOrders"] });
     const [grantFreeDeliveryMut, { loading: grantingFreeDelivery }] = useMutation(GRANT_FREE_DELIVERY);
     const [updateUserNoteMut] = useMutation(UPDATE_USER_NOTE_MUTATION, { refetchQueries: ["GetOrders"] });
-    const [fetchOrderCoverage, { data: coverageData, loading: coverageLoading }] = useLazyQuery(GET_ORDER_COVERAGE, { fetchPolicy: "network-only" });
+    const [fetchOrderCoverage, { data: coverageData, loading: coverageLoading }] = useLazyQuery<OrderCoverageQuery>(GET_ORDER_COVERAGE, { fetchPolicy: "network-only" });
     const [deductOrderStockMut, { loading: deductingStock }] = useMutation(DEDUCT_ORDER_STOCK);
     const [removeOrderItemMut, { loading: removingOrderItem }] = useMutation(REMOVE_ORDER_ITEM);
 
@@ -204,16 +219,13 @@ export default function OrdersPage() {
     const drivers = useMemo(() => driversData?.drivers ?? [], [driversData]);
     const driverOptions = useMemo(() => [
         { value: "", label: "Unassigned" },
-        ...drivers.map((d: any) => ({ value: d.id, label: `${d.firstName} ${d.lastName}` })),
+        ...drivers.map((driver) => ({ value: driver.id, label: `${driver.firstName} ${driver.lastName}` })),
     ], [drivers]);
 
     /* ─── Order normalization ─── */
     const normalizedOrders = useMemo(() => {
         const source = Array.isArray(orders) ? orders : [];
-        return source.map((order: any) => ({
-            ...order,
-            businesses: normalizeOrderBusinesses(order),
-        })) as Order[];
+        return source.map(normalizeFetchedOrder);
     }, [orders]);
 
     const matchesSearch = useCallback((order: Order, q: string) => {
@@ -274,7 +286,7 @@ export default function OrdersPage() {
 
     const completedOrders = useMemo(() => {
         const source = Array.isArray(completedOrdersRaw) ? completedOrdersRaw : [];
-        return source.map((o: any) => ({ ...o, businesses: normalizeOrderBusinesses(o) })) as Order[];
+        return source.map(normalizeFetchedOrder);
     }, [completedOrdersRaw]);
 
     const filteredCompletedOrders = useMemo(() => {
@@ -294,7 +306,7 @@ export default function OrdersPage() {
             });
             toast.success(`${removeItemQuantity}× "${removeItemDialog.itemName}" removed from order`);
             setRemoveItemDialog(null); setRemoveItemReason(""); setRemoveItemQuantity(1);
-        } catch (err: any) { toast.error(err.message || "Failed to remove item"); }
+        } catch (err) { toast.error(getErrorMessage(err, "Failed to remove item")); }
     };
 
     const handleApproveConfirm = async () => {
@@ -304,7 +316,7 @@ export default function OrdersPage() {
             setDismissedApprovalOrderIds(prev => { const n = new Set(prev); n.delete(approvalModalOrder.id); return n; });
             toast.success("Order approved — moving to Pending");
             setApprovalModalOrder(null);
-        } catch (err: any) { toast.error(err.message || "Failed to approve order"); }
+        } catch (err) { toast.error(getErrorMessage(err, "Failed to approve order")); }
     };
 
     const handleToggleTrustedCustomer = async (user: NonNullable<Order["user"]>, trust: boolean) => {
@@ -316,7 +328,7 @@ export default function OrdersPage() {
                 : (nextNote ? ((user.flagColor && user.flagColor !== "green") ? user.flagColor : "yellow") : null);
             await updateUserNoteMut({ variables: { userId: user.id, note: nextNote, flagColor: nextFlagColor } });
             toast.success(trust ? "Customer marked as trusted" : "Trusted flag removed");
-        } catch (err: any) { toast.error(err.message || "Failed to update trusted customer status"); }
+        } catch (err) { toast.error(getErrorMessage(err, "Failed to update trusted customer status")); }
         finally { setTrustUpdatingUserId(null); }
     };
 
@@ -326,7 +338,7 @@ export default function OrdersPage() {
             const nextNote = suppress ? upsertApprovalModalSuppressMarker(user.adminNote) : removeApprovalModalSuppressMarker(user.adminNote);
             await updateUserNoteMut({ variables: { userId: user.id, note: nextNote, flagColor: user.flagColor ?? null } });
             toast.success(suppress ? "Auto-popup muted for this customer" : "Auto-popup enabled for this customer");
-        } catch (err: any) { toast.error(err.message || "Failed to update popup preference"); }
+        } catch (err) { toast.error(getErrorMessage(err, "Failed to update popup preference")); }
         finally { setSuppressionUpdatingUserId(null); }
     }, [updateUserNoteMut]);
 
@@ -362,7 +374,7 @@ export default function OrdersPage() {
         try {
             await startPreparingMut({ variables: { id: prepTimeModalOrder.id, preparationMinutes: minutes } });
             setPrepTimeModalOrder(null);
-        } catch (err: any) { toast.error(err.message || "Failed to start preparing."); }
+        } catch (err) { toast.error(getErrorMessage(err, "Failed to start preparing.")); }
     };
 
     const handleUpdatePrepTime = async () => {
@@ -372,7 +384,7 @@ export default function OrdersPage() {
         try {
             await updatePrepTimeMut({ variables: { id: editPrepTimeOrder.id, preparationMinutes: minutes } });
             setEditPrepTimeOrder(null);
-        } catch (err: any) { toast.error(err.message || "Failed to update preparation time."); }
+        } catch (err) { toast.error(getErrorMessage(err, "Failed to update preparation time.")); }
     };
 
     const handleStatusChange = async (order: Order, newStatus: string) => {
@@ -392,7 +404,7 @@ export default function OrdersPage() {
         setAssigningDriverOrderId(orderId);
         try {
             await assignDriver({ variables: { id: orderId, driverId: driverId || null }, refetchQueries: ["GetOrders"] });
-        } catch (error: any) { toast.error(error.message || "Failed to assign driver"); }
+        } catch (error) { toast.error(getErrorMessage(error, "Failed to assign driver")); }
         finally { setAssigningDriverOrderId(null); }
     };
 
@@ -404,7 +416,7 @@ export default function OrdersPage() {
             await adminCancelOrderMut({ variables: { id: cancelModalOrder.id, reason: trimmed, settleDriver: cancelSettleDriver, settleBusiness: cancelSettleBusiness } });
             toast.success("Order cancelled successfully.");
             setCancelModalOrder(null); setCancelReason(""); setCancelSettleDriver(false); setCancelSettleBusiness(false);
-        } catch (err: any) { toast.error(err.message || "Failed to cancel order."); }
+        } catch (err) { toast.error(getErrorMessage(err, "Failed to cancel order.")); }
     };
 
     const openDetails = (order: Order) => {
@@ -433,7 +445,7 @@ export default function OrdersPage() {
         isBusinessUser,
         isAdmin,
         isSuperAdmin,
-        coverageData,
+        coverageData: coverageData?.orderCoverage ?? null,
         coverageLoading,
         deductingStock,
         grantingFreeDelivery,
@@ -450,13 +462,13 @@ export default function OrdersPage() {
                 await deductOrderStockMut({ variables: { orderId: selectedOrder.id } });
                 fetchOrderCoverage({ variables: { orderId: selectedOrder.id } });
                 toast.success("Stock deducted successfully.");
-            } catch (err: any) { toast.error(err.message || "Failed to deduct stock."); }
+            } catch (err) { toast.error(getErrorMessage(err, "Failed to deduct stock.")); }
         },
         onGrantFreeDelivery: async () => {
             try {
                 await grantFreeDeliveryMut({ variables: { userId: selectedOrder.user!.id, orderId: selectedOrder.id } });
                 toast.success(`Free delivery granted for ${selectedOrder.user!.firstName}'s next order.`);
-            } catch (err: any) { toast.error(err.message || "Failed to grant free delivery."); }
+            } catch (err) { toast.error(getErrorMessage(err, "Failed to grant free delivery.")); }
         },
         onToggleTrustedCustomer: handleToggleTrustedCustomer,
         onOpenApprovalModal: () => openApprovalModalForOrder(selectedOrder),
@@ -510,7 +522,7 @@ export default function OrdersPage() {
                             size="sm"
                             onClick={async () => {
                                 try { await createTestOrder({ refetchQueries: ["GetOrders"] }); }
-                                catch (err: any) { toast.error(err.message || "Failed to create test order"); }
+                                catch (err) { toast.error(getErrorMessage(err, "Failed to create test order")); }
                             }}
                             disabled={creatingTestOrder}
                             className="flex items-center gap-2 border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
@@ -533,7 +545,7 @@ export default function OrdersPage() {
                             <span className="ml-2 text-zinc-600">({visibleActiveOrders.length})</span>
                         </div>
 
-                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
                             {visibleActiveOrders.length === 0 ? (
                                 <div className="col-span-full text-center text-zinc-600 py-12">
                                     {debouncedSearch ? "No active orders matching your search" : "No active orders"}
@@ -542,7 +554,7 @@ export default function OrdersPage() {
                                 visibleActiveOrders.map((order) => {
                                     const nextStatus = STATUS_FLOW[order.status];
                                     const businessNames = getOrderBusinessesSafe(order).map(b => b.business.name).join(", ");
-                                    const preview = !isBusinessUser ? (order as any).settlementPreview : null;
+                                    const preview = !isBusinessUser ? order.settlementPreview ?? null : null;
                                     const marginSeverity = preview ? getMarginSeverity(preview.netMargin) : null;
                                     const approvalReasons = deriveApprovalReasons(order);
                                     const promoCount = (order.orderPromotions ?? []).length;
@@ -742,7 +754,7 @@ export default function OrdersPage() {
                                                             )}
                                                             <div className="pointer-events-none absolute left-0 bottom-full z-[120] mb-2 rounded-md border border-zinc-700 bg-[#0a0a0d] p-2 text-left text-[11px] text-zinc-300 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 min-w-[200px]">
                                                                 <div className="font-semibold text-zinc-200 mb-1">Settlement breakdown</div>
-                                                                {preview.lineItems.map((item: any, i: number) => (
+                                                                {preview.lineItems.map((item, i) => (
                                                                     <div key={i} className="flex justify-between gap-2">
                                                                         <span className="text-zinc-500 truncate">{item.reason}</span>
                                                                         <span className={item.direction === "RECEIVABLE" ? "text-emerald-300" : "text-rose-300"}>
@@ -905,7 +917,7 @@ export default function OrdersPage() {
                                     ) : (
                                         filteredCompletedOrders.map((order) => {
                                             const businessNames = getOrderBusinessesSafe(order).map(b => b.business.name).join(", ");
-                                            const preview = !isBusinessUser ? (order as any).settlementPreview : null;
+                                            const preview = !isBusinessUser ? order.settlementPreview ?? null : null;
                                             const marginSeverity = preview ? getMarginSeverity(preview.netMargin) : null;
                                             const promoCount = (order.orderPromotions ?? []).length;
                                             return (
@@ -1101,10 +1113,10 @@ export default function OrdersPage() {
             {/* ════ CANCEL ORDER MODAL ════ */}
             <Modal isOpen={!!cancelModalOrder} onClose={() => { setCancelModalOrder(null); setCancelReason(""); setCancelSettleDriver(false); setCancelSettleBusiness(false); }} title="Cancel Order">
                 {cancelModalOrder && (() => {
-                    const preview = !isBusinessUser ? (cancelModalOrder as any).settlementPreview : null;
+                    const preview = !isBusinessUser ? cancelModalOrder.settlementPreview ?? null : null;
                     const hasDriver = !!cancelModalOrder.driver;
-                    const businessReceivable = preview ? preview.lineItems.filter((li: any) => li.direction === "RECEIVABLE" && li.businessId).reduce((s: number, li: any) => s + li.amount, 0) : 0;
-                    const driverPayable = preview ? preview.lineItems.filter((li: any) => li.direction === "PAYABLE" && li.driverId).reduce((s: number, li: any) => s + li.amount, 0) : 0;
+                    const businessReceivable = preview ? preview.lineItems.filter((li) => li.direction === "RECEIVABLE" && li.businessId).reduce((s, li) => s + li.amount, 0) : 0;
+                    const driverPayable = preview ? preview.lineItems.filter((li) => li.direction === "PAYABLE" && li.driverId).reduce((s, li) => s + li.amount, 0) : 0;
                     return (
                         <div className="space-y-4">
                             <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
@@ -1160,7 +1172,7 @@ export default function OrdersPage() {
                 <InventoryCoverageModal
                     orderId={inventoryModalOrder.id}
                     displayId={inventoryModalOrder.displayId}
-                    coverage={coverageData?.orderCoverage as any}
+                    coverage={coverageData?.orderCoverage ?? null}
                     loading={coverageLoading}
                     onClose={() => setInventoryModalOrder(null)}
                 />

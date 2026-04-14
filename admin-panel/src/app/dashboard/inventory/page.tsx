@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@apollo/client/react";
 import { useBusinesses } from "@/lib/hooks/useBusinesses";
 import { useProducts } from "@/lib/hooks/useProducts";
+import type { ProductListItem } from "@/lib/hooks/useProducts";
 import { GET_STORE_STATUS, UPDATE_STORE_STATUS } from "@/graphql/operations/store";
 import {
     GET_MY_INVENTORY,
@@ -76,7 +77,7 @@ export default function InventoryPage() {
     const { businesses, loading: businessesLoading } = useBusinesses();
 
     const marketBusiness = useMemo(() => {
-        return businesses.find((b: any) => b.businessType === "MARKET");
+        return businesses.find((business) => business.businessType === "MARKET");
     }, [businesses]);
 
     const businessId = marketBusiness?.id ?? "";
@@ -176,7 +177,7 @@ function InventoryContent({ businessId, businessName }: { businessId: string; bu
     // Products not yet in inventory (for "Add" modal)
     const trackedProductIds = useMemo(() => new Set(inventory.map((i) => i.productId)), [inventory]);
     const untrackedProducts = useMemo(
-        () => marketProducts.filter((p: any) => !trackedProductIds.has(p.id) && p.isAvailable),
+        () => marketProducts.filter((product) => !trackedProductIds.has(product.id) && product.isAvailable),
         [marketProducts, trackedProductIds],
     );
 
@@ -852,7 +853,7 @@ function AddProductsModal({
     onClose,
     onAdded,
 }: {
-    products: any[];
+    products: ProductListItem[];
     businessId: string;
     onClose: () => void;
     onAdded: () => void;
@@ -864,7 +865,7 @@ function AddProductsModal({
     const filtered = useMemo(() => {
         if (!search.trim()) return products;
         const q = search.toLowerCase();
-        return products.filter((p: any) => p.name?.toLowerCase().includes(q));
+        return products.filter((product) => product.name?.toLowerCase().includes(q));
     }, [products, search]);
 
     const toggleProduct = (id: string) => {
@@ -953,7 +954,7 @@ function AddProductsModal({
                                 : "No products match your search."}
                         </div>
                     ) : (
-                        filtered.map((product: any) => {
+                        filtered.map((product) => {
                             const isSelected = selected.has(product.id);
                             const entry = selected.get(product.id);
                             return (

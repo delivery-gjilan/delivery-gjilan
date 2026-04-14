@@ -55,6 +55,15 @@ export const ORDERS_SUBSCRIPTION = gql(`
                     unitPrice
                     inventoryQuantity
                 }
+                removedItems {
+                    id
+                    productId
+                    name
+                    removedQuantity
+                    unitPrice
+                    reason
+                    removedAt
+                }
             }
         }
     }
@@ -116,6 +125,15 @@ export const ALL_ORDERS_SUBSCRIPTION = gql(`
                     quantity
                     unitPrice
                     inventoryQuantity
+                }
+                removedItems {
+                    id
+                    productId
+                    name
+                    removedQuantity
+                    unitPrice
+                    reason
+                    removedAt
                 }
             }
         }

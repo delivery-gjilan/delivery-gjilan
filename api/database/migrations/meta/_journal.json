@@ -92,6 +92,13 @@
       "when": 1776165822609,
       "tag": "0012_add-is-banned",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1776173306611,
+      "tag": "0013_order_items_soft_delete",
+      "breakpoints": true
     }
   ]
 }

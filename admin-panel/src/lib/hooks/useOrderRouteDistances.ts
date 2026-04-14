@@ -6,6 +6,33 @@ import { calculateRouteDistance } from '@/lib/utils/mapbox';
 const ROUTE_RECALC_MIN_MS = 60000;
 const ROUTE_RECALC_MIN_METERS = 80;
 
+type RoutePoint = { latitude: number; longitude: number };
+type RouteResult = NonNullable<Awaited<ReturnType<typeof calculateRouteDistance>>>;
+
+type DriverLocationCarrier = {
+    driverLocation?: RoutePoint | null;
+};
+
+type RouteOrder = {
+    id: string;
+    status: string;
+    driver?: ({ id: string } & DriverLocationCarrier) | null;
+    dropOffLocation?: RoutePoint | null;
+    businesses?: Array<{
+        business?: {
+            location?: RoutePoint | null;
+        } | null;
+    }> | null;
+};
+
+type OrderRouteDistance = {
+    toPickup?: RouteResult;
+    toDropoff?: RouteResult;
+    driverId: string | null;
+    status: string;
+    calculatedAtMs: number;
+};
+
 function haversineMeters(a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) {
     const R = 6371000;
     const dLat = ((b.latitude - a.latitude) * Math.PI) / 180;
@@ -16,8 +43,8 @@ function haversineMeters(a: { latitude: number; longitude: number }, b: { latitu
     return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
-export function useOrderRouteDistances(activeOrders: any[], driverMap: Record<string, any>) {
-    const [orderDistances, setOrderDistances] = useState<Record<string, any>>({});
+export function useOrderRouteDistances(activeOrders: RouteOrder[], driverMap: Record<string, DriverLocationCarrier | undefined>) {
+    const [orderDistances, setOrderDistances] = useState<Record<string, OrderRouteDistance>>({});
     const lastRouteCalcRef = useRef<Record<string, { timestamp: number; latitude: number; longitude: number }>>({});
 
     const shouldRecalculateRoute = (orderId: string, driverPos: { latitude: number; longitude: number }) => {
@@ -51,7 +78,7 @@ export function useOrderRouteDistances(activeOrders: any[], driverMap: Record<st
         let cancelled = false;
 
         const calculateDistances = async () => {
-            const nextDistances: Record<string, any> = {};
+            const nextDistances: Record<string, OrderRouteDistance> = {};
             for (const order of activeOrders) {
                 const cacheKey = `${order.id}-${order.driver?.id || 'none'}-${order.status}`;
                 const existingKey = orderDistances[order.id]
@@ -140,7 +167,7 @@ export function useOrderRouteDistances(activeOrders: any[], driverMap: Record<st
             cancelled = true;
             abortController.abort();
         };
-    }, [activeOrders.map((o: any) => `${o.id}-${o.driver?.id || 'none'}-${o.status}`).join(','), driverMap]);
+    }, [activeOrders.map((order) => `${order.id}-${order.driver?.id || 'none'}-${order.status}`).join(','), driverMap]);
 
     return { orderDistances };
 }

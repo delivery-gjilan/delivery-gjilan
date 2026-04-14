@@ -1413,6 +1413,7 @@ type Order {
 type OrderBusiness {
   business: Business!
   items: [OrderItem!]!
+  removedItems: [RemovedOrderItem!]!
 }
 
 type OrderConnection {
@@ -1901,6 +1902,19 @@ input RegisterDeviceTokenInput {
   deviceId: String!
   platform: DevicePlatform!
   token: String!
+}
+
+type RemovedOrderItem {
+  id: ID!
+  imageUrl: String
+  name: String!
+  productId: ID!
+  reason: String!
+  removedAt: Date
+
+  """Original quantity before removal"""
+  removedQuantity: Int!
+  unitPrice: Float!
 }
 
 type SendNotificationResult {

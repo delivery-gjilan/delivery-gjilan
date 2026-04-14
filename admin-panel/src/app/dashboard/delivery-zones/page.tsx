@@ -26,6 +26,7 @@ import {
   UPDATE_DELIVERY_ZONE,
   DELETE_DELIVERY_ZONE,
 } from "@/graphql/operations/deliveryZones";
+import type { GetDeliveryZonesQuery } from "@/gql/graphql";
 
 // ═══════════════════════════════════════════════════════════
 //  Constants
@@ -54,6 +55,40 @@ const ZONE_COLORS = [
 //  Types
 // ═══════════════════════════════════════════════════════════
 type PolygonPoint = { lat: number; lng: number };
+
+type PolygonFeature = {
+  type: "Feature";
+  properties: Record<string, unknown>;
+  geometry: {
+    type: "Polygon";
+    coordinates: Array<Array<[number, number]>>;
+  };
+};
+
+type DrawChangeEvent = {
+  features?: unknown[];
+};
+
+type ZoneGeoJsonFeature = {
+  type: "Feature";
+  properties: {
+    id: string;
+    name: string;
+    deliveryFee: number;
+    isActive: boolean;
+    color: string;
+  };
+  geometry: PolygonFeature["geometry"];
+};
+
+type ZoneGeoJsonCollection = {
+  type: "FeatureCollection";
+  features: ZoneGeoJsonFeature[];
+};
+
+type DeliveryZoneRecord = GetDeliveryZonesQuery["deliveryZones"][number];
+type MapboxMap = ReturnType<MapRef["getMap"]>;
+type MapControl = Parameters<MapboxMap["addControl"]>[0];
 
 type Zone = {
   id: string;
@@ -97,7 +132,57 @@ function polygonToGeoJSON(polygon: PolygonPoint[]) {
   };
 }
 
-function geoJSONToPolygon(feature: any): PolygonPoint[] {
+function isPolygonFeature(feature: unknown): feature is PolygonFeature {
+  if (!feature || typeof feature !== "object") {
+    return false;
+  }
+
+  const geometry = (feature as { geometry?: unknown }).geometry;
+
+  if (!geometry || typeof geometry !== "object") {
+    return false;
+  }
+
+  const candidate = geometry as { type?: unknown; coordinates?: unknown };
+  return candidate.type === "Polygon" && Array.isArray(candidate.coordinates);
+}
+
+function isZoneGeoJsonFeature(
+  feature: ZoneGeoJsonFeature | null
+): feature is ZoneGeoJsonFeature {
+  return feature !== null;
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof (error as { message?: unknown }).message === "string"
+  ) {
+    return (error as { message: string }).message;
+  }
+
+  return fallback;
+}
+
+function mapZone(zone: DeliveryZoneRecord): Zone {
+  return {
+    id: zone.id,
+    name: zone.name,
+    polygon: zone.polygon,
+    deliveryFee: zone.deliveryFee,
+    sortOrder: zone.sortOrder,
+    isActive: zone.isActive,
+    isServiceZone: zone.isServiceZone ?? false,
+  };
+}
+
+function geoJSONToPolygon(feature: PolygonFeature): PolygonPoint[] {
   const coords = feature.geometry.coordinates[0] as number[][];
   // Remove the closing duplicate point
   const points = coords.slice(0, -1);
@@ -107,9 +192,7 @@ function geoJSONToPolygon(feature: any): PolygonPoint[] {
 function readPolygonFromDraw(draw: MapboxDraw | null): PolygonPoint[] {
   if (!draw) return [];
   const collection = draw.getAll();
-  const polygonFeature = collection.features.find(
-    (feature: any) => feature?.geometry?.type === "Polygon"
-  );
+  const polygonFeature = collection.features.find(isPolygonFeature);
   if (!polygonFeature) return [];
   return geoJSONToPolygon(polygonFeature);
 }
@@ -139,17 +222,7 @@ export default function DeliveryZonesPage() {
   // Sync from query
   useEffect(() => {
     if (data?.deliveryZones) {
-      setZones(
-        data.deliveryZones.map((z: any) => ({
-          id: z.id,
-          name: z.name,
-          polygon: z.polygon,
-          deliveryFee: z.deliveryFee,
-          sortOrder: z.sortOrder,
-          isActive: z.isActive,
-          isServiceZone: z.isServiceZone ?? false,
-        }))
-      );
+      setZones(data.deliveryZones.map(mapZone));
     }
   }, [data]);
 
@@ -238,13 +311,13 @@ export default function DeliveryZonesPage() {
       ],
     });
 
-    map.addControl(draw as any);
+    map.addControl(draw as unknown as MapControl);
     drawRef.current = draw;
     drawInitialized.current = true;
 
     // Listen for polygon creation/update
-    map.on("draw.create", (e: any) => {
-      const feature = e.features?.[0];
+    map.on("draw.create", (event: DrawChangeEvent) => {
+      const feature = event.features?.find(isPolygonFeature);
       if (feature) {
         const polygon = geoJSONToPolygon(feature);
         setEditing((prev) => (prev ? { ...prev, polygon } : null));
@@ -252,8 +325,8 @@ export default function DeliveryZonesPage() {
       }
     });
 
-    map.on("draw.update", (e: any) => {
-      const feature = e.features?.[0];
+    map.on("draw.update", (event: DrawChangeEvent) => {
+      const feature = event.features?.find(isPolygonFeature);
       if (feature) {
         const polygon = geoJSONToPolygon(feature);
         setEditing((prev) => (prev ? { ...prev, polygon } : null));
@@ -278,7 +351,7 @@ export default function DeliveryZonesPage() {
     draw.deleteAll();
     const feature = polygonToGeoJSON(polygon);
     if (feature) {
-      draw.add(feature as any);
+      draw.add(feature);
       draw.changeMode("simple_select");
     }
   }, []);
@@ -393,8 +466,8 @@ export default function DeliveryZonesPage() {
       setEditing(null);
       clearDraw();
       refetch();
-    } catch (err: any) {
-      setErrorMsg(err?.message || "Failed to save zone");
+    } catch (err) {
+      setErrorMsg(getErrorMessage(err, "Failed to save zone"));
     }
   };
 
@@ -408,8 +481,8 @@ export default function DeliveryZonesPage() {
         clearDraw();
       }
       refetch();
-    } catch (err: any) {
-      setErrorMsg(err?.message || "Failed to delete zone");
+    } catch (err) {
+      setErrorMsg(getErrorMessage(err, "Failed to delete zone"));
     } finally {
       setDeletingId(null);
     }
@@ -424,15 +497,15 @@ export default function DeliveryZonesPage() {
         },
       });
       refetch();
-    } catch (err: any) {
-      setErrorMsg(err?.message || "Failed to toggle zone");
+    } catch (err) {
+      setErrorMsg(getErrorMessage(err, "Failed to toggle zone"));
     }
   };
 
   // ─────────────────────────────────────────────────────────
   //  Build GeoJSON for all saved zones (excluding the one being edited)
   // ─────────────────────────────────────────────────────────
-  const zonesGeoJSON = {
+  const zonesGeoJSON: ZoneGeoJsonCollection = {
     type: "FeatureCollection" as const,
     features: zones
       .filter((z) => editing?.id !== z.id) // Don't show edited zone as static layer
@@ -440,7 +513,8 @@ export default function DeliveryZonesPage() {
         const feature = polygonToGeoJSON(zone.polygon);
         if (!feature) return null;
         return {
-          ...feature,
+          type: "Feature" as const,
+          geometry: feature.geometry,
           properties: {
             id: zone.id,
             name: zone.name,
@@ -450,7 +524,7 @@ export default function DeliveryZonesPage() {
           },
         };
       })
-      .filter(Boolean),
+      .filter(isZoneGeoJsonFeature),
   };
 
   // ═══════════════════════════════════════════════════════════
@@ -517,7 +591,7 @@ export default function DeliveryZonesPage() {
             <Source
               id="delivery-zones"
               type="geojson"
-              data={zonesGeoJSON as any}
+              data={zonesGeoJSON}
             >
               <Layer
                 id="zone-fills"

@@ -109,14 +109,29 @@ export class OrderMappingModule {
             const richOrder = richOrderById.get(dbOrder.id);
             const allItems = richOrder?.orderItems ?? [];
             const topLevelItems = allItems.filter((item) => !item.parentOrderItemId);
+            // Active items: quantity > 0 (not fully removed)
+            const activeTopLevelItems = topLevelItems.filter((item) => item.quantity > 0);
+            // Removed items: quantity === 0 and removedAt is set (fully removed) OR removedQuantity > 0 (partially removed)
+            const removedTopLevelItems = topLevelItems.filter(
+                (item) => (item as any).removedAt != null || ((item as any).removedQuantity != null && item.quantity === 0),
+            );
             const businessMap = new Map<string, OrderItem[]>();
+            const removedBusinessMap = new Map<string, typeof removedTopLevelItems>();
 
-            for (const item of topLevelItems) {
+            for (const item of activeTopLevelItems) {
                 const businessId = item.product?.businessId;
                 if (!businessId) continue;
                 const rows = businessMap.get(businessId) ?? [];
                 rows.push(buildOrderItem(item));
                 businessMap.set(businessId, rows);
+            }
+
+            for (const item of removedTopLevelItems) {
+                const businessId = item.product?.businessId;
+                if (!businessId) continue;
+                const rows = removedBusinessMap.get(businessId) ?? [];
+                rows.push(item);
+                removedBusinessMap.set(businessId, rows);
             }
 
             const businessOrderList: OrderBusiness[] = [];
@@ -157,7 +172,68 @@ export class OrderMappingModule {
                             ratingCount: 0,
                         },
                         items: businessItems,
-                    });
+                        removedItems: (removedBusinessMap.get(businessId) ?? []).map((item) => ({
+                            id: item.id,
+                            productId: item.productId,
+                            name: item.product?.name ?? '',
+                            imageUrl: item.product?.imageUrl || undefined,
+                            removedQuantity: (item as any).removedQuantity ?? item.quantity,
+                            unitPrice: Number(item.finalAppliedPrice),
+                            reason: (item as any).removedReason ?? '',
+                            removedAt: (item as any).removedAt ? parseDbTimestamp((item as any).removedAt) : undefined,
+                        })),
+                    } as any);
+                }
+            }
+
+            // Also include businesses that only have removed items (all items removed)
+            for (const [businessId, removedItems] of removedBusinessMap) {
+                if (businessMap.has(businessId)) continue; // already handled above
+                const business = topLevelItems.find((i) => i.product?.businessId === businessId)?.product?.business;
+                if (business) {
+                    businessOrderList.push({
+                        business: {
+                            id: business.id,
+                            name: business.name,
+                            businessType: business.businessType,
+                            imageUrl: business.imageUrl || undefined,
+                            isActive: business.isActive ?? true,
+                            location: {
+                                latitude: business.locationLat,
+                                longitude: business.locationLng,
+                                address: business.locationAddress,
+                            },
+                            workingHours: {
+                                opensAt: this.minutesToTimeString(business.opensAt),
+                                closesAt: this.minutesToTimeString(business.closesAt),
+                            },
+                            avgPrepTimeMinutes: business.avgPrepTimeMinutes,
+                            commissionPercentage: Number(business.commissionPercentage),
+                            minOrderAmount: Number(business.minOrderAmount ?? 0),
+                            isFeatured: business.isFeatured ?? false,
+                            featuredSortOrder: business.featuredSortOrder ?? 0,
+                            createdAt: new Date(business.createdAt),
+                            updatedAt: new Date(business.updatedAt),
+                            isOpen: true,
+                            isTemporarilyClosed: business.isTemporarilyClosed ?? false,
+                            schedule: [],
+                            prepTimeOverrideMinutes: (business as any).prepTimeOverrideMinutes ?? null,
+                            temporaryClosureReason: (business as any).temporaryClosureReason ?? null,
+                            ratingAverage: 0,
+                            ratingCount: 0,
+                        },
+                        items: [],
+                        removedItems: removedItems.map((item) => ({
+                            id: item.id,
+                            productId: item.productId,
+                            name: item.product?.name ?? '',
+                            imageUrl: item.product?.imageUrl || undefined,
+                            removedQuantity: (item as any).removedQuantity ?? item.quantity,
+                            unitPrice: Number(item.finalAppliedPrice),
+                            reason: (item as any).removedReason ?? '',
+                            removedAt: (item as any).removedAt ? parseDbTimestamp((item as any).removedAt) : undefined,
+                        })),
+                    } as any);
                 }
             }
 

@@ -1601,6 +1601,39 @@ export const OrderDetails = ({ order, loading }: OrderDetailsProps) => {
                                         </Text>
                                     </View>
                                 ))}
+
+                                {/* Removed items */}
+                                {(Array.isArray((biz as any)?.removedItems) ? (biz as any).removedItems : []).length > 0 && (
+                                    <View style={{
+                                        marginTop: 4,
+                                        marginHorizontal: 18,
+                                        marginBottom: 12,
+                                        padding: 12,
+                                        backgroundColor: '#ef444408',
+                                        borderRadius: 10,
+                                        borderWidth: 1,
+                                        borderColor: '#ef444420',
+                                    }}>
+                                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#ef4444', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+                                            Removed Items
+                                        </Text>
+                                        {((biz as any).removedItems as Array<{ id: string; name: string; removedQuantity: number; unitPrice: number; reason: string }>).map((ri, riIdx) => (
+                                            <View key={riIdx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: riIdx > 0 ? 8 : 0 }}>
+                                                <View style={{ flex: 1 }}>
+                                                    <Text style={{ fontSize: 14, color: '#ef444490', textDecorationLine: 'line-through', fontWeight: '600' }} numberOfLines={1}>
+                                                        {ri.name}
+                                                    </Text>
+                                                    <Text style={{ fontSize: 11, color: '#ef444470', marginTop: 2 }}>
+                                                        ×{ri.removedQuantity} removed · {ri.reason}
+                                                    </Text>
+                                                </View>
+                                                <Text style={{ fontSize: 14, color: '#ef444480', textDecorationLine: 'line-through', fontWeight: '600', marginLeft: 8 }}>
+                                                    −€{formatCurrency(Number(ri.unitPrice) * ri.removedQuantity)}
+                                                </Text>
+                                            </View>
+                                        ))}
+                                    </View>
+                                )}
                             </View>
                         ))}
                     </View>

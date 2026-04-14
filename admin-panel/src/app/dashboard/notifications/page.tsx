@@ -42,30 +42,35 @@ import {
   ChevronDown,
   HeartHandshake,
 } from "lucide-react";
-import { PromotionType, PromotionTarget, PromotionCreatorType } from "@/gql/graphql";
+import {
+  PromotionType,
+  PromotionTarget,
+  PromotionCreatorType,
+  type AssignPromotionToUsersMutation,
+  type AssignPromotionToUsersMutationVariables,
+  type CreateCampaignMutation,
+  type CreateCampaignMutationVariables,
+  type CreatePromotionMutation,
+  type CreatePromotionMutationVariables,
+  type DeleteCampaignMutation,
+  type DeleteCampaignMutationVariables,
+  type GetNotificationCampaignsQuery,
+  type GetPromotionsQuery,
+  type IssueRecoveryPromotionMutation,
+  type IssueRecoveryPromotionMutationVariables,
+  type PreviewCampaignAudienceQuery,
+  type PreviewCampaignAudienceQueryVariables,
+  type SendCampaignMutation,
+  type SendCampaignMutationVariables,
+  type SendPushNotificationMutation,
+  type SendPushNotificationMutationVariables,
+  type UsersQuery,
+  type UsersQueryVariables,
+} from "@/gql/graphql";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-interface Campaign {
-  id: string;
-  title: string;
-  body: string;
-  titleAl: string | null;
-  bodyAl: string | null;
-  data: Record<string, unknown> | null;
-  imageUrl: string | null;
-  timeSensitive: boolean;
-  category: string | null;
-  relevanceScore: number | null;
-  query: Record<string, unknown> | null;
-  targetCount: number;
-  sentCount: number;
-  failedCount: number;
-  status: string;
-  sentBy: string | null;
-  createdAt: string;
-  sentAt: string | null;
-}
+type Campaign = GetNotificationCampaignsQuery["notificationCampaigns"][number];
 
 interface UserItem {
   id: string;
@@ -75,18 +80,7 @@ interface UserItem {
   role: string;
 }
 
-interface Promotion {
-  id: string;
-  name: string;
-  description: string;
-  code: string;
-  type: string;
-  discountValue: number;
-  maxDiscountCap: number;
-  isActive: boolean;
-  startsAt: string;
-  endsAt: string;
-}
+type Promotion = GetPromotionsQuery["getAllPromotions"][number];
 
 type Tab = "campaigns" | "direct" | "promotions" | "recovery";
 type StatusFilter = "ALL" | "DRAFT" | "SENDING" | "SENT" | "FAILED";
@@ -100,6 +94,16 @@ const CAMPAIGN_CATEGORY_OPTIONS = [
   { value: "order-delivered", label: "Order Delivered" },
   { value: "order-cancelled", label: "Order Cancelled" },
 ];
+
+const toUserItem = (
+  user: Pick<UsersQuery["users"][number], "id" | "email" | "firstName" | "lastName" | "role">,
+): UserItem => ({
+  id: user.id,
+  email: user.email,
+  firstName: user.firstName,
+  lastName: user.lastName,
+  role: user.role,
+});
 
 function isoDateDaysAgo(days: number) {
   const date = new Date();
@@ -477,26 +481,28 @@ export default function NotificationsPage() {
   const [recoveryNotifBody, setRecoveryNotifBody] = useState("");
 
   // Queries & Mutations
-  const { data, loading, refetch } = useQuery(GET_NOTIFICATION_CAMPAIGNS);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const campaigns: Campaign[] = (data as any)?.notificationCampaigns || [];
+  const { data, loading, refetch } = useQuery<GetNotificationCampaignsQuery>(GET_NOTIFICATION_CAMPAIGNS);
+  const campaigns: Campaign[] = data?.notificationCampaigns ?? [];
 
-  const { data: usersData } = useQuery(USERS_QUERY);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const allUsers: UserItem[] = (usersData as any)?.users || [];
+  const { data: usersData } = useQuery<UsersQuery, UsersQueryVariables>(USERS_QUERY, {
+    variables: { limit: 2000, offset: 0 },
+  });
+  const allUsers: UserItem[] = useMemo(
+    () => (usersData?.users ?? []).map(toUserItem),
+    [usersData],
+  );
 
-  const { data: promotionsData } = useQuery(GET_ALL_PROMOTIONS);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const allPromotions: Promotion[] = (promotionsData as any)?.getAllPromotions || [];
+  const { data: promotionsData } = useQuery<GetPromotionsQuery>(GET_ALL_PROMOTIONS);
+  const allPromotions: Promotion[] = promotionsData?.getAllPromotions ?? [];
 
-  const [createCampaign, { loading: creating }] = useMutation(CREATE_CAMPAIGN);
-  const [sendCampaignMut, { loading: sending }] = useMutation(SEND_CAMPAIGN);
-  const [deleteCampaignMut] = useMutation(DELETE_CAMPAIGN);
-  const [sendPushMut, { loading: sendingDirect }] = useMutation(SEND_PUSH_NOTIFICATION);
-  const [previewAudience, { loading: previewing }] = useLazyQuery(PREVIEW_CAMPAIGN_AUDIENCE);
-  const [assignPromotionMut, { loading: assigningPromo }] = useMutation(ASSIGN_PROMOTION_TO_USERS);
-  const [issueRecoveryMut, { loading: issuingRecovery }] = useMutation(ISSUE_RECOVERY_PROMOTION);
-  const [createPromotionMut, { loading: creatingPromo }] = useMutation(CREATE_PROMOTION);
+  const [createCampaign, { loading: creating }] = useMutation<CreateCampaignMutation, CreateCampaignMutationVariables>(CREATE_CAMPAIGN);
+  const [sendCampaignMut, { loading: sending }] = useMutation<SendCampaignMutation, SendCampaignMutationVariables>(SEND_CAMPAIGN);
+  const [deleteCampaignMut] = useMutation<DeleteCampaignMutation, DeleteCampaignMutationVariables>(DELETE_CAMPAIGN);
+  const [sendPushMut, { loading: sendingDirect }] = useMutation<SendPushNotificationMutation, SendPushNotificationMutationVariables>(SEND_PUSH_NOTIFICATION);
+  const [previewAudience, { loading: previewing }] = useLazyQuery<PreviewCampaignAudienceQuery, PreviewCampaignAudienceQueryVariables>(PREVIEW_CAMPAIGN_AUDIENCE);
+  const [assignPromotionMut, { loading: assigningPromo }] = useMutation<AssignPromotionToUsersMutation, AssignPromotionToUsersMutationVariables>(ASSIGN_PROMOTION_TO_USERS);
+  const [issueRecoveryMut, { loading: issuingRecovery }] = useMutation<IssueRecoveryPromotionMutation, IssueRecoveryPromotionMutationVariables>(ISSUE_RECOVERY_PROMOTION);
+  const [createPromotionMut, { loading: creatingPromo }] = useMutation<CreatePromotionMutation, CreatePromotionMutationVariables>(CREATE_PROMOTION);
 
   // Computed
   const stats = useMemo(() => ({
@@ -520,9 +526,11 @@ export default function NotificationsPage() {
   const handlePreview = async () => {
     try {
       const { data } = await previewAudience({ variables: { query: queryGroup } });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result = (data as any)?.previewCampaignAudience;
-      if (result) { setPreviewCount(result.count); setPreviewUsers(result.sampleUsers || []); }
+      const result = data?.previewCampaignAudience;
+      if (result) {
+        setPreviewCount(result.count);
+        setPreviewUsers(result.sampleUsers.map(toUserItem));
+      }
     } catch (err) { console.error("Preview failed:", err); }
   };
 
@@ -551,8 +559,7 @@ export default function NotificationsPage() {
         },
       });
       // If a promotion was selected, immediately send the campaign so we can attach the promotion
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const newId = (createData as any)?.createCampaign?.id;
+      const newId = createData?.createCampaign.id;
       if (newId && campaignPromoId) {
         await sendCampaignMut({ variables: { id: newId, promotionId: campaignPromoId } });
       }
@@ -600,8 +607,7 @@ export default function NotificationsPage() {
           },
         },
       });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result = (data as any)?.sendPushNotification;
+      const result = data?.sendPushNotification;
       if (result) { setDirectSent(result); setTimeout(() => setDirectSent(null), 5000); }
       setDirectTitle(""); setDirectBody(""); setDirectTitleAl(""); setDirectBodyAl("");
       setDirectImageUrl(""); setDirectTimeSensitive(false); setDirectCategory("");
@@ -627,8 +633,7 @@ export default function NotificationsPage() {
           },
         },
       });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const count = ((data as any)?.issueRecoveryPromotion || []).length;
+      const count = data?.issueRecoveryPromotion.length ?? 0;
       if (recoverySendNotif && recoveryNotifTitle.trim() && recoveryNotifBody.trim()) {
         await sendPushMut({
           variables: {
@@ -658,8 +663,7 @@ export default function NotificationsPage() {
       const { data } = await assignPromotionMut({
         variables: { input: { promotionId: selectedPromotion, userIds: promoUsers.map((u) => u.id) } },
       });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const count = ((data as any)?.assignPromotionToUsers || []).length;
+      const count = data?.assignPromotionToUsers.length ?? 0;
       if (promoNotifTitle.trim() && promoNotifBody.trim()) {
         await sendPushMut({
           variables: {
@@ -1292,8 +1296,7 @@ export default function NotificationsPage() {
                             },
                           },
                         });
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        const id = (data as any)?.createPromotion?.id;
+                        const id = data?.createPromotion.id;
                         if (id) setCampaignPromoId(id);
                       } catch (err) { console.error("Create promo failed:", err); }
                     }}
