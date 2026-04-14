@@ -13,6 +13,8 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AuthRepository } from '../AuthRepository';
+import type { DbType } from '@/database';
+import type { DbUser } from '@/database/schema/users';
 
 // ── Stub user shape ─────────────────────────────────────────────────────────
 
@@ -38,8 +40,8 @@ const STUB_USER = {
 // Mirrors the pattern used in BusinessRepository.test.ts.
 
 /** For mutations (.insert/.update … .returning()) */
-function makeMutationDb(rows: any[]) {
-    const chain: any = {
+function makeMutationDb(rows: unknown[]) {
+    const chain = {
         insert: vi.fn().mockReturnThis(),
         update: vi.fn().mockReturnThis(),
         delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([]) }),
@@ -52,9 +54,11 @@ function makeMutationDb(rows: any[]) {
 }
 
 /** For selects (.select().from().where() → thenable) */
-function makeSelectDb(rows: any[]) {
-    const whenWhere: any = {
-        then: (resolve: any, reject: any) => Promise.resolve(rows).then(resolve, reject),
+function makeSelectDb(rows: unknown[]) {
+    type Resolver = (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) => Promise<unknown>;
+    const whenWhere = {
+        then: ((resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) => Promise.resolve(rows).then(resolve, reject)) as Resolver,
+        where: vi.fn() as ReturnType<typeof vi.fn>,
     };
     whenWhere.where = vi.fn().mockReturnValue(whenWhere);
     return {
@@ -77,7 +81,8 @@ function makeSelectDb(rows: any[]) {
 describe('AuthRepository.createUser', () => {
     it('inserts with INITIAL signup step and returns the new user', async () => {
         const db = makeMutationDb([STUB_USER]);
-        const repo = new AuthRepository(db as any);
+        const repo = new AuthRepository(db as unknown as DbType);
+        vi.spyOn(repo, 'findByEmail').mockResolvedValue(STUB_USER as unknown as DbUser);
 
         const result = await repo.createUser('Besnik', 'Krasniqi', 'besnik@test.com', 'hashed-pw');
 
@@ -102,14 +107,14 @@ describe('AuthRepository.createUser', () => {
 describe('AuthRepository.findByEmail', () => {
     it('returns the user when a matching non-deleted row exists', async () => {
         const db = makeSelectDb([STUB_USER]);
-        const repo = new AuthRepository(db as any);
+        const repo = new AuthRepository(db as unknown as DbType);
         const result = await repo.findByEmail('besnik@test.com');
         expect(result).toEqual(STUB_USER);
     });
 
     it('returns undefined when no rows are returned', async () => {
         const db = makeSelectDb([]);
-        const repo = new AuthRepository(db as any);
+        const repo = new AuthRepository(db as unknown as DbType);
         const result = await repo.findByEmail('ghost@test.com');
         expect(result).toBeUndefined();
     });
@@ -120,13 +125,13 @@ describe('AuthRepository.findByEmail', () => {
 describe('AuthRepository.findById', () => {
     it('returns the user when found', async () => {
         const db = makeSelectDb([STUB_USER]);
-        const repo = new AuthRepository(db as any);
+        const repo = new AuthRepository(db as unknown as DbType);
         expect(await repo.findById('user-1')).toEqual(STUB_USER);
     });
 
     it('returns undefined for an unknown id', async () => {
         const db = makeSelectDb([]);
-        const repo = new AuthRepository(db as any);
+        const repo = new AuthRepository(db as unknown as DbType);
         expect(await repo.findById('nonexistent')).toBeUndefined();
     });
 });
@@ -136,7 +141,7 @@ describe('AuthRepository.findById', () => {
 describe('AuthRepository.verifyEmailCode', () => {
     it('returns undefined when the user does not exist', async () => {
         const db = makeSelectDb([]);
-        const repo = new AuthRepository(db as any);
+        const repo = new AuthRepository(db as unknown as DbType);
         const result = await repo.verifyEmailCode('user-x', '123456');
         expect(result).toBeUndefined();
     });
@@ -144,7 +149,7 @@ describe('AuthRepository.verifyEmailCode', () => {
     it('returns undefined when the code does not match', async () => {
         const unverifiedUser = { ...STUB_USER, emailVerificationCode: '111111' };
         const db = makeSelectDb([unverifiedUser]);
-        const repo = new AuthRepository(db as any);
+        const repo = new AuthRepository(db as unknown as DbType);
         const result = await repo.verifyEmailCode('user-1', '999999');
         expect(result).toBeUndefined();
     });
@@ -158,18 +163,20 @@ describe('AuthRepository.verifyEmailCode', () => {
         const mutationDb = makeMutationDb([verifiedUser]);
 
         // Combine: select methods from selectDb, mutation methods from mutationDb
-        const db: any = {
+        const db = {
             ...selectDb,
             update: mutationDb.update.bind(mutationDb),
             set: mutationDb.set.bind(mutationDb),
             returning: mutationDb.returning.bind(mutationDb),
-        };
+        } as unknown as DbType;
         // Wire the mutation chain for the update call
         mutationDb.update.mockReturnValue(mutationDb);
 
         const repo = new AuthRepository(db);
         // Spy on findById so control of the select path is straightforward
-        vi.spyOn(repo, 'findById').mockResolvedValue(unverifiedUser as any);
+        vi.spyOn(repo, 'findById')
+            .mockResolvedValueOnce(unverifiedUser as unknown as DbUser)
+            .mockResolvedValueOnce(verifiedUser as unknown as DbUser);
 
         const result = await repo.verifyEmailCode('user-1', '654321');
 
@@ -186,15 +193,15 @@ describe('AuthRepository.verifyEmailCode', () => {
 describe('AuthRepository.verifyPhoneCode', () => {
     it('returns undefined when user not found', async () => {
         const db = makeSelectDb([]);
-        const repo = new AuthRepository(db as any);
+        const repo = new AuthRepository(db as unknown as DbType);
         expect(await repo.verifyPhoneCode('user-x', '000000')).toBeUndefined();
     });
 
     it('returns undefined when the code does not match', async () => {
         const user = { ...STUB_USER, phoneVerificationCode: '112233' };
         const db = makeSelectDb([user]);
-        const repo = new AuthRepository(db as any);
-        vi.spyOn(repo, 'findById').mockResolvedValue(user as any);
+        const repo = new AuthRepository(db as unknown as DbType);
+        vi.spyOn(repo, 'findById').mockResolvedValue(user as unknown as DbUser);
         expect(await repo.verifyPhoneCode('user-1', '998877')).toBeUndefined();
     });
 
@@ -204,8 +211,10 @@ describe('AuthRepository.verifyPhoneCode', () => {
         const mutationDb = makeMutationDb([updated]);
         mutationDb.update.mockReturnValue(mutationDb);
 
-        const repo = new AuthRepository(mutationDb as any);
-        vi.spyOn(repo, 'findById').mockResolvedValue(user as any);
+        const repo = new AuthRepository(mutationDb as unknown as DbType);
+        vi.spyOn(repo, 'findById')
+            .mockResolvedValueOnce(user as unknown as DbUser)
+            .mockResolvedValueOnce(updated as unknown as DbUser);
 
         const result = await repo.verifyPhoneCode('user-1', '445566');
 
@@ -222,7 +231,7 @@ describe('AuthRepository.deleteUser', () => {
     it('returns true when a row is soft-deleted', async () => {
         const db = makeMutationDb([{ id: 'user-1' }]);
         db.update.mockReturnValue(db);
-        const repo = new AuthRepository(db as any);
+        const repo = new AuthRepository(db as unknown as DbType);
         const result = await repo.deleteUser('user-1');
         expect(result).toBe(true);
         expect(db.update).toHaveBeenCalled();
@@ -231,7 +240,7 @@ describe('AuthRepository.deleteUser', () => {
     it('returns false when no rows were affected (already deleted)', async () => {
         const db = makeMutationDb([]);
         db.update.mockReturnValue(db);
-        const repo = new AuthRepository(db as any);
+        const repo = new AuthRepository(db as unknown as DbType);
         const result = await repo.deleteUser('ghost-user');
         expect(result).toBe(false);
     });

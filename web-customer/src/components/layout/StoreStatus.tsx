@@ -16,6 +16,24 @@ const ACTIVE_ORDER_STATUSES = new Set([
     "OUT_FOR_DELIVERY",
 ]);
 
+type StoreStatusPayload = {
+    isStoreClosed?: boolean;
+    closedMessage?: string | null;
+    bannerEnabled?: boolean;
+    bannerMessage?: string | null;
+    bannerType?: string | null;
+};
+
+type GetStoreStatusQueryData = {
+    getStoreStatus?: StoreStatusPayload | null;
+};
+
+type GetOrdersQueryData = {
+    orders?: {
+        orders?: Array<{ status?: string | null }> | null;
+    } | null;
+};
+
 /**
  * Mount once in Providers — runs the query + subscription and syncs into
  * the Zustand store.
@@ -24,7 +42,7 @@ export function StoreStatusInit() {
     const update = useStoreStatusStore((s) => s._update);
     const setLoading = useStoreStatusStore((s) => s._setLoading);
 
-    const { data, loading, subscribeToMore } = useQuery(GET_STORE_STATUS, {
+    const { data, loading, subscribeToMore } = useQuery<GetStoreStatusQueryData>(GET_STORE_STATUS, {
         fetchPolicy: "network-only",
     });
 
@@ -65,7 +83,7 @@ export function StoreClosedOverlay() {
     const { t } = useTranslations();
 
     const shouldCheckActiveOrders = isStoreClosed && !wasOpenOnEntry && isAuthenticated;
-    const { data: ordersData, loading: ordersLoading } = useQuery(GET_ORDERS, {
+    const { data: ordersData, loading: ordersLoading } = useQuery<GetOrdersQueryData>(GET_ORDERS, {
         skip: !shouldCheckActiveOrders,
         fetchPolicy: "cache-and-network",
         variables: { limit: 20, offset: 0 },

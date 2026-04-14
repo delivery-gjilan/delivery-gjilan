@@ -75,7 +75,7 @@ interface OrderOverrides {
     status?: string;
 }
 
-function makeOrder(overrides: OrderOverrides = {}): DbOrder {
+function makeOrder(overrides: OrderOverrides = {}) {
     return {
         id: 'id' in overrides ? overrides.id : 'order-1',
         paymentCollection: overrides.paymentCollection ?? 'CASH_TO_DRIVER',
@@ -88,10 +88,10 @@ function makeOrder(overrides: OrderOverrides = {}): DbOrder {
         basePrice: 'basePrice' in overrides ? overrides.basePrice : 15,
         businessPrice: 'businessPrice' in overrides ? overrides.businessPrice : 15,
         status: overrides.status ?? 'DELIVERED',
-    };
+    } as unknown as DbOrder;
 }
 
-function makeOrderItem(overrides: Partial<DbOrderItem> = {}): DbOrderItem {
+function makeOrderItem(overrides: Record<string, unknown> = {}) {
     return {
         id: 'item-1',
         orderId: 'order-1',
@@ -103,7 +103,7 @@ function makeOrderItem(overrides: Partial<DbOrderItem> = {}): DbOrderItem {
         price: overrides.price ?? '10',
         createdAt: new Date().toISOString(),
         ...overrides,
-    };
+    } as unknown as DbOrderItem;
 }
 
 const DRIVER_ID = 'driver-1';

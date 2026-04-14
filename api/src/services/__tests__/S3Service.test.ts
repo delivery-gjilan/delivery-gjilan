@@ -43,6 +43,7 @@ vi.mock('@aws-sdk/client-s3', () => ({
 
 // ── 3. Import the service AFTER mocks are in place ───────────────────────────
 import s3Service from '../S3Service';
+import type { Readable } from 'stream';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -54,7 +55,7 @@ function makeFile(name = 'photo.jpg', mimetype = 'image/jpeg'): Express.Multer.F
         fieldname: 'file',
         encoding: '7bit',
         size: 16,
-        stream: null as unknown as NodeJS.ReadableStream,
+        stream: null as unknown as Readable,
         destination: '',
         filename: '',
         path: '',

@@ -43,6 +43,7 @@ vi.mock('redis', () => ({
 }));
 
 import { topics, pubsub, publish, subscribe } from '@/lib/pubsub';
+import type { DriversUpdatedPayload } from '@/lib/pubsub';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // A) topics.* key helpers
@@ -156,7 +157,7 @@ async function awaitNext<T>(pending: Promise<IteratorResult<T>>, timeoutMs = 500
 
 describe('publish + subscribe round-trips', () => {
     it('delivers an allDriversChanged payload to a subscriber', async () => {
-        const PAYLOAD = { drivers: [{ id: 'drv-1' } as Record<string, unknown>] };
+        const PAYLOAD = { drivers: [{ id: 'drv-1' }] } as unknown as DriversUpdatedPayload;
         const iter = subscribe(pubsub, topics.allDriversChanged())[Symbol.asyncIterator]();
 
         const pending = iter.next();          // ← start waiting first

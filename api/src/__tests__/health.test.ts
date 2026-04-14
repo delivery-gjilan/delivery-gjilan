@@ -60,16 +60,16 @@ vi.mock('@/lib/realtimeMonitoring', () => ({
 }));
 
 vi.mock('@/lib/metrics', () => ({
-    metricsMiddleware: (_req: any, _res: any, next: any) => next(),
-    metricsEndpoint: (_req: any, res: any) => res.status(200).send('# metrics'),
+    metricsMiddleware: (_req: unknown, _res: unknown, next: () => void) => next(),
+    metricsEndpoint: (_req: unknown, res: { status: (n: number) => { send: (s: string) => void } }) => res.status(200).send('# metrics'),
 }));
 
 vi.mock('@/lib/middleware/requestLogger', () => ({
-    requestLogger: (_req: any, _res: any, next: any) => next(),
+    requestLogger: (_req: unknown, _res: unknown, next: () => void) => next(),
 }));
 
 vi.mock('@/lib/middleware/errorHandler', () => ({
-    globalErrorHandler: (err: any, _req: any, res: any, _next: any) => {
+    globalErrorHandler: (err: Error, _req: unknown, res: { status: (n: number) => { json: (o: unknown) => void } }, _next: unknown) => {
         res.status(500).json({ error: err?.message ?? 'Internal Server Error' });
     },
 }));
@@ -86,7 +86,7 @@ vi.mock('@/lib/logger', () => ({
 
 // Mock graphql-yoga so no real schema/context evaluation happens
 vi.mock('graphql-yoga', () => {
-    const mockHandler = vi.fn((_req: any, _res: any, next: any) => next());
+    const mockHandler = vi.fn((_req: unknown, _res: unknown, next: () => void) => next());
     return {
         createYoga: vi.fn(() =>
             Object.assign(mockHandler, { graphqlEndpoint: '/graphql', getEnveloped: vi.fn() }),
@@ -103,13 +103,13 @@ vi.mock('../graphql/createContext', () => ({ createContext: vi.fn() }));
 
 // Mock routes so they don't try to connect to S3 / Mapbox / Firebase at import time
 vi.mock('../routes/uploadRoutes', () => ({
-    default: (_req: any, _res: any, next: any) => next(),
+    default: (_req: unknown, _res: unknown, next: () => void) => next(),
 }));
 vi.mock('../routes/directionsRoutes', () => ({
-    directionsRouter: (_req: any, _res: any, next: any) => next(),
+    directionsRouter: (_req: unknown, _res: unknown, next: () => void) => next(),
 }));
 vi.mock('../routes/debugRoutes', () => ({
-    default: (_req: any, _res: any, next: any) => next(),
+    default: (_req: unknown, _res: unknown, next: () => void) => next(),
 }));
 
 // ── Import app AFTER mocks ─────────────────────────────────────────────────
@@ -146,7 +146,7 @@ describe('GET /health', () => {
 describe('GET /ready', () => {
     beforeEach(() => {
         vi.mocked(cache.ping).mockResolvedValue({ ok: false, disabled: true });
-        vi.mocked(getDB).mockResolvedValue({ execute: vi.fn().mockResolvedValue([]) } as any);
+        vi.mocked(getDB).mockResolvedValue({ execute: vi.fn().mockResolvedValue([]) } as unknown as Awaited<ReturnType<typeof getDB>>);
         delete process.env.REDIS_REQUIRED;
     });
 
@@ -204,7 +204,7 @@ describe('GET /health/realtime', () => {
         vi.mocked(realtimeMonitor.getSummary).mockReturnValueOnce({
             activeSockets: 5,
             activeSubscriptions: 12,
-        } as any);
+        } as unknown as ReturnType<typeof realtimeMonitor.getSummary>);
         const res = await request(app).get('/health/realtime');
         expect(res.body.activeSockets).toBe(5);
         expect(res.body.activeSubscriptions).toBe(12);

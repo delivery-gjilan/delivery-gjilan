@@ -26,6 +26,10 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof
 
 const HIDDEN_ON = ["/orders", "/checkout", "/login", "/signup", "/profile"];
 
+type UserOrdersUpdatedSubscriptionData = {
+    userOrdersUpdated?: any[] | null;
+};
+
 function extractOrders(data: any): any[] {
     const payload = data?.orders;
     if (Array.isArray(payload)) return payload;
@@ -55,7 +59,7 @@ export function ActiveOrderBanner() {
         variables: { limit: 20, offset: 0 },
     });
 
-    const { data: subData } = useSubscription(USER_ORDERS_UPDATED, {
+    const { data: subData } = useSubscription<UserOrdersUpdatedSubscriptionData>(USER_ORDERS_UPDATED, {
         skip: !isAuthenticated || isHiddenPage,
     });
 

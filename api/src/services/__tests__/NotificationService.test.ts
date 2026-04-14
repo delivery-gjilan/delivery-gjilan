@@ -59,12 +59,14 @@ vi.mock('@/lib/cache', () => ({
 }));
 
 import { NotificationService, type NotificationPayload } from '../NotificationService';
+import type { NotificationRepository } from '@/repositories/NotificationRepository';
+import type { NotificationType } from '@/database/schema/notifications';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ──────────────────────────────────────────────────────────────────────────────
 
-function makeRepo(overrides: Partial<Record<string, any>> = {}) {
+function makeRepo(overrides: Partial<Record<string, unknown>> = {}) {
     return {
         getTokensByUserId: vi.fn().mockResolvedValue([]),
         getTokensByUserIdAndAppType: vi.fn().mockResolvedValue([]),
@@ -83,8 +85,8 @@ function makeRepo(overrides: Partial<Record<string, any>> = {}) {
     };
 }
 
-function makeService(repoOverrides: Partial<Record<string, any>> = {}) {
-    return new NotificationService(makeRepo(repoOverrides) as any);
+function makeService(repoOverrides: Partial<Record<string, unknown>> = {}) {
+    return new NotificationService(makeRepo(repoOverrides) as unknown as NotificationRepository);
 }
 
 // Shorthand to call private methods
@@ -164,7 +166,7 @@ describe('NotificationService.resolveLocalizedPayload', () => {
 
     it('strips localeContent from the resolved payload', () => {
         const result = priv(makeService()).resolveLocalizedPayload(BILINGUAL_PAYLOAD, 'en');
-        expect((result as any).localeContent).toBeUndefined();
+        expect((result as Record<string, unknown>).localeContent).toBeUndefined();
     });
 });
 
@@ -221,7 +223,7 @@ describe('NotificationService.sendToUser — FCM success', () => {
         const result = await svc.sendToUser('user-1', { title: 'Order Ready', body: 'Pick it up!' }, 'ORDER_STATUS');
 
         expect(mockSendEachForMulticast).toHaveBeenCalledOnce();
-        const call = mockSendEachForMulticast.mock.calls[0][0] as any;
+        const call = mockSendEachForMulticast.mock.calls[0][0] as { tokens: string[]; notification: { title: string } };
         expect(call.tokens).toContain('device-token-abc');
         expect(call.notification.title).toBe('Order Ready');
 
@@ -234,8 +236,8 @@ describe('NotificationService.sendToUser — FCM success', () => {
         mockSendEachForMulticast.mockResolvedValue({ successCount: 1, failureCount: 0, responses: [{ error: null }] });
 
         const repo = makeRepo({ getTokensByUserId: vi.fn().mockResolvedValue(tokens) });
-        const svc = new NotificationService(repo as any);
-        await svc.sendToUser('user-2', { title: 'Hi', body: 'Hello' }, 'PROMO' as any);
+        const svc = new NotificationService(repo as unknown as NotificationRepository);
+        await svc.sendToUser('user-2', { title: 'Hi', body: 'Hello' }, 'PROMO' as unknown as NotificationType);
 
         expect(repo.createNotification).toHaveBeenCalledWith(
             expect.objectContaining({ userId: 'user-2', title: 'Hi', type: 'PROMO' }),
@@ -261,7 +263,7 @@ describe('NotificationService.sendToUser — stale token cleanup', () => {
         });
 
         const repo = makeRepo({ getTokensByUserId: vi.fn().mockResolvedValue(tokens) });
-        const svc = new NotificationService(repo as any);
+        const svc = new NotificationService(repo as unknown as NotificationRepository);
         const result = await svc.sendToUser('user-3', { title: 'X', body: 'Y' }, 'ORDER_STATUS');
 
         expect(result.staleTokens).toContain('stale-tok');
@@ -277,7 +279,7 @@ describe('NotificationService.sendToUser — stale token cleanup', () => {
         });
 
         const repo = makeRepo({ getTokensByUserId: vi.fn().mockResolvedValue(tokens) });
-        const svc = new NotificationService(repo as any);
+        const svc = new NotificationService(repo as unknown as NotificationRepository);
         const result = await svc.sendToUser('user-4', { title: 'X', body: 'Y' }, 'ORDER_STATUS');
 
         expect(result.staleTokens).toContain('bad-tok');
@@ -292,7 +294,7 @@ describe('NotificationService.sendToUser — stale token cleanup', () => {
         });
 
         const repo = makeRepo({ getTokensByUserId: vi.fn().mockResolvedValue(tokens) });
-        const svc = new NotificationService(repo as any);
+        const svc = new NotificationService(repo as unknown as NotificationRepository);
         const result = await svc.sendToUser('user-5', { title: 'X', body: 'Y' }, 'ORDER_STATUS');
 
         expect(result.staleTokens).toHaveLength(0);

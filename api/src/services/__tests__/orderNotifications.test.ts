@@ -31,6 +31,7 @@ import {
     notifyDriverNewAdminMessage,
     notifyBusinessUserNewAdminMessage,
 } from '../orderNotifications';
+import type { NotificationService } from '../NotificationService';
 
 vi.mock('@/lib/logger', () => ({
     default: {
@@ -78,20 +79,20 @@ describe('notifyCustomerOrderStatus', () => {
 
     for (const status of KNOWN_STATUSES) {
         it(`calls sendToUser for STATUS=${status}`, async () => {
-            notifyCustomerOrderStatus(svc as any, 'customer-1', 'order-abc', status);
+            notifyCustomerOrderStatus(svc as unknown as NotificationService, 'customer-1', 'order-abc', status);
             await flush();
             expect(svc.sendToUser).toHaveBeenCalledOnce();
         });
 
         it(`passes the orderId in data for STATUS=${status}`, async () => {
-            notifyCustomerOrderStatus(svc as any, 'customer-1', 'order-abc', status);
+            notifyCustomerOrderStatus(svc as unknown as NotificationService, 'customer-1', 'order-abc', status);
             await flush();
             const [[, payload]] = svc.sendToUser.mock.calls;
             expect(payload.data?.orderId).toBe('order-abc');
         });
 
         it(`uses notification type ORDER_STATUS for ${status}`, async () => {
-            notifyCustomerOrderStatus(svc as any, 'customer-1', 'order-abc', status);
+            notifyCustomerOrderStatus(svc as unknown as NotificationService, 'customer-1', 'order-abc', status);
             await flush();
             const [[, , type]] = svc.sendToUser.mock.calls;
             expect(type).toBe('ORDER_STATUS');
@@ -99,48 +100,48 @@ describe('notifyCustomerOrderStatus', () => {
     }
 
     it('does NOT call sendToUser for an unknown status', async () => {
-        notifyCustomerOrderStatus(svc as any, 'customer-1', 'order-abc', 'TOTALLY_UNKNOWN');
+        notifyCustomerOrderStatus(svc as unknown as NotificationService, 'customer-1', 'order-abc', 'TOTALLY_UNKNOWN');
         await flush();
         expect(svc.sendToUser).not.toHaveBeenCalled();
     });
 
     it('sets timeSensitive: false for PREPARING', async () => {
-        notifyCustomerOrderStatus(svc as any, 'customer-1', 'order-abc', 'PREPARING');
+        notifyCustomerOrderStatus(svc as unknown as NotificationService, 'customer-1', 'order-abc', 'PREPARING');
         await flush();
         const [[, payload]] = svc.sendToUser.mock.calls;
         expect(payload.timeSensitive).toBe(false);
     });
 
     it('sets timeSensitive: true for OUT_FOR_DELIVERY', async () => {
-        notifyCustomerOrderStatus(svc as any, 'customer-1', 'order-abc', 'OUT_FOR_DELIVERY');
+        notifyCustomerOrderStatus(svc as unknown as NotificationService, 'customer-1', 'order-abc', 'OUT_FOR_DELIVERY');
         await flush();
         const [[, payload]] = svc.sendToUser.mock.calls;
         expect(payload.timeSensitive).toBe(true);
     });
 
     it('sets timeSensitive: true for DELIVERED', async () => {
-        notifyCustomerOrderStatus(svc as any, 'customer-1', 'order-abc', 'DELIVERED');
+        notifyCustomerOrderStatus(svc as unknown as NotificationService, 'customer-1', 'order-abc', 'DELIVERED');
         await flush();
         const [[, payload]] = svc.sendToUser.mock.calls;
         expect(payload.timeSensitive).toBe(true);
     });
 
     it('sets timeSensitive: true for CANCELLED', async () => {
-        notifyCustomerOrderStatus(svc as any, 'customer-1', 'order-abc', 'CANCELLED');
+        notifyCustomerOrderStatus(svc as unknown as NotificationService, 'customer-1', 'order-abc', 'CANCELLED');
         await flush();
         const [[, payload]] = svc.sendToUser.mock.calls;
         expect(payload.timeSensitive).toBe(true);
     });
 
     it('sends to the correct customerId', async () => {
-        notifyCustomerOrderStatus(svc as any, 'customer-xyz', 'order-abc', 'DELIVERED');
+        notifyCustomerOrderStatus(svc as unknown as NotificationService, 'customer-xyz', 'order-abc', 'DELIVERED');
         await flush();
         const [[userId]] = svc.sendToUser.mock.calls;
         expect(userId).toBe('customer-xyz');
     });
 
     it('includes both English and Albanian localeContent', async () => {
-        notifyCustomerOrderStatus(svc as any, 'customer-1', 'order-abc', 'DELIVERED');
+        notifyCustomerOrderStatus(svc as unknown as NotificationService, 'customer-1', 'order-abc', 'DELIVERED');
         await flush();
         const [[, payload]] = svc.sendToUser.mock.calls;
         expect(payload.localeContent?.en).toBeDefined();
@@ -148,7 +149,7 @@ describe('notifyCustomerOrderStatus', () => {
     });
 
     it('relevanceScore for DELIVERED is 1.0', async () => {
-        notifyCustomerOrderStatus(svc as any, 'customer-1', 'order-abc', 'DELIVERED');
+        notifyCustomerOrderStatus(svc as unknown as NotificationService, 'customer-1', 'order-abc', 'DELIVERED');
         await flush();
         const [[, payload]] = svc.sendToUser.mock.calls;
         expect(payload.relevanceScore).toBe(1.0);
@@ -167,28 +168,28 @@ describe('notifyDriverNewAdminMessage', () => {
     });
 
     it('calls sendToUserByAppType with appType DRIVER', async () => {
-        notifyDriverNewAdminMessage(svc as any, 'driver-1', 'Pick up order', 'INFO');
+        notifyDriverNewAdminMessage(svc as unknown as NotificationService, 'driver-1', 'Pick up order', 'INFO');
         await flush();
         const [[, appType]] = svc.sendToUserByAppType.mock.calls;
         expect(appType).toBe('DRIVER');
     });
 
     it('sends to the correct driverId', async () => {
-        notifyDriverNewAdminMessage(svc as any, 'driver-99', 'Test msg', 'INFO');
+        notifyDriverNewAdminMessage(svc as unknown as NotificationService, 'driver-99', 'Test msg', 'INFO');
         await flush();
         const [[driverId]] = svc.sendToUserByAppType.mock.calls;
         expect(driverId).toBe('driver-99');
     });
 
     it('uses notification type ADMIN_ALERT', async () => {
-        notifyDriverNewAdminMessage(svc as any, 'drv-1', 'msg', 'INFO');
+        notifyDriverNewAdminMessage(svc as unknown as NotificationService, 'drv-1', 'msg', 'INFO');
         await flush();
         const [[, , , type]] = svc.sendToUserByAppType.mock.calls;
         expect(type).toBe('ADMIN_ALERT');
     });
 
     it('URGENT sets timeSensitive: true and relevanceScore: 1.0', async () => {
-        notifyDriverNewAdminMessage(svc as any, 'drv-1', 'Urgent!', 'URGENT');
+        notifyDriverNewAdminMessage(svc as unknown as NotificationService, 'drv-1', 'Urgent!', 'URGENT');
         await flush();
         const [[, , payload]] = svc.sendToUserByAppType.mock.calls;
         expect(payload.timeSensitive).toBe(true);
@@ -196,7 +197,7 @@ describe('notifyDriverNewAdminMessage', () => {
     });
 
     it('WARNING sets timeSensitive: true and relevanceScore: 0.8', async () => {
-        notifyDriverNewAdminMessage(svc as any, 'drv-1', 'Warning!', 'WARNING');
+        notifyDriverNewAdminMessage(svc as unknown as NotificationService, 'drv-1', 'Warning!', 'WARNING');
         await flush();
         const [[, , payload]] = svc.sendToUserByAppType.mock.calls;
         expect(payload.timeSensitive).toBe(true);
@@ -204,7 +205,7 @@ describe('notifyDriverNewAdminMessage', () => {
     });
 
     it('INFO sets timeSensitive: false and relevanceScore: 0.5', async () => {
-        notifyDriverNewAdminMessage(svc as any, 'drv-1', 'FYI', 'INFO');
+        notifyDriverNewAdminMessage(svc as unknown as NotificationService, 'drv-1', 'FYI', 'INFO');
         await flush();
         const [[, , payload]] = svc.sendToUserByAppType.mock.calls;
         expect(payload.timeSensitive).toBe(false);
@@ -212,7 +213,7 @@ describe('notifyDriverNewAdminMessage', () => {
     });
 
     it('puts the message body in the notification body', async () => {
-        notifyDriverNewAdminMessage(svc as any, 'drv-1', 'Zone A is busy', 'INFO');
+        notifyDriverNewAdminMessage(svc as unknown as NotificationService, 'drv-1', 'Zone A is busy', 'INFO');
         await flush();
         const [[, , payload]] = svc.sendToUserByAppType.mock.calls;
         expect(payload.body).toBe('Zone A is busy');
@@ -231,35 +232,35 @@ describe('notifyBusinessUserNewAdminMessage', () => {
     });
 
     it('calls sendToUserByAppType with appType BUSINESS', async () => {
-        notifyBusinessUserNewAdminMessage(svc as any, 'biz-user-1', 'Hello', 'INFO');
+        notifyBusinessUserNewAdminMessage(svc as unknown as NotificationService, 'biz-user-1', 'Hello', 'INFO');
         await flush();
         const [[, appType]] = svc.sendToUserByAppType.mock.calls;
         expect(appType).toBe('BUSINESS');
     });
 
     it('sends to the correct businessUserId', async () => {
-        notifyBusinessUserNewAdminMessage(svc as any, 'biz-user-99', 'Hello', 'INFO');
+        notifyBusinessUserNewAdminMessage(svc as unknown as NotificationService, 'biz-user-99', 'Hello', 'INFO');
         await flush();
         const [[userId]] = svc.sendToUserByAppType.mock.calls;
         expect(userId).toBe('biz-user-99');
     });
 
     it('URGENT sets timeSensitive: true', async () => {
-        notifyBusinessUserNewAdminMessage(svc as any, 'biz-user-1', 'Critical!', 'URGENT');
+        notifyBusinessUserNewAdminMessage(svc as unknown as NotificationService, 'biz-user-1', 'Critical!', 'URGENT');
         await flush();
         const [[, , payload]] = svc.sendToUserByAppType.mock.calls;
         expect(payload.timeSensitive).toBe(true);
     });
 
     it('INFO sets timeSensitive: false', async () => {
-        notifyBusinessUserNewAdminMessage(svc as any, 'biz-user-1', 'FYI', 'INFO');
+        notifyBusinessUserNewAdminMessage(svc as unknown as NotificationService, 'biz-user-1', 'FYI', 'INFO');
         await flush();
         const [[, , payload]] = svc.sendToUserByAppType.mock.calls;
         expect(payload.timeSensitive).toBe(false);
     });
 
     it('uses notification type ADMIN_ALERT', async () => {
-        notifyBusinessUserNewAdminMessage(svc as any, 'biz-user-1', 'msg', 'INFO');
+        notifyBusinessUserNewAdminMessage(svc as unknown as NotificationService, 'biz-user-1', 'msg', 'INFO');
         await flush();
         const [[, , , type]] = svc.sendToUserByAppType.mock.calls;
         expect(type).toBe('ADMIN_ALERT');

@@ -11,6 +11,8 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BusinessRepository } from '../BusinessRepository';
+import type { DbType } from '@/database';
+import type { NewDbBusiness } from '@/database/schema/businesses';
 
 // ---------------------------------------------------------------------------
 // Minimal business stub that matches the shape the repo returns
@@ -33,8 +35,9 @@ const STUB_BUSINESS = {
 // so we build a simple chainable mock that resolves to a fixed value at the end.
 // ---------------------------------------------------------------------------
 
-function makeChain(resolveWith: any) {
-    const chain: any = {
+function makeChain(resolveWith: unknown) {
+    type Resolver = ((resolve: (value: unknown) => unknown) => Promise<unknown>) | undefined;
+    const chain = {
         select: vi.fn().mockReturnThis(),
         insert: vi.fn().mockReturnThis(),
         update: vi.fn().mockReturnThis(),
@@ -43,15 +46,14 @@ function makeChain(resolveWith: any) {
         set: vi.fn().mockReturnThis(),
         values: vi.fn().mockReturnThis(),
         returning: vi.fn().mockResolvedValue(resolveWith),
-        // For plain select() that resolves directly (no .returning())
-        then: undefined as any,
+        then: undefined as Resolver,
+        [Symbol.iterator]: undefined as undefined,
     };
     // Make the chain itself thenable for paths that await the chain directly
-    chain.where.mockImplementation(() => {
-        const sub: any = { ...chain };
+    chain.where = vi.fn().mockImplementation(() => {
+        const sub = { ...chain };
         sub[Symbol.iterator] = undefined;
-        // Allow `await db.select().from().where()` to resolve
-        sub.then = (resolve: any) => Promise.resolve(resolveWith).then(resolve);
+        sub.then = (resolve: (value: unknown) => unknown) => Promise.resolve(resolveWith).then(resolve);
         return sub;
     });
     return chain;
@@ -62,10 +64,11 @@ function makeChain(resolveWith: any) {
 // .returning() — they await the query chain directly.
 // ---------------------------------------------------------------------------
 
-function makeFindDb(rows: any[]) {
+function makeFindDb(rows: unknown[]) {
+    type Resolver = (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) => Promise<unknown>;
     const whenWhere = {
-        then: (resolve: any, reject: any) => Promise.resolve(rows).then(resolve, reject),
-        where: vi.fn(),
+        then: ((resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) => Promise.resolve(rows).then(resolve, reject)) as Resolver,
+        where: vi.fn() as ReturnType<typeof vi.fn>,
     };
     whenWhere.where = vi.fn().mockReturnValue(whenWhere);
     return {
@@ -85,10 +88,10 @@ function makeFindDb(rows: any[]) {
 
 describe('BusinessRepository.create', () => {
     it('inserts the provided data and returns the created business', async () => {
-        const db: any = makeChain([STUB_BUSINESS]);
+        const db = makeChain([STUB_BUSINESS]) as unknown as DbType;
         const repo = new BusinessRepository(db);
 
-        const result = await repo.create(STUB_BUSINESS as any);
+        const result = await repo.create(STUB_BUSINESS as unknown as NewDbBusiness);
 
         expect(db.insert).toHaveBeenCalled();
         expect(result).toEqual(STUB_BUSINESS);
@@ -101,14 +104,14 @@ describe('BusinessRepository.create', () => {
 
 describe('BusinessRepository.findById', () => {
     it('returns the business when found', async () => {
-        const db: any = makeFindDb([STUB_BUSINESS]);
+        const db = makeFindDb([STUB_BUSINESS]) as unknown as DbType;
         const repo = new BusinessRepository(db);
         const result = await repo.findById('biz-001');
         expect(result).toEqual(STUB_BUSINESS);
     });
 
     it('returns undefined when no rows are returned', async () => {
-        const db: any = makeFindDb([]);
+        const db = makeFindDb([]) as unknown as DbType;
         const repo = new BusinessRepository(db);
         const result = await repo.findById('nonexistent');
         expect(result).toBeUndefined();
@@ -123,15 +126,15 @@ describe('BusinessRepository.findAll', () => {
     it('returns all businesses', async () => {
         const allBiz = [STUB_BUSINESS, { ...STUB_BUSINESS, id: 'biz-002', name: 'Cozy Cafe' }];
         const whenWhere = {
-            then: (resolve: any, reject: any) => Promise.resolve(allBiz).then(resolve, reject),
+            then: (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) => Promise.resolve(allBiz).then(resolve, reject),
         };
-        const db: any = {
+        const db = {
             select: vi.fn().mockReturnValue({
                 from: vi.fn().mockReturnValue({
                     where: vi.fn().mockReturnValue(whenWhere),
                 }),
             }),
-        };
+        } as unknown as DbType;
         const repo = new BusinessRepository(db);
         const result = await repo.findAll();
         expect(result).toHaveLength(2);
@@ -145,7 +148,7 @@ describe('BusinessRepository.findAll', () => {
 
 describe('BusinessRepository.delete', () => {
     it('returns true when a row was soft-deleted', async () => {
-        const db: any = {
+        const db = {
             update: vi.fn().mockReturnValue({
                 set: vi.fn().mockReturnValue({
                     where: vi.fn().mockReturnValue({
@@ -153,7 +156,7 @@ describe('BusinessRepository.delete', () => {
                     }),
                 }),
             }),
-        };
+        } as unknown as DbType;
         const repo = new BusinessRepository(db);
         const result = await repo.delete('biz-001');
         expect(result).toBe(true);
@@ -161,7 +164,7 @@ describe('BusinessRepository.delete', () => {
     });
 
     it('returns false when no rows matched (already deleted or not found)', async () => {
-        const db: any = {
+        const db = {
             update: vi.fn().mockReturnValue({
                 set: vi.fn().mockReturnValue({
                     where: vi.fn().mockReturnValue({
@@ -169,7 +172,7 @@ describe('BusinessRepository.delete', () => {
                     }),
                 }),
             }),
-        };
+        } as unknown as DbType;
         const repo = new BusinessRepository(db);
         const result = await repo.delete('nonexistent');
         expect(result).toBe(false);
@@ -183,7 +186,7 @@ describe('BusinessRepository.delete', () => {
 describe('BusinessRepository.update', () => {
     it('returns the updated business on success', async () => {
         const updated = { ...STUB_BUSINESS, name: 'Casbas Grill' };
-        const db: any = {
+        const db = {
             update: vi.fn().mockReturnValue({
                 set: vi.fn().mockReturnValue({
                     where: vi.fn().mockReturnValue({
@@ -191,14 +194,14 @@ describe('BusinessRepository.update', () => {
                     }),
                 }),
             }),
-        };
+        } as unknown as DbType;
         const repo = new BusinessRepository(db);
-        const result = await repo.update('biz-001', { name: 'Casbas Grill' } as any);
+        const result = await repo.update('biz-001', { name: 'Casbas Grill' } as Partial<NewDbBusiness>);
         expect(result?.name).toBe('Casbas Grill');
     });
 
     it('returns undefined when the business was not found', async () => {
-        const db: any = {
+        const db = {
             update: vi.fn().mockReturnValue({
                 set: vi.fn().mockReturnValue({
                     where: vi.fn().mockReturnValue({
@@ -206,9 +209,9 @@ describe('BusinessRepository.update', () => {
                     }),
                 }),
             }),
-        };
+        } as unknown as DbType;
         const repo = new BusinessRepository(db);
-        const result = await repo.update('nonexistent', { name: 'Ghost' } as any);
+        const result = await repo.update('nonexistent', { name: 'Ghost' } as Partial<NewDbBusiness>);
         expect(result).toBeUndefined();
     });
 });
