@@ -262,9 +262,9 @@ export default function AuditLogsPage() {
         if (action === 'ORDER_STATUS_CHANGED') {
             return (
                 <span className="text-zinc-400">
-                    Status: <span className="text-red-400">{metadataData.oldValue?.status}</span>
-                    {' â†’ '}
-                    <span className="text-green-400">{metadataData.newValue?.status}</span>
+                    Status: <span className="text-red-400">{String(metadataData.oldValue?.status ?? '')}</span>
+                    {' → '}
+                    <span className="text-green-400">{String(metadataData.newValue?.status ?? '')}</span>
                 </span>
             );
         }

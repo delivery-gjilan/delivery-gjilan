@@ -55,20 +55,7 @@ import type {
 
 // ── Types ────────────────────────────────────────────────────────────
 
-interface Campaign {
-  id: string;
-  title: string;
-  body: string;
-  data: Record<string, unknown> | null;
-  query: Record<string, unknown> | null;
-  targetCount: number;
-  sentCount: number;
-  failedCount: number;
-  status: string;
-  sentBy: string | null;
-  createdAt: string;
-  sentAt: string | null;
-}
+type Campaign = GetNotificationCampaignsQuery['notificationCampaigns'][number];
 
 interface UserItem {
   id: string;
@@ -78,16 +65,7 @@ interface UserItem {
   role: string;
 }
 
-interface Promotion {
-  id: string;
-  name: string;
-  description: string;
-  code: string;
-  type: string;
-  discountValue: number;
-  maxDiscountCap: number;
-  isActive: boolean;
-}
+type Promotion = NonNullable<GetPromotionsQuery['getAllPromotions']>[number];
 
 type Tab = "campaigns" | "direct" | "promotions";
 type StatusFilter = "ALL" | "DRAFT" | "SENDING" | "SENT" | "FAILED";

@@ -338,8 +338,8 @@ function SummaryCards({ earnings }: { earnings?: InventoryEarningsData }) {
             label: "Profit",
             value: `€${(earnings?.totalProfit ?? 0).toFixed(2)}`,
             icon: TrendingUp,
-            color: earnings?.totalProfit >= 0 ? "text-emerald-400" : "text-red-400",
-            bg: earnings?.totalProfit >= 0 ? "bg-emerald-500/10" : "bg-red-500/10",
+            color: (earnings?.totalProfit ?? 0) >= 0 ? "text-emerald-400" : "text-red-400",
+            bg: (earnings?.totalProfit ?? 0) >= 0 ? "bg-emerald-500/10" : "bg-red-500/10",
         },
         {
             label: "Units Sold",
