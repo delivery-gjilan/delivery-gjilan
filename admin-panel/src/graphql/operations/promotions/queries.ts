@@ -22,6 +22,12 @@ export const GET_PROMOTIONS = graphql(`
             isActive
             startsAt
             endsAt
+            scheduleType
+            scheduleTimezone
+            dailyStartTime
+            dailyEndTime
+            activeWeekdays
+            newUserWindowDays
             createdAt
             totalUsageCount
             totalRevenue
@@ -80,6 +86,55 @@ export const GET_PROMOTION_AUDIENCE_GROUPS = graphql(`
             }
             createdAt
             updatedAt
+        }
+    }
+`);
+
+export const GET_PROMOTIONS_ANALYTICS = graphql(`
+    query GetPromotionsAnalytics($from: String, $to: String, $includeRecovery: Boolean, $isActive: Boolean) {
+        getPromotionsAnalytics(from: $from, to: $to, includeRecovery: $includeRecovery, isActive: $isActive) {
+            summary {
+                totalUsageCount
+                totalDeducted
+                totalDiscountDeducted
+                totalDeliveryDeducted
+                platformPaid
+                businessPaid
+                uniqueUsers
+                averageOrderValue
+            }
+            dailyPoints {
+                date
+                usageCount
+                uniqueUsers
+                totalDeducted
+                totalDiscountDeducted
+                totalDeliveryDeducted
+                platformPaid
+                businessPaid
+            }
+            items {
+                creatorName
+                totalUsageCount
+                uniqueUsers
+                totalDeducted
+                totalDiscountDeducted
+                totalDeliveryDeducted
+                platformPaid
+                businessPaid
+                freeDeliveryUsageCount
+                averageOrderValue
+                promotion {
+                    id
+                    name
+                    code
+                    type
+                    target
+                    isActive
+                    creatorType
+                    createdAt
+                }
+            }
         }
     }
 `);

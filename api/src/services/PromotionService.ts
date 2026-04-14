@@ -13,7 +13,7 @@ export interface CreatePromotionInput {
     description?: string;
     code?: string;
     type: 'FIXED_AMOUNT' | 'PERCENTAGE' | 'FREE_DELIVERY' | 'SPEND_X_PERCENT' | 'SPEND_X_FIXED' | 'SPEND_X_GET_FREE';
-    target: 'ALL_USERS' | 'SPECIFIC_USERS' | 'FIRST_ORDER' | 'CONDITIONAL';
+    target: 'ALL_USERS' | 'SPECIFIC_USERS' | 'FIRST_ORDER' | 'NEW_USERS' | 'CONDITIONAL';
     discountValue?: number;
     maxDiscountCap?: number;
     minOrderAmount?: number;
@@ -26,6 +26,12 @@ export interface CreatePromotionInput {
     isActive?: boolean;
     startsAt?: Date | string;
     endsAt?: Date | string;
+    scheduleType?: 'ALWAYS' | 'DATE_RANGE' | 'RECURRING';
+    scheduleTimezone?: string;
+    dailyStartTime?: string;
+    dailyEndTime?: string;
+    activeWeekdays?: number[];
+    newUserWindowDays?: number;
 
     creatorType: 'PLATFORM' | 'BUSINESS';
     creatorId?: string;
@@ -87,6 +93,12 @@ export class PromotionService {
             isActive: promo.isActive,
             startsAt: toISOString(promo.startsAt),
             endsAt: toISOString(promo.endsAt),
+            scheduleType: promo.scheduleType as any,
+            scheduleTimezone: promo.scheduleTimezone,
+            dailyStartTime: promo.dailyStartTime,
+            dailyEndTime: promo.dailyEndTime,
+            activeWeekdays: Array.isArray(promo.activeWeekdays) ? (promo.activeWeekdays as number[]) : [],
+            newUserWindowDays: promo.newUserWindowDays,
             createdAt: toISOString(promo.createdAt)!,
             totalUsageCount: promo.totalUsageCount,
             totalRevenue: promo.totalRevenue || 0,
@@ -118,6 +130,18 @@ export class PromotionService {
             (!input.discountValue || input.discountValue <= 0 || input.discountValue > 100)
         ) {
             throw AppError.badInput('Percentage discount must be between 0 and 100');
+        }
+
+        if (input.target === 'NEW_USERS') {
+            if (!input.newUserWindowDays || input.newUserWindowDays <= 0) {
+                throw AppError.badInput('newUserWindowDays must be greater than 0 for NEW_USERS promotions');
+            }
+        }
+
+        if (input.scheduleType === 'RECURRING') {
+            if (!input.dailyStartTime || !input.dailyEndTime) {
+                throw AppError.badInput('dailyStartTime and dailyEndTime are required for RECURRING promotions');
+            }
         }
 
         if (input.type === 'FIXED_AMOUNT' && (!input.discountValue || input.discountValue <= 0)) {
@@ -164,6 +188,12 @@ export class PromotionService {
                     ? input.endsAt
                     : (input.endsAt as any).toISOString()
                 : null,
+            scheduleType: (input.scheduleType ?? 'DATE_RANGE') as any,
+            scheduleTimezone: input.scheduleTimezone ?? null,
+            dailyStartTime: input.dailyStartTime ?? null,
+            dailyEndTime: input.dailyEndTime ?? null,
+            activeWeekdays: input.activeWeekdays && input.activeWeekdays.length > 0 ? input.activeWeekdays : null,
+            newUserWindowDays: input.newUserWindowDays ?? null,
             creatorType: input.creatorType as any,
             creatorId: input.creatorId ?? null,
             createdBy: null, // Will be set by GraphQL resolver

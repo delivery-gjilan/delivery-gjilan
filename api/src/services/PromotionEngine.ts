@@ -7,6 +7,7 @@ import {
     promotionBusinessEligibility
 } from '@/database/schema/promotions';
 import { orders } from '@/database/schema';
+import { users } from '@/database/schema/users';
 import { eq, and, or, sql, gte, lte, isNull, inArray } from 'drizzle-orm';
 import logger from '@/lib/logger';
 import { AppError } from '@/lib/errors';
@@ -33,7 +34,7 @@ export type ApplicablePromotion = {
     code: string | null;
     name: string;
     type: 'FIXED_AMOUNT' | 'PERCENTAGE' | 'FREE_DELIVERY' | 'SPEND_X_GET_FREE' | 'SPEND_X_PERCENT' | 'SPEND_X_FIXED';
-    target: 'ALL_USERS' | 'SPECIFIC_USERS' | 'FIRST_ORDER' | 'CONDITIONAL';
+    target: 'ALL_USERS' | 'SPECIFIC_USERS' | 'FIRST_ORDER' | 'NEW_USERS' | 'CONDITIONAL';
     discountValue?: number | null;
     maxDiscountCap?: number | null;
     freeDelivery: boolean;
@@ -60,6 +61,93 @@ export type PromotionUsageBreakdown = {
 export class PromotionEngine {
     constructor(private db: DbType) {}
 
+    private parseHHMM(value?: string | null): number | null {
+        if (!value) return null;
+        const match = /^(\d{2}):(\d{2})$/.exec(value.trim());
+        if (!match) return null;
+
+        const hours = Number(match[1]);
+        const minutes = Number(match[2]);
+        if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+
+        return hours * 60 + minutes;
+    }
+
+    private getWeekdayIndex(weekday?: string): number {
+        switch ((weekday || '').toLowerCase()) {
+            case 'sun': return 0;
+            case 'mon': return 1;
+            case 'tue': return 2;
+            case 'wed': return 3;
+            case 'thu': return 4;
+            case 'fri': return 5;
+            case 'sat': return 6;
+            default: return -1;
+        }
+    }
+
+    private isWithinRecurringWindow(
+        promo: {
+            dailyStartTime?: string | null;
+            dailyEndTime?: string | null;
+            activeWeekdays?: unknown;
+            scheduleTimezone?: string | null;
+        },
+        nowDate: Date,
+    ): boolean {
+        const start = this.parseHHMM(promo.dailyStartTime);
+        const end = this.parseHHMM(promo.dailyEndTime);
+
+        if (start === null || end === null) {
+            return true;
+        }
+
+        const parts = new Intl.DateTimeFormat('en-GB', {
+            timeZone: promo.scheduleTimezone || 'Europe/Belgrade',
+            weekday: 'short',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+        }).formatToParts(nowDate);
+
+        const part = (type: string) => parts.find((p) => p.type === type)?.value;
+        const weekday = this.getWeekdayIndex(part('weekday'));
+        const hour = Number(part('hour') ?? '0');
+        const minute = Number(part('minute') ?? '0');
+        const minutesNow = hour * 60 + minute;
+
+        const days = Array.isArray(promo.activeWeekdays)
+            ? (promo.activeWeekdays as unknown[])
+                  .map((day) => Number(day))
+                  .filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
+            : [];
+
+        if (days.length > 0 && !days.includes(weekday)) {
+            return false;
+        }
+
+        if (start === end) {
+            return true;
+        }
+
+        if (start < end) {
+            return minutesNow >= start && minutesNow < end;
+        }
+
+        // Overnight window (for example 22:00-02:00).
+        return minutesNow >= start || minutesNow < end;
+    }
+
+    private isWithinNewUserWindow(userCreatedAt?: string | null, days?: number | null, nowDate: Date = new Date()): boolean {
+        if (!userCreatedAt || !days || days <= 0) return false;
+        const created = new Date(userCreatedAt);
+        if (Number.isNaN(created.getTime())) return false;
+
+        const expires = new Date(created.getTime());
+        expires.setUTCDate(expires.getUTCDate() + days);
+        return nowDate.getTime() <= expires.getTime();
+    }
+
     /**
      * MAIN METHOD: Find all applicable promotions for a user's cart
      */
@@ -70,6 +158,7 @@ export class PromotionEngine {
         explicitlySelectedPromotionIds?: string[],
     ): Promise<ApplicablePromotion[]> {
         const now = new Date().toISOString();
+        const nowDate = new Date(now);
         const applicable: ApplicablePromotion[] = [];
         const normalizedManualCode = manualPromoCode?.trim().toUpperCase();
         const explicitlySelectedSet = new Set((explicitlySelectedPromotionIds ?? []).filter(Boolean));
@@ -80,6 +169,12 @@ export class PromotionEngine {
             .select()
             .from(userPromoMetadata)
             .where(eq(userPromoMetadata.userId, userId))
+            .limit(1);
+
+        const [userRow] = await this.db
+            .select({ createdAt: users.createdAt })
+            .from(users)
+            .where(eq(users.id, userId))
             .limit(1);
 
         const isFirstOrder = !metadata?.hasUsedFirstOrderPromo;
@@ -197,6 +292,13 @@ export class PromotionEngine {
                     log.debug({ isEligible, isFirstOrder }, 'promo:firstOrder');
                     break;
 
+                case 'NEW_USERS':
+                    isEligible =
+                        withinPerUserLimit &&
+                        this.isWithinNewUserWindow(userRow?.createdAt ?? null, Number((promo as any).newUserWindowDays ?? 0), nowDate);
+                    log.debug({ isEligible, newUserWindowDays: (promo as any).newUserWindowDays }, 'promo:newUsers');
+                    break;
+
                 case 'SPECIFIC_USERS':
                     isEligible = assignedPromoIds.has(promo.id);
                     log.debug({ isEligible }, 'promo:specificUsers');
@@ -211,6 +313,14 @@ export class PromotionEngine {
             if (!isEligible) {
                 log.debug({ promoId: promo.id }, 'promo:skip:notEligible');
                 continue;
+            }
+
+            if ((promo as any).scheduleType === 'RECURRING') {
+                const withinRecurringWindow = this.isWithinRecurringWindow(promo as any, nowDate);
+                if (!withinRecurringWindow) {
+                    log.debug({ promoId: promo.id }, 'promo:skip:outsideRecurringWindow');
+                    continue;
+                }
             }
 
             // Check business eligibility (in-memory using prefetched data)
@@ -415,6 +525,7 @@ export class PromotionEngine {
         cart: CartContext,
     ): Promise<PromotionResult> {
         const now = new Date().toISOString();
+        const nowDate = new Date(now);
 
         // 1. Fetch the promotion
         const [promo] = await this.db
@@ -437,6 +548,9 @@ export class PromotionEngine {
         if (promo.endsAt && promo.endsAt < now) {
             throw AppError.businessRule('Promotion has expired');
         }
+        if ((promo as any).scheduleType === 'RECURRING' && !this.isWithinRecurringWindow(promo as any, nowDate)) {
+            throw AppError.businessRule('Promotion is not active in the current time window');
+        }
         if (promo.minOrderAmount && cart.subtotal < Number(promo.minOrderAmount)) {
             throw AppError.businessRule(
                 `Minimum order amount of ${promo.minOrderAmount} required`,
@@ -457,6 +571,12 @@ export class PromotionEngine {
             .where(eq(userPromoMetadata.userId, userId))
             .limit(1);
 
+        const [userRow] = await this.db
+            .select({ createdAt: users.createdAt })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1);
+
         switch (promo.target) {
             case 'FIRST_ORDER': {
                 if (metadata?.hasUsedFirstOrderPromo) {
@@ -468,6 +588,17 @@ export class PromotionEngine {
                 const assigned = await this.checkUserAssignment(promo.id, userId);
                 if (!assigned) {
                     throw AppError.businessRule('Promotion is not available for you');
+                }
+                break;
+            }
+            case 'NEW_USERS': {
+                const withinWindow = this.isWithinNewUserWindow(
+                    userRow?.createdAt ?? null,
+                    Number((promo as any).newUserWindowDays ?? 0),
+                    nowDate,
+                );
+                if (!withinWindow) {
+                    throw AppError.businessRule('Promotion is only available for newly registered users');
                 }
                 break;
             }

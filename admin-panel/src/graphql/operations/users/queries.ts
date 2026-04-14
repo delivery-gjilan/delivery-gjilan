@@ -17,6 +17,11 @@ export const USERS_QUERY = graphql(`
       adminNote
       flagColor
       permissions
+      totalOrders
+      signupStep
+      emailVerified
+      phoneVerified
+      createdAt
       business {
         id
         name

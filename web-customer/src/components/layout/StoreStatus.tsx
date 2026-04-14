@@ -3,8 +3,18 @@
 import { useEffect } from "react";
 import { useQuery } from "@apollo/client/react";
 import { GET_STORE_STATUS, STORE_STATUS_UPDATED } from "@/graphql/operations/store";
+import { GET_ORDERS } from "@/graphql/operations/orders";
 import { useStoreStatusStore } from "@/store/storeStatusStore";
 import { useTranslations } from "@/localization";
+import { useAuth } from "@/lib/auth-context";
+
+const ACTIVE_ORDER_STATUSES = new Set([
+    "AWAITING_APPROVAL",
+    "PENDING",
+    "PREPARING",
+    "READY",
+    "OUT_FOR_DELIVERY",
+]);
 
 /**
  * Mount once in Providers — runs the query + subscription and syncs into
@@ -51,9 +61,24 @@ export function StoreStatusInit() {
 export function StoreClosedOverlay() {
     const { isStoreClosed, closedMessage, wasOpenOnEntry, loading } =
         useStoreStatusStore();
+    const { isAuthenticated } = useAuth();
     const { t } = useTranslations();
 
+    const shouldCheckActiveOrders = isStoreClosed && !wasOpenOnEntry && isAuthenticated;
+    const { data: ordersData, loading: ordersLoading } = useQuery(GET_ORDERS, {
+        skip: !shouldCheckActiveOrders,
+        fetchPolicy: "cache-and-network",
+        variables: { limit: 20, offset: 0 },
+    });
+
+    const orders = ordersData?.orders?.orders ?? [];
+    const hasActiveOrders = orders.some((order: { status?: string | null }) =>
+        ACTIVE_ORDER_STATUSES.has(order?.status ?? ""),
+    );
+
     if (loading || !isStoreClosed || wasOpenOnEntry) return null;
+    if (shouldCheckActiveOrders && ordersLoading) return null;
+    if (hasActiveOrders) return null;
 
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-background/95 backdrop-blur-sm">

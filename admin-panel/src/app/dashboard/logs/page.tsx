@@ -21,11 +21,30 @@ interface AuditLog {
     action: string;
     entityType: string;
     entityId?: string;
-    metadata?: any;
+    metadata?: AuditMetadata;
     ipAddress?: string;
     userAgent?: string;
     createdAt: string;
 }
+
+type AuditMetadataPrimitive = string | number | boolean | null;
+type AuditMetadataValue = AuditMetadataPrimitive | AuditMetadataValue[] | { [key: string]: AuditMetadataValue };
+type AuditMetadata = { [key: string]: AuditMetadataValue };
+
+type AuditMetadataWithDiff = AuditMetadata & {
+    oldValue?: AuditMetadata;
+    newValue?: AuditMetadata;
+    changedFields?: string[];
+    amount?: number;
+    type?: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    role?: string;
+    name?: string;
+    category?: string;
+    driverName?: string;
+};
 
 const ACTION_TYPES = [
     { value: '', label: 'All Actions' },
@@ -144,17 +163,18 @@ export default function AuditLogsPage() {
         return colors[actorType] || 'bg-neutral-600';
     };
 
-    const formatMetadataPreview = (action: string, metadata: any) => {
+    const formatMetadataPreview = (action: string, metadata: AuditLog['metadata']) => {
         if (!metadata) return null;
+        const metadataData = metadata as AuditMetadataWithDiff;
 
         // User/Driver creation
         if (action === 'USER_CREATED' || action === 'DRIVER_CREATED') {
-            const name = `${metadata.firstName} ${metadata.lastName}`;
+            const name = `${metadataData.firstName ?? ''} ${metadataData.lastName ?? ''}`.trim();
             return (
                 <span className="text-zinc-400">
                     Created: <span className="text-white font-medium">{name}</span>
-                    {metadata.email && <span className="text-zinc-600"> ({metadata.email})</span>}
-                    {metadata.role && <span className="text-violet-400"> â€¢ {metadata.role}</span>}
+                    {metadataData.email && <span className="text-zinc-600"> ({metadataData.email})</span>}
+                    {metadataData.role && <span className="text-violet-400"> â€¢ {metadataData.role}</span>}
                 </span>
             );
         }
@@ -163,8 +183,8 @@ export default function AuditLogsPage() {
         if (action === 'BUSINESS_CREATED') {
             return (
                 <span className="text-zinc-400">
-                    Created: <span className="text-white font-medium">{metadata.name}</span>
-                    {metadata.category && <span className="text-zinc-600"> ({metadata.category})</span>}
+                    Created: <span className="text-white font-medium">{metadataData.name}</span>
+                    {metadataData.category && <span className="text-zinc-600"> ({metadataData.category})</span>}
                 </span>
             );
         }
@@ -173,20 +193,20 @@ export default function AuditLogsPage() {
         if (action === 'BUSINESS_UPDATED') {
             const changes = [];
             
-            if (metadata.oldValue && metadata.newValue) {
-                if (metadata.oldValue.name !== metadata.newValue.name) {
-                    changes.push(`Name: "${metadata.oldValue.name}" â†’ "${metadata.newValue.name}"`);
+            if (metadataData.oldValue && metadataData.newValue) {
+                if (metadataData.oldValue.name !== metadataData.newValue.name) {
+                    changes.push(`Name: "${metadataData.oldValue.name}" â†’ "${metadataData.newValue.name}"`);
                 }
-                if (metadata.oldValue.isOpen !== metadata.newValue.isOpen) {
-                    changes.push(`Status: ${metadata.oldValue.isOpen ? 'Open' : 'Closed'} â†’ ${metadata.newValue.isOpen ? 'Open' : 'Closed'}`);
+                if (metadataData.oldValue.isOpen !== metadataData.newValue.isOpen) {
+                    changes.push(`Status: ${metadataData.oldValue.isOpen ? 'Open' : 'Closed'} â†’ ${metadataData.newValue.isOpen ? 'Open' : 'Closed'}`);
                 }
             }
 
             if (changes.length > 0) {
                 return (
                     <span className="text-zinc-400">
-                        {metadata.name && <span className="text-white font-medium">{metadata.name}</span>}
-                        {metadata.name && ' â€¢ '}
+                        {metadataData.name && <span className="text-white font-medium">{metadataData.name}</span>}
+                        {metadataData.name && ' â€¢ '}
                         {changes.join(', ')}
                     </span>
                 );
@@ -197,7 +217,7 @@ export default function AuditLogsPage() {
         if (action === 'PRODUCT_CREATED') {
             return (
                 <span className="text-zinc-400">
-                    Created: <span className="text-white font-medium">{metadata.name}</span>
+                    Created: <span className="text-white font-medium">{metadataData.name}</span>
                 </span>
             );
         }
@@ -206,23 +226,23 @@ export default function AuditLogsPage() {
         if (action === 'PRODUCT_UPDATED' || action === 'PRODUCT_PRICE_CHANGED' || action === 'PRODUCT_AVAILABILITY_CHANGED') {
             const changes = [];
             
-            if (metadata.oldValue && metadata.newValue) {
-                if (metadata.oldValue.price !== undefined && metadata.newValue.price !== undefined && metadata.oldValue.price !== metadata.newValue.price) {
-                    changes.push(`Price: $${metadata.oldValue.price} â†’ $${metadata.newValue.price}`);
+            if (metadataData.oldValue && metadataData.newValue) {
+                if (metadataData.oldValue.price !== undefined && metadataData.newValue.price !== undefined && metadataData.oldValue.price !== metadataData.newValue.price) {
+                    changes.push(`Price: $${metadataData.oldValue.price} â†’ $${metadataData.newValue.price}`);
                 }
-                if (metadata.oldValue.isAvailable !== undefined && metadata.newValue.isAvailable !== undefined && metadata.oldValue.isAvailable !== metadata.newValue.isAvailable) {
-                    changes.push(`Available: ${metadata.oldValue.isAvailable ? 'Yes' : 'No'} â†’ ${metadata.newValue.isAvailable ? 'Yes' : 'No'}`);
+                if (metadataData.oldValue.isAvailable !== undefined && metadataData.newValue.isAvailable !== undefined && metadataData.oldValue.isAvailable !== metadataData.newValue.isAvailable) {
+                    changes.push(`Available: ${metadataData.oldValue.isAvailable ? 'Yes' : 'No'} â†’ ${metadataData.newValue.isAvailable ? 'Yes' : 'No'}`);
                 }
-                if (metadata.oldValue.name !== undefined && metadata.newValue.name !== undefined && metadata.oldValue.name !== metadata.newValue.name) {
-                    changes.push(`Name: "${metadata.oldValue.name}" â†’ "${metadata.newValue.name}"`);
+                if (metadataData.oldValue.name !== undefined && metadataData.newValue.name !== undefined && metadataData.oldValue.name !== metadataData.newValue.name) {
+                    changes.push(`Name: "${metadataData.oldValue.name}" â†’ "${metadataData.newValue.name}"`);
                 }
             }
 
             if (changes.length > 0) {
                 return (
                     <span className="text-zinc-400">
-                        {metadata.name && <span className="text-white font-medium">{metadata.name}</span>}
-                        {metadata.name && ' â€¢ '}
+                        {metadataData.name && <span className="text-white font-medium">{metadataData.name}</span>}
+                        {metadataData.name && ' â€¢ '}
                         {changes.join(', ')}
                     </span>
                 );
@@ -233,7 +253,7 @@ export default function AuditLogsPage() {
         if (action === 'PRODUCT_DELETED') {
             return (
                 <span className="text-zinc-400">
-                    Deleted: <span className="text-white font-medium">{metadata.name}</span>
+                    Deleted: <span className="text-white font-medium">{metadataData.name}</span>
                 </span>
             );
         }
@@ -242,9 +262,9 @@ export default function AuditLogsPage() {
         if (action === 'ORDER_STATUS_CHANGED') {
             return (
                 <span className="text-zinc-400">
-                    Status: <span className="text-red-400">{metadata.oldValue?.status}</span>
+                    Status: <span className="text-red-400">{metadataData.oldValue?.status}</span>
                     {' â†’ '}
-                    <span className="text-green-400">{metadata.newValue?.status}</span>
+                    <span className="text-green-400">{metadataData.newValue?.status}</span>
                 </span>
             );
         }
@@ -253,7 +273,7 @@ export default function AuditLogsPage() {
         if (action === 'ORDER_ASSIGNED') {
             return (
                 <span className="text-zinc-400">
-                    Assigned to: <span className="text-white font-medium">{metadata.driverName || 'Unassigned'}</span>
+                    Assigned to: <span className="text-white font-medium">{metadataData.driverName || 'Unassigned'}</span>
                 </span>
             );
         }
@@ -262,8 +282,8 @@ export default function AuditLogsPage() {
         if (action === 'SETTLEMENT_PAID' || action === 'SETTLEMENT_PARTIAL_PAID') {
             return (
                 <span className="text-zinc-400">
-                    Amount: <span className="text-green-400 font-medium">${metadata.amount?.toFixed(2)}</span>
-                    {metadata.type && <span className="text-zinc-600"> ({metadata.type})</span>}
+                    Amount: <span className="text-green-400 font-medium">${metadataData.amount?.toFixed(2)}</span>
+                    {metadataData.type && <span className="text-zinc-600"> ({metadataData.type})</span>}
                 </span>
             );
         }
@@ -271,19 +291,20 @@ export default function AuditLogsPage() {
         return null;
     };
 
-    const renderMetadataDetails = (action: string, metadata: any) => {
-        if (!metadata || Object.keys(metadata).length === 0) return null;
+    const renderMetadataDetails = (action: string, metadata: AuditLog['metadata']) => {
+        const metadataData = metadata as AuditMetadataWithDiff | undefined;
+        if (!metadataData || Object.keys(metadataData).length === 0) return null;
 
         // For updates with old/new values
-        if (metadata.oldValue && metadata.newValue) {
-            const changedFields = metadata.changedFields || Object.keys(metadata.newValue);
+        if (metadataData.oldValue && metadataData.newValue) {
+            const changedFields = metadataData.changedFields || Object.keys(metadataData.newValue);
             
             return (
                 <div className="space-y-3">
                     <p className="text-zinc-600 font-semibold">Changes Made:</p>
                     {changedFields.map((field: string) => {
-                        const oldVal = metadata.oldValue[field];
-                        const newVal = metadata.newValue[field];
+                        const oldVal = metadataData.oldValue?.[field];
+                        const newVal = metadataData.newValue?.[field];
                         
                         if (oldVal === newVal) return null;
                         
@@ -317,7 +338,7 @@ export default function AuditLogsPage() {
         }
 
         // For creation/other actions with simple metadata
-        const importantFields = Object.entries(metadata).filter(([key]) => 
+        const importantFields = Object.entries(metadataData).filter(([key]) => 
             !['timestamp', 'changedFields', 'oldValue', 'newValue'].includes(key)
         );
 

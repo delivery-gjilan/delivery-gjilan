@@ -578,9 +578,12 @@ input CreatePromotionAudienceGroupInput {
 }
 
 input CreatePromotionInput {
+  activeWeekdays: [Int!]
   code: String
   creatorId: ID
   creatorType: PromotionCreatorType!
+  dailyEndTime: String
+  dailyStartTime: String
   description: String
   discountValue: Float
   driverPayoutAmount: Float
@@ -594,7 +597,10 @@ input CreatePromotionInput {
   maxUsagePerUser: Int
   minOrderAmount: Float
   name: String!
+  newUserWindowDays: Int
   priority: Int!
+  scheduleTimezone: String
+  scheduleType: PromotionScheduleType
   spendThreshold: Float
   startsAt: String
   target: PromotionTarget!
@@ -1633,12 +1639,15 @@ type ProductVariantGroup {
 }
 
 type Promotion {
+  activeWeekdays: [Int!]
   assignedUsers: [UserPromotion!]
   code: String
   createdAt: String!
   creatorId: ID
   creatorType: PromotionCreatorType!
   currentGlobalUsage: Int!
+  dailyEndTime: String
+  dailyStartTime: String
   description: String
   discountValue: Float
   eligibleBusinesses: [Business!]
@@ -1652,8 +1661,11 @@ type Promotion {
   maxUsagePerUser: Int
   minOrderAmount: Float
   name: String!
+  newUserWindowDays: Int
   orderId: ID
   priority: Int!
+  scheduleTimezone: String
+  scheduleType: PromotionScheduleType!
   spendThreshold: Float
   startsAt: String
   target: PromotionTarget!
@@ -1661,6 +1673,31 @@ type Promotion {
   totalRevenue: Float!
   totalUsageCount: Int!
   type: PromotionType!
+}
+
+type PromotionAnalyticsDailyPoint {
+  businessPaid: Float!
+  date: String!
+  platformPaid: Float!
+  totalDeducted: Float!
+  totalDeliveryDeducted: Float!
+  totalDiscountDeducted: Float!
+  uniqueUsers: Int!
+  usageCount: Int!
+}
+
+type PromotionAnalyticsListItem {
+  averageOrderValue: Float!
+  businessPaid: Float!
+  creatorName: String
+  freeDeliveryUsageCount: Int!
+  platformPaid: Float!
+  promotion: Promotion!
+  totalDeducted: Float!
+  totalDeliveryDeducted: Float!
+  totalDiscountDeducted: Float!
+  totalUsageCount: Int!
+  uniqueUsers: Int!
 }
 
 type PromotionAnalyticsResult {
@@ -1708,10 +1745,17 @@ type PromotionResult {
   totalDiscount: Float!
 }
 
+enum PromotionScheduleType {
+  ALWAYS
+  DATE_RANGE
+  RECURRING
+}
+
 enum PromotionTarget {
   ALL_USERS
   CONDITIONAL
   FIRST_ORDER
+  NEW_USERS
   SPECIFIC_USERS
 }
 
@@ -1747,6 +1791,23 @@ type PromotionUsage {
   usedAt: String!
   user: User
   userId: ID!
+}
+
+type PromotionsAnalyticsResult {
+  dailyPoints: [PromotionAnalyticsDailyPoint!]!
+  items: [PromotionAnalyticsListItem!]!
+  summary: PromotionsAnalyticsSummary!
+}
+
+type PromotionsAnalyticsSummary {
+  averageOrderValue: Float!
+  businessPaid: Float!
+  platformPaid: Float!
+  totalDeducted: Float!
+  totalDeliveryDeducted: Float!
+  totalDiscountDeducted: Float!
+  totalUsageCount: Int!
+  uniqueUsers: Int!
 }
 
 type PushTelemetryEvent {
@@ -1840,6 +1901,7 @@ type Query {
   getPromotionAudienceGroups(isActive: Boolean, search: String): [PromotionAudienceGroup!]!
   getPromotionThresholds(cart: CartContextInput!): [PromotionThreshold!]!
   getPromotionUsage(limit: Int, offset: Int, promotionId: ID!): [PromotionUsage!]!
+  getPromotionsAnalytics(from: String, includeRecovery: Boolean, isActive: Boolean, to: String): PromotionsAnalyticsResult!
   getRecoveryPromotions: [Promotion!]!
   getStoreStatus(url: String): StoreStatus!
   getUserPromoMetadata(userId: ID!): UserPromoMetadata
@@ -2402,6 +2464,7 @@ type User {
   business: Business
   businessId: ID
   commissionPercentage: Float
+  createdAt: DateTime!
   driverConnection: DriverConnection
   driverLocation: Location
   driverLocationUpdatedAt: Date

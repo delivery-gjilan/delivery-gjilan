@@ -329,7 +329,7 @@ Bottom-sheet configurator: variants, option groups (radio or multi-select up to 
 | `favoritesStore` | `favorites-storage` | localStorage | Favorite business IDs (client-only) |
 | `orderModalsStore` | — | Ephemeral | Success + awaiting modals |
 | `searchStore` | — | Ephemeral | Global search query string |
-| `storeStatusStore` | — | Ephemeral | Platform open/closed + banner +`wasOpenOnEntry` |
+| `storeStatusStore` | — | Ephemeral | Platform open/closed + banner + `wasOpenOnEntry`; closed overlay is bypassed for authenticated users with active orders |
 
 **Cart store issues:**
 - Deduplication key uses `JSON.stringify(selectedOptions)` — order-dependent, could create duplicate entries for identical options added in different order.
@@ -450,7 +450,7 @@ Ray-casting polygon test. Mirrors `mobile-customer` implementation.
 | Open cart | `cartDrawerStore.open()` → `CartDrawer` → `CheckoutFlow` |
 | Place order | `CheckoutFlow` → 3 steps → `CREATE_ORDER` mutation |
 | Track live order | `ActiveOrderModal` + `OrderTrackingMap` + `ORDER_DRIVER_LIVE_TRACKING` sub |
-| Check store open/closed | `StoreStatusInit` (headless) → `storeStatusStore` → `StoreClosedOverlay` |
+| Check store open/closed | `StoreStatusInit` (headless) → `storeStatusStore` → `StoreClosedOverlay` (skips blocking if user has active order) |
 | Language toggle | `useTranslations().setLocale()` + `SET_MY_PREFERRED_LANGUAGE_MUTATION` (locale saved to localStorage only — mutation not wired in Header) |
 | Favorites | `favoritesStore` — client-only, localStorage |
 

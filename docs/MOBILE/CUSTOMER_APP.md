@@ -85,7 +85,7 @@ index.tsx (Expo entry)
                  ├── useNotifications() → FCM token registration
                  ├── useActiveOrdersTracking() → order subscription + store sync
                  ├── useBackgroundLiveActivity() → iOS Live Activity updates
-                 ├── Store closed check (blocks only if closed on entry)
+                 ├── Store closed check (blocks only if closed on entry and no active orders)
                  └── Stack Navigator
                       ├── Global overlays: FloatingBars, Toast, SuccessModal,
                       │    OrderReviewModal, AwaitingApprovalModal
@@ -180,7 +180,7 @@ Tab bar uses animated underline markers with spring physics (damping: 14, stiffn
 ### Store & Theme
 | Hook | Purpose |
 |------|---------|
-| `useStoreStatus` | Reads from storeStatusStore. `wasOpenOnEntry` flag prevents in-session block. |
+| `useStoreStatus` | Reads from storeStatusStore. `wasOpenOnEntry` prevents in-session block, and active orders bypass the closed-entry block for tracking continuity. |
 | `useTheme` | Reads NativeWind colorScheme, returns navigation-compatible theme |
 | `useTranslations` | Returns `t` object + current language |
 
@@ -383,7 +383,7 @@ After DELIVERED status, a review prompt is queued:
 | `AuthGate` | Wraps content requiring auth, shows login prompt if unauthenticated |
 | `ErrorBoundary` | Catches render errors, shows fallback UI |
 | `LoadingScreen` | Full-screen spinner |
-| `StoreClosedScreen` | Blocks app when store closed on entry |
+| `StoreClosedScreen` | Blocks app when store closed on entry and user has no active orders |
 
 ### Modals & Sheets
 | Component | Purpose |

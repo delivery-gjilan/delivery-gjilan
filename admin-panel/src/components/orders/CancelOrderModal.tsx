@@ -3,20 +3,19 @@
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import type { Order } from "./types";
+import {
+    CANCEL_REASON_CATEGORY_LABELS,
+    type CancelReasonCategory,
+} from "./cancelReason";
 
-export type CancelReasonCategory =
-    | "CUSTOMER_REQUEST"
-    | "BUSINESS_ISSUE"
-    | "DRIVER_ISSUE"
-    | "LOGISTICS"
-    | "SYSTEM";
+export type { CancelReasonCategory } from "./cancelReason";
 
 const CATEGORY_OPTIONS: Array<{ value: CancelReasonCategory; label: string }> = [
-    { value: "CUSTOMER_REQUEST", label: "Customer" },
-    { value: "BUSINESS_ISSUE", label: "Business" },
-    { value: "DRIVER_ISSUE", label: "Driver" },
-    { value: "LOGISTICS", label: "Logistics" },
-    { value: "SYSTEM", label: "System" },
+    { value: "CUSTOMER_REQUEST", label: CANCEL_REASON_CATEGORY_LABELS.CUSTOMER_REQUEST },
+    { value: "BUSINESS_ISSUE", label: CANCEL_REASON_CATEGORY_LABELS.BUSINESS_ISSUE },
+    { value: "DRIVER_ISSUE", label: CANCEL_REASON_CATEGORY_LABELS.DRIVER_ISSUE },
+    { value: "LOGISTICS", label: CANCEL_REASON_CATEGORY_LABELS.LOGISTICS },
+    { value: "SYSTEM", label: CANCEL_REASON_CATEGORY_LABELS.SYSTEM },
 ];
 
 const CANCEL_REASON_PRESETS: Array<{ category: CancelReasonCategory; text: string }> = [

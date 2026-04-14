@@ -19,7 +19,14 @@ export const promotionTargetEnum = pgEnum('promotion_target', [
     'ALL_USERS', // Public promo code
     'SPECIFIC_USERS', // Assigned to specific users
     'FIRST_ORDER', // Auto-applied to first orders
+    'NEW_USERS', // Auto-applied/eligible for users within a signup-age window
     'CONDITIONAL', // Spend X get Y (legacy; prefer SPEND_X_* types)
+]);
+
+export const promotionScheduleTypeEnum = pgEnum('promotion_schedule_type', [
+    'ALWAYS',
+    'DATE_RANGE',
+    'RECURRING',
 ]);
 
 export const promotionCreatorTypeEnum = pgEnum('promotion_creator_type', [
@@ -73,6 +80,14 @@ export const promotions = pgTable(
         isActive: boolean('is_active').default(true).notNull(),
         startsAt: timestamp('starts_at', { withTimezone: true, mode: 'string' }),
         endsAt: timestamp('ends_at', { withTimezone: true, mode: 'string' }),
+        scheduleType: promotionScheduleTypeEnum('schedule_type').default('DATE_RANGE').notNull(),
+        scheduleTimezone: text('schedule_timezone'),
+        dailyStartTime: text('daily_start_time'), // HH:mm in schedule timezone
+        dailyEndTime: text('daily_end_time'), // HH:mm in schedule timezone
+        activeWeekdays: jsonb('active_weekdays').$type<number[]>(), // 0=Sun ... 6=Sat
+
+        // Applies when target=NEW_USERS: user must be within N days since signup.
+        newUserWindowDays: integer('new_user_window_days'),
 
         // Analytics
         totalRevenue: numeric('total_revenue', { mode: 'number', precision: 12, scale: 2 }).default(0),

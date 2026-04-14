@@ -27,6 +27,7 @@ import { GET_ORDER_COVERAGE } from "@/graphql/operations/inventory/queries";
 import InventoryCoverageModal from "@/components/inventory/InventoryCoverageModal";
 import CancelOrderModal from "@/components/orders/CancelOrderModal";
 import type { CancelReasonCategory } from "@/components/orders/CancelOrderModal";
+import { composeTaggedCancellationReason } from "@/components/orders/cancelReason";
 import { getInitials, getAvatarColor } from "@/lib/avatarUtils";
 import { useAdminPtt } from "@/lib/hooks/useAdminPtt";
 
@@ -73,6 +74,81 @@ type RealtimeHealth = {
   driverPollingFallback: boolean;
   orderFallbackRefetchAtMs: number;
 };
+type ApprovalReason = 'FIRST_ORDER' | 'HIGH_VALUE' | 'OUT_OF_ZONE';
+type MapUserLike = {
+  id?: string;
+  firstName?: string;
+  lastName?: string;
+  phoneNumber?: string | null;
+  totalOrders?: number | null;
+  role?: string | null;
+  business?: { id?: string | null } | null;
+  isTrustedCustomer?: boolean | null;
+  flagColor?: string | null;
+  adminNote?: string | null;
+  [key: string]: unknown;
+};
+type MapDriverLike = {
+  id?: string;
+  firstName?: string;
+  lastName?: string;
+  driverLocation?: { latitude?: number; longitude?: number } | null;
+  driverLocationUpdatedAt?: string | null;
+  driverConnection?: {
+    connectionStatus?: string | null;
+    onlinePreference?: boolean | null;
+  } | null;
+};
+type MapBusinessEntryLike = {
+  business?: {
+    id?: string;
+    name?: string;
+    location?: { latitude?: number; longitude?: number };
+    prepTimeOverrideMinutes?: number | null;
+    avgPrepTimeMinutes?: number | null;
+  };
+  items?: unknown[] | null;
+  [key: string]: unknown;
+};
+type MapOrderLike = {
+  id?: string;
+  displayId?: string;
+  status?: string;
+  user?: MapUserLike | null;
+  totalPrice?: number | null;
+  inventoryPrice?: number | null;
+  dropOffLocation?: { latitude?: number; longitude?: number } | null;
+  settlementPreview?: {
+    totalReceivable: number;
+    totalPayable: number;
+    netMargin: number;
+    driverAssigned: boolean;
+    lineItems: Array<{ reason: string; direction: string; amount: number }>;
+  } | null;
+  approvalReasons?: (string | null | undefined)[] | null;
+  locationFlagged?: boolean | null;
+  needsApproval?: boolean | null;
+  orderDate?: string | null;
+  updatedAt?: string | null;
+  preparingAt?: string | null;
+  businesses?: MapBusinessEntryLike[] | null;
+  driver?: { id?: string | null } | null;
+  [key: string]: unknown;
+};
+type ChatMessageLike = { id?: string; [key: string]: unknown };
+type BusinessDeviceRowLike = {
+  businessId?: string;
+  userId?: string;
+  onlineStatus?: string;
+  receivingOrders?: boolean;
+  batteryLevel?: number;
+  isCharging?: boolean;
+  networkType?: string;
+};
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
 
 const ORDER_STATUS_COLORS = {
   AWAITING_APPROVAL: { bg: "bg-rose-500/10", border: "border-rose-500/50", text: "text-rose-400", marker: "#f43f5e", selectBg: "bg-rose-500/20", hex: "#f43f5e" },
@@ -166,7 +242,7 @@ const formatHeartbeatElapsed = (lastHeartbeat: string | null | undefined, now: n
   return `${Math.floor(elapsed / 3600000)}h ago`;
 };
 
-const isTrustedCustomer = (user: any) => {
+const isTrustedCustomer = (user: MapUserLike | null | undefined) => {
   if (!user) return false;
   if (user.isTrustedCustomer) return true;
   if (String(user.flagColor || '').toLowerCase() === 'green') return true;
@@ -183,7 +259,7 @@ const removeTrustMarker = (note?: string | null) => {
   return cleaned || null;
 };
 
-const isApprovalModalSuppressed = (user: any) => {
+const isApprovalModalSuppressed = (user: MapUserLike | null | undefined) => {
   if (!user) return false;
   return String(user.adminNote || '').toUpperCase().includes(APPROVAL_MODAL_SUPPRESS_MARKER);
 };
@@ -198,8 +274,8 @@ const removeApprovalModalSuppressMarker = (note?: string | null) => {
   return cleaned || null;
 };
 
-const getApprovalReasons = (order: any): Array<'FIRST_ORDER' | 'HIGH_VALUE' | 'OUT_OF_ZONE'> => {
-  const normalized = new Set<'FIRST_ORDER' | 'HIGH_VALUE' | 'OUT_OF_ZONE'>();
+const getApprovalReasons = (order: MapOrderLike): ApprovalReason[] => {
+  const normalized = new Set<ApprovalReason>();
   for (const reason of order?.approvalReasons || []) {
     if (reason === 'FIRST_ORDER' || reason === 'HIGH_VALUE' || reason === 'OUT_OF_ZONE') {
       normalized.add(reason);
@@ -216,7 +292,7 @@ const getApprovalReasons = (order: any): Array<'FIRST_ORDER' | 'HIGH_VALUE' | 'O
   return Array.from(normalized);
 };
 
-const getOrderStatusStartMs = (order: any, fallbackNow: number) => {
+const getOrderStatusStartMs = (order: MapOrderLike, fallbackNow: number) => {
   const createdMs = parseServerTimeMs(order?.orderDate);
   const updatedMs = parseServerTimeMs(order?.updatedAt);
   const preparingMs = parseServerTimeMs(order?.preparingAt);
@@ -229,15 +305,15 @@ const getOrderStatusStartMs = (order: any, fallbackNow: number) => {
   return updatedMs ?? createdMs ?? fallbackNow;
 };
 
-const isDriverAssignable = (driver: any) => {
+const isDriverAssignable = (driver: MapDriverLike) => {
   const connectionStatus = driver?.driverConnection?.connectionStatus;
   const onlinePreference = driver?.driverConnection?.onlinePreference ?? false;
   return onlinePreference && (connectionStatus === "CONNECTED" || connectionStatus === "STALE");
 };
 
 const MAX_DRIVER_ACTIVE_ORDERS = 2;
-const getActiveCountForDriver = (driverId: string, activeOrders: any[]) =>
-  activeOrders.filter((o: any) => o.driver?.id === driverId).length;
+const getActiveCountForDriver = (driverId: string, activeOrders: MapOrderLike[]) =>
+  activeOrders.filter((o) => o.driver?.id === driverId).length;
 
 const distanceMeters = (a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) => {
   const R = 6371000;
@@ -270,12 +346,12 @@ const percentile = (values: number[], p: number) => {
   return sorted[idx];
 };
 
-const getStatusElapsedMs = (order: any, nowMs: number, statusChangeTime: Record<string, number>) => {
+const getStatusElapsedMs = (order: MapOrderLike, nowMs: number, statusChangeTime: Record<string, number>) => {
   const statusStartMs = statusChangeTime[order.id] || getOrderStatusStartMs(order, nowMs);
   return Math.max(0, nowMs - statusStartMs);
 };
 
-const getOrderSlaRisk = (order: any, nowMs: number, statusChangeTime: Record<string, number>) => {
+const getOrderSlaRisk = (order: MapOrderLike, nowMs: number, statusChangeTime: Record<string, number>) => {
   const statusElapsedMs = getStatusElapsedMs(order, nowMs, statusChangeTime);
   if (order.status === 'PENDING') {
     if (statusElapsedMs > PENDING_WARNING_MS * 2) return { level: 'critical', delayMs: statusElapsedMs - PENDING_WARNING_MS };
@@ -332,17 +408,17 @@ const snapToRoute = (
   return bestDist <= ROUTE_SNAP_MAX_DISTANCE_M ? { latitude: bestLat, longitude: bestLng } : null;
 };
 
-const getOrderBusinesses = (order: any) => (
+const getOrderBusinesses = (order: MapOrderLike) => (
   Array.isArray(order?.businesses) ? order.businesses : []
 );
 
-const getOrderBusinessItems = (businessEntry: any) => (
+const getOrderBusinessItems = (businessEntry: MapBusinessEntryLike) => (
   Array.isArray(businessEntry?.items) ? businessEntry.items : []
 );
 
-const normalizeOrderShape = (order: any) => ({
+const normalizeOrderShape = (order: MapOrderLike): MapOrderLike => ({
   ...order,
-  businesses: getOrderBusinesses(order).map((businessEntry: any) => ({
+  businesses: getOrderBusinesses(order).map((businessEntry) => ({
     ...businessEntry,
     items: getOrderBusinessItems(businessEntry),
   })),
@@ -389,12 +465,18 @@ interface DriverMotionTarget {
   updatedAtMs: number;
 }
 
+type DistanceDataLike = {
+  calculatedAtMs?: number;
+  toPickup?: { durationMin?: number | null } | null;
+  toDropoff?: { durationMin?: number | null } | null;
+};
+
 function getOrderEtaMinutes(
-  order: any,
-  distanceData: any,
+  order: MapOrderLike,
+  distanceData: DistanceDataLike | null | undefined,
   nowMs: number,
   routeProgress: number,
-  driver: any,
+  driver: MapDriverLike,
 ): number | null {
   const liveEtaOrderId = driver?.driverConnection?.activeOrderId;
   const liveEtaSeconds = driver?.driverConnection?.remainingEtaSeconds;
@@ -447,12 +529,7 @@ function getOrderEtaMinutes(
 // ╚══════════════════════════════════════════════════════════╝
 export default function MapPage() {
   // Realtime data sync is encapsulated in a dedicated hook to keep page logic UI-focused.
-  const { businesses, orders: rawOrders, drivers, realtimeHealth } = useMapRealtimeData() as {
-    businesses: any[];
-    orders: any[];
-    drivers: any[];
-    realtimeHealth: RealtimeHealth;
-  };
+  const { businesses, orders: rawOrders, drivers, realtimeHealth } = useMapRealtimeData();
   
   const [assignDriver] = useMutation(ASSIGN_DRIVER_TO_ORDER);
   const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS, { fetchPolicy: "no-cache" });
@@ -466,21 +543,21 @@ export default function MapPage() {
     pollInterval: 15000,
     fetchPolicy: 'cache-and-network',
   });
-  const bizDeviceRows: any[] = (bizDeviceData as any)?.businessDeviceHealth ?? [];
+  const bizDeviceRows: BusinessDeviceRowLike[] = (bizDeviceData as { businessDeviceHealth?: BusinessDeviceRowLike[] } | undefined)?.businessDeviceHealth ?? [];
   // Business chat state
   const [chatBizUserId, setChatBizUserId] = useState<string | null>(null);
   const [chatBizInput, setChatBizInput] = useState('');
-  const [chatBizMessages, setChatBizMessages] = useState<any[]>([]);
+  const [chatBizMessages, setChatBizMessages] = useState<unknown[]>([]);
   const chatBizBottomRef = useRef<HTMLDivElement | null>(null);
   const [loadBizMessages, { loading: chatBizLoading }] = useLazyQuery(GET_BUSINESS_MESSAGES, {
     fetchPolicy: 'no-cache',
     onCompleted: (data) => {
-      const msgs = [...((data as any)?.businessMessages ?? [])].reverse();
+      const msgs = [...((data as { businessMessages?: unknown[] } | undefined)?.businessMessages ?? [])].reverse();
       setChatBizMessages(msgs);
       setTimeout(() => chatBizBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
     },
   });
-  const [inventoryModalOrder, setInventoryModalOrder] = useState<any | null>(null);
+  const [inventoryModalOrder, setInventoryModalOrder] = useState<MapOrderLike | null>(null);
   const [fetchOrderCoverage, { data: coverageData, loading: coverageLoading }] = useLazyQuery(GET_ORDER_COVERAGE, { fetchPolicy: 'network-only' });
   useSubscription(ADMIN_BUSINESS_MESSAGE_RECEIVED, {
     variables: { businessUserId: chatBizUserId ?? '' },
@@ -497,13 +574,10 @@ export default function MapPage() {
     fetchPolicy: 'cache-first',
   });
 
-  const orders = useMemo(
-    () => (rawOrders as any[]).map(normalizeOrderShape),
-    [rawOrders],
-  );
+  const orders = useMemo(() => rawOrders.map(normalizeOrderShape), [rawOrders]);
 
   const activeOrders = useMemo(
-    () => orders.filter((o: any) => o.status !== "DELIVERED" && o.status !== "CANCELLED"),
+    () => orders.filter((o) => o.status !== "DELIVERED" && o.status !== "CANCELLED"),
     [orders]
   );
 
@@ -594,8 +668,8 @@ export default function MapPage() {
   const [updateUserNote] = useMutation(UPDATE_USER_NOTE_MUTATION, { refetchQueries: ['GetOrders'] });
   const [trustUpdatingUserId, setTrustUpdatingUserId] = useState<string | null>(null);
   const [suppressionUpdatingUserId, setSuppressionUpdatingUserId] = useState<string | null>(null);
-  const cancelModalOrder = useMemo(() => cancelModalOrderId ? activeOrders.find((o: any) => o.id === cancelModalOrderId) ?? null : null, [cancelModalOrderId, activeOrders]);
-  const approvalModalOrder = useMemo(() => approvalModalOrderId ? activeOrders.find((o: any) => o.id === approvalModalOrderId) ?? null : null, [approvalModalOrderId, activeOrders]);
+  const cancelModalOrder = useMemo(() => cancelModalOrderId ? activeOrders.find((o) => o.id === cancelModalOrderId) ?? null : null, [cancelModalOrderId, activeOrders]);
+  const approvalModalOrder = useMemo(() => approvalModalOrderId ? activeOrders.find((o) => o.id === approvalModalOrderId) ?? null : null, [approvalModalOrderId, activeOrders]);
   const dismissApprovalModal = useCallback(() => {
     if (approvalModalOrderId) {
       setDismissedApprovalOrderIds((prev) => {
@@ -607,7 +681,7 @@ export default function MapPage() {
     setApprovalModalOrderId(null);
   }, [approvalModalOrderId]);
 
-  const setApprovalModalSuppressionForUser = useCallback(async (user: any, suppress: boolean) => {
+  const setApprovalModalSuppressionForUser = useCallback(async (user: MapUserLike, suppress: boolean) => {
     if (!user?.id) return;
     setSuppressionUpdatingUserId(user.id);
     try {
@@ -623,14 +697,15 @@ export default function MapPage() {
         },
       });
       toast.success(suppress ? 'Auto-popup muted for this customer' : 'Auto-popup enabled for this customer');
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to update popup preference');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update popup preference';
+      toast.error(message);
     } finally {
       setSuppressionUpdatingUserId(null);
     }
   }, [updateUserNote]);
 
-  const handleToggleTrustedCustomer = useCallback(async (user: any, trust: boolean) => {
+  const handleToggleTrustedCustomer = useCallback(async (user: MapUserLike, trust: boolean) => {
     if (!user?.id) return;
     setTrustUpdatingUserId(user.id);
     try {
@@ -647,22 +722,23 @@ export default function MapPage() {
         },
       });
       toast.success(trust ? 'Customer marked as trusted' : 'Trusted flag removed');
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to update trusted customer status');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update trusted customer status';
+      toast.error(message);
     } finally {
       setTrustUpdatingUserId(null);
     }
   }, [updateUserNote]);
 
   useEffect(() => {
-    const flaggedOrders = activeOrders.filter((order: any) => {
+    const flaggedOrders = activeOrders.filter((order) => {
       if (!order.needsApproval) return false;
       return !isApprovalModalSuppressed(order?.user);
     });
     const seen = seenFlaggedOrderIdsRef.current;
-    const newFlagged = flaggedOrders.filter((order: any) => !seen.has(order.id));
+    const newFlagged = flaggedOrders.filter((order) => !seen.has(order.id));
 
-    flaggedOrders.forEach((order: any) => seen.add(order.id));
+    flaggedOrders.forEach((order) => seen.add(order.id));
 
     if (!approvalModalOrderId && newFlagged.length > 0) {
       setApprovalModalOrderId(newFlagged[0].id);
@@ -671,14 +747,14 @@ export default function MapPage() {
   // Driver chat
   const [chatDriverId, setChatDriverId] = useState<string | null>(null);
   const [chatInput, setChatInput] = useState('');
-  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessageLike[]>([]);
   const chatBottomRef = useRef<HTMLDivElement | null>(null);
   const [markDriverMessagesRead] = useMutation(MARK_DRIVER_MESSAGES_READ);
   const [loadDriverMessages, { loading: chatLoading }] = useLazyQuery(GET_DRIVER_MESSAGES, {
     fetchPolicy: 'no-cache',
     onCompleted: (data) => {
-      const msgs = [...((data as any)?.driverMessages ?? [])].reverse();
-      setChatMessages(msgs);
+      const msgs = [...((data as { driverMessages?: ChatMessageLike[] } | undefined)?.driverMessages ?? [])].reverse();
+      setChatMessages(msgs as ChatMessageLike[]);
       setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
     },
   });
@@ -703,19 +779,19 @@ export default function MapPage() {
 
   // == FILTERED ==
   const filteredOrders = useMemo(() => {
-    return activeOrders.filter((order: any) => {
+    return activeOrders.filter((order) => {
       if (statusFilter !== "ALL" && order.status !== statusFilter) return false;
       if (filters.driver !== "ALL" && order.driver?.id !== filters.driver) return false;
-      if (filters.business !== "ALL" && !getOrderBusinesses(order).some((b: any) => b.business?.id === filters.business)) return false;
+      if (filters.business !== "ALL" && !getOrderBusinesses(order).some((b) => (b as { business?: { id?: string } }).business?.id === filters.business)) return false;
       if (filters.unassignedOnly && order.driver) return false;
       return true;
     });
   }, [activeOrders, filters, statusFilter]);
 
-  const users = useMemo(() => (usersData as any)?.users ?? [], [usersData]);
+  const users = useMemo(() => (usersData as { users?: MapUserLike[] } | undefined)?.users ?? [], [usersData]);
   const businessContactByBusinessId = useMemo(() => {
-    const byBusinessId: Record<string, any> = {};
-    users.forEach((user: any) => {
+    const byBusinessId: Record<string, MapUserLike> = {};
+    users.forEach((user) => {
       const businessId = user?.business?.id;
       if (!businessId) return;
       if (!byBusinessId[businessId] || user.role === 'BUSINESS_OWNER') {
@@ -737,7 +813,7 @@ export default function MapPage() {
       businessCounts: Record<string, number>;
     }>();
 
-    activeOrders.forEach((order: any) => {
+    activeOrders.forEach((order) => {
       const risk = getOrderSlaRisk(order, now, statusChangeTime);
       if (risk.level === 'ok') return;
       const drop = order?.dropOffLocation;
@@ -782,7 +858,7 @@ export default function MapPage() {
 
   const businessSlaChips = useMemo(() => {
     const byBusiness = new globalThis.Map<string, { businessName: string; delays: number[]; warning: number; critical: number }>();
-    activeOrders.forEach((order: any) => {
+    activeOrders.forEach((order) => {
       const risk = getOrderSlaRisk(order, now, statusChangeTime);
       if (risk.level === 'ok') return;
       const businessName = getOrderBusinesses(order)[0]?.business?.name || 'Unknown';
@@ -803,49 +879,52 @@ export default function MapPage() {
   }, [activeOrders, now, statusChangeTime]);
 
   const selectedOrder = useMemo(
-    () => activeOrders.find((o: any) => o.id === selectedOrderId) ?? null,
+    () => activeOrders.find((o) => o.id === selectedOrderId) ?? null,
     [activeOrders, selectedOrderId]
   );
 
   // == STATS ==
   const stats = useMemo(() => {
-    const pendingOrders = activeOrders.filter((o: any) => o.status === "PENDING");
-    const preparingOrders = activeOrders.filter((o: any) => o.status === "PREPARING");
-    const readyOrders = activeOrders.filter((o: any) => o.status === "READY");
-    const outOrders = activeOrders.filter((o: any) => o.status === "OUT_FOR_DELIVERY");
-    const todayDelivered = orders.filter((o: any) => {
+    const pendingOrders = activeOrders.filter((o) => o.status === "PENDING");
+    const preparingOrders = activeOrders.filter((o) => o.status === "PREPARING");
+    const readyOrders = activeOrders.filter((o) => o.status === "READY");
+    const outOrders = activeOrders.filter((o) => o.status === "OUT_FOR_DELIVERY");
+    const todayDelivered = orders.filter((o) => {
       const d = o.orderDate ? new Date(o.orderDate) : null;
       return d && d.toDateString() === new Date().toDateString() && o.status === "DELIVERED";
     });
-    const todayRevenue = todayDelivered.reduce((s: number, o: any) => s + (o.totalPrice || 0), 0);
+    const todayRevenue = todayDelivered.reduce((s: number, o) => s + (o.totalPrice || 0), 0);
 
-    const pendingWarnings = pendingOrders.filter((o: any) => {
+    const pendingWarnings = pendingOrders.filter((o) => {
       const orderDate = parseServerTimeMs(o.orderDate) ?? now;
       return (now - orderDate) > PENDING_WARNING_MS;
     }).length;
 
     const driverStats = {
-      connected: drivers.filter((d: any) => d.driverConnection?.connectionStatus === "CONNECTED").length,
-      stale: drivers.filter((d: any) => d.driverConnection?.connectionStatus === "STALE").length,
-      lost: drivers.filter((d: any) => d.driverConnection?.connectionStatus === "LOST").length,
-      disconnected: drivers.filter((d: any) => d.driverConnection?.connectionStatus === "DISCONNECTED" || !d.driverConnection?.connectionStatus).length,
-      assignable: drivers.filter((d: any) => isDriverAssignable(d) && getActiveCountForDriver(d.id, activeOrders) < MAX_DRIVER_ACTIVE_ORDERS).length,
+      connected: drivers.filter((d) => d.driverConnection?.connectionStatus === "CONNECTED").length,
+      stale: drivers.filter((d) => d.driverConnection?.connectionStatus === "STALE").length,
+      lost: drivers.filter((d) => d.driverConnection?.connectionStatus === "LOST").length,
+      disconnected: drivers.filter((d) => d.driverConnection?.connectionStatus === "DISCONNECTED" || !d.driverConnection?.connectionStatus).length,
+      assignable: drivers.filter((d) => isDriverAssignable(d) && getActiveCountForDriver(d.id, activeOrders) < MAX_DRIVER_ACTIVE_ORDERS).length,
     };
 
     return { pendingOrders: pendingOrders.length, preparingOrders: preparingOrders.length, readyOrders: readyOrders.length, outOrders: outOrders.length, todayDelivered: todayDelivered.length, todayRevenue, pendingWarnings, driverStats, activeCount: activeOrders.length };
   }, [activeOrders, drivers, orders, now]);
 
   const driverMap = useMemo(() => {
-    const map: Record<string, any> = {};
-    drivers.forEach((d: any) => { map[d.id] = d; });
+    const map: Record<string, MapDriverLike> = {};
+    drivers.forEach((d) => {
+      if (d.id) map[d.id] = d;
+    });
     return map;
   }, [drivers]);
 
   const activeOrderCountByBusinessId = useMemo(() => {
     const counts: Record<string, number> = {};
-    activeOrders.forEach((order: any) => {
-      getOrderBusinesses(order).forEach((be: any) => {
-        if (be.business?.id) counts[be.business.id] = (counts[be.business.id] || 0) + 1;
+    activeOrders.forEach((order) => {
+      getOrderBusinesses(order).forEach((be) => {
+        const businessId = (be as { business?: { id?: string } }).business?.id;
+        if (businessId) counts[businessId] = (counts[businessId] || 0) + 1;
       });
     });
     return counts;
@@ -860,10 +939,10 @@ export default function MapPage() {
   const filteredDrivers = useMemo(() => {
     // If any drivers are marked as working, hide non-working ones from the panel and map
     let result = workingDriverIds.size > 0
-      ? drivers.filter((d: any) => workingDriverIds.has(d.id))
+      ? drivers.filter((d) => workingDriverIds.has(d.id))
       : [...drivers];
     if (driverFilter !== "ALL") {
-      result = result.filter((d: any) => {
+      result = result.filter((d) => {
         const status = d.driverConnection?.connectionStatus ?? "DISCONNECTED";
         if (driverFilter === "ASSIGNABLE") return isDriverAssignable(d) && getActiveCountForDriver(d.id, activeOrders) < MAX_DRIVER_ACTIVE_ORDERS;
         if (driverFilter === "BUSY") return getActiveCountForDriver(d.id, activeOrders) > 0;
@@ -871,7 +950,7 @@ export default function MapPage() {
         return status === driverFilter;
       });
     }
-    result.sort((a: any, b: any) => {
+    result.sort((a, b) => {
       const statusOrder: Record<string, number> = { CONNECTED: 0, STALE: 1, LOST: 2, DISCONNECTED: 3 };
       return (statusOrder[a.driverConnection?.connectionStatus ?? "DISCONNECTED"] ?? 3) - (statusOrder[b.driverConnection?.connectionStatus ?? "DISCONNECTED"] ?? 3);
     });
@@ -884,7 +963,7 @@ export default function MapPage() {
 
   const pttConnectedSelectedIds = useMemo(
     () => pttSelectedDriverIds.filter((id) => {
-      const d = drivers.find((d: any) => d.id === id);
+      const d = drivers.find((d) => d.id === id);
       return d?.driverConnection?.connectionStatus === 'CONNECTED';
     }),
     [pttSelectedDriverIds, drivers],
@@ -939,7 +1018,7 @@ export default function MapPage() {
     if (!orders.length) return;
     setIncidentNotes((prev) => {
       const patch: Record<string, IncidentNote> = {};
-      for (const order of orders as any[]) {
+      for (const order of orders) {
         if (!order.adminNote) continue;
         try {
           const parsed = JSON.parse(order.adminNote);
@@ -979,7 +1058,7 @@ export default function MapPage() {
   useEffect(() => {
     setStatusChangeTime((prev) => {
       const next = { ...prev };
-      activeOrders.forEach((order: any) => {
+      activeOrders.forEach((order) => {
         const prevStatus = prevOrderStatusRef.current[order.id];
         const derivedStatusStartMs = getOrderStatusStartMs(order, now);
         if (!prevStatus) {
@@ -994,7 +1073,7 @@ export default function MapPage() {
       });
 
       Object.keys(next).forEach((orderId) => {
-        if (!activeOrders.some((o: any) => o.id === orderId)) {
+        if (!activeOrders.some((o) => o.id === orderId)) {
           delete next[orderId];
           delete prevOrderStatusRef.current[orderId];
         }
@@ -1002,7 +1081,7 @@ export default function MapPage() {
 
       return next;
     });
-  }, [activeOrders.map((o: any) => `${o.id}-${o.status}-${o.updatedAt || ""}-${o.preparingAt || ""}`).join(","), now]);
+  }, [activeOrders.map((o) => `${o.id}-${o.status}-${o.updatedAt || ""}-${o.preparingAt || ""}`).join(","), now]);
 
   // Driver tracking & motion interpolation
   // Keep this effect focused on driver snapshots only.
@@ -1011,8 +1090,8 @@ export default function MapPage() {
     const nowTs = Date.now();
 
     setDriverTracks((prev) => {
-      const next = { ...prev } as Record<string, any>;
-      drivers.forEach((driver: any) => {
+      const next = { ...prev } as Record<string, unknown>;
+      drivers.forEach((driver) => {
         const location = driver.driverLocation;
         if (!location?.latitude || !location?.longitude) return;
         const newPos = { latitude: location.latitude, longitude: location.longitude };
@@ -1083,7 +1162,7 @@ export default function MapPage() {
     if (!activeOrders.length) return;
 
     const nextProgress: Record<string, number> = {};
-    activeOrders.forEach((order: any) => {
+    activeOrders.forEach((order) => {
       if (order.status === "OUT_FOR_DELIVERY" && order.driver) {
         const driver = driverMap[order.driver.id];
         const driverLocation = driver?.driverLocation;
@@ -1144,7 +1223,7 @@ export default function MapPage() {
         // Road-snap: if the driver has an active OFD order with route geometry, snap to it
         let snapped = nextPoint;
         const driverOrders = activeOrdersRef.current.filter(
-          (o: any) => o.driver?.id === driverId && o.status === 'OUT_FOR_DELIVERY',
+          (o) => o.driver?.id === driverId && o.status === 'OUT_FOR_DELIVERY',
         );
         for (const o of driverOrders) {
           const geo = orderDistancesRef.current[o.id]?.toDropoff?.geometry;
@@ -1214,13 +1293,13 @@ export default function MapPage() {
       if (driverId) {
         setTimeout(() => { setShowPolylines((prev) => ({ ...prev, [orderId]: true })); }, 500);
       }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to assign driver");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Failed to assign driver"));
     }
   };
 
   const handleNotifyDriver = async (orderId: string) => {
-    const order = activeOrders.find((o: any) => o.id === orderId);
+    const order = activeOrders.find((o) => o.id === orderId);
     if (!order?.driver?.id) {
       toast.warning('No driver assigned to notify.');
       return;
@@ -1238,13 +1317,13 @@ export default function MapPage() {
         },
       });
       toast.success('Driver notified.');
-    } catch (error: any) {
-      toast.error(error?.message || 'Failed to notify driver');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Failed to notify driver'));
     }
   };
 
   const handleNotifyBusiness = async (orderId: string) => {
-    const order = activeOrders.find((o: any) => o.id === orderId);
+    const order = activeOrders.find((o) => o.id === orderId);
     const businessId = getOrderBusinesses(order)[0]?.business?.id;
     if (!businessId) {
       toast.warning('Business not found for this order.');
@@ -1264,8 +1343,8 @@ export default function MapPage() {
         },
       });
       toast.success('Business notified.');
-    } catch (error: any) {
-      toast.error(error?.message || 'Failed to notify business');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Failed to notify business'));
     }
   };
 
@@ -1293,21 +1372,21 @@ export default function MapPage() {
 
   const handleAutoAssign = async (orderId: string) => {
     try {
-      const order = activeOrders.find((o: any) => o.id === orderId);
+      const order = activeOrders.find((o) => o.id === orderId);
       if (!order) { toast.error("Order not found"); return; }
       const firstBusiness = order.businesses?.[0]?.business;
       let pickup = null;
       if (firstBusiness?.location?.latitude && firstBusiness?.location?.longitude) {
         pickup = { latitude: firstBusiness.location.latitude, longitude: firstBusiness.location.longitude };
       } else if (firstBusiness?.id && businesses.length > 0) {
-        const fullBusiness = businesses.find((b: any) => b.id === firstBusiness.id);
+        const fullBusiness = businesses.find((b) => b.id === firstBusiness.id);
         if (fullBusiness?.location?.latitude && fullBusiness?.location?.longitude) {
           pickup = { latitude: fullBusiness.location.latitude, longitude: fullBusiness.location.longitude };
         }
       }
       if (!pickup) { toast.error("Business location not available"); return; }
 
-      const availableDrivers = drivers.filter((d: any) => {
+      const availableDrivers = drivers.filter((d) => {
         const hasLocation = d.driverLocation?.latitude && d.driverLocation?.longitude;
         const isBusy = getActiveCountForDriver(d.id, activeOrders) > 0;
         const canAssign = isDriverAssignable(d);
@@ -1317,18 +1396,18 @@ export default function MapPage() {
 
       let nearestDriver = availableDrivers[0];
       let minDistance = Infinity;
-      availableDrivers.forEach((driver: any) => {
+      availableDrivers.forEach((driver) => {
         const dist = distanceMeters(pickup!, { latitude: driver.driverLocation.latitude, longitude: driver.driverLocation.longitude });
         if (dist < minDistance) { minDistance = dist; nearestDriver = driver; }
       });
       await handleAssignDriver(orderId, nearestDriver.id);
-    } catch (error: any) {
-      toast.error(error.message || "Failed to auto-assign driver");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Failed to auto-assign driver"));
     }
   };
 
-  const handleUpdateStatus = async (orderId: string, status: any) => {
-    const order = activeOrders.find((o: any) => o.id === orderId);
+  const handleUpdateStatus = async (orderId: string, status: string) => {
+    const order = activeOrders.find((o) => o.id === orderId);
     if (!order) { toast.error('Order not found'); return; }
     // Always confirm status changes
     if (status === 'CANCELLED') {
@@ -1353,7 +1432,7 @@ export default function MapPage() {
   const handleConfirmStatusChange = async () => {
     if (!pendingStatusChange) return;
     const { orderId, status } = pendingStatusChange;
-    const order = activeOrders.find((o: any) => o.id === orderId);
+    const order = activeOrders.find((o) => o.id === orderId);
     if (status === 'OUT_FOR_DELIVERY' && !order?.driver?.id) {
       setPendingStatusChange(null);
       setConfirmNoDriverAction({ orderId, status });
@@ -1373,8 +1452,8 @@ export default function MapPage() {
           awaitRefetchQueries: true,
         });
         toast.success(`Order marked as preparing (${minutes} min)`);
-      } catch (error: any) {
-        toast.error(error.message || 'Failed to start preparing');
+      } catch (error) {
+        toast.error(getErrorMessage(error, 'Failed to start preparing'));
       }
       return;
     }
@@ -1383,8 +1462,8 @@ export default function MapPage() {
       await updateOrderStatus({ variables: { id: orderId, status }, refetchQueries: ['GetOrders'], awaitRefetchQueries: true });
       toast.success(`Order marked as ${status.replace(/_/g, ' ').toLowerCase()}`);
       if (status === 'DELIVERED') { setSelectedOrderId(null); setDetailPanelExpanded(false); }
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to update status');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Failed to update status'));
     }
   };
 
@@ -1392,14 +1471,14 @@ export default function MapPage() {
     if (!cancelModalOrderId) return;
     const trimmed = cancelReason.trim();
     if (!trimmed) { toast.warning('Please provide a cancellation reason.'); return; }
-    const taggedReason = cancelReasonCategory ? `[${cancelReasonCategory}] ${trimmed}` : trimmed;
+    const taggedReason = composeTaggedCancellationReason(cancelReasonCategory, trimmed);
     try {
       await adminCancelOrder({ variables: { id: cancelModalOrderId, reason: taggedReason, settleDriver: cancelSettleDriver, settleBusiness: cancelSettleBusiness } });
       toast.success('Order cancelled.');
       setCancelModalOrderId(null); setCancelReason(''); setCancelReasonCategory(null); setCancelSettleDriver(false); setCancelSettleBusiness(false);
       setSelectedOrderId(null); setDetailPanelExpanded(false);
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to cancel order.');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Failed to cancel order.'));
     }
   };
 
@@ -1418,8 +1497,8 @@ export default function MapPage() {
       });
       toast.success('Order approved and sent to business');
       setApprovalModalOrderId(null);
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to approve order');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Failed to approve order'));
     }
   };
 
@@ -1434,12 +1513,12 @@ export default function MapPage() {
         awaitRefetchQueries: true,
       });
       toast.success(`Order marked as ${status.replace(/_/g, ' ').toLowerCase()} (no driver assigned)`);
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to update status');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Failed to update status'));
     }
   };
 
-  const focusOrder = useCallback((order: any) => {
+  const focusOrder = useCallback((order: MapOrderLike) => {
     const map = mapRef.current?.getMap?.();
     if (!map || !order.dropOffLocation) return;
 
@@ -1447,8 +1526,8 @@ export default function MapPage() {
     const driverLocation = order.driver?.id ? driverMap[order.driver.id]?.driverLocation : null;
     const hasDriverLocation = isValidLatLng(driverLocation?.latitude, driverLocation?.longitude);
     const pickup = order.businesses
-      ?.map((entry: any) => entry?.business?.location)
-      ?.find((location: any) => isValidLatLng(location?.latitude, location?.longitude));
+      ?.map((entry) => (entry as MapBusinessEntryLike)?.business?.location)
+      ?.find((location) => isValidLatLng(location?.latitude, location?.longitude));
 
     const fitBoundsWithPadding = (from: { latitude: number; longitude: number }, to: { latitude: number; longitude: number }) => {
       const minLng = Math.min(from.longitude, to.longitude);
@@ -1483,7 +1562,7 @@ export default function MapPage() {
   const selectOrder = useCallback((orderId: string) => {
     setSelectedOrderId(orderId);
     setRightPanelTab('order');
-    const order = activeOrders.find((o: any) => o.id === orderId);
+    const order = activeOrders.find((o) => o.id === orderId);
     if (order) {
       focusOrder(order);
       if (order.needsApproval && dismissedApprovalOrderIds.has(order.id)) {
@@ -1499,7 +1578,7 @@ export default function MapPage() {
     map.flyTo({ center: [DEFAULT_CENTER.longitude, DEFAULT_CENTER.latitude], zoom: 12, essential: true });
   }, []);
 
-  const handleMapLoad = useCallback((e: any) => {
+  const handleMapLoad = useCallback((e: { target: { getLayer: (layer: string) => unknown; setLayoutProperty: (layer: string, prop: string, value: string) => void } }) => {
     const map = e.target;
     ['poi-label', 'transit-label'].forEach((layer) => {
       if (map.getLayer(layer)) map.setLayoutProperty(layer, 'visibility', 'none');
@@ -1526,7 +1605,7 @@ export default function MapPage() {
         onClick={() => { setSelectedOrderId(null); setDetailPanelExpanded(false); }}
       >
         {/* ── Business Markers ── */}
-        {businesses.map((business: any) => {
+        {businesses.map((business) => {
           if (!business.location?.latitude || !business.location?.longitude) return null;
           const isHovered = hoveredBusinessId === business.id;
           const isInactive = !business.isActive;
@@ -1597,7 +1676,7 @@ export default function MapPage() {
         })}
 
         {/* ── Route Polylines ── */}
-        {activeOrders.map((order: any) => {
+        {activeOrders.map((order) => {
           if (!showPolylines[order.id] || !orderDistances[order.id]) return null;
           const routes = orderDistances[order.id];
 
@@ -1712,11 +1791,11 @@ export default function MapPage() {
         })}
 
         {/* ── Order Markers ── */}
-        {filteredOrders.map((order: any) => {
+        {filteredOrders.map((order) => {
           const drop = order.dropOffLocation;
           if (!drop?.latitude || !drop?.longitude) return null;
           const statusColor = ORDER_STATUS_COLORS[order.status as keyof typeof ORDER_STATUS_COLORS] || ORDER_STATUS_COLORS.PENDING;
-          const businessNames = getOrderBusinesses(order).map((b: any) => b.business?.name).filter(Boolean).join(", ") || "Order";
+          const businessNames = getOrderBusinesses(order).map((b) => (b as MapBusinessEntryLike).business?.name).filter(Boolean).join(", ") || "Order";
           const isHovered = hoveredOrderId === order.id;
           const isSelected = selectedOrderId === order.id;
           const isPending = order.status === "PENDING";
@@ -1768,7 +1847,7 @@ export default function MapPage() {
         })}
 
         {/* ── Driver Markers ── */}
-        {Object.values(driverTracks).map((track: any) => {
+        {Object.values(driverTracks).map((track) => {
           // Hide off-shift drivers from the map entirely
           if (!isOnShift(track.id)) return null;
           const pos = animatedDriverPositions[track.id] || track.to;
@@ -1970,7 +2049,7 @@ export default function MapPage() {
         {/* Order cards list */}
         <div className="flex-1 overflow-y-auto scrollbar-hide" style={{ maxHeight: 'calc(100vh - 60px)' }}>
           <div className="p-1.5 space-y-px">
-            {filteredOrders.map((order: any) => {
+            {filteredOrders.map((order) => {
               const statusColor = ORDER_STATUS_COLORS[order.status as keyof typeof ORDER_STATUS_COLORS] || ORDER_STATUS_COLORS.PENDING;
               const businessName = order.businesses?.[0]?.business?.name || "Unknown";
               const isSelected = selectedOrderId === order.id;
@@ -1980,7 +2059,7 @@ export default function MapPage() {
               const pendingTooLong = isPending && elapsed > PENDING_WARNING_MS;
               const customerName = order.user ? `${order.user.firstName} ${order.user.lastName}` : "Unknown";
               const distanceData = orderDistances[order.id];
-              const preview = (order as any).settlementPreview;
+              const preview = order.settlementPreview;
               const marginSeverity = preview ? getMarginSeverity(preview.netMargin) : null;
               const etaMin = getOrderEtaMinutes(
                 order,
@@ -2074,7 +2153,7 @@ export default function MapPage() {
                           </span>
                           <div data-settlement-tip className="pointer-events-none fixed z-[9999] w-56 rounded-lg border border-zinc-700 bg-[#0a0a0d] p-2 text-[10px] text-zinc-300 opacity-0 shadow-2xl transition-opacity group-hover/pill:opacity-100">
                             <div className="font-semibold text-zinc-200 mb-1 text-[11px]">Settlement breakdown</div>
-                            {preview.lineItems.map((li: any, i: number) => (
+                            {preview.lineItems.map((li, i: number) => (
                               <div key={i} className="flex justify-between gap-2 py-0.5">
                                 <span className="text-zinc-500 truncate">{li.reason}</span>
                                 <span className={`whitespace-nowrap font-medium ${li.direction === 'RECEIVABLE' ? 'text-emerald-300' : 'text-rose-300'}`}>
@@ -2192,7 +2271,7 @@ export default function MapPage() {
             <div className="flex-shrink-0 flex items-center gap-2 px-3 py-2 border-b border-white/5">
               <div className="flex items-center gap-1" title="Online">
                 <Signal size={10} className="text-emerald-400" />
-                <span className="text-[10px] font-bold text-emerald-400">{filteredDrivers.filter((d: any) => d.driverConnection?.connectionStatus === 'CONNECTED').length}</span>
+                <span className="text-[10px] font-bold text-emerald-400">{filteredDrivers.filter((d) => d.driverConnection?.connectionStatus === 'CONNECTED').length}</span>
               </div>
               <div className="flex items-center gap-1" title={workingDriverIds.size > 0 ? `${workingDriverIds.size} on shift` : 'All drivers'}>
                 <User size={10} className={workingDriverIds.size > 0 ? 'text-blue-400' : 'text-zinc-500'} />
@@ -2224,11 +2303,11 @@ export default function MapPage() {
                   <span className="text-xs">No drivers</span>
                 </div>
               )}
-              {filteredDrivers.map((driver: any) => {
+              {filteredDrivers.map((driver) => {
                 const connStatus = (driver.driverConnection?.connectionStatus ?? 'DISCONNECTED') as keyof typeof DRIVER_CONNECTION_COLORS;
                 const statusStyle = DRIVER_CONNECTION_COLORS[connStatus];
                 const StatusIcon = statusStyle.icon;
-                const assignedOrders = activeOrders.filter((o: any) => o.driver?.id === driver.id);
+                const assignedOrders = activeOrders.filter((o) => o.driver?.id === driver.id);
                 const isBusy = assignedOrders.length > 0;
                 const isPttSelected = pttSelectedDriverIds.includes(driver.id);
                 const isConnected = connStatus === 'CONNECTED';
@@ -2296,7 +2375,7 @@ export default function MapPage() {
                       </div>
                       {assignedOrders.length > 0 && (
                         <div className="mt-0.5 space-y-0.5">
-                          {assignedOrders.map((o: any) => (
+                          {assignedOrders.map((o) => (
                             <div key={o.id} className="text-[9px] text-zinc-600 truncate">→ {o.businesses?.[0]?.business?.name || 'Order'}</div>
                           ))}
                         </div>
@@ -2389,7 +2468,7 @@ export default function MapPage() {
                     setChatMessages((prev) => prev.some((m) => m.id === sent.id) ? prev : [...prev, sent]);
                   }
                   setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
-                } catch (e: any) { toast.error(e.message || 'Send failed'); }
+                } catch (error) { toast.error(getErrorMessage(error, 'Send failed')); }
               };
               return (
                 <div className="absolute inset-0 flex flex-col bg-[#0a0a0b] z-10">
@@ -2414,7 +2493,7 @@ export default function MapPage() {
                     {!chatLoading && chatMessages.length === 0 && (
                       <div className="text-[10px] text-zinc-700 text-center py-6">No messages yet</div>
                     )}
-                    {chatMessages.map((msg: any, i: number) => {
+                    {chatMessages.map((msg, i: number) => {
                       const isAdmin = msg.senderRole === 'ADMIN';
                       return (
                         <div key={msg.id ?? i} className={`flex ${isAdmin ? 'justify-end' : 'justify-start'}`}>
@@ -2461,14 +2540,14 @@ export default function MapPage() {
               {businesses.length === 0 && (
                 <div className="text-[10px] text-zinc-600 text-center py-8">No businesses</div>
               )}
-              {[...businesses].sort((a: any, b: any) => {
-                const ha = bizDeviceRows.find((r: any) => r.businessId === a.id);
-                const hb = bizDeviceRows.find((r: any) => r.businessId === b.id);
-                const statusScore = (h: any) => {
+              {[...businesses].sort((a, b) => {
+                const ha = bizDeviceRows.find((r) => r.businessId === a.id);
+                const hb = bizDeviceRows.find((r) => r.businessId === b.id);
+                const statusScore = (h: BusinessDeviceRowLike | undefined) => {
                   const s = h?.onlineStatus ?? 'OFFLINE';
                   return s === 'OFFLINE' ? 0 : s === 'STALE' ? 1 : 2;
                 };
-                const battScore = (h: any) => {
+                const battScore = (h: BusinessDeviceRowLike | undefined) => {
                   if (h?.batteryLevel != null && !h.isCharging && h.batteryLevel < 20) return 0;
                   return 1;
                 };
@@ -2477,9 +2556,9 @@ export default function MapPage() {
                 const ba = battScore(ha), bb = battScore(hb);
                 if (ba !== bb) return ba - bb;
                 return a.name.localeCompare(b.name);
-              }).map((biz: any) => {
-                const bizOrders = activeOrders.filter((o: any) =>
-                  getOrderBusinesses(o).some((be: any) => be.business?.id === biz.id)
+              }).map((biz) => {
+                const bizOrders = activeOrders.filter((o) =>
+                  getOrderBusinesses(o).some((be) => (be as MapBusinessEntryLike).business?.id === biz.id)
                 );
                 const isActive = biz.isActive;
                 const hasActiveHours = (() => {
@@ -2492,7 +2571,7 @@ export default function MapPage() {
                   return curMin >= openMin && curMin < closeMin;
                 })();
                 const contact = businessContactByBusinessId[biz.id];
-                const health = bizDeviceRows.find((r: any) => r.businessId === biz.id);
+                const health = bizDeviceRows.find((r) => r.businessId === biz.id);
                 const onlineStatus: string = health?.onlineStatus ?? 'OFFLINE';
                 const onlinePill =
                   onlineStatus === 'ONLINE' ? 'bg-emerald-500/20 text-emerald-400' :
@@ -2551,8 +2630,8 @@ export default function MapPage() {
 
             {/* Business chat overlay */}
             {chatBizUserId && (() => {
-              const chatBiz = businesses.find((b: any) => {
-                const h = bizDeviceRows.find((r: any) => r.userId === chatBizUserId);
+              const chatBiz = businesses.find((b) => {
+                const h = bizDeviceRows.find((r) => r.userId === chatBizUserId);
                 return h ? b.id === h.businessId : false;
               });
               const sendBizChat = async () => {
@@ -2563,10 +2642,10 @@ export default function MapPage() {
                   const result = await sendBusinessMessage({ variables: { businessUserId: chatBizUserId, body: trimmed, alertType: 'INFO' } });
                   const sent = result.data?.sendBusinessMessage;
                   if (sent) {
-                    setChatBizMessages((prev: any[]) => prev.some((m) => m.id === sent.id) ? prev : [...prev, sent]);
+                    setChatBizMessages((prev) => prev.some((m) => m.id === sent.id) ? prev : [...prev, sent]);
                   }
                   setTimeout(() => chatBizBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
-                } catch (e: any) { toast.error(e.message || 'Send failed'); }
+                } catch (error) { toast.error(getErrorMessage(error, 'Send failed')); }
               };
               return (
                 <div className="absolute inset-0 flex flex-col bg-[#0a0a0b] z-10">
@@ -2588,7 +2667,7 @@ export default function MapPage() {
                     {chatBizMessages.length === 0 && (
                       <div className="text-[10px] text-zinc-700 text-center py-6">No messages yet</div>
                     )}
-                    {chatBizMessages.map((msg: any, i: number) => {
+                    {chatBizMessages.map((msg, i: number) => {
                       const isAdmin = msg.senderRole === 'ADMIN';
                       return (
                         <div key={msg.id ?? i} className={`flex ${isAdmin ? 'justify-end' : 'justify-start'}`}>
@@ -2650,7 +2729,7 @@ export default function MapPage() {
 
             {/* Driver list */}
             <div className="max-h-[420px] overflow-y-auto divide-y divide-zinc-800/60">
-              {drivers.map((driver: any) => {
+              {drivers.map((driver) => {
                 const connectionStatus = (driver.driverConnection?.connectionStatus ?? 'DISCONNECTED') as keyof typeof DRIVER_CONNECTION_COLORS;
                 const statusStyle = DRIVER_CONNECTION_COLORS[connectionStatus];
                 const StatusIcon = statusStyle.icon;
@@ -2698,7 +2777,7 @@ export default function MapPage() {
               <button
                 onClick={async () => {
                   const prev = new Set(workingDriverIds);
-                  const allIds = new Set<string>(drivers.map((d: any) => d.id));
+                  const allIds = new Set<string>(drivers.map((d) => d.id));
                   const allArr = [...allIds];
                   setWorkingDriverIds(allIds);
                   try { localStorage.setItem(WORKING_DRIVERS_KEY, JSON.stringify(allArr)); } catch {}
@@ -2743,7 +2822,7 @@ export default function MapPage() {
 
       {/* Status Change Confirmation */}
       {pendingStatusChange && (() => {
-        const order = activeOrders.find((o: any) => o.id === pendingStatusChange.orderId);
+        const order = activeOrders.find((o) => o.id === pendingStatusChange.orderId);
         const fromStatus = order?.status || '';
         const toStatus = pendingStatusChange.status;
         const toColor = ORDER_STATUS_COLORS[toStatus as keyof typeof ORDER_STATUS_COLORS];
@@ -2785,7 +2864,7 @@ export default function MapPage() {
 
       {/* Cancel Order Modal */}
       <CancelOrderModal
-        order={cancelModalOrder as any}
+        order={cancelModalOrder}
         reason={cancelReason}
         category={cancelReasonCategory}
         settleDriver={cancelSettleDriver}
@@ -2803,6 +2882,12 @@ export default function MapPage() {
       {/* Approve Order Modal */}
       {approvalModalOrder && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center">
+          {(() => {
+            const modalUser = approvalModalOrder.user;
+            const isTrusted = isTrustedCustomer(modalUser);
+            const modalUserId = modalUser?.id ?? null;
+            return (
+          <>
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={dismissApprovalModal} />
           <div className="relative z-[201] w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-950 shadow-2xl overflow-hidden">
             <div className="px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
@@ -2812,33 +2897,33 @@ export default function MapPage() {
             <div className="px-5 py-4 space-y-4">
               {/* Order summary */}
               <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-3">
-                <div className="font-medium text-rose-300 text-sm">{(approvalModalOrder as any).displayId || approvalModalOrder.id.slice(0, 8)}</div>
-                {(approvalModalOrder as any).user && (
+                <div className="font-medium text-rose-300 text-sm">{approvalModalOrder.displayId || approvalModalOrder.id.slice(0, 8)}</div>
+                {modalUser && (
                   <>
-                    <div className="text-xs text-zinc-400 mt-0.5">{(approvalModalOrder as any).user.firstName} {(approvalModalOrder as any).user.lastName}</div>
-                    <div className="text-xs text-zinc-500 mt-1">{Number((approvalModalOrder as any).user.totalOrders || 0)} total orders</div>
-                    {(approvalModalOrder as any).user.phoneNumber && (
+                    <div className="text-xs text-zinc-400 mt-0.5">{modalUser.firstName} {modalUser.lastName}</div>
+                    <div className="text-xs text-zinc-500 mt-1">{Number(modalUser.totalOrders || 0)} total orders</div>
+                    {modalUser.phoneNumber && (
                       <div className="flex items-center gap-1.5 mt-1 text-xs text-zinc-400">
                         <Phone size={11} className="text-zinc-600" />
-                        <a href={`tel:${(approvalModalOrder as any).user.phoneNumber}`} className="hover:text-white transition-colors">
-                          {(approvalModalOrder as any).user.phoneNumber}
+                        <a href={`tel:${modalUser.phoneNumber}`} className="hover:text-white transition-colors">
+                          {modalUser.phoneNumber}
                         </a>
                       </div>
                     )}
                     <div className="mt-2">
                       <button
                         type="button"
-                        disabled={trustUpdatingUserId === (approvalModalOrder as any).user.id}
-                        onClick={() => handleToggleTrustedCustomer((approvalModalOrder as any).user, !isTrustedCustomer((approvalModalOrder as any).user))}
+                        disabled={trustUpdatingUserId === modalUserId}
+                        onClick={() => handleToggleTrustedCustomer(modalUser, !isTrusted)}
                         className={`inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors disabled:opacity-50 ${
-                          isTrustedCustomer((approvalModalOrder as any).user)
+                          isTrusted
                             ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20'
                             : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'
                         }`}
                       >
-                        {trustUpdatingUserId === (approvalModalOrder as any).user.id
+                        {trustUpdatingUserId === modalUserId
                           ? 'Saving...'
-                          : isTrustedCustomer((approvalModalOrder as any).user)
+                          : isTrusted
                             ? 'Trusted customer: enabled'
                             : 'Mark as trusted customer'}
                       </button>
@@ -2846,10 +2931,10 @@ export default function MapPage() {
                     <label className="mt-2 flex items-center gap-2 text-xs text-zinc-400">
                       <input
                         type="checkbox"
-                        disabled={suppressionUpdatingUserId === (approvalModalOrder as any).user?.id}
-                        checked={isApprovalModalSuppressed((approvalModalOrder as any).user)}
+                        disabled={suppressionUpdatingUserId === modalUserId}
+                        checked={isApprovalModalSuppressed(modalUser)}
                         onChange={(e) => {
-                          const user = (approvalModalOrder as any).user;
+                          const user = modalUser;
                           if (!user) return;
                           void setApprovalModalSuppressionForUser(user, e.target.checked);
                         }}
@@ -2859,7 +2944,7 @@ export default function MapPage() {
                     </label>
                   </>
                 )}
-                <div className="text-xs text-zinc-500 mt-0.5">€{Number((approvalModalOrder as any).totalPrice || 0).toFixed(2)}</div>
+                <div className="text-xs text-zinc-500 mt-0.5">€{Number(approvalModalOrder.totalPrice || 0).toFixed(2)}</div>
               </div>
               {/* Reason flags */}
               <div className="space-y-2">
@@ -2879,7 +2964,7 @@ export default function MapPage() {
                     📍 Outside delivery zone — confirm drop-off address with customer
                   </div>
                 )}
-                {getApprovalReasons(approvalModalOrder).length === 0 && (approvalModalOrder as any).needsApproval && (
+                {getApprovalReasons(approvalModalOrder).length === 0 && approvalModalOrder.needsApproval && (
                   <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-medium">
                     ⚠ Manual verification required before approval
                   </div>
@@ -2898,6 +2983,9 @@ export default function MapPage() {
               </div>
             </div>
           </div>
+          </>
+            );
+          })()}
         </div>
       )}
 
@@ -2932,7 +3020,7 @@ export default function MapPage() {
         <InventoryCoverageModal
           orderId={inventoryModalOrder.id}
           displayId={inventoryModalOrder.displayId || inventoryModalOrder.id.slice(0, 8)}
-          coverage={(coverageData as any)?.orderCoverage}
+          coverage={(coverageData as { orderCoverage?: unknown } | undefined)?.orderCoverage}
           loading={coverageLoading}
           onClose={() => setInventoryModalOrder(null)}
         />
@@ -2944,10 +3032,10 @@ export default function MapPage() {
 // ── Items list with show more/less ───────────────────────────────────────────
 const ITEMS_PREVIEW = 3;
 
-function ItemsList({ orderBusinesses }: { orderBusinesses: any[] }) {
+function ItemsList({ orderBusinesses }: { orderBusinesses: MapBusinessEntryLike[] }) {
   const [expanded, setExpanded] = useState(false);
-  const allItems = orderBusinesses.flatMap((b: any) =>
-    getOrderBusinessItems(b).map((item: any, idx: number) => ({ ...item, key: `${b.business?.id}-${idx}` }))
+  const allItems = orderBusinesses.flatMap((b) =>
+    getOrderBusinessItems(b).map((item, idx: number) => ({ ...(item as Record<string, unknown>), key: `${b.business?.id}-${idx}` }))
   );
   const visible = expanded ? allItems : allItems.slice(0, ITEMS_PREVIEW);
   const hidden = allItems.length - ITEMS_PREVIEW;
@@ -2956,7 +3044,7 @@ function ItemsList({ orderBusinesses }: { orderBusinesses: any[] }) {
     <div className="px-5 py-3 border-b border-white/5">
       <div className="text-[10px] uppercase tracking-widest text-zinc-600 font-semibold mb-2">Items</div>
       <div className="space-y-1">
-        {visible.map((item: any) => (
+        {visible.map((item) => (
           <div key={item.key} className="flex justify-between text-sm">
             <span className="text-zinc-300 truncate pr-2">{item.quantity}× {item.name || 'Item'}</span>
             <span className="text-zinc-500 flex-shrink-0">€{((item.unitPrice || item.basePrice || 0) * item.quantity).toFixed(2)}</span>
@@ -2983,7 +3071,35 @@ function BottomDetailPanel({
   onTogglePolyline, showPolyline, onToggleBothRoutes, showBothRoutes,
   onFocus, driverProgressOnRoute, onNotifyDriver, onNotifyBusiness, incident, onIncidentUpdate,
   workingDriverIds, onToggleTrustedCustomer, trustUpdatingUserId,
-}: any) {
+}: {
+  order: MapOrderLike;
+  drivers: MapDriverLike[];
+  activeOrders: MapOrderLike[];
+  orderDistances: Record<string, DistanceDataLike | undefined>;
+  driverMap: Record<string, MapDriverLike>;
+  now: number;
+  statusChangeTime: Record<string, number>;
+  expanded: boolean;
+  onToggleExpand: () => void;
+  onClose: () => void;
+  onAssignDriver: (orderId: string, driverId: string | null) => void | Promise<void>;
+  onAutoAssign: (orderId: string) => void | Promise<void>;
+  onUpdateStatus: (orderId: string, status: string) => void | Promise<void>;
+  onApproveOrder: (orderId: string) => void;
+  onTogglePolyline: (orderId: string) => void;
+  showPolyline: boolean;
+  onToggleBothRoutes: (orderId: string) => void;
+  showBothRoutes: boolean;
+  onFocus: (order: MapOrderLike) => void;
+  driverProgressOnRoute: Record<string, number>;
+  onNotifyDriver: (orderId: string) => void | Promise<void>;
+  onNotifyBusiness: (orderId: string) => void | Promise<void>;
+  incident: IncidentNote;
+  onIncidentUpdate: (orderId: string, patch: Partial<IncidentNote>) => void;
+  workingDriverIds: Set<string>;
+  onToggleTrustedCustomer: (user: MapUserLike, trust: boolean) => void | Promise<void>;
+  trustUpdatingUserId: string | null;
+}) {
   const [selectedDriverId, setSelectedDriverId] = useState(order.driver?.id || "");
   const statusColor = ORDER_STATUS_COLORS[order.status as keyof typeof ORDER_STATUS_COLORS] || ORDER_STATUS_COLORS.PENDING;
   const isTerminalStatus = order.status === "DELIVERED" || order.status === "CANCELLED";
@@ -3007,18 +3123,18 @@ function BottomDetailPanel({
   const statusStartMs = statusChangeTime[order.id] || getOrderStatusStartMs(order, now);
   const statusElapsed = Math.max(0, now - statusStartMs);
   const pickupLocation = orderBusinesses
-    ?.map((entry: any) => entry?.business?.location)
-    ?.find((location: any) => isValidLatLng(location?.latitude, location?.longitude));
-  const preview = (order as any).settlementPreview;
+    ?.map((entry) => entry?.business?.location)
+    ?.find((location) => isValidLatLng(location?.latitude, location?.longitude));
+  const preview = order.settlementPreview;
   const previewSeverity = preview ? getMarginSeverity(preview.netMargin) : null;
 
   const allDriversSorted = useMemo(() => {
     return drivers
-      .filter((driver: any) => {
+      .filter((driver) => {
         const onShift = !workingDriverIds || workingDriverIds.size === 0 || workingDriverIds.has(driver.id);
         return onShift;
       })
-      .map((driver: any) => {
+      .map((driver) => {
         const hasLocation = isValidLatLng(driver?.driverLocation?.latitude, driver?.driverLocation?.longitude);
         const distanceToPickupMeters = hasLocation && pickupLocation
           ? distanceMeters(
@@ -3031,8 +3147,8 @@ function BottomDetailPanel({
         const isFree = activeCount < MAX_DRIVER_ACTIVE_ORDERS;
         return { driver, distanceToPickupMeters, isAssignable, isFree, hasLocation, activeCount };
       })
-      .sort((a: any, b: any) => {
-        const score = (d: any) =>
+      .sort((a, b) => {
+        const score = (d: { isAssignable: boolean; isFree: boolean }) =>
           d.isAssignable && d.isFree ? 0 :  // online, free
           d.isAssignable ? 1 :               // online, busy
           2;                                 // offline/unavailable
@@ -3042,7 +3158,7 @@ function BottomDetailPanel({
       });
   }, [drivers, activeOrders, workingDriverIds, pickupLocation?.latitude, pickupLocation?.longitude]);
 
-  const recommendedDriver = !order.driver ? (allDriversSorted.find((d: any) => d.isAssignable && d.isFree) ?? null) : null;
+  const recommendedDriver = !order.driver ? (allDriversSorted.find((d) => d.isAssignable && d.isFree) ?? null) : null;
   const prepTimeMinutes = orderBusinesses[0]?.business?.avgPrepTimeMinutes;
   const prepRemainingMin = order.status === "PREPARING" && order.estimatedReadyAt
     ? Math.max(0, Math.round((new Date(order.estimatedReadyAt).getTime() - now) / 60000))
@@ -3057,7 +3173,7 @@ function BottomDetailPanel({
   useEffect(() => { setSelectedDriverId(order.driver?.id || ""); }, [order.driver?.id, order.id]);
   useEffect(() => {
     if (order.driver || !recommendedDriver || selectedDriverId) return;
-    setSelectedDriverId((recommendedDriver as any).driver.id);
+    setSelectedDriverId(recommendedDriver.driver.id);
   }, [order.driver, recommendedDriver, selectedDriverId]);
 
   const slaRisk = getOrderSlaRisk(order, now, statusChangeTime);
@@ -3186,7 +3302,7 @@ function BottomDetailPanel({
               💰 Over €20
             </div>
           )}
-          {(order as any).inventoryPrice != null && Number((order as any).inventoryPrice) > 0 && (
+          {order.inventoryPrice != null && Number(order.inventoryPrice) > 0 && (
             <div
               role="button"
               tabIndex={0}
@@ -3194,11 +3310,11 @@ function BottomDetailPanel({
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); setInventoryModalOrder(order); fetchOrderCoverage({ variables: { orderId: order.id } }); } }}
               className="mt-2 w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/30 text-violet-300 text-xs font-semibold hover:bg-violet-500/20 transition-colors text-left cursor-pointer"
             >
-              📦 Stock items — €{Number((order as any).inventoryPrice).toFixed(2)}
+              📦 Stock items — €{Number(order.inventoryPrice).toFixed(2)}
               <span className="ml-auto text-violet-500 text-[10px]">View →</span>
             </div>
           )}
-          {(order as any).needsApproval && (
+          {order.needsApproval && (
             <div className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold">
               ⚠ Awaiting approval
             </div>
@@ -3216,7 +3332,7 @@ function BottomDetailPanel({
         </div>
 
         {/* ── Order items ── */}
-        {orderBusinesses.some((b: any) => getOrderBusinessItems(b).length > 0) && (
+        {orderBusinesses.some((b) => getOrderBusinessItems(b).length > 0) && (
           <ItemsList orderBusinesses={orderBusinesses} />
         )}
 
@@ -3254,12 +3370,12 @@ function BottomDetailPanel({
               <div className="overflow-y-auto space-y-1" style={{ maxHeight: '180px' }}>
                 {allDriversSorted.length === 0 ? (
                   <div className="text-sm text-zinc-600 italic">No drivers found</div>
-                ) : allDriversSorted.map(({ driver, distanceToPickupMeters, isAssignable, isFree }: any) => {
+                ) : allDriversSorted.map(({ driver, distanceToPickupMeters, isAssignable, isFree }) => {
                   const cs = (driver.driverConnection?.connectionStatus ?? 'DISCONNECTED') as keyof typeof DRIVER_CONNECTION_COLORS;
                   const ss = DRIVER_CONNECTION_COLORS[cs];
                   const SI = ss.icon;
                   const isSelected = selectedDriverId === driver.id;
-                  const isRecommended = recommendedDriver && (recommendedDriver as any).driver?.id === driver.id;
+                  const isRecommended = recommendedDriver && recommendedDriver.driver?.id === driver.id;
                   const isBusy = isAssignable && !isFree;
                   const isUnavailable = !isAssignable;
                   return (
@@ -3326,7 +3442,7 @@ function BottomDetailPanel({
         {/* ── Status ── */}
         <div className="px-5 py-3 border-b border-white/5">
           <div className="text-[10px] uppercase tracking-widest text-zinc-600 font-semibold mb-2">Status</div>
-          {(order as any).needsApproval && (
+          {order.needsApproval && (
             <button
               onClick={() => onApproveOrder(order.id)}
               className="w-full mb-2 px-3 py-2.5 rounded-xl text-sm font-semibold bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25 transition"
@@ -3382,7 +3498,7 @@ function BottomDetailPanel({
                 <div className="mb-2 text-[10px] px-2 py-1 rounded bg-amber-500/15 text-amber-300 font-semibold inline-block">No driver assigned</div>
               )}
               <div className="space-y-1">
-                {preview.lineItems.map((li: any, i: number) => (
+                {preview.lineItems.map((li, i: number) => (
                   <div key={i} className="flex items-center justify-between text-xs">
                     <span className="text-zinc-500 truncate mr-2">{li.reason}</span>
                     <span className={`font-semibold whitespace-nowrap ${li.direction === 'RECEIVABLE' ? 'text-emerald-300' : 'text-rose-300'}`}>

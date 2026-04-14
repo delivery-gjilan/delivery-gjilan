@@ -5,6 +5,11 @@ import { Check, Copy, Hash, Calendar, Clock, User, Truck, MapPin, MessageSquare,
 import Button from "@/components/ui/Button";
 import { getMarginSeverity } from "@/lib/constants/orderHelpers";
 import {
+    CANCEL_REASON_CATEGORY_LABELS,
+    getCancelReasonBadgeClass,
+    parseTaggedCancellationReason,
+} from "./cancelReason";
+import {
     STATUS_COLORS,
     STATUS_LABELS,
     isTrustedCustomer,
@@ -216,13 +221,25 @@ export default function OrderDetailPanel({
                 {/* Cancellation info */}
                 {order.status === "CANCELLED" && (order.cancellationReason || order.cancelledAt) && (
                     <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3">
+                        {(() => {
+                            const parsed = parseTaggedCancellationReason(order.cancellationReason);
+                            return (
+                                <>
                         <div className="text-[10px] text-red-400 uppercase tracking-wider mb-1.5 font-semibold">Cancellation</div>
                         {order.cancelledAt && (
                             <div className="text-xs text-zinc-500 mb-1">{new Date(order.cancelledAt).toLocaleString()}</div>
                         )}
-                        {order.cancellationReason && (
-                            <div className="text-sm text-red-200">{order.cancellationReason}</div>
+                        {parsed.category && (
+                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold mb-2 ${getCancelReasonBadgeClass(parsed.category)}`}>
+                                {CANCEL_REASON_CATEGORY_LABELS[parsed.category]}
+                            </span>
                         )}
+                        {parsed.reasonText && (
+                            <div className="text-sm text-red-200">{parsed.reasonText}</div>
+                        )}
+                                </>
+                            );
+                        })()}
                     </div>
                 )}
 

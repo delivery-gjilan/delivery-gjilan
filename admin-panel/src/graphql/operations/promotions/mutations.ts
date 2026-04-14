@@ -22,6 +22,12 @@ export const CREATE_PROMOTION = graphql(`
             isActive
             startsAt
             endsAt
+            scheduleType
+            scheduleTimezone
+            dailyStartTime
+            dailyEndTime
+            activeWeekdays
+            newUserWindowDays
             createdAt
         }
     }
@@ -49,6 +55,12 @@ export const UPDATE_PROMOTION = graphql(`
             isActive
             startsAt
             endsAt
+            scheduleType
+            scheduleTimezone
+            dailyStartTime
+            dailyEndTime
+            activeWeekdays
+            newUserWindowDays
             createdAt
         }
     }

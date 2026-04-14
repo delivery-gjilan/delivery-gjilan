@@ -354,7 +354,7 @@ export class PromotionRepository {
         const [deleted] = await this.db
             .delete(promotionAudienceGroups)
             .where(eq(promotionAudienceGroups.id, id))
-            .returning({ id: promotionAudienceGroups.id });
+            .returning();
 
         return !!deleted;
     }

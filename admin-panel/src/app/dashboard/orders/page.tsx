@@ -20,6 +20,12 @@ import InventoryCoverageModal from "@/components/inventory/InventoryCoverageModa
 import OrderDetailPanel from "@/components/orders/OrderDetailPanel";
 import CancelOrderModal from "@/components/orders/CancelOrderModal";
 import type { CancelReasonCategory } from "@/components/orders/CancelOrderModal";
+import {
+    CANCEL_REASON_CATEGORY_LABELS,
+    composeTaggedCancellationReason,
+    getCancelReasonBadgeClass,
+    parseTaggedCancellationReason,
+} from "@/components/orders/cancelReason";
 import { Package, Store, Search, ArrowRight, MapPin, User, Plus, ChefHat, Timer, Copy, Check, Phone, Hash, MessageSquare, Calendar, X } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -420,7 +426,7 @@ export default function OrdersPage() {
         if (!cancelModalOrder) return;
         const trimmed = cancelReason.trim();
         if (!trimmed) { toast.warning("Please provide a cancellation reason."); return; }
-        const taggedReason = cancelReasonCategory ? `[${cancelReasonCategory}] ${trimmed}` : trimmed;
+        const taggedReason = composeTaggedCancellationReason(cancelReasonCategory, trimmed);
         try {
             await adminCancelOrderMut({ variables: { id: cancelModalOrder.id, reason: taggedReason, settleDriver: cancelSettleDriver, settleBusiness: cancelSettleBusiness } });
             toast.success("Order cancelled successfully.");
@@ -955,7 +961,21 @@ export default function OrdersPage() {
                                                             <Dropdown value={order.status} onChange={(val) => handleStatusChange(order, val)} options={STATUS_OPTIONS} disabled={updateLoading && updatingOrderId === order.id} className="min-w-[130px]" />
                                                         ) : <StatusBadge status={order.status} />}
                                                         {order.status === "CANCELLED" && order.cancellationReason && (
-                                                            <div className="text-xs text-red-400/80 mt-1 max-w-[220px] truncate" title={order.cancellationReason}>{order.cancellationReason}</div>
+                                                            (() => {
+                                                                const parsed = parseTaggedCancellationReason(order.cancellationReason);
+                                                                return (
+                                                                    <div className="mt-1 max-w-[220px]" title={order.cancellationReason}>
+                                                                        {parsed.category && (
+                                                                            <span className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${getCancelReasonBadgeClass(parsed.category)}`}>
+                                                                                {CANCEL_REASON_CATEGORY_LABELS[parsed.category]}
+                                                                            </span>
+                                                                        )}
+                                                                        <div className="text-xs text-red-400/80 truncate mt-1">
+                                                                            {parsed.reasonText}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })()
                                                         )}
                                                     </td>
                                                     <td className="px-3 py-3 align-top font-semibold text-white">

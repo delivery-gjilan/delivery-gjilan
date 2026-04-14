@@ -67,6 +67,7 @@ admin-panel/
 │   │   │   │   └── [id]/page.tsx    # Business detail + products
 │   │   │   ├── users/page.tsx       # Customer/user management
 │   │   │   ├── promotions/page.tsx  # Promotion CRUD
+│   │   │   ├── promotions/analytics/page.tsx # Promotion usage/loss analytics
 │   │   │   ├── statistics/page.tsx  # Statistics (placeholder only)
 │   │   │   ├── notifications/page.tsx # Push notification campaigns
 │   │   │   ├── logs/page.tsx        # Audit log viewer
@@ -211,6 +212,7 @@ The most complex page. Manages the full active + completed order pipeline.
 - Approval modal for flagged orders (`FIRST_ORDER`, `HIGH_VALUE`, `OUT_OF_ZONE`). Suppressible via `[SUPPRESS_APPROVAL_MODAL]` marker in `adminNote`.
 - Trusted customer detection via `[TRUSTED_CUSTOMER]` adminNote marker, `isTrustedCustomer` field, or green `flagColor`.
 - Order cancellation uses shared `CancelOrderModal` with required reason, category tagging (`CUSTOMER_REQUEST`, `BUSINESS_ISSUE`, `DRIVER_ISSUE`, `LOGISTICS`, `SYSTEM`), quick-reason presets, and optional settlement toggles (`settleDriver`, `settleBusiness`) before calling `AdminCancelOrder`.
+- Cancellation reason rendering in order detail/table and cancelled-orders list parses the tag prefix and shows a category badge with clean reason text.
 - Inventory coverage modal showing stock vs. market fulfillment.
 - Incident tagging (JSON stored in `adminNote`).
 - `usePrepTimeAlerts` for overrun notifications.
@@ -232,6 +234,8 @@ The most complex visual page. Full-screen Mapbox GL map with driver positions, o
 - Per-driver/order warning thresholds: PENDING >2min, READY >3min, OUT_FOR_DELIVERY >10min.
 - Status-to-cancel transition opens the same `CancelOrderModal` used in Orders, keeping reason capture and settlement decisions consistent across both pages.
 - Driver/business chat panels with unread count tracking.
+- Core map helpers (trust markers, approval reasons, ETA fallback, status timing, and auto-assign/status action handlers) now use explicit local user/order/driver shape aliases instead of raw `any` parameters.
+- Render-layer typing cleanup is applied through map markers, right-panel cards, driver/business/chat panes, approval modal, and bottom detail helper components, with local shape aliases covering settlement preview and inventory badges instead of broad `any` casts.
 - `// @ts-nocheck` — entire file bypasses TypeScript type safety.
 
 ### `/dashboard/drivers` — Driver Fleet
@@ -258,7 +262,9 @@ The most complex visual page. Full-screen Mapbox GL map with driver positions, o
 
 ### `/dashboard/users` — Customer Management
 
-**Layout:** Master-detail split-pane. Left panel shows a searchable customer list with avatar initials (flag-color-ringed when flagged), status icons (banned/trusted/demo), and flag dots. Clicking a user opens a right-side detail panel; the list shrinks to 380 px. The selected user is derived from live query data so the panel auto-refreshes after mutations.
+**Layout:** Toggle between two views via tab buttons at the top:
+
+**User List view (default):** Master-detail split-pane. Left panel shows a searchable customer list (sorted by signup date desc) with avatar initials (flag-color-ringed when flagged), status icons (banned/trusted/demo), and flag dots. Clicking a user opens a right-side detail panel; the list shrinks to 380 px. The selected user is derived from live query data so the panel auto-refreshes after mutations.
 
 **Detail panel tabs:**
 - **Overview:** Flag & Notes card (5-level color picker: none/green/yellow/orange/red with inline edit), Customer Info card (email, phone, address, user ID).
@@ -266,15 +272,29 @@ The most complex visual page. Full-screen Mapbox GL map with driver positions, o
 
 **Actions bar:** Edit (opens create/edit modal), Ban/Unban (confirmation modal), Delete (confirmation modal). All super-admin only.
 
-**GraphQL:** `USERS_QUERY`, `GET_ORDERS` (lazy, loads on Orders tab), `USER_BEHAVIOR_QUERY` (lazy, super-admin only), 5 mutations (`createUser`, `updateUser`, `deleteUser`, `updateUserNote`, `banUser`). All mutations refetch — no cache updates.
+**Statistics view:** Signup analytics dashboard showing:
+- **Summary cards:** Total new users, users with orders (%), users without orders (%), completed signups (%), pending signups (%).
+- **Signup Trend Chart:** LineChart showing new user count per day over the selected date range.
+- **Filters:** Date range (7d/30d/90d/all), user status (all/new-only/with-orders/without-orders).
+- **New Users List:** Sortable list of new users in the filtered range with signup date, order count, and completion status.
 
-**Key features:** 5-color flag system with inline note editing. `isBanned` column blocks ordering (backend). `isTrustedCustomer` skips FIRST_ORDER and HIGH_VALUE approval. Ban/unban with confirmation. Search by name, email, or phone. Only CUSTOMER-role users shown (drivers managed separately).
+**GraphQL:** `USERS_QUERY` (includes `createdAt`, `totalOrders`, `signupStep`, `emailVerified`, `phoneVerified`), `GET_ORDERS` (lazy, loads on Orders tab), `USER_BEHAVIOR_QUERY` (lazy, super-admin only), 5 mutations (`createUser`, `updateUser`, `deleteUser`, `updateUserNote`, `banUser`). All mutations refetch — no cache updates.
+
+**Key features:** 5-color flag system with inline note editing. `isBanned` column blocks ordering (backend). `isTrustedCustomer` skips FIRST_ORDER and HIGH_VALUE approval. Ban/unban with confirmation. Search by name, email, or phone. Only CUSTOMER-role users shown (drivers managed separately). Signup date-based analytics and charting via `recharts` LineChart.
+
+**New Implementation (Apr 2026):** Statistics tab added with full signup trend analysis, date-range and status filters, and user list filtering by signup cohort and order activity.
 
 ### `/dashboard/promotions` — Promotion Management
 
 **GraphQL:** `GET_PROMOTIONS`, `GET_RECOVERY_PROMOTIONS`, `GET_BUSINESSES`, `USERS_QUERY`, 5 mutations. `ASSIGN_PROMOTION_TO_USERS` is imported from `notifications` operations (semantic mismatch).
 
 **Key features:** Six promotion types with conditional field visibility. `driverPayoutAmount` for delivery-fee promos. `creatorType` (PLATFORM/BUSINESS). Quick-code modal. User assign flow (pick users → assign promo). Recovery promotions tab. Promotions list status shows global usage progress (`used/limit` + `remaining`) and marks exhausted promos as `Limit reached`.
+
+### `/dashboard/promotions/analytics` — Promotion Usage & Loss Analytics
+
+**GraphQL:** `GET_PROMOTIONS_ANALYTICS` (`getPromotionsAnalytics` query).
+
+**Key features:** Date-range filters (`from`, `to`), status filter (active/inactive/all), optional inclusion of recovery promotions, summary cards (total deducted, platform-paid, business-paid, usage/users), view tabs (`Breakdown`, `Trends`), sortable-by-default table (highest deducted first), and per-promotion breakdown columns: total deducted, price-discount deducted, delivery deducted, free-delivery usage count, average order value, and creator attribution (platform/business + creator name when business-owned). Trends view renders two daily charts from `dailyPoints`: deductions split by payer and usage vs unique users.
 
 ### `/dashboard/statistics` — Statistics
 
@@ -297,7 +317,7 @@ The most complex visual page. Full-screen Mapbox GL map with driver positions, o
 
 **GraphQL:** `GET_AUDIT_LOGS` (`fetchPolicy: 'network-only'`, page size 50). Filterable by action (17 types), entity (8 types), actor (5 types), date range.
 
-**Key features:** `formatMetadataPreview(action, metadata)` — action-aware. `getActionColor` and `getActorBadge` for visual coding. Expandable rows showing raw `metadata` JSON.
+**Key features:** `formatMetadataPreview(action, metadata)` — action-aware. `getActionColor` and `getActorBadge` for visual coding. Expandable rows showing raw `metadata` JSON. Metadata shaping in preview/details renderers uses local typed metadata aliases (including diff-oriented `oldValue`/`newValue`) instead of explicit `any` annotations.
 
 ### `/dashboard/products` — Product Management Entry
 
@@ -364,6 +384,8 @@ Business picker + `<CategoriesBlock>` + `<SubcategoriesBlock>`. **Note:** `GET_B
 ### `/dashboard/market` — Market Product Management
 
 **Key features:** Full category/subcategory/product CRUD with drag-and-drop reorder (`@dnd-kit`). Multi-column layout (categories | subcategories | products). Variant group management. Grid/list view toggle. Sort mode freezes filters and shows drag handles.
+
+**Typing state:** Modal state (`category`, `subcategory`, `product`) and variant-group creation response are typed with explicit local interfaces; market-business selection uses inferred business query row types without callback casts.
 
 **Hooks:** 17 custom hooks for data + mutation operations.
 
@@ -562,8 +584,10 @@ Pure function `canAccessAdminPanelPath(role, pathname)` — defines allowed path
 - **settlementRules.ts:** `SettlementRules`, `SettlementRulesCount`, `BusinessesSelection`, `PromotionsSelection`, `CreateSettlementRule`, `UpdateSettlementRule`, `DeleteSettlementRule`
 
 ### Promotions (`graphql/operations/promotions/`)
-- **Queries:** `GetPromotions`, `GetRecoveryPromotions`
+- **Queries:** `GetPromotions`, `GetRecoveryPromotions`, `GetPromotionsAnalytics`
 - **Mutations:** `CreatePromotion`, `UpdatePromotion`, `DeletePromotion`, `GrantFreeDelivery`, `IssueRecoveryPromotion`
+
+`GetPromotionsAnalytics` returns a summary block, per-promotion rows, and a date-bucketed `dailyPoints` series used by the trends charts.
 
 ### Banners (`graphql/operations/banners/`)
 - **Queries:** `GetBanners`, `Banner`, `GetActiveBanners`, `GetBusinessesList`, `GetBusinessPerformanceStats`, `GetBusinessProducts`

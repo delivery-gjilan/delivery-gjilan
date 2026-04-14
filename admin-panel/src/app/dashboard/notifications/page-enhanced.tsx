@@ -44,6 +44,14 @@ import {
   Tag,
   Gift,
 } from "lucide-react";
+import type {
+  AssignPromotionToUsersMutation,
+  GetNotificationCampaignsQuery,
+  GetPromotionsQuery,
+  PreviewCampaignAudienceQuery,
+  SendPushNotificationMutation,
+  UsersQuery,
+} from "@/gql/graphql";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -190,14 +198,14 @@ export default function NotificationsPage() {
   const [promoSent, setPromoSent] = useState<{ success: boolean; count: number } | null>(null);
 
   // ── Queries & Mutations ─────────────────────────────
-  const { data, loading, refetch } = useQuery(GET_NOTIFICATION_CAMPAIGNS);
-  const campaigns: Campaign[] = (data as any)?.notificationCampaigns || [];
+  const { data, loading, refetch } = useQuery<GetNotificationCampaignsQuery>(GET_NOTIFICATION_CAMPAIGNS);
+  const campaigns: Campaign[] = data?.notificationCampaigns || [];
 
-  const { data: usersData } = useQuery(USERS_QUERY);
-  const allUsers: UserItem[] = (usersData as any)?.users || [];
+  const { data: usersData } = useQuery<UsersQuery>(USERS_QUERY);
+  const allUsers: UserItem[] = usersData?.users || [];
 
-  const { data: promotionsData } = useQuery(GET_ALL_PROMOTIONS);
-  const promotions: Promotion[] = (promotionsData as any)?.getAllPromotions || [];
+  const { data: promotionsData } = useQuery<GetPromotionsQuery>(GET_ALL_PROMOTIONS);
+  const promotions: Promotion[] = promotionsData?.getAllPromotions || [];
 
   const [createCampaign, { loading: creating }] = useMutation(CREATE_CAMPAIGN);
   const [sendCampaignMut, { loading: sending }] = useMutation(SEND_CAMPAIGN);
@@ -270,7 +278,7 @@ export default function NotificationsPage() {
   const handlePreview = async () => {
     try {
       const { data } = await previewAudience({ variables: { query: queryGroup } });
-      const result = (data as any)?.previewCampaignAudience;
+      const result: PreviewCampaignAudienceQuery["previewCampaignAudience"] | undefined = data?.previewCampaignAudience;
       if (result) {
         setPreviewCount(result.count);
         setPreviewUsers(result.sampleUsers || []);
@@ -351,7 +359,7 @@ export default function NotificationsPage() {
           },
         },
       });
-      const result = (data as any)?.sendPushNotification;
+      const result: SendPushNotificationMutation["sendPushNotification"] | undefined = data?.sendPushNotification;
       if (result) {
         setDirectSent(result);
         setTimeout(() => setDirectSent(null), 5000);
@@ -383,8 +391,8 @@ export default function NotificationsPage() {
           },
         },
       });
-      
-      const assignResult = (assignData as any)?.assignPromotionToUsers;
+
+      const assignResult: AssignPromotionToUsersMutation["assignPromotionToUsers"] | undefined = assignData?.assignPromotionToUsers;
       if (assignResult) {
         // Send notification if title/body provided
         if (promoNotifTitle.trim() && promoNotifBody.trim()) {

@@ -13,7 +13,14 @@ enum PromotionTarget {
   ALL_USERS
   SPECIFIC_USERS
   FIRST_ORDER
+  NEW_USERS
   CONDITIONAL
+}
+
+enum PromotionScheduleType {
+  ALWAYS
+  DATE_RANGE
+  RECURRING
 }
 
 enum PromotionCreatorType {
@@ -41,6 +48,12 @@ type Promotion {
   isActive: Boolean!
   startsAt: String
   endsAt: String
+  scheduleType: PromotionScheduleType!
+  scheduleTimezone: String
+  dailyStartTime: String
+  dailyEndTime: String
+  activeWeekdays: [Int!]
+  newUserWindowDays: Int
   createdAt: String!
   
   # Analytics
@@ -167,6 +180,12 @@ input CreatePromotionInput {
   isActive: Boolean!
   startsAt: String
   endsAt: String
+  scheduleType: PromotionScheduleType
+  scheduleTimezone: String
+  dailyStartTime: String
+  dailyEndTime: String
+  activeWeekdays: [Int!]
+  newUserWindowDays: Int
 
   # Creator
   creatorType: PromotionCreatorType!
@@ -287,6 +306,7 @@ type Query {
   
   # Analytics
   getPromotionAnalytics(promotionId: ID!): PromotionAnalyticsResult!
+  getPromotionsAnalytics(from: String, to: String, includeRecovery: Boolean, isActive: Boolean): PromotionsAnalyticsResult!
 
   # Persistent audience groups for targeted promotions
   getPromotionAudienceGroups(isActive: Boolean, search: String): [PromotionAudienceGroup!]!
@@ -300,6 +320,48 @@ type PromotionAnalyticsResult {
   uniqueUsers: Int!
   averageOrderValue: Float!
   conversionRate: Float
+}
+
+type PromotionsAnalyticsSummary {
+  totalUsageCount: Int!
+  totalDeducted: Float!
+  totalDiscountDeducted: Float!
+  totalDeliveryDeducted: Float!
+  platformPaid: Float!
+  businessPaid: Float!
+  uniqueUsers: Int!
+  averageOrderValue: Float!
+}
+
+type PromotionAnalyticsListItem {
+  promotion: Promotion!
+  creatorName: String
+  totalUsageCount: Int!
+  uniqueUsers: Int!
+  totalDeducted: Float!
+  totalDiscountDeducted: Float!
+  totalDeliveryDeducted: Float!
+  platformPaid: Float!
+  businessPaid: Float!
+  freeDeliveryUsageCount: Int!
+  averageOrderValue: Float!
+}
+
+type PromotionAnalyticsDailyPoint {
+  date: String!
+  usageCount: Int!
+  uniqueUsers: Int!
+  totalDeducted: Float!
+  totalDiscountDeducted: Float!
+  totalDeliveryDeducted: Float!
+  platformPaid: Float!
+  businessPaid: Float!
+}
+
+type PromotionsAnalyticsResult {
+  summary: PromotionsAnalyticsSummary!
+  items: [PromotionAnalyticsListItem!]!
+  dailyPoints: [PromotionAnalyticsDailyPoint!]!
 }
 
 # ============================================

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "@apollo/client/react";
 import { Tag, Plus, Edit, Trash2, HeartHandshake, CheckCircle2, Clock, Users, Search, X } from "lucide-react";
@@ -24,6 +25,7 @@ import {
     PromotionType,
     PromotionCreatorType,
     PromotionTarget,
+    PromotionScheduleType,
     type AssignPromotionToUsersMutation,
     type AssignPromotionToUsersMutationVariables,
     type BusinessesQuery,
@@ -61,8 +63,19 @@ const promotionTargetLabels: Record<PromotionTarget, string> = {
     ALL_USERS: "All users",
     SPECIFIC_USERS: "Specific users",
     FIRST_ORDER: "First order",
+    NEW_USERS: "New users",
     CONDITIONAL: "Conditional",
 };
+
+const weekdayOptions = [
+    { value: 1, label: 'Mon' },
+    { value: 2, label: 'Tue' },
+    { value: 3, label: 'Wed' },
+    { value: 4, label: 'Thu' },
+    { value: 5, label: 'Fri' },
+    { value: 6, label: 'Sat' },
+    { value: 0, label: 'Sun' },
+];
 
 type PromotionFormState = {
     name: string;
@@ -83,6 +96,12 @@ type PromotionFormState = {
     isActive: string;
     startsAt: string;
     endsAt: string;
+    scheduleType: PromotionScheduleType;
+    scheduleTimezone: string;
+    dailyStartTime: string;
+    dailyEndTime: string;
+    activeWeekdays: number[];
+    newUserWindowDays: string;
     eligibleBusinessIds: string[];
 
     // Creator
@@ -133,6 +152,12 @@ const emptyForm: PromotionFormState = {
     isActive: "true",
     startsAt: "",
     endsAt: "",
+    scheduleType: PromotionScheduleType.DateRange,
+    scheduleTimezone: "Europe/Belgrade",
+    dailyStartTime: "",
+    dailyEndTime: "",
+    activeWeekdays: [],
+    newUserWindowDays: "",
     eligibleBusinessIds: [],
     creatorType: "PLATFORM",
     creatorId: "",
@@ -587,6 +612,14 @@ export default function PromotionsPage() {
 
         const vis = typeFieldVisibility[formData.type];
 
+        if (formData.target === "NEW_USERS" && !toOptionalNumber(formData.newUserWindowDays)) {
+            return;
+        }
+
+        if (formData.scheduleType === PromotionScheduleType.Recurring && (!formData.dailyStartTime || !formData.dailyEndTime)) {
+            return;
+        }
+
         const payload: CreatePromotionInput = {
             name: formData.name.trim(),
             description: formData.description.trim() || undefined,
@@ -609,6 +642,18 @@ export default function PromotionsPage() {
                     : undefined,
             startsAt: formData.startsAt || undefined,
             endsAt: formData.endsAt || undefined,
+            scheduleType: formData.scheduleType,
+            scheduleTimezone: formData.scheduleType === PromotionScheduleType.Recurring ? (formData.scheduleTimezone || undefined) : undefined,
+            dailyStartTime: formData.scheduleType === PromotionScheduleType.Recurring ? (formData.dailyStartTime || undefined) : undefined,
+            dailyEndTime: formData.scheduleType === PromotionScheduleType.Recurring ? (formData.dailyEndTime || undefined) : undefined,
+            activeWeekdays:
+                formData.scheduleType === PromotionScheduleType.Recurring && formData.activeWeekdays.length > 0
+                    ? formData.activeWeekdays
+                    : undefined,
+            newUserWindowDays:
+                formData.target === "NEW_USERS" && toOptionalNumber(formData.newUserWindowDays)
+                    ? Math.round(Number(formData.newUserWindowDays))
+                    : undefined,
             creatorType: formData.creatorType === "BUSINESS" ? PromotionCreatorType.Business : PromotionCreatorType.Platform,
             creatorId: formData.creatorType === "BUSINESS" && formData.creatorId ? formData.creatorId : undefined,
             driverPayoutAmount,
@@ -646,12 +691,17 @@ export default function PromotionsPage() {
                         Manage promotions, wallet credits, and targeted campaigns.
                     </p>
                 </div>
-                {activeTab === "promotions" && (
-                    <Button onClick={handleOpenCreate}>
-                        <Plus size={18} className="mr-2" />
-                        Create Promotion
-                    </Button>
-                )}
+                <div className="flex items-center gap-2">
+                    <Link href="/dashboard/promotions/analytics">
+                        <Button variant="secondary">View Analytics</Button>
+                    </Link>
+                    {activeTab === "promotions" && (
+                        <Button onClick={handleOpenCreate}>
+                            <Plus size={18} className="mr-2" />
+                            Create Promotion
+                        </Button>
+                    )}
+                </div>
             </div>
 
             {/* Tabs */}
@@ -739,6 +789,7 @@ export default function PromotionsPage() {
                             <option value="ALL_USERS">All users</option>
                             <option value="SPECIFIC_USERS">Specific users</option>
                             <option value="FIRST_ORDER">First order</option>
+                            <option value="NEW_USERS">New users</option>
                             <option value="CONDITIONAL">Conditional</option>
                         </Select>
                         <Select
@@ -1545,16 +1596,36 @@ export default function PromotionsPage() {
                                                     <option value="ALL_USERS">All Users</option>
                                                     <option value="SPECIFIC_USERS">Specific Users</option>
                                                     <option value="FIRST_ORDER">First Order Only</option>
+                                                    <option value="NEW_USERS">New Users (Signup Window)</option>
                                                     <option value="CONDITIONAL">Conditional (Spend Threshold)</option>
                                                 </Select>
                                                 <div className="text-xs text-zinc-600 mt-1">
                                                     {formData.target === "ALL_USERS" && "Anyone can use this promo"}
                                                     {formData.target === "SPECIFIC_USERS" && "Manually assign to specific users"}
                                                     {formData.target === "FIRST_ORDER" && "Auto-applies to user's first order"}
+                                                    {formData.target === "NEW_USERS" && "Eligible only for users within N days after signup"}
                                                     {formData.target === "CONDITIONAL" && "Requires minimum spend threshold"}
                                                 </div>
                                             </div>
                                         </div>
+
+                                        {formData.target === "NEW_USERS" && (
+                                            <div className="grid grid-cols-2 gap-4 pt-2">
+                                                <div>
+                                                    <Input
+                                                        label="Signup Window (days) *"
+                                                        type="number"
+                                                        min="1"
+                                                        value={formData.newUserWindowDays}
+                                                        onChange={(e) => setFormData({ ...formData, newUserWindowDays: e.target.value })}
+                                                        placeholder="14"
+                                                    />
+                                                    <div className="text-xs text-zinc-600 mt-1">
+                                                        Example: 14 means users are eligible only in their first 14 days.
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
 
                                         {/* Creator Type */}
                                         <div className="space-y-2 pt-2">
@@ -1980,7 +2051,25 @@ export default function PromotionsPage() {
                                     <h3 className="text-white font-semibold text-sm flex items-center gap-2 border-b border-zinc-800 pb-2">
                                         Schedule &amp; Status
                                     </h3>
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <div>
+                                            <Select
+                                                label="Schedule Mode"
+                                                value={formData.scheduleType}
+                                                onChange={(e) =>
+                                                    setFormData({
+                                                        ...formData,
+                                                        scheduleType: e.target.value as PromotionScheduleType,
+                                                        ...(e.target.value === PromotionScheduleType.DateRange
+                                                            ? { dailyStartTime: "", dailyEndTime: "", activeWeekdays: [] }
+                                                            : {}),
+                                                    })
+                                                }
+                                            >
+                                                <option value={PromotionScheduleType.DateRange}>Date Range</option>
+                                                <option value={PromotionScheduleType.Recurring}>Recurring (time window)</option>
+                                            </Select>
+                                        </div>
                                         <div>
                                             <Input
                                                 label="Start Date & Time"
@@ -2004,6 +2093,71 @@ export default function PromotionsPage() {
                                             </div>
                                         </div>
                                     </div>
+
+                                    {formData.scheduleType === PromotionScheduleType.Recurring && (
+                                        <>
+                                            <div className="grid grid-cols-3 gap-4">
+                                                <div>
+                                                    <Input
+                                                        label="Daily Start Time *"
+                                                        type="time"
+                                                        value={formData.dailyStartTime}
+                                                        onChange={(e) => setFormData({ ...formData, dailyStartTime: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Input
+                                                        label="Daily End Time *"
+                                                        type="time"
+                                                        value={formData.dailyEndTime}
+                                                        onChange={(e) => setFormData({ ...formData, dailyEndTime: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Input
+                                                        label="Timezone"
+                                                        value={formData.scheduleTimezone}
+                                                        onChange={(e) => setFormData({ ...formData, scheduleTimezone: e.target.value })}
+                                                        placeholder="Europe/Belgrade"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <div className="text-sm text-zinc-300 font-medium">Active weekdays (optional)</div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {weekdayOptions.map((day) => {
+                                                        const active = formData.activeWeekdays.includes(day.value);
+                                                        return (
+                                                            <button
+                                                                key={day.value}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const current = formData.activeWeekdays;
+                                                                    setFormData({
+                                                                        ...formData,
+                                                                        activeWeekdays: active
+                                                                            ? current.filter((d) => d !== day.value)
+                                                                            : [...current, day.value],
+                                                                    });
+                                                                }}
+                                                                className={`px-3 py-1.5 rounded-md border text-xs font-medium transition-colors ${
+                                                                    active
+                                                                        ? 'bg-violet-600 border-violet-500 text-white'
+                                                                        : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-zinc-500'
+                                                                }`}
+                                                            >
+                                                                {day.label}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                                <div className="text-xs text-zinc-600">
+                                                    Leave empty to run every day. Overnight ranges (for example 22:00-02:00) are supported.
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
 
                                     <Select
                                         label="Status"

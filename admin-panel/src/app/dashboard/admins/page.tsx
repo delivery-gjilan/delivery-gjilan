@@ -13,7 +13,7 @@ import Modal from "@/components/ui/Modal";
 import { useAuth } from "@/lib/auth-context";
 import { Pencil, Trash2, Building2, UserCog, AlertCircle } from "lucide-react";
 import { PermissionSelector } from "@/components/dashboard/PermissionSelector";
-import { UserPermission } from "@/gql/graphql";
+import { UserPermission, UserRole } from "@/gql/graphql";
 
 interface UserItem {
     id: string;
@@ -155,7 +155,7 @@ export default function AdminsPage() {
                         id: editingUser.id,
                         firstName: formData.firstName,
                         lastName: formData.lastName,
-                        role: formData.role as any,
+                        role: formData.role as UserRole,
                         businessId: (formData.role === 'BUSINESS_OWNER' || formData.role === 'BUSINESS_EMPLOYEE') ? formData.businessId : null,
                     },
                 });

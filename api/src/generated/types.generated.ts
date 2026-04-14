@@ -605,9 +605,12 @@ export type CreatePromotionAudienceGroupInput = {
 };
 
 export type CreatePromotionInput = {
+  activeWeekdays?: InputMaybe<Array<Scalars['Int']['input']>>;
   code?: InputMaybe<Scalars['String']['input']>;
   creatorId?: InputMaybe<Scalars['ID']['input']>;
   creatorType: PromotionCreatorType;
+  dailyEndTime?: InputMaybe<Scalars['String']['input']>;
+  dailyStartTime?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   discountValue?: InputMaybe<Scalars['Float']['input']>;
   driverPayoutAmount?: InputMaybe<Scalars['Float']['input']>;
@@ -621,7 +624,10 @@ export type CreatePromotionInput = {
   maxUsagePerUser?: InputMaybe<Scalars['Int']['input']>;
   minOrderAmount?: InputMaybe<Scalars['Float']['input']>;
   name: Scalars['String']['input'];
+  newUserWindowDays?: InputMaybe<Scalars['Int']['input']>;
   priority: Scalars['Int']['input'];
+  scheduleTimezone?: InputMaybe<Scalars['String']['input']>;
+  scheduleType?: InputMaybe<PromotionScheduleType>;
   spendThreshold?: InputMaybe<Scalars['Float']['input']>;
   startsAt?: InputMaybe<Scalars['String']['input']>;
   target: PromotionTarget;
@@ -2354,12 +2360,15 @@ export type ProductVariantGroup = {
 
 export type Promotion = {
   __typename?: 'Promotion';
+  activeWeekdays?: Maybe<Array<Scalars['Int']['output']>>;
   assignedUsers?: Maybe<Array<UserPromotion>>;
   code?: Maybe<Scalars['String']['output']>;
   createdAt: Scalars['String']['output'];
   creatorId?: Maybe<Scalars['ID']['output']>;
   creatorType: PromotionCreatorType;
   currentGlobalUsage: Scalars['Int']['output'];
+  dailyEndTime?: Maybe<Scalars['String']['output']>;
+  dailyStartTime?: Maybe<Scalars['String']['output']>;
   description?: Maybe<Scalars['String']['output']>;
   discountValue?: Maybe<Scalars['Float']['output']>;
   eligibleBusinesses?: Maybe<Array<Business>>;
@@ -2373,8 +2382,11 @@ export type Promotion = {
   maxUsagePerUser?: Maybe<Scalars['Int']['output']>;
   minOrderAmount?: Maybe<Scalars['Float']['output']>;
   name: Scalars['String']['output'];
+  newUserWindowDays?: Maybe<Scalars['Int']['output']>;
   orderId?: Maybe<Scalars['ID']['output']>;
   priority: Scalars['Int']['output'];
+  scheduleTimezone?: Maybe<Scalars['String']['output']>;
+  scheduleType: PromotionScheduleType;
   spendThreshold?: Maybe<Scalars['Float']['output']>;
   startsAt?: Maybe<Scalars['String']['output']>;
   target: PromotionTarget;
@@ -2382,6 +2394,33 @@ export type Promotion = {
   totalRevenue: Scalars['Float']['output'];
   totalUsageCount: Scalars['Int']['output'];
   type: PromotionType;
+};
+
+export type PromotionAnalyticsDailyPoint = {
+  __typename?: 'PromotionAnalyticsDailyPoint';
+  businessPaid: Scalars['Float']['output'];
+  date: Scalars['String']['output'];
+  platformPaid: Scalars['Float']['output'];
+  totalDeducted: Scalars['Float']['output'];
+  totalDeliveryDeducted: Scalars['Float']['output'];
+  totalDiscountDeducted: Scalars['Float']['output'];
+  uniqueUsers: Scalars['Int']['output'];
+  usageCount: Scalars['Int']['output'];
+};
+
+export type PromotionAnalyticsListItem = {
+  __typename?: 'PromotionAnalyticsListItem';
+  averageOrderValue: Scalars['Float']['output'];
+  businessPaid: Scalars['Float']['output'];
+  creatorName?: Maybe<Scalars['String']['output']>;
+  freeDeliveryUsageCount: Scalars['Int']['output'];
+  platformPaid: Scalars['Float']['output'];
+  promotion: Promotion;
+  totalDeducted: Scalars['Float']['output'];
+  totalDeliveryDeducted: Scalars['Float']['output'];
+  totalDiscountDeducted: Scalars['Float']['output'];
+  totalUsageCount: Scalars['Int']['output'];
+  uniqueUsers: Scalars['Int']['output'];
 };
 
 export type PromotionAnalyticsResult = {
@@ -2429,10 +2468,16 @@ export type PromotionResult = {
   totalDiscount: Scalars['Float']['output'];
 };
 
+export type PromotionScheduleType =
+  | 'ALWAYS'
+  | 'DATE_RANGE'
+  | 'RECURRING';
+
 export type PromotionTarget =
   | 'ALL_USERS'
   | 'CONDITIONAL'
   | 'FIRST_ORDER'
+  | 'NEW_USERS'
   | 'SPECIFIC_USERS';
 
 export type PromotionThreshold = {
@@ -2468,6 +2513,25 @@ export type PromotionUsage = {
   usedAt: Scalars['String']['output'];
   user?: Maybe<User>;
   userId: Scalars['ID']['output'];
+};
+
+export type PromotionsAnalyticsResult = {
+  __typename?: 'PromotionsAnalyticsResult';
+  dailyPoints: Array<PromotionAnalyticsDailyPoint>;
+  items: Array<PromotionAnalyticsListItem>;
+  summary: PromotionsAnalyticsSummary;
+};
+
+export type PromotionsAnalyticsSummary = {
+  __typename?: 'PromotionsAnalyticsSummary';
+  averageOrderValue: Scalars['Float']['output'];
+  businessPaid: Scalars['Float']['output'];
+  platformPaid: Scalars['Float']['output'];
+  totalDeducted: Scalars['Float']['output'];
+  totalDeliveryDeducted: Scalars['Float']['output'];
+  totalDiscountDeducted: Scalars['Float']['output'];
+  totalUsageCount: Scalars['Int']['output'];
+  uniqueUsers: Scalars['Int']['output'];
 };
 
 export type PushTelemetryEvent = {
@@ -2554,6 +2618,7 @@ export type Query = {
   getPromotionAudienceGroups: Array<PromotionAudienceGroup>;
   getPromotionThresholds: Array<PromotionThreshold>;
   getPromotionUsage: Array<PromotionUsage>;
+  getPromotionsAnalytics: PromotionsAnalyticsResult;
   getRecoveryPromotions: Array<Promotion>;
   getStoreStatus: StoreStatus;
   getUserPromoMetadata?: Maybe<UserPromoMetadata>;
@@ -2795,6 +2860,14 @@ export type QuerygetPromotionUsageArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
   promotionId: Scalars['ID']['input'];
+};
+
+
+export type QuerygetPromotionsAnalyticsArgs = {
+  from?: InputMaybe<Scalars['String']['input']>;
+  includeRecovery?: InputMaybe<Scalars['Boolean']['input']>;
+  isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  to?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -3598,6 +3671,7 @@ export type User = {
   business?: Maybe<Business>;
   businessId?: Maybe<Scalars['ID']['output']>;
   commissionPercentage?: Maybe<Scalars['Float']['output']>;
+  createdAt: Scalars['DateTime']['output'];
   driverConnection?: Maybe<DriverConnection>;
   driverLocation?: Maybe<Location>;
   driverLocationUpdatedAt?: Maybe<Scalars['Date']['output']>;
@@ -3924,17 +3998,22 @@ export type ResolversTypes = {
   ProductOrderInput: ProductOrderInput;
   ProductSubcategory: ResolverTypeWrapper<ProductSubcategory>;
   ProductVariantGroup: ResolverTypeWrapper<ProductVariantGroup>;
-  Promotion: ResolverTypeWrapper<Omit<Promotion, 'assignedUsers' | 'creatorType' | 'eligibleBusinesses' | 'target' | 'type'> & { assignedUsers?: Maybe<Array<ResolversTypes['UserPromotion']>>, creatorType: ResolversTypes['PromotionCreatorType'], eligibleBusinesses?: Maybe<Array<ResolversTypes['Business']>>, target: ResolversTypes['PromotionTarget'], type: ResolversTypes['PromotionType'] }>;
+  Promotion: ResolverTypeWrapper<Omit<Promotion, 'assignedUsers' | 'creatorType' | 'eligibleBusinesses' | 'scheduleType' | 'target' | 'type'> & { assignedUsers?: Maybe<Array<ResolversTypes['UserPromotion']>>, creatorType: ResolversTypes['PromotionCreatorType'], eligibleBusinesses?: Maybe<Array<ResolversTypes['Business']>>, scheduleType: ResolversTypes['PromotionScheduleType'], target: ResolversTypes['PromotionTarget'], type: ResolversTypes['PromotionType'] }>;
+  PromotionAnalyticsDailyPoint: ResolverTypeWrapper<PromotionAnalyticsDailyPoint>;
+  PromotionAnalyticsListItem: ResolverTypeWrapper<Omit<PromotionAnalyticsListItem, 'promotion'> & { promotion: ResolversTypes['Promotion'] }>;
   PromotionAnalyticsResult: ResolverTypeWrapper<Omit<PromotionAnalyticsResult, 'promotion'> & { promotion: ResolversTypes['Promotion'] }>;
   PromotionAppliesTo: ResolverTypeWrapper<'PRICE' | 'DELIVERY'>;
   PromotionApplyMethod: ResolverTypeWrapper<'AUTO' | 'CODE_REQUIRED'>;
   PromotionAudienceGroup: ResolverTypeWrapper<Omit<PromotionAudienceGroup, 'members'> & { members: Array<ResolversTypes['User']> }>;
   PromotionCreatorType: ResolverTypeWrapper<'PLATFORM' | 'BUSINESS'>;
   PromotionResult: ResolverTypeWrapper<Omit<PromotionResult, 'promotions'> & { promotions: Array<ResolversTypes['ApplicablePromotion']> }>;
-  PromotionTarget: ResolverTypeWrapper<'ALL_USERS' | 'SPECIFIC_USERS' | 'FIRST_ORDER' | 'CONDITIONAL'>;
+  PromotionScheduleType: ResolverTypeWrapper<'ALWAYS' | 'DATE_RANGE' | 'RECURRING'>;
+  PromotionTarget: ResolverTypeWrapper<'ALL_USERS' | 'SPECIFIC_USERS' | 'FIRST_ORDER' | 'NEW_USERS' | 'CONDITIONAL'>;
   PromotionThreshold: ResolverTypeWrapper<PromotionThreshold>;
   PromotionType: ResolverTypeWrapper<'FIXED_AMOUNT' | 'PERCENTAGE' | 'FREE_DELIVERY' | 'SPEND_X_GET_FREE' | 'SPEND_X_PERCENT' | 'SPEND_X_FIXED'>;
   PromotionUsage: ResolverTypeWrapper<Omit<PromotionUsage, 'order' | 'promotion' | 'user'> & { order?: Maybe<ResolversTypes['Order']>, promotion?: Maybe<ResolversTypes['Promotion']>, user?: Maybe<ResolversTypes['User']> }>;
+  PromotionsAnalyticsResult: ResolverTypeWrapper<Omit<PromotionsAnalyticsResult, 'items'> & { items: Array<ResolversTypes['PromotionAnalyticsListItem']> }>;
+  PromotionsAnalyticsSummary: ResolverTypeWrapper<PromotionsAnalyticsSummary>;
   PushTelemetryEvent: ResolverTypeWrapper<Omit<PushTelemetryEvent, 'appType' | 'eventType' | 'platform'> & { appType: ResolversTypes['DeviceAppType'], eventType: ResolversTypes['PushTelemetryEventType'], platform: ResolversTypes['DevicePlatform'] }>;
   PushTelemetryEventType: ResolverTypeWrapper<'RECEIVED' | 'OPENED' | 'ACTION_TAPPED' | 'TOKEN_REGISTERED' | 'TOKEN_REFRESHED' | 'TOKEN_UNREGISTERED'>;
   PushTelemetrySummary: ResolverTypeWrapper<PushTelemetrySummary>;
@@ -4128,11 +4207,15 @@ export type ResolversParentTypes = {
   ProductSubcategory: ProductSubcategory;
   ProductVariantGroup: ProductVariantGroup;
   Promotion: Omit<Promotion, 'assignedUsers' | 'eligibleBusinesses'> & { assignedUsers?: Maybe<Array<ResolversParentTypes['UserPromotion']>>, eligibleBusinesses?: Maybe<Array<ResolversParentTypes['Business']>> };
+  PromotionAnalyticsDailyPoint: PromotionAnalyticsDailyPoint;
+  PromotionAnalyticsListItem: Omit<PromotionAnalyticsListItem, 'promotion'> & { promotion: ResolversParentTypes['Promotion'] };
   PromotionAnalyticsResult: Omit<PromotionAnalyticsResult, 'promotion'> & { promotion: ResolversParentTypes['Promotion'] };
   PromotionAudienceGroup: Omit<PromotionAudienceGroup, 'members'> & { members: Array<ResolversParentTypes['User']> };
   PromotionResult: Omit<PromotionResult, 'promotions'> & { promotions: Array<ResolversParentTypes['ApplicablePromotion']> };
   PromotionThreshold: PromotionThreshold;
   PromotionUsage: Omit<PromotionUsage, 'order' | 'promotion' | 'user'> & { order?: Maybe<ResolversParentTypes['Order']>, promotion?: Maybe<ResolversParentTypes['Promotion']>, user?: Maybe<ResolversParentTypes['User']> };
+  PromotionsAnalyticsResult: Omit<PromotionsAnalyticsResult, 'items'> & { items: Array<ResolversParentTypes['PromotionAnalyticsListItem']> };
+  PromotionsAnalyticsSummary: PromotionsAnalyticsSummary;
   PushTelemetryEvent: PushTelemetryEvent;
   PushTelemetrySummary: PushTelemetrySummary;
   Query: {};
@@ -5236,12 +5319,15 @@ export type ProductVariantGroupResolvers<ContextType = GraphQLContext, ParentTyp
 };
 
 export type PromotionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Promotion'] = ResolversParentTypes['Promotion']> = {
+  activeWeekdays?: Resolver<Maybe<Array<ResolversTypes['Int']>>, ParentType, ContextType>;
   assignedUsers?: Resolver<Maybe<Array<ResolversTypes['UserPromotion']>>, ParentType, ContextType>;
   code?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   createdAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   creatorId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
   creatorType?: Resolver<ResolversTypes['PromotionCreatorType'], ParentType, ContextType>;
   currentGlobalUsage?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  dailyEndTime?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  dailyStartTime?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   description?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   discountValue?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   eligibleBusinesses?: Resolver<Maybe<Array<ResolversTypes['Business']>>, ParentType, ContextType>;
@@ -5255,8 +5341,11 @@ export type PromotionResolvers<ContextType = GraphQLContext, ParentType extends 
   maxUsagePerUser?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
   minOrderAmount?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  newUserWindowDays?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
   orderId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
   priority?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  scheduleTimezone?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  scheduleType?: Resolver<ResolversTypes['PromotionScheduleType'], ParentType, ContextType>;
   spendThreshold?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   startsAt?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   target?: Resolver<ResolversTypes['PromotionTarget'], ParentType, ContextType>;
@@ -5264,6 +5353,33 @@ export type PromotionResolvers<ContextType = GraphQLContext, ParentType extends 
   totalRevenue?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   totalUsageCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   type?: Resolver<ResolversTypes['PromotionType'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type PromotionAnalyticsDailyPointResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['PromotionAnalyticsDailyPoint'] = ResolversParentTypes['PromotionAnalyticsDailyPoint']> = {
+  businessPaid?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  date?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  platformPaid?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  totalDeducted?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  totalDeliveryDeducted?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  totalDiscountDeducted?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  uniqueUsers?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  usageCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type PromotionAnalyticsListItemResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['PromotionAnalyticsListItem'] = ResolversParentTypes['PromotionAnalyticsListItem']> = {
+  averageOrderValue?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  businessPaid?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  creatorName?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  freeDeliveryUsageCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  platformPaid?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  promotion?: Resolver<ResolversTypes['Promotion'], ParentType, ContextType>;
+  totalDeducted?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  totalDeliveryDeducted?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  totalDiscountDeducted?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  totalUsageCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  uniqueUsers?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -5306,7 +5422,9 @@ export type PromotionResultResolvers<ContextType = GraphQLContext, ParentType ex
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
-export type PromotionTargetResolvers = EnumResolverSignature<{ ALL_USERS?: any, CONDITIONAL?: any, FIRST_ORDER?: any, SPECIFIC_USERS?: any }, ResolversTypes['PromotionTarget']>;
+export type PromotionScheduleTypeResolvers = EnumResolverSignature<{ ALWAYS?: any, DATE_RANGE?: any, RECURRING?: any }, ResolversTypes['PromotionScheduleType']>;
+
+export type PromotionTargetResolvers = EnumResolverSignature<{ ALL_USERS?: any, CONDITIONAL?: any, FIRST_ORDER?: any, NEW_USERS?: any, SPECIFIC_USERS?: any }, ResolversTypes['PromotionTarget']>;
 
 export type PromotionThresholdResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['PromotionThreshold'] = ResolversParentTypes['PromotionThreshold']> = {
   code?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
@@ -5334,6 +5452,25 @@ export type PromotionUsageResolvers<ContextType = GraphQLContext, ParentType ext
   usedAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   user?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType>;
   userId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type PromotionsAnalyticsResultResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['PromotionsAnalyticsResult'] = ResolversParentTypes['PromotionsAnalyticsResult']> = {
+  dailyPoints?: Resolver<Array<ResolversTypes['PromotionAnalyticsDailyPoint']>, ParentType, ContextType>;
+  items?: Resolver<Array<ResolversTypes['PromotionAnalyticsListItem']>, ParentType, ContextType>;
+  summary?: Resolver<ResolversTypes['PromotionsAnalyticsSummary'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type PromotionsAnalyticsSummaryResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['PromotionsAnalyticsSummary'] = ResolversParentTypes['PromotionsAnalyticsSummary']> = {
+  averageOrderValue?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  businessPaid?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  platformPaid?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  totalDeducted?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  totalDeliveryDeducted?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  totalDiscountDeducted?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  totalUsageCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  uniqueUsers?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -5407,6 +5544,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   getPromotionAudienceGroups?: Resolver<Array<ResolversTypes['PromotionAudienceGroup']>, ParentType, ContextType, Partial<QuerygetPromotionAudienceGroupsArgs>>;
   getPromotionThresholds?: Resolver<Array<ResolversTypes['PromotionThreshold']>, ParentType, ContextType, RequireFields<QuerygetPromotionThresholdsArgs, 'cart'>>;
   getPromotionUsage?: Resolver<Array<ResolversTypes['PromotionUsage']>, ParentType, ContextType, RequireFields<QuerygetPromotionUsageArgs, 'promotionId'>>;
+  getPromotionsAnalytics?: Resolver<ResolversTypes['PromotionsAnalyticsResult'], ParentType, ContextType, Partial<QuerygetPromotionsAnalyticsArgs>>;
   getRecoveryPromotions?: Resolver<Array<ResolversTypes['Promotion']>, ParentType, ContextType>;
   getStoreStatus?: Resolver<ResolversTypes['StoreStatus'], ParentType, ContextType, Partial<QuerygetStoreStatusArgs>>;
   getUserPromoMetadata?: Resolver<Maybe<ResolversTypes['UserPromoMetadata']>, ParentType, ContextType, RequireFields<QuerygetUserPromoMetadataArgs, 'userId'>>;
@@ -5689,6 +5827,7 @@ export type UserResolvers<ContextType = GraphQLContext, ParentType extends Resol
   business?: Resolver<Maybe<ResolversTypes['Business']>, ParentType, ContextType>;
   businessId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
   commissionPercentage?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
+  createdAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
   driverConnection?: Resolver<Maybe<ResolversTypes['DriverConnection']>, ParentType, ContextType>;
   driverLocation?: Resolver<Maybe<ResolversTypes['Location']>, ParentType, ContextType>;
   driverLocationUpdatedAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
@@ -5876,16 +6015,21 @@ export type Resolvers<ContextType = GraphQLContext> = {
   ProductSubcategory?: ProductSubcategoryResolvers<ContextType>;
   ProductVariantGroup?: ProductVariantGroupResolvers<ContextType>;
   Promotion?: PromotionResolvers<ContextType>;
+  PromotionAnalyticsDailyPoint?: PromotionAnalyticsDailyPointResolvers<ContextType>;
+  PromotionAnalyticsListItem?: PromotionAnalyticsListItemResolvers<ContextType>;
   PromotionAnalyticsResult?: PromotionAnalyticsResultResolvers<ContextType>;
   PromotionAppliesTo?: PromotionAppliesToResolvers;
   PromotionApplyMethod?: PromotionApplyMethodResolvers;
   PromotionAudienceGroup?: PromotionAudienceGroupResolvers<ContextType>;
   PromotionCreatorType?: PromotionCreatorTypeResolvers;
   PromotionResult?: PromotionResultResolvers<ContextType>;
+  PromotionScheduleType?: PromotionScheduleTypeResolvers;
   PromotionTarget?: PromotionTargetResolvers;
   PromotionThreshold?: PromotionThresholdResolvers<ContextType>;
   PromotionType?: PromotionTypeResolvers;
   PromotionUsage?: PromotionUsageResolvers<ContextType>;
+  PromotionsAnalyticsResult?: PromotionsAnalyticsResultResolvers<ContextType>;
+  PromotionsAnalyticsSummary?: PromotionsAnalyticsSummaryResolvers<ContextType>;
   PushTelemetryEvent?: PushTelemetryEventResolvers<ContextType>;
   PushTelemetryEventType?: PushTelemetryEventTypeResolvers;
   PushTelemetrySummary?: PushTelemetrySummaryResolvers<ContextType>;

@@ -8,6 +8,11 @@ import { GET_RECOVERY_PROMOTIONS } from "@/graphql/operations/promotions/queries
 import { SEND_PUSH_NOTIFICATION } from "@/graphql/operations/notifications";
 import { Package, Store, User, Hash, Copy, Check, Phone, HeartHandshake, X, CheckCircle2 } from "lucide-react";
 import { GetCancelledOrdersQuery, GetRecoveryPromotionsQuery, PromotionType } from "@/gql/graphql";
+import {
+    CANCEL_REASON_CATEGORY_LABELS,
+    getCancelReasonBadgeClass,
+    parseTaggedCancellationReason,
+} from "@/components/orders/cancelReason";
 import Link from "next/link";
 
 /* ---------------------------------------------------------
@@ -134,7 +139,9 @@ export default function CancelledOrdersPage() {
             userName: `${order.user.firstName} ${order.user.lastName}`,
             phoneNumber: order.user.phoneNumber,
         });
-        setRecoveryType(PromotionType.FreeDelivery);
+        const parsedReason = parseTaggedCancellationReason(order.cancellationReason);
+        const recoveryContext = parsedReason.reasonText || order.cancellationReason;
+        setRecoveryReason(recoveryContext ? `Order #${order.displayId} cancelled: ${recoveryContext}` : `Order #${order.displayId} was cancelled`);
         setRecoveryAmount("");
         setRecoveryReason(order.cancellationReason ? `Order #${order.displayId} cancelled: ${order.cancellationReason}` : `Order #${order.displayId} was cancelled`);
         setPushEnabled(true);
@@ -314,13 +321,22 @@ export default function CancelledOrdersPage() {
 
                                     {/* Reason */}
                                     <td className="px-4 py-3 max-w-xs">
-                                        {order.cancellationReason ? (
-                                            <span className="text-sm text-zinc-400 line-clamp-2" title={order.cancellationReason}>
-                                                {order.cancellationReason}
-                                            </span>
-                                        ) : (
-                                            <span className="text-zinc-600 text-sm">—</span>
-                                        )}
+                                        {(() => {
+                                            const parsed = parseTaggedCancellationReason(order.cancellationReason);
+                                            if (!parsed.reasonText) {
+                                                return <span className="text-zinc-600 text-sm">—</span>;
+                                            }
+                                            return (
+                                                <div className="space-y-1" title={order.cancellationReason ?? undefined}>
+                                                    {parsed.category && (
+                                                        <span className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${getCancelReasonBadgeClass(parsed.category)}`}>
+                                                            {CANCEL_REASON_CATEGORY_LABELS[parsed.category]}
+                                                        </span>
+                                                    )}
+                                                    <span className="block text-sm text-zinc-400 line-clamp-2">{parsed.reasonText}</span>
+                                                </div>
+                                            );
+                                        })()}
                                     </td>
 
                                     {/* Incident */}

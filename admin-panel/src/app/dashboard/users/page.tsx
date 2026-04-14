@@ -3,6 +3,7 @@
 import { useState, FormEvent, useMemo, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@apollo/client/react";
 import { USERS_QUERY, USER_BEHAVIOR_QUERY } from "@/graphql/operations/users/queries";
+import { UserRole } from "@/gql/graphql";
 import {
     CREATE_USER_MUTATION,
     UPDATE_USER_MUTATION,
@@ -18,9 +19,10 @@ import { useAuth } from "@/lib/auth-context";
 import {
     Pencil, Trash2, AlertCircle, ShieldBan, ShieldCheck, BadgeCheck,
     Search, X, Plus, User, Phone, Mail, MapPin, MessageSquare,
-    ChevronRight, Clock, Package, CircleDollarSign, ChevronLeft,
+    ChevronRight, Clock, Package, CircleDollarSign, ChevronLeft, BarChart3, TrendingUp,
 } from "lucide-react";
 import { toast } from "sonner";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 
 /* ---------------------------------------------------------
    Types
@@ -35,11 +37,16 @@ interface UserItem {
     isBanned?: boolean;
     isTrustedCustomer?: boolean;
     role: string;
-    phoneNumber?: string;
-    address?: string;
-    adminNote?: string;
-    flagColor?: string;
-    business?: { id: string; name: string };
+    phoneNumber?: string | null;
+    address?: string | null;
+    adminNote?: string | null;
+    flagColor?: string | null;
+    business?: { id: string; name: string } | null;
+    totalOrders?: number;
+    signupStep?: string;
+    emailVerified?: boolean;
+    phoneVerified?: boolean;
+    createdAt?: string;
 }
 
 interface UsersResponse {
@@ -198,7 +205,7 @@ export default function UsersPage() {
     const isSuperAdmin = admin?.role === "SUPER_ADMIN";
 
     /* --- data --- */
-    const { data, loading, error, refetch } = useQuery<UsersResponse>(USERS_QUERY);
+    const { data, loading, error, refetch } = useQuery(USERS_QUERY);
 
     const [createUser, { loading: creating }] = useMutation<CreateUserResponse>(CREATE_USER_MUTATION, { onCompleted: () => refetch() });
     const [updateUser, { loading: updating }] = useMutation(UPDATE_USER_MUTATION, { onCompleted: () => refetch() });
@@ -209,6 +216,11 @@ export default function UsersPage() {
     /* --- panel state --- */
     const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
     const [panelTab, setPanelTab] = useState<"overview" | "orders">("overview");
+    const [mainView, setMainView] = useState<"list" | "statistics">("list");
+
+    /* --- statistics filters --- */
+    const [statDateRange, setStatDateRange] = useState<"7d" | "30d" | "90d" | "all">("7d");
+    const [statUserFilter, setStatUserFilter] = useState<"all" | "new-only" | "with-orders" | "without-orders">("all");
 
     /* --- flag/note editing --- */
     const [isEditingNote, setIsEditingNote] = useState(false);
@@ -288,6 +300,76 @@ export default function UsersPage() {
             .sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
     }, [ordersData?.orders, selectedUser]);
 
+    /* --- statistics calculations --- */
+    const getDateRangeStart = useCallback(() => {
+        const now = new Date();
+        switch (statDateRange) {
+            case "7d":
+                return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            case "30d":
+                return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            case "90d":
+                return new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+            case "all":
+                return new Date(0);
+            default:
+                return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        }
+    }, [statDateRange]);
+
+    const statisticsData = useMemo(() => {
+        const customers = data?.users?.filter((u) => u.role === "CUSTOMER") || [];
+        const rangeStart = getDateRangeStart();
+        
+        const newUsers = customers.filter(u => {
+            if (!u.createdAt) return false;
+            const signupDate = new Date(u.createdAt);
+            return signupDate >= rangeStart;
+        });
+
+        const usersWithOrders = newUsers.filter(u => (u.totalOrders || 0) > 0);
+        const usersWithoutOrders = newUsers.filter(u => (u.totalOrders || 0) === 0);
+        const completedSignups = newUsers.filter(u => u.signupStep === "COMPLETED");
+        const pendingSignups = newUsers.filter(u => u.signupStep !== "COMPLETED");
+
+        // Group new users by day for chart
+        const usersByDay: Record<string, number> = {};
+        newUsers.forEach(u => {
+            if (u.createdAt) {
+                const date = new Date(u.createdAt).toLocaleDateString();
+                usersByDay[date] = (usersByDay[date] || 0) + 1;
+            }
+        });
+
+        const chartData = Object.entries(usersByDay)
+            .sort(([dateA], [dateB]) => new Date(dateA).getTime() - new Date(dateB).getTime())
+            .map(([date, count]) => ({ date, count }));
+
+        // Apply user status filter
+        let filteredNewUsers = newUsers;
+        if (statUserFilter === "new-only") {
+            filteredNewUsers = newUsers;
+        } else if (statUserFilter === "with-orders") {
+            filteredNewUsers = usersWithOrders;
+        } else if (statUserFilter === "without-orders") {
+            filteredNewUsers = usersWithoutOrders;
+        }
+
+        return {
+            totalNewUsers: newUsers.length,
+            usersWithOrders: usersWithOrders.length,
+            usersWithoutOrders: usersWithoutOrders.length,
+            completedSignups: completedSignups.length,
+            pendingSignups: pendingSignups.length,
+            chartData,
+            filteredNewUsers: filteredNewUsers.sort((a, b) => {
+                const dateA = new Date(a.createdAt || 0).getTime();
+                const dateB = new Date(b.createdAt || 0).getTime();
+                return dateB - dateA;
+            }),
+        };
+    }, [data?.users, statDateRange, statUserFilter, getDateRangeStart]);
+
     /* --- handlers --- */
 
     const selectUser = useCallback((u: UserItem) => {
@@ -360,7 +442,7 @@ export default function UsersPage() {
                 await updateUser({
                     variables: {
                         id: editingUser.id, firstName: formData.firstName, lastName: formData.lastName,
-                        role: formData.role as any, businessId: formData.businessId || null, isDemoAccount: formData.isDemoAccount,
+                        role: formData.role as UserRole, businessId: formData.businessId || null, isDemoAccount: formData.isDemoAccount,
                     },
                 });
                 setFormSuccess("Updated");
@@ -453,8 +535,39 @@ export default function UsersPage() {
                 <div className="bg-red-900/20 border border-red-800 rounded-lg p-4 text-red-300 text-sm mb-4">{error.message}</div>
             )}
 
-            {/* Main layout: list + detail panel */}
-            <div className="flex gap-0 min-h-[calc(100vh-180px)]">
+            {/* View tabs */}
+            <div className="flex gap-3 mb-5 border-b border-zinc-800/40">
+                <button
+                    onClick={() => setMainView("list")}
+                    className={`px-4 py-2.5 text-sm font-medium transition-colors ${
+                        mainView === "list"
+                            ? "text-violet-400 border-b-2 border-violet-400 -mb-0.5"
+                            : "text-zinc-500 hover:text-zinc-300"
+                    }`}
+                >
+                    <div className="flex items-center gap-2">
+                        <User size={14} />
+                        User List
+                    </div>
+                </button>
+                <button
+                    onClick={() => setMainView("statistics")}
+                    className={`px-4 py-2.5 text-sm font-medium transition-colors ${
+                        mainView === "statistics"
+                            ? "text-violet-400 border-b-2 border-violet-400 -mb-0.5"
+                            : "text-zinc-500 hover:text-zinc-300"
+                    }`}
+                >
+                    <div className="flex items-center gap-2">
+                        <BarChart3 size={14} />
+                        Signup Statistics
+                    </div>
+                </button>
+            </div>
+
+            {/* Main layout: list + detail panel OR statistics */}
+            {mainView === "list" ? (
+            <div className="flex gap-0 min-h-[calc(100vh-240px)]">
 
                 {/* ---- User list ---- */}
                 <div className={`transition-all duration-200 ${selectedUser ? "w-[380px] flex-shrink-0" : "w-full"}`}>
@@ -834,6 +947,134 @@ export default function UsersPage() {
                     </div>
                 )}
             </div>
+            ) : (
+            /* --- Statistics View --- */
+            <div className="space-y-5">
+                {/* Filters */}
+                <div className="flex gap-4 items-center flex-wrap">
+                    <div>
+                        <label className="text-xs text-zinc-500 mb-2 block">Date Range</label>
+                        <select
+                            value={statDateRange}
+                            onChange={(e) => setStatDateRange(e.target.value as "7d" | "30d" | "90d" | "all")}
+                            className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-violet-500/50"
+                        >
+                            <option value="7d">Last 7 Days</option>
+                            <option value="30d">Last 30 Days</option>
+                            <option value="90d">Last 90 Days</option>
+                            <option value="all">All Time</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-xs text-zinc-500 mb-2 block">User Status</label>
+                        <select
+                            value={statUserFilter}
+                            onChange={(e) => setStatUserFilter(e.target.value as "all" | "new-only" | "with-orders" | "without-orders")}
+                            className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-violet-500/50"
+                        >
+                            <option value="all">All New Users</option>
+                            <option value="new-only">New Users Only</option>
+                            <option value="with-orders">With Orders</option>
+                            <option value="without-orders">Without Orders</option>
+                        </select>
+                    </div>
+                </div>
+
+                {/* Stats cards */}
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg p-4">
+                        <div className="text-xs text-zinc-500 mb-2">Total New Users</div>
+                        <div className="text-2xl font-bold text-violet-400">{statisticsData.totalNewUsers}</div>
+                        <div className="text-xs text-zinc-600 mt-1">{statDateRange === "7d" ? "Last 7 days" : statDateRange === "30d" ? "Last 30 days" : statDateRange === "90d" ? "Last 90 days" : "All time"}</div>
+                    </div>
+                    <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg p-4">
+                        <div className="text-xs text-zinc-500 mb-2">With Orders</div>
+                        <div className="text-2xl font-bold text-emerald-400">{statisticsData.usersWithOrders}</div>
+                        <div className="text-xs text-zinc-600 mt-1">{statisticsData.totalNewUsers > 0 ? Math.round((statisticsData.usersWithOrders / statisticsData.totalNewUsers) * 100) : 0}%</div>
+                    </div>
+                    <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg p-4">
+                        <div className="text-xs text-zinc-500 mb-2">Without Orders</div>
+                        <div className="text-2xl font-bold text-amber-400">{statisticsData.usersWithoutOrders}</div>
+                        <div className="text-xs text-zinc-600 mt-1">{statisticsData.totalNewUsers > 0 ? Math.round((statisticsData.usersWithoutOrders / statisticsData.totalNewUsers) * 100) : 0}%</div>
+                    </div>
+                    <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg p-4">
+                        <div className="text-xs text-zinc-500 mb-2">Completed Signup</div>
+                        <div className="text-2xl font-bold text-blue-400">{statisticsData.completedSignups}</div>
+                        <div className="text-xs text-zinc-600 mt-1">{statisticsData.totalNewUsers > 0 ? Math.round((statisticsData.completedSignups / statisticsData.totalNewUsers) * 100) : 0}%</div>
+                    </div>
+                    <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg p-4">
+                        <div className="text-xs text-zinc-500 mb-2">Pending Signup</div>
+                        <div className="text-2xl font-bold text-orange-400">{statisticsData.pendingSignups}</div>
+                        <div className="text-xs text-zinc-600 mt-1">{statisticsData.totalNewUsers > 0 ? Math.round((statisticsData.pendingSignups / statisticsData.totalNewUsers) * 100) : 0}%</div>
+                    </div>
+                </div>
+
+                {/* Chart */}
+                {statisticsData.chartData.length > 0 && (
+                    <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg p-5">
+                        <h3 className="text-sm font-semibold text-zinc-200 mb-4 flex items-center gap-2">
+                            <TrendingUp size={14} /> Signup Trend
+                        </h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={statisticsData.chartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                                <XAxis dataKey="date" stroke="#71717a" style={{ fontSize: "12px" }} />
+                                <YAxis stroke="#71717a" style={{ fontSize: "12px" }} />
+                                <Tooltip 
+                                    contentStyle={{ backgroundColor: "#18181b", border: "1px solid #27272a" }}
+                                    labelStyle={{ color: "#fafafa" }}
+                                />
+                                <Line type="monotone" dataKey="count" stroke="#a78bfa" strokeWidth={2} dot={{ fill: "#a78bfa", r: 4 }} />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </div>
+                )}
+
+                {/* Users list */}
+                <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg overflow-hidden">
+                    <div className="px-4 py-3 border-b border-zinc-800/60">
+                        <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-2">
+                            <User size={14} /> New Users ({statisticsData.filteredNewUsers.length})
+                        </h3>
+                    </div>
+                    {statisticsData.filteredNewUsers.length > 0 ? (
+                        <div className="divide-y divide-zinc-800/40 max-h-[400px] overflow-y-auto">
+                            {statisticsData.filteredNewUsers.map((u) => (
+                                <div key={u.id} className="p-4 hover:bg-zinc-800/40 transition-colors">
+                                    <div className="flex items-start justify-between">
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-medium text-zinc-100">
+                                                    {u.firstName} {u.lastName}
+                                                </span>
+                                                {u.signupStep === "COMPLETED" && (
+                                                    <span className="text-[10px] bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded">VERIFIED</span>
+                                                )}
+                                                {u.signupStep !== "COMPLETED" && (
+                                                    <span className="text-[10px] bg-amber-500/15 text-amber-400 px-2 py-0.5 rounded">PENDING</span>
+                                                )}
+                                            </div>
+                                            <div className="text-xs text-zinc-500 mt-0.5">{u.email}</div>
+                                            <div className="text-xs text-zinc-600 mt-1">
+                                                Signed up: {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "N/A"}
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-sm font-semibold text-zinc-100">{u.totalOrders || 0} orders</div>
+                                            <div className="text-xs text-zinc-500 mt-0.5">
+                                                {(u.totalOrders || 0) > 0 ? "Active" : "No orders yet"}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="p-8 text-center text-zinc-500">No users found with the selected filters.</div>
+                    )}
+                </div>
+            </div>
+            )}
 
             {/* ============ MODALS ============ */}
 
