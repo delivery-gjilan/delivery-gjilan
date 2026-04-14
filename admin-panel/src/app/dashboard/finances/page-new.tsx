@@ -81,7 +81,7 @@ export default function FinancesDashboard() {
         onCompleted: () => refetchSettlements(),
     });
 
-    const settlements: Settlement[] = ((settlementsData as any)?.settlements || []) as Settlement[];
+    const settlements: Settlement[] = (settlementsData?.settlements ?? []) as Settlement[];
 
     // Get unique businesses and drivers
     const { businesses, drivers } = useMemo(() => {

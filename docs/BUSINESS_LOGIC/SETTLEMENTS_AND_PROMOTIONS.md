@@ -1,6 +1,6 @@
 # Settlements & Promotions
 
-<!-- MDS:BL1 | Domain: Business Logic | Updated: 2026-04-06 -->
+<!-- MDS:BL1 | Domain: Business Logic | Updated: 2026-04-14 -->
 <!-- Depends-On: B2, B3, B6 -->
 <!-- Depended-By: O3, O8, O11, M4 -->
 <!-- Nav: Rule/promo changes → update O3 (Notifications campaigns), O8 (Testing preflight). Payment collection → update B2 (Order Creation), M4 (Mobile Audit). -->
@@ -212,7 +212,7 @@ Promotions are a separate discount system. They reduce what the customer pays.
 | `name` | text | Human label |
 | `description` | text (nullable) | Optional description |
 | `type` | enum | `FIXED_AMOUNT`, `PERCENTAGE`, `FREE_DELIVERY`, `SPEND_X_GET_FREE`, `SPEND_X_PERCENT`, `SPEND_X_FIXED` |
-| `target` | enum | `ALL_USERS`, `SPECIFIC_USERS`, `FIRST_ORDER`, `CONDITIONAL` |
+| `target` | enum | `ALL_USERS`, `SPECIFIC_USERS`, `FIRST_ORDER`, `NEW_USERS`, `CONDITIONAL` |
 | `discount_value` | numeric(10,2) | The discount amount (EUR) or percentage (0–100) |
 | `max_discount_cap` | numeric(10,2) | Cap on percentage discounts |
 | `min_order_amount` | numeric(10,2) | Minimum subtotal to qualify |
@@ -226,6 +226,12 @@ Promotions are a separate discount system. They reduce what the customer pays.
 | `is_active` | boolean | Only active promos are considered |
 | `starts_at` | timestamp | Start of validity window |
 | `ends_at` | timestamp | End of validity window |
+| `schedule_type` | enum | `ALWAYS`, `DATE_RANGE`, `RECURRING` |
+| `schedule_timezone` | text (nullable) | IANA timezone used for recurring windows (for example `Europe/Belgrade`) |
+| `daily_start_time` | text (nullable) | Daily recurring window start in `HH:mm` |
+| `daily_end_time` | text (nullable) | Daily recurring window end in `HH:mm` |
+| `active_weekdays` | jsonb (nullable) | Optional weekday list `[0..6]` where `0=Sunday` |
+| `new_user_window_days` | integer (nullable) | Number of days after signup where `NEW_USERS` target remains eligible |
 | `total_revenue` | numeric(12,2) | Sum of order subtotals where this promo was used |
 | `total_usage_count` | integer | Total redemptions |
 | `creator_type` | enum | `PLATFORM` or `BUSINESS` |
@@ -275,7 +281,40 @@ Links orders to applied promotions:
 - **One-time usage**: supported via `maxUsagePerUser = 1` (default behavior in recovery flow).
 - **Global usage cap**: supported via `maxGlobalUsage`.
 - **First-order targeting**: supported via `target = FIRST_ORDER`.
+- **Signup-age targeting**: supported via `target = NEW_USERS` + `newUserWindowDays`.
 - **Conditional spend targeting**: supported via `target = CONDITIONAL` and `spendThreshold`.
+- **Recurring daily windows**: supported via `scheduleType = RECURRING` + `dailyStartTime` + `dailyEndTime` (+ optional `activeWeekdays`).
+
+### Admin recipes (current)
+
+These flows are configured in the Promotions create modal on `admin-panel/src/app/dashboard/promotions/page.tsx`.
+
+#### Happy hour promo (daily or selected weekdays)
+
+1. Set your core promotion setup (`type`, value, usage caps, and target audience).
+2. In Schedule & Status, set `Schedule Mode = Recurring (time window)`.
+3. Set `Daily Start Time` and `Daily End Time` (for example `16:00` to `19:00`).
+4. Set `Timezone` (default `Europe/Belgrade`).
+5. Optional: choose `Active weekdays` to run only specific days; leave empty to run every day.
+6. Optional: set `Start Date & Time` and `End Date & Time` as the outer campaign lifetime.
+
+Behavior:
+- Recurring rules gate eligibility inside the configured daily window.
+- If weekdays are selected, only those weekdays are eligible.
+- Overnight windows are supported (for example `22:00` to `02:00`).
+- `startsAt` and `endsAt` remain outer bounds; both checks apply.
+
+#### New users promo for 14 days
+
+1. Create promotion with the desired discount type and limits.
+2. Set `Target Audience = New users`.
+3. Set `New user window (days)` to `14` (or any positive integer).
+4. Optionally combine with recurring schedule (for example happy-hour only for new users).
+
+Behavior:
+- Eligibility is based on account age from `users.createdAt`.
+- A user is eligible while account age is less than or equal to the configured day window.
+- Existing targets and usage caps still apply normally.
 
 ### Promotion targeting model notes
 

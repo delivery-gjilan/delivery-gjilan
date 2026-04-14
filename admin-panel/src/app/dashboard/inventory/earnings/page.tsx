@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@apollo/client/react";
 import { useBusinesses } from "@/lib/hooks/useBusinesses";
 import { GET_INVENTORY_EARNINGS } from "@/graphql/operations/inventory";
+import type { InventoryEarningsQuery } from "@/gql/graphql";
 import {
     Warehouse,
     TrendingUp,
@@ -34,6 +35,7 @@ interface EarningsProduct {
 type SortField = "name" | "unitsSold" | "revenue" | "cost" | "profit" | "margin";
 type SortDir = "asc" | "desc";
 type DatePreset = "today" | "7days" | "30days" | "month" | "all" | "custom";
+type InventoryEarningsData = InventoryEarningsQuery["inventoryEarnings"];
 
 /* ===============================================
    MAIN PAGE
@@ -43,7 +45,7 @@ export default function InventoryEarningsPage() {
     const { businesses, loading: businessesLoading } = useBusinesses();
 
     const marketBusiness = useMemo(() => {
-        return businesses.find((b: any) => b.businessType === "MARKET");
+        return businesses.find((b) => b.businessType === "MARKET");
     }, [businesses]);
 
     const businessId = marketBusiness?.id ?? "";
@@ -316,7 +318,7 @@ function EarningsContent({ businessId }: { businessId: string }) {
    SUMMARY CARDS
 =============================================== */
 
-function SummaryCards({ earnings }: { earnings: any }) {
+function SummaryCards({ earnings }: { earnings?: InventoryEarningsData }) {
     const cards = [
         {
             label: "Revenue",

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { GET_ALL_BUSINESSES_FOR_FEATURED } from '@/graphql/operations/businesses/queries';
 import { SET_BUSINESS_FEATURED } from '@/graphql/operations/businesses/mutations';
+import type { SetBusinessFeaturedMutation } from '@/gql/graphql';
 import { toast } from 'sonner';
 import { Star, StarOff, GripVertical, Store } from 'lucide-react';
 
@@ -17,18 +18,22 @@ interface BusinessRow {
   featuredSortOrder: number;
 }
 
+interface FeaturedBusinessesQueryData {
+  businesses: BusinessRow[];
+}
+
 export default function FeaturedBusinessesPage() {
-  const { data, loading, error } = useQuery(GET_ALL_BUSINESSES_FOR_FEATURED, {
+  const { data, loading, error } = useQuery<FeaturedBusinessesQueryData>(GET_ALL_BUSINESSES_FOR_FEATURED, {
     fetchPolicy: 'cache-and-network',
   });
 
-  const [setBusinessFeatured, { loading: saving }] = useMutation(SET_BUSINESS_FEATURED, {
+  const [setBusinessFeatured, { loading: saving }] = useMutation<SetBusinessFeaturedMutation>(SET_BUSINESS_FEATURED, {
     onCompleted: () => toast.success('Featured status updated'),
     onError: (e) => toast.error(e.message),
     // Write the updated isFeatured / featuredSortOrder directly into the cached
     // businesses list so the UI reflects the change immediately without a refetch.
     update(cache, { data: mutationData }) {
-      const updated = (mutationData as any)?.setBusinessFeatured;
+      const updated = mutationData?.setBusinessFeatured;
       if (!updated) return;
       cache.modify({
         id: cache.identify({ __typename: 'Business', id: updated.id }),
@@ -42,7 +47,7 @@ export default function FeaturedBusinessesPage() {
 
   const [sortOrderEdits, setSortOrderEdits] = useState<Record<string, string>>({});
 
-  const businesses: BusinessRow[] = (data as any)?.businesses ?? [];
+  const businesses: BusinessRow[] = data?.businesses ?? [];
 
   const featured = [...businesses]
     .filter((b) => b.isFeatured)

@@ -191,9 +191,36 @@ const authLink = setContext((_, { headers }) => {
     }));
 });
 
-const errorLink = onError(({ graphQLErrors, networkError }) => {
+const isOrderOperation = (operationName?: string) => {
+    if (!operationName) return false;
+    const normalized = operationName.toLowerCase();
+    return normalized.includes('order');
+};
+
+const errorLink = onError(({ graphQLErrors, networkError, operation }) => {
+    const operationName = operation.operationName || 'UnknownOperation';
+    const shouldDebugLog = isOrderOperation(operationName);
+
+    if (shouldDebugLog) {
+        console.log('[GraphQL][Orders] Operation failed', {
+            operationName,
+            variables: operation.variables,
+        });
+    }
+
     if (graphQLErrors) {
         for (const err of graphQLErrors) {
+            if (shouldDebugLog) {
+                console.error('[GraphQL][Orders] GraphQL error', {
+                    operationName,
+                    message: err.message,
+                    code: err.extensions?.code,
+                    path: err.path,
+                    locations: err.locations,
+                    variables: operation.variables,
+                });
+            }
+
             const code = err.extensions?.code;
             if (code === "UNAUTHENTICATED") {
                 // Invalid or expired auth token — redirect to login.
@@ -211,6 +238,15 @@ const errorLink = onError(({ graphQLErrors, networkError }) => {
         }
     }
     if (networkError) {
+        if (shouldDebugLog) {
+            console.error('[GraphQL][Orders] Network error', {
+                operationName,
+                message: networkError.message,
+                statusCode: 'statusCode' in networkError ? networkError.statusCode : undefined,
+                variables: operation.variables,
+            });
+        }
+
         const statusCode = 'statusCode' in networkError ? networkError.statusCode : undefined;
         if (statusCode === 401 && typeof window !== "undefined") {
             clearStoredAuth();

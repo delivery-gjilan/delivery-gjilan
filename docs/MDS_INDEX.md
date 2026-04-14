@@ -26,7 +26,7 @@
 | B9 | [BACKEND/UPLOADS_AND_S3.md](BACKEND/UPLOADS_AND_S3.md) | Backend | S3Service, upload/delete REST routes, key generation, auth gaps |
 | B10 | [BACKEND/AUDIT_LOGGING.md](BACKEND/AUDIT_LOGGING.md) | Backend | audit_logs table, actor/action/entity enums, AuditLogRepository |
 | B11 | [BACKEND/OUT_OF_ZONE_AND_APPROVAL.md](BACKEND/OUT_OF_ZONE_AND_APPROVAL.md) | Backend | Out-of-coverage handling, locationFlagged, approval-required orders, admin alerts |
-| BL1 | [BUSINESS_LOGIC/SETTLEMENTS_AND_PROMOTIONS.md](BUSINESS_LOGIC/SETTLEMENTS_AND_PROMOTIONS.md) | Business Logic | Settlements, rules, promotions, FinancialService, PromotionEngine, mobile-customer progression bar |
+| BL1 | [BUSINESS_LOGIC/SETTLEMENTS_AND_PROMOTIONS.md](BUSINESS_LOGIC/SETTLEMENTS_AND_PROMOTIONS.md) | Business Logic | Settlements, rules, promotions (including recurring windows and new-user targeting), FinancialService, PromotionEngine, mobile-customer progression bar |
 | BL2 | [BUSINESS_LOGIC/PRODUCT_BUSINESS_CATEGORY_REFACTOR_FLOW.md](BUSINESS_LOGIC/PRODUCT_BUSINESS_CATEGORY_REFACTOR_FLOW.md) | Business Logic | CRUD flows, delete semantics, hook consolidation |
 | BL3 | [BUSINESS_LOGIC/CART_ACTIVE_ORDER_FLOW_RECOMMENDATIONS.md](BUSINESS_LOGIC/CART_ACTIVE_ORDER_FLOW_RECOMMENDATIONS.md) | Business Logic | Cart store, subscription lifecycle, race conditions |
 | BL4 | [BUSINESS_LOGIC/PERSONAL_INVENTORY_COVERAGE.md](BUSINESS_LOGIC/PERSONAL_INVENTORY_COVERAGE.md) | Business Logic | ⚠️ **Superseded by FF1** — see FUTURE_FEATURES/PERSONAL_INVENTORY_COVERAGE.md |
@@ -194,7 +194,7 @@ ARCHITECTURE (A1)
 | Banner management | BL5 |
 | Banner scheduling | BL5 |
 | Business/product targeting | BL5 |
-| Promotion system | BL1, B2, B3 |
+| Promotion system (targets, schedule windows, stacking) | BL1, B2, B3 |
 | Multi-media banners (image/GIF/video) | BL5 |
 
 ### Notifications Domain

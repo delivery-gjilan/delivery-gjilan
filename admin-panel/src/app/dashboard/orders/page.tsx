@@ -535,8 +535,21 @@ export default function OrdersPage() {
                         <Button
                             size="sm"
                             onClick={async () => {
-                                try { await createTestOrder({ refetchQueries: ["GetOrders"] }); }
-                                catch (err) { toast.error(getErrorMessage(err, "Failed to create test order")); }
+                                console.log("[Orders][MockOrder] createTestOrder clicked", {
+                                    refetchQueries: ["GetOrders"],
+                                });
+                                try {
+                                    const result = await createTestOrder({ refetchQueries: ["GetOrders"] });
+                                    console.log("[Orders][MockOrder] createTestOrder success", {
+                                        operation: "CreateTestOrder",
+                                        orderId: result?.data?.createTestOrder?.id,
+                                        status: result?.data?.createTestOrder?.status,
+                                    });
+                                }
+                                catch (err) {
+                                    console.error("[Orders][MockOrder] createTestOrder failed", err);
+                                    toast.error(getErrorMessage(err, "Failed to create test order"));
+                                }
                             }}
                             disabled={creatingTestOrder}
                             className="flex items-center gap-2 border-amber-500/30 text-amber-400 hover:bg-amber-500/10"

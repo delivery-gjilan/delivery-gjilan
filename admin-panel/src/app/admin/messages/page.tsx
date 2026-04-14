@@ -48,6 +48,12 @@ type BusinessThread = NonNullable<BusinessMessageThreadsQuery['businessMessageTh
 
 type DriverItem = NonNullable<DriversQuery['drivers']>[number];
 type UserItem = NonNullable<UsersQuery['users']>[number];
+type AlertStyle = {
+    badge: string;
+    border: string;
+    bg: string;
+    icon: React.ReactNode;
+};
 
 // ─── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -66,9 +72,20 @@ const BIZ_STYLES = {
 } as const;
 
 function alertStyle(tab: Tab, type: MessageAlertType) {
-    return tab === 'drivers' 
-        ? ((DRIVER_STYLES as any)[type] || DRIVER_STYLES[MessageAlertType.Info]) 
-        : ((BIZ_STYLES as any)[type] || BIZ_STYLES[MessageAlertType.Info]);
+    const styles = tab === 'drivers' ? DRIVER_STYLES : BIZ_STYLES;
+    const candidate = styles[type as keyof typeof styles];
+    if (
+        candidate
+        && typeof candidate === 'object'
+        && 'badge' in candidate
+        && 'border' in candidate
+        && 'bg' in candidate
+        && 'icon' in candidate
+    ) {
+        return candidate as AlertStyle;
+    }
+
+    return styles[MessageAlertType.Info] as AlertStyle;
 }
 
 function formatTime(iso: string) {

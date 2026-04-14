@@ -45,7 +45,9 @@ export function TableRow({ children, className = "", onClick }: { children: Reac
   );
 }
 
-export function TableHead({ children, className = "", ...props }: { children?: React.ReactNode; className?: string; [key: string]: any }) {
+type TableHeadProps = React.ThHTMLAttributes<HTMLTableCellElement>;
+
+export function TableHead({ children, className = "", ...props }: TableHeadProps) {
   return (
     <th className={`h-12 px-4 text-left align-middle font-medium text-zinc-400 ${className}`} {...props}>
       {children}
@@ -53,7 +55,9 @@ export function TableHead({ children, className = "", ...props }: { children?: R
   );
 }
 
-export function TableCell({ children, className = "", ...props }: { children: React.ReactNode; className?: string; [key: string]: any }) {
+type TableCellProps = React.TdHTMLAttributes<HTMLTableCellElement>;
+
+export function TableCell({ children, className = "", ...props }: TableCellProps) {
   return (
     <td className={`p-4 align-middle text-zinc-300 ${className}`} {...props}>
       {children}

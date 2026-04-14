@@ -172,6 +172,7 @@ Auth token is stored in `localStorage`. Several pages read it directly for REST 
 - **Split link:** HTTP link for queries/mutations, WebSocket link (`graphql-ws`) for subscriptions.
 - **Auth header:** Inlined via `authLink` — reads `localStorage.getItem('authToken')` on every request.
 - **Error handling:** `onError` link intercepts `UNAUTHENTICATED` → triggers token refresh → retries. Other errors fire a Sonner toast.
+- **Debug instrumentation:** order-related operations now emit structured console logs from `errorLink` (`[GraphQL][Orders] ...`) including operation name, variables, GraphQL error code/path, and network status to speed up cross-surface order incident triage.
 - **Token refresh:** Dedicated `refreshTokenLink` calls an inlined `RefreshToken` mutation (not exported as a named operation constant).
 - **Cache:** `InMemoryCache` with default config — no explicit type policies or field merge configuration.
 
@@ -218,6 +219,7 @@ The most complex page. Manages the full active + completed order pipeline.
 - `usePrepTimeAlerts` for overrun notifications.
 - Active/completed list normalization, settlement preview rows, and inventory coverage modal props are aligned with generated GraphQL nullability through shared typed order models.
 - Order cards/tables show a compact promo-applied indicator only; detailed promotion rows and amounts are shown in the order details modal.
+- The `Mock Order` action emits explicit click/success/failure console traces (`[Orders][MockOrder] ...`) so a button press can be correlated with subsequent GraphQL/network logs.
 
 ### `/dashboard/map` — Live Dispatching Map
 
@@ -318,6 +320,8 @@ The most complex visual page. Full-screen Mapbox GL map with driver positions, o
 **GraphQL:** `GET_AUDIT_LOGS` (`fetchPolicy: 'network-only'`, page size 50). Filterable by action (17 types), entity (8 types), actor (5 types), date range.
 
 **Key features:** `formatMetadataPreview(action, metadata)` — action-aware. `getActionColor` and `getActorBadge` for visual coding. Expandable rows showing raw `metadata` JSON. Metadata shaping in preview/details renderers uses local typed metadata aliases (including diff-oriented `oldValue`/`newValue`) instead of explicit `any` annotations.
+
+Current typing state across nearby admin routes: `/dashboard/admins` and `/dashboard/users` role payloads are cast to `UserRole` (instead of raw `any`) when sending update mutations; `/dashboard/delivery-pricing` save error handling treats thrown values as `unknown` with safe message extraction; `/dashboard/finances/page-new` reads settlements from query data without `as any`; and `lib/utils/cn` accepts `ClassValue[]` for class composition. In adjacent admin surfaces, `/admin/messages` alert-style lookup returns a typed style object without `as any`, `/dashboard/inventory/earnings` summary cards use typed inventory earnings query output, `components/ui/Table` header/cell pass-through props are typed via `React.ThHTMLAttributes` / `React.TdHTMLAttributes`, and `/admin/featured` query/mutation cache-update paths consume typed GraphQL payloads without `as any`.
 
 ### `/dashboard/products` — Product Management Entry
 

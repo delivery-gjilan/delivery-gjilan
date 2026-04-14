@@ -185,8 +185,9 @@ export default function DeliveryPricingPage() {
       });
       setDirty(false);
       setSuccess(true);
-    } catch (err: any) {
-      setError(err.message || "Failed to save pricing tiers.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to save pricing tiers.";
+      setError(message);
     }
   };
 
