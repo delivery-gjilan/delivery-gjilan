@@ -25,6 +25,23 @@ export interface CartItem {
     }[];
 }
 
+export interface PromoResult {
+    promotionId: string | null;
+    promotionIds: string[];
+    code: string;
+    promotionSummary: string | null;
+    deliveryPromotionSummary: string | null;
+    orderDiscountAmount: number;
+    deliveryDiscountAmount: number;
+    autoApplyReason?: string | null;
+    selectionReason?: string | null;
+    discountAmount: number;
+    freeDeliveryApplied: boolean;
+    effectiveDeliveryPrice: number;
+    totalPrice: number;
+    source: 'eligible' | 'manual';
+}
+
 export type CartStoreState = {
     items: CartItem[];
 };
