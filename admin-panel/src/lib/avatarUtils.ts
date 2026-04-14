@@ -55,7 +55,7 @@ export const getAvatarData = (driver: AvatarSubject) => {
     // Verify driver has basic data
     if (!driver?.id) return null;
 
-    const initials = getInitials(driver.firstName, driver.lastName);
+    const initials = getInitials(driver.firstName ?? undefined, driver.lastName ?? undefined);
     const color = getAvatarColor(driver.id);
     const name = getDriverName(driver);
 
