@@ -104,10 +104,12 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
     user: one(users, {
         fields: [orders.userId],
         references: [users.id],
+        relationName: 'orderCustomer',
     }),
     driver: one(users, {
         fields: [orders.driverId],
         references: [users.id],
+        relationName: 'orderDriver',
     }),
     business: one(businesses, {
         fields: [orders.businessId],
