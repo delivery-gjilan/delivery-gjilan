@@ -7,6 +7,11 @@ import { decodeJwtToken } from '@/lib/utils/authUtils';
 const log = logger.child({ service: 'UploadRoutes' });
 const router = Router();
 
+interface AuthenticatedRequest extends Request {
+    userId?: string;
+    userRole?: string;
+}
+
 /**
  * Middleware to verify JWT token on upload routes
  */
@@ -20,8 +25,8 @@ function requireAuth(req: Request, res: Response, next: () => void) {
     try {
         const token = authHeader.substring(7);
         const decoded = decodeJwtToken(token);
-        (req as any).userId = decoded.userId;
-        (req as any).userRole = decoded.role;
+        (req as AuthenticatedRequest).userId = decoded.userId;
+        (req as AuthenticatedRequest).userRole = decoded.role;
         next();
     } catch {
         res.status(401).json({ success: false, error: 'Invalid or expired token' });
@@ -62,7 +67,7 @@ router.post('/image', requireAuth, uploadMiddleware.single('image'), async (req:
         // Enforce role-based folder access:
         // - businesses/ → ADMIN and SUPER_ADMIN only (business creation is admin-only)
         // - products/ and categories/ → all business roles (owner + employee can manage products)
-        const userRole = (req as any).userRole as string;
+        const userRole = (req as AuthenticatedRequest).userRole;
         if (folder === 'businesses' && !ADMIN_ROLES.includes(userRole)) {
             return res.status(403).json({
                 success: false,
@@ -111,7 +116,7 @@ router.post('/image', requireAuth, uploadMiddleware.single('image'), async (req:
 router.delete('/image', requireAuth, async (req: Request, res: Response) => {
     try {
         // Only business roles can delete images
-        const userRole = (req as any).userRole as string;
+        const userRole = (req as AuthenticatedRequest).userRole;
         if (!BUSINESS_ROLES.includes(userRole)) {
             return res.status(403).json({
                 success: false,

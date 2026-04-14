@@ -31,31 +31,28 @@ export class SettlementRuleRepository {
     }
 
     async getRules(filters: SettlementRuleFilters, limit?: number, offset?: number): Promise<DbSettlementRule[]> {
-        let query = this.db.select().from(settlementRules);
+        let query = this.db.select().from(settlementRules).$dynamic();
         const conditions = this.buildFilterConditions(filters);
 
         if (conditions.length > 0) {
             const combined = and(...conditions);
             if (combined) {
-                query = query.where(combined) as any;
+                query = query.where(combined);
             }
         }
 
-        let orderedQuery: any = query.orderBy(settlementRules.createdAt);
+        query = query.orderBy(settlementRules.createdAt);
 
         if (limit !== undefined && limit > 0) {
-            orderedQuery = orderedQuery.limit(limit);
+            query = query.limit(limit);
         }
 
         if (offset !== undefined && offset > 0) {
-            orderedQuery = orderedQuery.offset(offset);
+            query = query.offset(offset);
         }
 
-        const rules = await orderedQuery;
-        return rules.map((rule: any) => ({
-            ...rule,
-            amount: parseFloat(rule.amount as any),
-        })) as any;
+        const rules = await query;
+        return rules;
     }
 
     async getRulesCount(filters: SettlementRuleFilters): Promise<number> {
@@ -66,7 +63,7 @@ export class SettlementRuleRepository {
             .select({ count: sql<number>`COUNT(*)::INT` })
             .from(settlementRules)
             .where(whereClause)
-            .then((rows: any[]) => rows[0]);
+            .then((rows) => rows[0]);
 
         return result?.count ?? 0;
     }
@@ -78,11 +75,11 @@ export class SettlementRuleRepository {
         conditions.push(eq(settlementRules.isDeleted, false));
 
         if (filters.entityTypes && filters.entityTypes.length > 0) {
-            conditions.push(inArray(settlementRules.entityType, filters.entityTypes as any));
+            conditions.push(inArray(settlementRules.entityType, filters.entityTypes));
         }
 
         if (filters.type) {
-            conditions.push(eq(settlementRules.type, filters.type as any));
+            conditions.push(eq(settlementRules.type, filters.type));
         }
 
         if (filters.businessIds && filters.businessIds.length > 0) {

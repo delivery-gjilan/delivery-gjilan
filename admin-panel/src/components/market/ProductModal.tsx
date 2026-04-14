@@ -231,7 +231,7 @@ export default function ProductModal({
             <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
                 <div className="grid grid-cols-2 gap-3">
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">Category *</label>
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">Category *</label>
                         <Select
                             value={form.categoryId}
                             onChange={(e) => setForm({ ...form, categoryId: e.target.value, subcategoryId: '' })}
@@ -246,7 +246,7 @@ export default function ProductModal({
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">Subcategory</label>
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">Subcategory</label>
                         <Select
                             value={form.subcategoryId}
                             onChange={(e) => setForm({ ...form, subcategoryId: e.target.value })}
@@ -263,7 +263,7 @@ export default function ProductModal({
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Product Name *</label>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1.5">Product Name *</label>
                     <Input
                         placeholder="e.g., Coca-Cola 500ml"
                         value={form.name}
@@ -272,19 +272,19 @@ export default function ProductModal({
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Description</label>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1.5">Description</label>
                     <textarea
                         placeholder="Product description..."
                         value={form.description}
                         onChange={(e) => setForm({ ...form, description: e.target.value })}
-                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        className="w-full bg-[#09090b] border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all duration-150"
                         rows={3}
                     />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">Price * ($)</label>
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">Price * (€)</label>
                         <Input
                             type="number"
                             step="0.01"
@@ -294,7 +294,7 @@ export default function ProductModal({
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">Discount % (0–90)</label>
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">Discount % (0–90)</label>
                         <Input
                             type="number"
                             step="1"
@@ -310,7 +310,7 @@ export default function ProductModal({
 
                 <div className="grid grid-cols-2 gap-3">
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">Markup Price (€)</label>
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">Markup Price (€)</label>
                         <Input
                             type="number"
                             step="0.01"
@@ -319,10 +319,10 @@ export default function ProductModal({
                             value={form.markupPrice}
                             onChange={(e) => setForm({ ...form, markupPrice: e.target.value })}
                         />
-                        <p className="text-[11px] text-gray-600 mt-0.5">For driver settlements only</p>
+                        <p className="text-[11px] text-zinc-600 mt-0.5">For driver settlements only</p>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">Night Price (€)</label>
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">Night Price (€)</label>
                         <Input
                             type="number"
                             step="0.01"
@@ -331,17 +331,17 @@ export default function ProductModal({
                             value={form.nightMarkedupPrice}
                             onChange={(e) => setForm({ ...form, nightMarkedupPrice: e.target.value })}
                         />
-                        <p className="text-[11px] text-gray-600 mt-0.5">Active 23:00–06:00</p>
+                        <p className="text-[11px] text-zinc-600 mt-0.5">Active 23:00–06:00</p>
                     </div>
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">Product Image</label>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1.5">Product Image</label>
                     <input
                         type="file"
                         accept="image/*"
                         onChange={handleImageChange}
-                        className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700"
+                        className="block w-full text-sm text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-violet-600 file:text-white hover:file:bg-violet-500 cursor-pointer"
                     />
                     {imagePreview && (
                         <img src={imagePreview} alt="Preview" className="mt-2 w-32 h-32 object-cover rounded" />
@@ -364,7 +364,7 @@ export default function ProductModal({
                             }
                             className="w-4 h-4"
                         />
-                        <label htmlFor="isOffer" className="text-sm text-gray-300">
+                        <label htmlFor="isOffer" className="text-sm text-zinc-300">
                             Create as Deal / Offer
                         </label>
                     </div>
@@ -385,7 +385,7 @@ export default function ProductModal({
                             }}
                             className="w-4 h-4"
                         />
-                        <label htmlFor="isVariant" className="text-sm text-gray-300">
+                        <label htmlFor="isVariant" className="text-sm text-zinc-300">
                             Add as Variant
                         </label>
                     </div>
@@ -413,7 +413,7 @@ export default function ProductModal({
                             onChange={(e) => setForm({ ...form, isOnSale: e.target.checked })}
                             className="w-4 h-4"
                         />
-                        <label htmlFor="isOnSale" className="text-sm text-gray-300">
+                        <label htmlFor="isOnSale" className="text-sm text-zinc-300">
                             On Sale
                         </label>
                     </div>
@@ -426,7 +426,7 @@ export default function ProductModal({
                             onChange={(e) => setForm({ ...form, isAvailable: e.target.checked })}
                             className="w-4 h-4"
                         />
-                        <label htmlFor="isAvailable" className="text-sm text-gray-300">
+                        <label htmlFor="isAvailable" className="text-sm text-zinc-300">
                             Available
                         </label>
                     </div>
@@ -533,9 +533,9 @@ function VariantGroupModal({
         <Modal isOpen={isOpen} onClose={onClose} title="Select or Create Variant Group">
             <div className="space-y-4">
                 <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">Existing Variant Groups</label>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1.5">Existing Variant Groups</label>
                     {existingGroups.length === 0 ? (
-                        <p className="text-sm text-gray-500">No variant groups yet. Create your first one below.</p>
+                        <p className="text-sm text-zinc-600">No variant groups yet. Create your first one below.</p>
                     ) : (
                         <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
                             {existingGroups.map((group) => (
@@ -546,7 +546,7 @@ function VariantGroupModal({
                                     className={`w-full text-left rounded-lg border px-3 py-2 text-sm transition-colors ${
                                         selectedGroupId === group.id
                                             ? 'border-violet-400 bg-violet-500/20 text-violet-100'
-                                            : 'border-gray-700 bg-gray-800 text-gray-200 hover:border-violet-500/50'
+                                            : 'border-zinc-800 bg-[#09090b] text-zinc-200 hover:border-violet-500/50'
                                     }`}
                                 >
                                     {group.name}
@@ -556,8 +556,8 @@ function VariantGroupModal({
                     )}
                 </div>
 
-                <div className="border-t border-gray-700 pt-4 space-y-2">
-                    <label className="block text-sm font-medium text-gray-400">Create New Variant Group</label>
+                <div className="border-t border-zinc-800 pt-4 space-y-2">
+                    <label className="block text-xs font-medium text-zinc-400">Create New Variant Group</label>
                     <Input
                         placeholder="e.g., Coca-Cola Sizes"
                         value={newName}

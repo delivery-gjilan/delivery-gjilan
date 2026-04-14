@@ -69,7 +69,7 @@ export default function CategoryModal({ modal, onClose, onCreate, onUpdate }: Ca
         >
             <div className="space-y-4">
                 <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Category Name *</label>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1.5">Category Name *</label>
                     <Input
                         placeholder="e.g., Beverages, Snacks, Dairy"
                         value={name}
@@ -87,7 +87,7 @@ export default function CategoryModal({ modal, onClose, onCreate, onUpdate }: Ca
                             onChange={(e) => setIsActive(e.target.checked)}
                             className="w-4 h-4"
                         />
-                        <label htmlFor="isActive" className="text-sm text-gray-300">
+                        <label htmlFor="isActive" className="text-sm text-zinc-300">
                             Active
                         </label>
                     </div>

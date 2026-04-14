@@ -81,7 +81,7 @@ export default function SubcategoryModal({ modal, categories, onClose, onCreate,
             <div className="space-y-4">
                 {modal.mode === 'create' ? (
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">Category *</label>
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">Category *</label>
                         <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
                             <option value="">Select category</option>
                             {categories.map((cat) => (
@@ -93,15 +93,15 @@ export default function SubcategoryModal({ modal, categories, onClose, onCreate,
                     </div>
                 ) : (
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">Category</label>
-                        <div className="text-gray-200">
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">Category</label>
+                        <div className="text-zinc-200">
                             {categories.find((c) => c.id === categoryId)?.name || 'Unknown'}
                         </div>
                     </div>
                 )}
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Subcategory Name *</label>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1.5">Subcategory Name *</label>
                     <Input
                         placeholder="e.g., Soft Drinks, Chips, Milk"
                         value={name}

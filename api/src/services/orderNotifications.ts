@@ -294,13 +294,13 @@ export function notifyDriverOrderReassigned(
                 body: 'Nje admin e ricaktoi nje nga porosite tuaja te nje shofer tjeter.',
             },
         },
-        data: { orderId, screen: 'orders', type: 'ORDER_REASSIGNED' as any },
+        data: { orderId, screen: 'orders', type: 'ORDER_REASSIGNED' },
         timeSensitive: true,
         relevanceScore: 1.0,
     };
 
     notificationService
-        .sendToUserByAppType(previousDriverId, 'DRIVER', payload, 'ORDER_REASSIGNED' as any)
+        .sendToUserByAppType(previousDriverId, 'DRIVER', payload, 'ORDER_STATUS')
         .catch((err) => logger.error({ err, previousDriverId, orderId }, 'Failed to send driver reassignment notification'));
 }
 
@@ -358,7 +358,7 @@ export function notifyAdminsOrderNeedsApproval(
                 body: 'Një porosi kërkon shqyrtimin tuaj para se të vazhdojë.',
             },
         },
-        data: { orderId, screen: 'orders', type: 'ORDER_NEEDS_APPROVAL', reasons: reasons as any },
+        data: { orderId, screen: 'orders', type: 'ORDER_NEEDS_APPROVAL', reasons: reasons?.join(',') ?? '' },
         timeSensitive: true,
         relevanceScore: 1.0,
     };
@@ -398,13 +398,13 @@ export function notifyDriversOrderReady(
                     : 'Nje porosi e re eshte gati per marrje.',
             },
         },
-        data: { orderId, screen: 'orders', type: 'ORDER_READY_POOL' as any },
+        data: { orderId, screen: 'orders', type: 'ORDER_READY_POOL' },
         timeSensitive: true,
         relevanceScore: 0.9,
     };
 
     notificationService
-        .sendToUsersByAppType(driverIds, 'DRIVER', payload, 'ORDER_READY_POOL' as any)
+        .sendToUsersByAppType(driverIds, 'DRIVER', payload, 'ORDER_ASSIGNED')
         .catch((err) => logger.error({ err, orderId }, 'Failed to notify drivers of ready order'));
 }
 
@@ -431,13 +431,13 @@ export function notifyDriversOrderExpanded(
                 body: 'Nje porosi po pret per marrje. Prek per ta pranuar.',
             },
         },
-        data: { orderId, screen: 'orders', type: 'ORDER_READY_POOL' as any },
+        data: { orderId, screen: 'orders', type: 'ORDER_READY_POOL' },
         timeSensitive: true,
         relevanceScore: 0.8,
     };
 
     notificationService
-        .sendToUsersByAppType(driverIds, 'DRIVER', payload, 'ORDER_READY_POOL' as any)
+        .sendToUsersByAppType(driverIds, 'DRIVER', payload, 'ORDER_ASSIGNED')
         .catch((err) => logger.error({ err, orderId }, 'Failed to notify expanded drivers'));
 }
 

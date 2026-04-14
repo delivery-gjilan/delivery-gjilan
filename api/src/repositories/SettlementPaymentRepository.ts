@@ -26,11 +26,11 @@ export class SettlementPaymentRepository {
     }
 
     async getPayments(filters: SettlementPaymentFilters): Promise<DbSettlementPayment[]> {
-        let query: any = this.db.select().from(settlementPayments);
+        let query = this.db.select().from(settlementPayments).$dynamic();
         const conditions = [];
 
         if (filters.entityType) {
-            conditions.push(eq(settlementPayments.entityType, filters.entityType as any));
+            conditions.push(eq(settlementPayments.entityType, filters.entityType as 'DRIVER' | 'BUSINESS'));
         }
         if (filters.driverId) {
             conditions.push(eq(settlementPayments.driverId, filters.driverId));

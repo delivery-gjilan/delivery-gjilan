@@ -1,5 +1,5 @@
 import { YogaInitialContext } from 'graphql-yoga';
-import { getDB } from '@/database';
+import { getDB, type DbType } from '@/database';
 import { BusinessRepository } from '@/repositories/BusinessRepository';
 import { BusinessHoursRepository } from '@/repositories/BusinessHoursRepository';
 import { BusinessService } from '@/services/BusinessService';
@@ -35,10 +35,8 @@ import { BannerRepository } from '@/repositories/BannerRepository';
  * Returns userData with userId and role if token is valid, empty object otherwise
  * Non-blocking: continues gracefully if token is missing or invalid
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function extractUserData(
-    context: YogaInitialContext & { connectionParams?: any; req?: any },
+    context: YogaInitialContext & { connectionParams?: Record<string, string>; req?: { headers?: Record<string, string | string[] | undefined> } },
 ): Promise<{ userId?: string; role?: string; businessId?: string }> {
     try {
         let authHeader: string | null | undefined = null;
@@ -54,7 +52,8 @@ async function extractUserData(
             if (context.request) {
                 authHeader = context.request.headers.get('authorization');
             } else if (context.req && context.req.headers) {
-                authHeader = context.req.headers['authorization'];
+                const rawAuth = context.req.headers['authorization'];
+                authHeader = Array.isArray(rawAuth) ? rawAuth[0] : rawAuth;
             }
         }
 
@@ -92,7 +91,7 @@ let cachedServices: {
     bannerRepository: BannerRepository;
 } | null = null;
 
-async function getOrCreateServices(db: any) {
+async function getOrCreateServices(db: DbType) {
     if (cachedServices) return cachedServices;
 
     const businessRepository = new BusinessRepository(db);
@@ -131,8 +130,8 @@ export async function createContext(initialContext: YogaInitialContext): Promise
     const userData = await extractUserData(initialContext);
 
     // Extract requestId from the underlying Express req (set by requestLogger middleware)
-    const expressReq = (initialContext as any).req ?? (initialContext as any).request;
-    const requestId: string = (expressReq as any)?.requestId ?? '';
+    const expressReq = (initialContext as unknown as Record<string, unknown>).req ?? (initialContext as unknown as Record<string, unknown>).request;
+    const requestId: string = (expressReq as Record<string, unknown> | undefined)?.requestId as string ?? '';
 
     // Create a per-request child logger with correlation
     const reqLog = logger.child({ requestId, userId: userData.userId, role: userData.role });

@@ -47,8 +47,13 @@ export default function Dropdown({
     useEffect(() => {
         if (isOpen && buttonRef.current) {
             const rect = buttonRef.current.getBoundingClientRect();
+            const dropdownMaxHeight = 240 + 4; // max-h-60 = 240px + gap
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const openUpward = spaceBelow < dropdownMaxHeight && rect.top > dropdownMaxHeight;
             setPosition({
-                top: rect.bottom + window.scrollY + 4,
+                top: openUpward
+                    ? rect.top + window.scrollY - dropdownMaxHeight
+                    : rect.bottom + window.scrollY + 4,
                 left: rect.left + window.scrollX,
                 width: rect.width,
             });

@@ -39,11 +39,11 @@ export default function ManageCategoriesPanel({
     onDeleteSubcategory,
 }: ManageCategoriesPanelProps) {
     return (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+        <div className="bg-[#111113] border border-[#1e1e22] rounded-xl p-6">
             <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-                    <Grid3x3 size={20} className="text-purple-400" />
-                    Manage Categories & Subcategories
+                <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider flex items-center gap-2">
+                    <Grid3x3 size={16} className="text-violet-400" />
+                    Categories & Subcategories
                 </h2>
                 <Button variant="outline" size="sm" onClick={onClose}>
                     <X size={16} />
@@ -53,8 +53,8 @@ export default function ManageCategoriesPanel({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Categories */}
                 <div>
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-medium text-gray-200">Categories</h3>
+                    <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-medium text-zinc-200">Categories</h3>
                         <Button variant="primary" size="sm" onClick={onAddCategory}>
                             <Plus size={14} className="mr-1" />
                             Add
@@ -62,16 +62,16 @@ export default function ManageCategoriesPanel({
                     </div>
                     <div className="space-y-2">
                         {categories.length === 0 ? (
-                            <p className="text-gray-500 text-sm text-center py-8">No categories yet</p>
+                            <p className="text-zinc-600 text-sm text-center py-8">No categories yet</p>
                         ) : (
                             categories.map((cat) => (
                                 <div
                                     key={cat.id}
-                                    className="bg-gray-800 border border-gray-700 rounded-lg p-3 flex items-center justify-between hover:border-purple-500/50 transition-colors"
+                                    className="bg-[#09090b] border border-[#1e1e22] rounded-lg p-3 flex items-center justify-between hover:border-zinc-700 transition-colors"
                                 >
                                     <div>
-                                        <div className="font-medium text-white">{cat.name}</div>
-                                        <div className="text-xs text-gray-500">
+                                        <div className="font-medium text-zinc-100 text-sm">{cat.name}</div>
+                                        <div className="text-xs text-zinc-600">
                                             {subcategories.filter((s) => s.categoryId === cat.id).length} subcategories
                                         </div>
                                     </div>
@@ -94,23 +94,23 @@ export default function ManageCategoriesPanel({
 
                 {/* Subcategories */}
                 <div>
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-medium text-gray-200">All Subcategories</h3>
+                    <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-medium text-zinc-200">All Subcategories</h3>
                     </div>
                     <div className="space-y-2">
                         {subcategories.length === 0 ? (
-                            <p className="text-gray-500 text-sm text-center py-8">No subcategories yet</p>
+                            <p className="text-zinc-600 text-sm text-center py-8">No subcategories yet</p>
                         ) : (
                             subcategories.map((subcat) => {
                                 const category = categories.find((c) => c.id === subcat.categoryId);
                                 return (
                                     <div
                                         key={subcat.id}
-                                        className="bg-gray-800 border border-gray-700 rounded-lg p-3 flex items-center justify-between hover:border-violet-500/50 transition-colors"
+                                        className="bg-[#09090b] border border-[#1e1e22] rounded-lg p-3 flex items-center justify-between hover:border-zinc-700 transition-colors"
                                     >
                                         <div>
-                                            <div className="font-medium text-white">{subcat.name}</div>
-                                            <div className="text-xs text-gray-500">in {category?.name || 'Unknown'}</div>
+                                            <div className="font-medium text-zinc-100 text-sm">{subcat.name}</div>
+                                            <div className="text-xs text-zinc-600">in {category?.name || 'Unknown'}</div>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <Button variant="outline" size="sm" onClick={() => onEditSubcategory(subcat)}>

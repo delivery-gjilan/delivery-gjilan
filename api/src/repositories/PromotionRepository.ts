@@ -10,8 +10,16 @@ import {
     users,
     DbPromotion,
     NewDbPromotion,
+    DbPromotionUsage,
+    DbUserPromotion,
+    DbUserPromoMetadata,
 } from '@/database/schema';
-import { eq, and, or, isNull, lte, gte, ne, desc, inArray, ilike, sql } from 'drizzle-orm';
+import { eq, and, or, isNull, lte, gte, ne, desc, inArray, ilike, sql, type SQL } from 'drizzle-orm';
+
+import type { DbUser } from '@/database/schema/users';
+
+type PromotionType = 'FIXED_AMOUNT' | 'PERCENTAGE' | 'FREE_DELIVERY' | 'SPEND_X_GET_FREE' | 'SPEND_X_PERCENT' | 'SPEND_X_FIXED';
+type PromotionTarget = 'ALL_USERS' | 'SPECIFIC_USERS' | 'FIRST_ORDER' | 'NEW_USERS' | 'CONDITIONAL';
 
 /** NOTE: The promotions table has an isDeleted column. All queries MUST filter by isDeleted=false.
  *  Deletions MUST set isDeleted=true instead of removing the row. See SOFT_DELETE_CONVENTION.md. */
@@ -68,9 +76,9 @@ export class PromotionRepository {
     }
 
     async list(filters: PromotionFilters = {}): Promise<DbPromotion[]> {
-        let query: any = this.db.select().from(promotions);
+        let query = this.db.select().from(promotions).$dynamic();
 
-        const conditions = [];
+        const conditions: SQL[] = [];
 
         // Always exclude soft-deleted
         conditions.push(eq(promotions.isDeleted, false));
@@ -80,11 +88,11 @@ export class PromotionRepository {
         }
 
         if (filters.type) {
-            conditions.push(eq(promotions.type, filters.type as any));
+            conditions.push(eq(promotions.type, filters.type as PromotionType));
         }
 
         if (filters.target) {
-            conditions.push(eq(promotions.target, filters.target as any));
+            conditions.push(eq(promotions.target, filters.target as PromotionTarget));
         }
 
         if (filters.code) {
@@ -106,7 +114,7 @@ export class PromotionRepository {
         }
 
         if (conditions.length > 0) {
-            query = query.where(and(...conditions)) as any;
+            query = query.where(and(...conditions));
         }
 
         if (filters.limit) {
@@ -146,7 +154,7 @@ export class PromotionRepository {
     }
 
     async checkCodeExists(code: string, excludeId?: string): Promise<boolean> {
-        const conditions: any[] = [
+        const conditions: SQL[] = [
             eq(promotions.code, code.toUpperCase()),
             eq(promotions.isDeleted, false),
         ];
@@ -161,7 +169,7 @@ export class PromotionRepository {
         return !!result;
     }
 
-    async getUsageByPromotion(promotionId: string, limit = 500, offset = 0): Promise<any[]> {
+    async getUsageByPromotion(promotionId: string, limit = 500, offset = 0): Promise<DbPromotionUsage[]> {
         return await this.db
             .select()
             .from(promotionUsage)
@@ -193,20 +201,18 @@ export class PromotionRepository {
             });
     }
 
-    async getUserAssignments(userId: string, onlyActive = true): Promise<any[]> {
-        let query: any = this.db
+    async getUserAssignments(userId: string, onlyActive = true): Promise<DbUserPromotion[]> {
+        const conditions: SQL[] = [eq(userPromotions.userId, userId)];
+        if (onlyActive) {
+            conditions.push(eq(userPromotions.isActive, true));
+        }
+        return this.db
             .select()
             .from(userPromotions)
-            .where(eq(userPromotions.userId, userId));
-        
-        if (onlyActive) {
-            query = query.where(eq(userPromotions.isActive, true)) as any;
-        }
-        
-        return await query;
+            .where(and(...conditions));
     }
 
-    async getUserAssignmentsForPromotion(promotionId: string): Promise<any[]> {
+    async getUserAssignmentsForPromotion(promotionId: string): Promise<DbUserPromotion[]> {
         return this.db
             .select()
             .from(userPromotions)
@@ -367,7 +373,7 @@ export class PromotionRepository {
         createdAt: string;
         updatedAt: string;
         memberCount: number;
-        members: any[];
+        members: DbUser[];
     }>> {
         const conditions = [];
 
@@ -403,7 +409,7 @@ export class PromotionRepository {
             .innerJoin(users, eq(users.id, promotionAudienceGroupMembers.userId))
             .where(inArray(promotionAudienceGroupMembers.groupId, groupIds));
 
-        const membersByGroup = new Map<string, any[]>();
+        const membersByGroup = new Map<string, DbUser[]>();
         for (const row of memberRows) {
             const existing = membersByGroup.get(row.groupId) ?? [];
             existing.push(row.user);
@@ -454,7 +460,7 @@ export class PromotionRepository {
         return results.map(r => r.businessId);
     }
 
-    async getMetadata(userId: string): Promise<any> {
+    async getMetadata(userId: string): Promise<DbUserPromoMetadata | null> {
         const [metadata] = await this.db
             .select()
             .from(userPromoMetadata)
@@ -464,7 +470,7 @@ export class PromotionRepository {
         return metadata || null;
     }
 
-    async upsertMetadata(userId: string, updates: Partial<any>): Promise<void> {
+    async upsertMetadata(userId: string, updates: Partial<DbUserPromoMetadata>): Promise<void> {
         const existing = await this.getMetadata(userId);
         
         if (existing) {

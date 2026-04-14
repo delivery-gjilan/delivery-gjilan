@@ -89,35 +89,31 @@ export default function MarketPage() {
     }, [admin?.businessId, admin?.role, marketBusiness?.id]);
 
     if (businessesLoading) {
-        return <p className="text-gray-400">Loading market...</p>;
+        return (
+            <div className="text-white">
+                <div className="flex justify-between items-center mb-5">
+                    <h1 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Market</h1>
+                </div>
+                <div className="h-64 rounded-xl bg-zinc-900 border border-zinc-800 animate-pulse" />
+            </div>
+        );
     }
 
     return (
         <div className="text-white space-y-6">
             <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-semibold flex items-center gap-2">
-                        <ShoppingBag className="text-purple-400" size={28} />
-                        Market Management
-                    </h1>
-                    <p className="text-sm text-gray-400 mt-1">
-                        Organize your market with categories, subcategories, and products
-                    </p>
-                </div>
+                <h1 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Market</h1>
                 {marketBusiness && (
-                    <div className="text-right">
-                        <div className="text-sm text-gray-400">Business</div>
-                        <div className="text-base font-semibold text-purple-300">{marketBusiness.name}</div>
-                    </div>
+                    <span className="text-sm text-zinc-500">{marketBusiness.name}</span>
                 )}
             </div>
 
             {effectiveBusinessId ? (
                 <MarketContent businessId={effectiveBusinessId} />
             ) : (
-                <div className="bg-gray-900 border border-gray-800 rounded-xl p-12 text-center">
-                    <ShoppingBag className="mx-auto mb-4 text-gray-600" size={48} />
-                    <p className="text-gray-400">No market business found. Create one first.</p>
+                <div className="bg-[#111113] border border-[#1e1e22] rounded-xl p-12 text-center">
+                    <ShoppingBag className="mx-auto mb-4 text-zinc-700" size={48} />
+                    <p className="text-zinc-500">No market business found. Create one first.</p>
                 </div>
             )}
         </div>
@@ -309,7 +305,7 @@ function MarketContent({ businessId }: { businessId: string }) {
     };
 
     if (categoriesLoading) {
-        return <p className="text-gray-400">Loading...</p>;
+        return <div className="h-64 rounded-xl bg-zinc-900 border border-zinc-800 animate-pulse" />;
     }
 
     return (
@@ -317,7 +313,7 @@ function MarketContent({ businessId }: { businessId: string }) {
             {/* Top Bar: Search + Actions */}
             <div className="flex gap-3 items-center">
                 <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
                     <Input
                         placeholder="Search products by name or description..."
                         value={searchQuery}
@@ -353,9 +349,9 @@ function MarketContent({ businessId }: { businessId: string }) {
 
             {/* Sort Mode Info Banner */}
             {sortMode && (
-                <div className="bg-purple-500/20 border border-purple-500/50 rounded-lg p-3 flex items-center gap-3">
-                    <GripVertical className="text-purple-400" size={20} />
-                    <p className="text-purple-200 text-sm flex-1">
+                <div className="bg-violet-500/10 border border-violet-500/30 rounded-lg p-3 flex items-center gap-3">
+                    <GripVertical className="text-violet-400" size={20} />
+                    <p className="text-violet-300 text-sm flex-1">
                         <strong>Sort Mode Active:</strong> Drag and drop to reorder products
                         {selectedCategoryId !== "all"
                             ? ` in ${(categories as Category[]).find((c) => c.id === selectedCategoryId)?.name}`
@@ -392,8 +388,8 @@ function MarketContent({ businessId }: { businessId: string }) {
             )}
 
             {/* Filters */}
-            <div className="flex gap-3 items-center bg-gray-900 border border-gray-800 rounded-xl p-4">
-                <LayoutGrid className="text-purple-400" size={20} />
+            <div className="flex gap-3 items-center bg-[#111113] border border-[#1e1e22] rounded-xl p-4">
+                <LayoutGrid className="text-violet-400" size={20} />
                 <div className="flex gap-3 flex-1 items-center">
                     <Select
                         value={selectedCategoryId}
@@ -446,11 +442,11 @@ function MarketContent({ businessId }: { businessId: string }) {
 
             {/* Products Table */}
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+                <div className="bg-[#111113] border border-[#1e1e22] rounded-xl overflow-hidden">
                     {filteredProducts.length === 0 ? (
                         <div className="p-12 text-center">
-                            <Package className="mx-auto mb-4 text-gray-600" size={48} />
-                            <p className="text-gray-400 mb-4">
+                            <Package className="mx-auto mb-4 text-zinc-700" size={48} />
+                            <p className="text-zinc-500 mb-4">
                                 {searchQuery ? "No products found" : "No products yet. Add your first product!"}
                             </p>
                             {!searchQuery && (
@@ -471,40 +467,40 @@ function MarketContent({ businessId }: { businessId: string }) {
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead className="bg-gray-800/50 border-b border-gray-700">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
                                     <tr>
                                         {sortMode && (
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider w-12" />
+                                            <th className="px-4 py-2.5 text-zinc-500 bg-[#09090b] border-b border-[#1e1e22] text-[11px] font-medium uppercase tracking-wider w-12" />
                                         )}
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider w-20">
+                                        <th className="px-4 py-2.5 text-zinc-500 bg-[#09090b] border-b border-[#1e1e22] text-[11px] font-medium uppercase tracking-wider w-20">
                                             Image
                                         </th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                        <th className="px-4 py-2.5 text-zinc-500 bg-[#09090b] border-b border-[#1e1e22] text-[11px] font-medium uppercase tracking-wider">
                                             Product
                                         </th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                        <th className="px-4 py-2.5 text-zinc-500 bg-[#09090b] border-b border-[#1e1e22] text-[11px] font-medium uppercase tracking-wider">
                                             Category
                                         </th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                        <th className="px-4 py-2.5 text-zinc-500 bg-[#09090b] border-b border-[#1e1e22] text-[11px] font-medium uppercase tracking-wider">
                                             Subcategory
                                         </th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                        <th className="px-4 py-2.5 text-zinc-500 bg-[#09090b] border-b border-[#1e1e22] text-[11px] font-medium uppercase tracking-wider">
                                             Price
                                         </th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                        <th className="px-4 py-2.5 text-zinc-500 bg-[#09090b] border-b border-[#1e1e22] text-[11px] font-medium uppercase tracking-wider">
                                             Markup
                                         </th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                        <th className="px-4 py-2.5 text-zinc-500 bg-[#09090b] border-b border-[#1e1e22] text-[11px] font-medium uppercase tracking-wider">
                                             Night
                                         </th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                            On Sale
+                                        <th className="px-4 py-2.5 text-zinc-500 bg-[#09090b] border-b border-[#1e1e22] text-[11px] font-medium uppercase tracking-wider">
+                                            Sale
                                         </th>
-                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider w-24">
+                                        <th className="px-4 py-2.5 text-zinc-500 bg-[#09090b] border-b border-[#1e1e22] text-[11px] font-medium uppercase tracking-wider text-center w-24">
                                             Available
                                         </th>
-                                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider w-32">
+                                        <th className="px-4 py-2.5 text-zinc-500 bg-[#09090b] border-b border-[#1e1e22] text-[11px] font-medium uppercase tracking-wider text-right w-32">
                                             Actions
                                         </th>
                                     </tr>
@@ -514,7 +510,7 @@ function MarketContent({ businessId }: { businessId: string }) {
                                     strategy={verticalListSortingStrategy}
                                     disabled={!sortMode}
                                 >
-                                    <tbody className="divide-y divide-gray-800">
+                                    <tbody>
                                         {filteredProducts.map((product) => (
                                             <ProductRow
                                                 key={product.id}

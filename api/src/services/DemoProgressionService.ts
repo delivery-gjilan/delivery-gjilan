@@ -1,5 +1,5 @@
 import { and, eq, inArray, isNull } from 'drizzle-orm';
-import type { ApiContextInterface } from '@/graphql/context';
+import type { ApiContextInterface, GraphQLContext } from '@/graphql/context';
 import logger from '@/lib/logger';
 import { users as usersTable } from '@/database/schema';
 
@@ -182,7 +182,7 @@ async function maybeMarkReady(
         businessId: actors.businessId,
     });
 
-    await context.orderService.updateStatusWithSideEffects(orderId, 'READY', businessContext);
+    await context.orderService.updateStatusWithSideEffects(orderId, 'READY', businessContext as unknown as GraphQLContext);
 }
 
 async function maybePickUpOrder(
@@ -203,7 +203,7 @@ async function maybePickUpOrder(
         ? impersonateContext(context, { userId: actors.demoDriverId, role: 'DRIVER' })
         : impersonateContext(context, { userId: actors.adminUserId, role: 'SUPER_ADMIN' });
 
-    await context.orderService.updateStatusWithSideEffects(orderId, 'OUT_FOR_DELIVERY', pickupContext);
+    await context.orderService.updateStatusWithSideEffects(orderId, 'OUT_FOR_DELIVERY', pickupContext as unknown as GraphQLContext);
 }
 
 async function maybeDeliverOrder(
@@ -220,7 +220,7 @@ async function maybeDeliverOrder(
         ? impersonateContext(context, { userId: actors.demoDriverId, role: 'DRIVER' })
         : impersonateContext(context, { userId: actors.adminUserId, role: 'SUPER_ADMIN' });
 
-    await context.orderService.updateStatusWithSideEffects(orderId, 'DELIVERED', deliverContext);
+    await context.orderService.updateStatusWithSideEffects(orderId, 'DELIVERED', deliverContext as unknown as GraphQLContext);
 }
 
 export async function scheduleDemoOrderProgression(

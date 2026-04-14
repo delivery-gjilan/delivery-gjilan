@@ -29,6 +29,16 @@ export interface SettlementSummaryFilters {
     endDate?: string;
 }
 
+export interface SettlementSummary {
+    totalAmount: number;
+    totalPending: number;
+    totalPaid: number;
+    totalReceivable: number;
+    totalPayable: number;
+    count: number;
+    pendingCount: number;
+}
+
 export class SettlementRepository {
     constructor(private db: DbType) {}
 
@@ -38,15 +48,15 @@ export class SettlementRepository {
     }
 
     async getSettlements(filters: SettlementFilters): Promise<DbSettlement[]> {
-        let query: any = this.db.select().from(settlements);
+        let query = this.db.select().from(settlements).$dynamic();
         const conditions = [];
 
         if (filters.type) {
-            conditions.push(eq(settlements.type, filters.type as any));
+            conditions.push(eq(settlements.type, filters.type as 'DRIVER' | 'BUSINESS'));
         }
 
         if (filters.direction) {
-            conditions.push(eq(settlements.direction, filters.direction as any));
+            conditions.push(eq(settlements.direction, filters.direction as 'RECEIVABLE' | 'PAYABLE'));
         }
 
         if (filters.isSettled !== undefined) {
@@ -99,15 +109,15 @@ export class SettlementRepository {
         return query.orderBy(sql`${settlements.createdAt} DESC`);
     }
 
-    async getSettlementSummary(filters: SettlementSummaryFilters): Promise<any> {
+    async getSettlementSummary(filters: SettlementSummaryFilters): Promise<SettlementSummary> {
         const conditions = [];
 
         if (filters.type) {
-            conditions.push(eq(settlements.type, filters.type as any));
+            conditions.push(eq(settlements.type, filters.type as 'DRIVER' | 'BUSINESS'));
         }
 
         if (filters.direction) {
-            conditions.push(eq(settlements.direction, filters.direction as any));
+            conditions.push(eq(settlements.direction, filters.direction as 'RECEIVABLE' | 'PAYABLE'));
         }
 
         if (filters.isSettled !== undefined) {
@@ -163,7 +173,7 @@ export class SettlementRepository {
             })
             .from(settlements)
             .where(whereClause)
-            .then((result: any[]) => result[0]);
+            .then((rows) => rows[0]);
 
         return {
             totalAmount: result.totalAmount || 0,
@@ -176,14 +186,14 @@ export class SettlementRepository {
         };
     }
 
-    async getDriverBalance(driverId: string): Promise<any> {
+    async getDriverBalance(driverId: string): Promise<SettlementSummary> {
         return this.getSettlementSummary({
             type: 'DRIVER',
             driverId,
         });
     }
 
-    async getBusinessBalance(businessId: string): Promise<any> {
+    async getBusinessBalance(businessId: string): Promise<SettlementSummary> {
         return this.getSettlementSummary({
             type: 'BUSINESS',
             businessId,

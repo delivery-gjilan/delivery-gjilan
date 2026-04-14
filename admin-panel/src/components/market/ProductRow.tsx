@@ -1,9 +1,11 @@
 'use client';
 
 import Button from '@/components/ui/Button';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Edit2, Trash2, Eye, EyeOff, Tag, GripVertical, Package } from 'lucide-react';
+import { Edit2, Trash2, GripVertical, Package } from 'lucide-react';
 
 interface Product {
     id: string;
@@ -59,42 +61,42 @@ export default function ProductRow({
         <tr
             ref={setNodeRef}
             style={style}
-            className={`hover:bg-gray-800/50 transition-colors ${
+            className={`transition-colors hover:bg-zinc-800/30 ${
                 sortMode ? 'cursor-grab active:cursor-grabbing' : ''
-            } ${isDragging ? 'bg-gray-800' : ''}`}
+            } ${isDragging ? 'bg-zinc-900' : ''}`}
         >
             {/* Drag Handle */}
             {sortMode && (
-                <td className="px-4 py-3">
+                <td className="px-4 py-2.5 border-b border-[#1e1e22]/60">
                     <div
                         {...attributes}
                         {...listeners}
-                        className="p-1.5 bg-purple-500/20 rounded cursor-grab active:cursor-grabbing hover:bg-purple-500/30"
+                        className="inline-flex items-center justify-center rounded border border-violet-500/30 bg-violet-500/10 p-1 text-violet-300 hover:bg-violet-500/20 cursor-grab active:cursor-grabbing"
                     >
-                        <GripVertical size={16} className="text-purple-400" />
+                        <GripVertical size={14} />
                     </div>
                 </td>
             )}
 
             {/* Image */}
-            <td className="px-4 py-3">
-                <div className="w-12 h-12 bg-gray-800 rounded overflow-hidden flex-shrink-0">
+            <td className="px-4 py-2.5 border-b border-[#1e1e22]/60">
+                <div className="w-10 h-10 bg-zinc-800 rounded-lg overflow-hidden flex-shrink-0 border border-zinc-800">
                     {product.imageUrl ? (
                         <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
                     ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                            <Package size={20} className="text-gray-600" />
+                            <Package size={16} className="text-zinc-700" />
                         </div>
                     )}
                 </div>
             </td>
 
             {/* Product Name & Description */}
-            <td className="px-4 py-3">
+            <td className="px-4 py-2.5 border-b border-[#1e1e22]/60">
                 <div className="flex flex-col">
-                    <span className="font-medium text-white text-sm">{product.name}</span>
+                    <span className="font-medium text-zinc-100 text-sm">{product.name}</span>
                     {product.description && (
-                        <span className="text-xs text-gray-500 truncate max-w-xs" title={product.description}>
+                        <span className="text-xs text-zinc-500 truncate max-w-xs" title={product.description}>
                             {product.description}
                         </span>
                     )}
@@ -102,94 +104,70 @@ export default function ProductRow({
             </td>
 
             {/* Category */}
-            <td className="px-4 py-3">
-                <span className="text-xs px-2 py-1 bg-purple-500/20 text-purple-300 rounded">{categoryName}</span>
+            <td className="px-4 py-2.5 border-b border-[#1e1e22]/60">
+                <Badge variant="default" className="text-[11px]">{categoryName}</Badge>
             </td>
 
             {/* Subcategory */}
-            <td className="px-4 py-3">
+            <td className="px-4 py-2.5 border-b border-[#1e1e22]/60">
                 {subcategoryName ? (
-                    <span className="text-xs px-2 py-1 bg-violet-500/20 text-violet-300 rounded">
-                        {subcategoryName}
-                    </span>
+                    <Badge variant="secondary" className="text-[11px]">{subcategoryName}</Badge>
                 ) : (
-                    <span className="text-gray-600 text-xs">—</span>
+                    <span className="text-zinc-700 text-xs">—</span>
                 )}
             </td>
 
             {/* Price */}
-            <td className="px-4 py-3">
+            <td className="px-4 py-2.5 border-b border-[#1e1e22]/60">
                 <div className="flex flex-col gap-0.5">
                     {product.isOnSale && product.saleDiscountPercentage != null ? (
                         <>
-                            <span className="font-bold text-green-400">
-                                ${(product.price * (1 - product.saleDiscountPercentage / 100)).toFixed(2)}
+                            <span className="font-semibold text-green-400 text-sm tabular-nums">
+                                €{(product.price * (1 - product.saleDiscountPercentage / 100)).toFixed(2)}
                             </span>
-                            <span className="text-xs text-gray-500 line-through">${product.price.toFixed(2)}</span>
+                            <span className="text-xs text-zinc-600 line-through tabular-nums">€{product.price.toFixed(2)}</span>
                         </>
                     ) : (
-                        <span className="font-bold text-white">${product.price.toFixed(2)}</span>
+                        <span className="font-semibold text-zinc-100 text-sm tabular-nums">€{product.price.toFixed(2)}</span>
                     )}
                 </div>
             </td>
 
             {/* Markup Price */}
-            <td className="px-4 py-3">
+            <td className="px-4 py-2.5 border-b border-[#1e1e22]/60">
                 {product.markupPrice != null && product.markupPrice > 0 ? (
-                    <span className="font-medium text-zinc-200 tabular-nums">€{product.markupPrice.toFixed(2)}</span>
+                    <span className="text-sm text-zinc-300 tabular-nums">€{product.markupPrice.toFixed(2)}</span>
                 ) : (
-                    <span className="text-amber-400/70 text-xs">Not set</span>
+                    <span className="text-zinc-700 text-xs">—</span>
                 )}
             </td>
 
             {/* Night Price */}
-            <td className="px-4 py-3">
+            <td className="px-4 py-2.5 border-b border-[#1e1e22]/60">
                 {product.nightMarkedupPrice != null && product.nightMarkedupPrice > 0 ? (
-                    <span className="font-medium text-zinc-200 tabular-nums">
-                        €{product.nightMarkedupPrice.toFixed(2)}
-                    </span>
+                    <span className="text-sm text-zinc-300 tabular-nums">€{product.nightMarkedupPrice.toFixed(2)}</span>
                 ) : (
-                    <span className="text-amber-400/70 text-xs">Not set</span>
+                    <span className="text-zinc-700 text-xs">—</span>
                 )}
             </td>
 
             {/* On Sale Toggle */}
-            <td className="px-4 py-3 text-center">
-                <button
-                    onClick={onToggleSale}
-                    className={`p-2 rounded transition-colors ${
-                        product.isOnSale
-                            ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                            : 'bg-gray-800 text-gray-500 hover:text-gray-300'
-                    }`}
-                    title={product.isOnSale ? 'Remove from sale' : 'Put on sale'}
-                >
-                    <Tag size={16} />
-                </button>
+            <td className="px-4 py-2.5 border-b border-[#1e1e22]/60">
+                <Switch checked={product.isOnSale} onCheckedChange={onToggleSale} />
             </td>
 
             {/* Available Toggle */}
-            <td className="px-4 py-3 text-center">
-                <button
-                    onClick={onToggleAvailability}
-                    className={`p-2 rounded transition-colors ${
-                        product.isAvailable
-                            ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                            : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                    }`}
-                    title={product.isAvailable ? 'Mark as unavailable' : 'Mark as available'}
-                >
-                    {product.isAvailable ? <Eye size={16} /> : <EyeOff size={16} />}
-                </button>
+            <td className="px-4 py-2.5 border-b border-[#1e1e22]/60 text-center">
+                <Switch checked={product.isAvailable} onCheckedChange={onToggleAvailability} />
             </td>
 
             {/* Actions */}
-            <td className="px-4 py-3 text-right">
+            <td className="px-4 py-2.5 border-b border-[#1e1e22]/60 text-right">
                 <div className="flex items-center justify-end gap-2">
-                    <Button variant="outline" size="sm" onClick={onEdit} className="px-3 py-1.5">
+                    <Button variant="outline" size="sm" onClick={onEdit}>
                         <Edit2 size={14} />
                     </Button>
-                    <Button variant="danger" size="sm" onClick={onDelete} className="px-3 py-1.5">
+                    <Button variant="danger" size="sm" onClick={onDelete}>
                         <Trash2 size={14} />
                     </Button>
                 </div>

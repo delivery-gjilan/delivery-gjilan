@@ -21,7 +21,7 @@ export interface CreateAuditLogInput {
     action: ActionType;
     entityType: EntityType;
     entityId?: string;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
     ipAddress?: string;
     userAgent?: string;
 }
@@ -83,7 +83,7 @@ export class AuditLogRepository {
         }
 
         // Build query for logs
-        let query: any = this.db.select().from(auditLogs);
+        let query = this.db.select().from(auditLogs).$dynamic();
 
         if (conditions.length > 0) {
             query = query.where(and(...conditions));
@@ -102,7 +102,7 @@ export class AuditLogRepository {
         const logs = await query;
 
         // Get total count for pagination
-        let countQuery: any = this.db.select({ count: sql<number>`count(*)::int` }).from(auditLogs);
+        let countQuery = this.db.select({ count: sql<number>`count(*)::int` }).from(auditLogs).$dynamic();
 
         if (conditions.length > 0) {
             countQuery = countQuery.where(and(...conditions));

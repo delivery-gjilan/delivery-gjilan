@@ -15,6 +15,10 @@ const CACHE_KEY_DECIMALS = 5;
 
 type DirectionsResult = Record<string, unknown>;
 
+interface AuthenticatedRequest extends Request {
+    userId?: string;
+}
+
 // Deduplicate concurrent cache-miss requests for the same route/options.
 const inFlightRequests = new Map<string, Promise<DirectionsResult>>();
 
@@ -28,7 +32,7 @@ function requireAuth(req: Request, res: Response, next: () => void) {
     }
     try {
         const decoded = decodeJwtToken(authHeader.substring(7));
-        (req as any).userId = decoded.userId;
+        (req as AuthenticatedRequest).userId = decoded.userId;
         next();
     } catch {
         res.status(401).json({ error: 'Invalid or expired token' });
@@ -101,7 +105,7 @@ async function fetchAndTransformDirections(
         };
     }
 
-    const data: any = await upstream.json();
+    const data = await upstream.json() as { routes?: Array<{ distance: number; duration: number; geometry: { coordinates: Array<[number, number]> }; legs?: Array<{ steps?: Array<{ maneuver: { instruction?: string; type: string; modifier?: string; location: [number, number] }; distance: number; duration: number }> }> }> };
     if (!data.routes?.length) {
         throw { status: 404, body: { error: 'No route found' } };
     }
@@ -114,8 +118,8 @@ async function fetchAndTransformDirections(
     };
 
     if (withSteps) {
-        result.steps = (route.legs ?? []).flatMap((leg: any) =>
-            (leg.steps ?? []).map((step: any) => ({
+        result.steps = (route.legs ?? []).flatMap((leg) =>
+            (leg.steps ?? []).map((step) => ({
                 instruction: step.maneuver.instruction ?? 'Continue straight',
                 distanceM: step.distance,
                 durationS: step.duration,

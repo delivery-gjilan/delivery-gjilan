@@ -9,5 +9,6 @@ export const getPromotionUsage: NonNullable<QueryResolvers['getPromotionUsage']>
     if (!userData.userId || (userData.role !== 'ADMIN' && userData.role !== 'SUPER_ADMIN')) {
         throw new GraphQLError('Forbidden', { extensions: { code: 'FORBIDDEN' } });
     }
-    return promotionService.getPromotionUsage(promotionId, limit ?? undefined, offset ?? undefined);
+    const usage = await promotionService.getPromotionUsage(promotionId, limit ?? undefined, offset ?? undefined);
+    return usage.map((u) => ({ ...u, usedAt: u.createdAt }));
 };

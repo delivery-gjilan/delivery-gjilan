@@ -176,8 +176,8 @@ export class SettlementScenarioHarnessService {
     private settlementRepo: SettlementRepository;
 
     constructor(private db: Database) {
-        this.financialService = new FinancialService(this.db as any);
-        this.settlementRepo = new SettlementRepository(this.db as any);
+        this.financialService = new FinancialService(this.db);
+        this.settlementRepo = new SettlementRepository(this.db);
     }
 
     getScenarioDefinitions() {
@@ -522,15 +522,15 @@ export class SettlementScenarioHarnessService {
         ]);
 
         // Seed settlement rules
-        await (this.db.insert(settlementRules) as any).values([
+        await this.db.insert(settlementRules).values([
             {
                 id: IDS.ruleBusiness10SubtotalId,
                 name: 'Global Business 10% Subtotal',
+                type: 'ORDER_PRICE',
                 entityType: 'BUSINESS',
                 direction: 'RECEIVABLE',
                 amountType: 'PERCENT',
                 amount: '10.00',
-                appliesTo: 'SUBTOTAL' as any,
                 businessId: null,
                 promotionId: null,
                 isActive: true,
@@ -541,11 +541,11 @@ export class SettlementScenarioHarnessService {
             {
                 id: IDS.ruleDriver80DeliveryId,
                 name: 'Global Driver 80% Delivery Fee',
+                type: 'DELIVERY_PRICE',
                 entityType: 'DRIVER',
                 direction: 'PAYABLE',
                 amountType: 'PERCENT',
                 amount: '80.00',
-                appliesTo: 'DELIVERY_FEE' as any,
                 businessId: null,
                 promotionId: null,
                 isActive: true,
@@ -556,11 +556,11 @@ export class SettlementScenarioHarnessService {
             {
                 id: IDS.ruleDriverFreeDelivery2Id,
                 name: 'Driver Free Delivery Compensation 2 EUR',
+                type: 'DELIVERY_PRICE',
                 entityType: 'DRIVER',
                 direction: 'PAYABLE',
                 amountType: 'FIXED',
                 amount: '2.00',
-                appliesTo: null,
                 businessId: null,
                 promotionId: IDS.promoFreeDeliveryId,
                 isActive: true,
@@ -571,11 +571,11 @@ export class SettlementScenarioHarnessService {
             {
                 id: IDS.ruleBusinessPromoFixed15Id,
                 name: 'Business Price Promo Fixed 1.5 EUR',
+                type: 'ORDER_PRICE',
                 entityType: 'BUSINESS',
                 direction: 'RECEIVABLE',
                 amountType: 'FIXED',
                 amount: '1.50',
-                appliesTo: null,
                 businessId: null,
                 promotionId: IDS.promoPriceDiscountId,
                 isActive: true,
@@ -586,11 +586,11 @@ export class SettlementScenarioHarnessService {
             {
                 id: IDS.ruleDriverBusinessFreeDelivery1Id,
                 name: 'Business Free Delivery Driver Compensation 1 EUR',
+                type: 'DELIVERY_PRICE',
                 entityType: 'DRIVER',
                 direction: 'PAYABLE',
                 amountType: 'FIXED',
                 amount: '1.00',
-                appliesTo: null,
                 businessId: IDS.businessAId,
                 promotionId: IDS.promoBusinessFreeDeliveryId,
                 isActive: true,
@@ -601,11 +601,11 @@ export class SettlementScenarioHarnessService {
             {
                 id: IDS.ruleDriver20DeliveryReceivableId,
                 name: 'Business Free Delivery Driver 20% Delivery Fee Receivable',
+                type: 'DELIVERY_PRICE',
                 entityType: 'DRIVER',
                 direction: 'RECEIVABLE',
                 amountType: 'PERCENT',
                 amount: '20.00',
-                appliesTo: 'DELIVERY_FEE' as any,
                 businessId: null,
                 promotionId: IDS.promoBusinessFreeDeliveryId,
                 isActive: true,
@@ -616,11 +616,11 @@ export class SettlementScenarioHarnessService {
             {
                 id: IDS.ruleDriverBusinessFullSponsor1Id,
                 name: 'Business Full Sponsor Driver Compensation 1 EUR',
+                type: 'DELIVERY_PRICE',
                 entityType: 'DRIVER',
                 direction: 'PAYABLE',
                 amountType: 'FIXED',
                 amount: '1.00',
-                appliesTo: null,
                 businessId: IDS.businessAId,
                 promotionId: IDS.promoBusinessFullSponsorFreeDeliveryId,
                 isActive: true,
@@ -631,11 +631,11 @@ export class SettlementScenarioHarnessService {
             {
                 id: IDS.ruleBusinessBusinessFullSponsorRecover1Id,
                 name: 'Business Full Sponsor Reimbursement 1 EUR',
+                type: 'DELIVERY_PRICE',
                 entityType: 'BUSINESS',
                 direction: 'RECEIVABLE',
                 amountType: 'FIXED',
                 amount: '1.00',
-                appliesTo: null,
                 businessId: IDS.businessAId,
                 promotionId: IDS.promoBusinessFullSponsorFreeDeliveryId,
                 isActive: true,
@@ -646,11 +646,11 @@ export class SettlementScenarioHarnessService {
             {
                 id: IDS.ruleDriverBusinessSplitSponsor2Id,
                 name: 'Business Split Sponsor Driver Compensation 2 EUR',
+                type: 'DELIVERY_PRICE',
                 entityType: 'DRIVER',
                 direction: 'PAYABLE',
                 amountType: 'FIXED',
                 amount: '2.00',
-                appliesTo: null,
                 businessId: IDS.businessAId,
                 promotionId: IDS.promoBusinessSplitSponsorFreeDeliveryId,
                 isActive: true,
@@ -661,11 +661,11 @@ export class SettlementScenarioHarnessService {
             {
                 id: IDS.ruleBusinessBusinessSplitSponsorRecover1Id,
                 name: 'Business Split Sponsor Reimbursement 1 EUR',
+                type: 'DELIVERY_PRICE',
                 entityType: 'BUSINESS',
                 direction: 'RECEIVABLE',
                 amountType: 'FIXED',
                 amount: '1.00',
-                appliesTo: null,
                 businessId: IDS.businessAId,
                 promotionId: IDS.promoBusinessSplitSponsorFreeDeliveryId,
                 isActive: true,
@@ -676,11 +676,11 @@ export class SettlementScenarioHarnessService {
             {
                 id: IDS.ruleDriverBusinessPrepaidSponsor1Id,
                 name: 'Business Prepaid Sponsor Driver Compensation 1 EUR',
+                type: 'DELIVERY_PRICE',
                 entityType: 'DRIVER',
                 direction: 'PAYABLE',
                 amountType: 'FIXED',
                 amount: '1.00',
-                appliesTo: null,
                 businessId: IDS.businessAId,
                 promotionId: IDS.promoBusinessPrepaidSponsorFreeDeliveryId,
                 isActive: true,
@@ -691,11 +691,11 @@ export class SettlementScenarioHarnessService {
             {
                 id: IDS.ruleBusinessBusinessPrepaidSponsorRecover1Id,
                 name: 'Business Prepaid Sponsor Reimbursement 1 EUR',
+                type: 'DELIVERY_PRICE',
                 entityType: 'BUSINESS',
                 direction: 'RECEIVABLE',
                 amountType: 'FIXED',
                 amount: '1.00',
-                appliesTo: null,
                 businessId: IDS.businessAId,
                 promotionId: IDS.promoBusinessPrepaidSponsorFreeDeliveryId,
                 isActive: true,
@@ -719,7 +719,7 @@ export class SettlementScenarioHarnessService {
             ],
         });
 
-        await this.financialService.createOrderSettlements(order as any, items as any, order.driverId);
+        await this.financialService.createOrderSettlements(order, items, order.driverId);
 
         return this.evaluateScenario(
             'cash-markup-basic',
@@ -767,7 +767,7 @@ export class SettlementScenarioHarnessService {
             ],
         });
 
-        await this.financialService.createOrderSettlements(order as any, items as any, order.driverId);
+        await this.financialService.createOrderSettlements(order, items, order.driverId);
 
         return this.evaluateScenario(
             'prepaid-markup-no-remittance',
@@ -810,7 +810,7 @@ export class SettlementScenarioHarnessService {
             ],
         });
 
-        await this.financialService.createOrderSettlements(order as any, items as any, order.driverId);
+        await this.financialService.createOrderSettlements(order, items, order.driverId);
 
         return this.evaluateScenario(
             'cash-free-delivery-promo',
@@ -861,7 +861,7 @@ export class SettlementScenarioHarnessService {
             ],
         });
 
-        await this.financialService.createOrderSettlements(order as any, items as any, order.driverId);
+        await this.financialService.createOrderSettlements(order, items, order.driverId);
 
         return this.evaluateScenario(
             'cash-price-promo-scoped-rule',
@@ -917,7 +917,7 @@ export class SettlementScenarioHarnessService {
             ],
         });
 
-        await this.financialService.createOrderSettlements(order as any, items as any, order.driverId);
+        await this.financialService.createOrderSettlements(order, items, order.driverId);
 
         return this.evaluateScenario(
             'no-driver-assigned',
@@ -950,7 +950,7 @@ export class SettlementScenarioHarnessService {
             ],
         });
 
-        await this.financialService.createOrderSettlements(order as any, items as any, order.driverId);
+        await this.financialService.createOrderSettlements(order, items, order.driverId);
 
         return this.evaluateScenario(
             'multi-business-global-rule',
@@ -993,7 +993,7 @@ export class SettlementScenarioHarnessService {
             ],
         });
 
-        await this.financialService.createOrderSettlements(order as any, items as any, order.driverId);
+        await this.financialService.createOrderSettlements(order, items, order.driverId);
 
         return this.evaluateScenario(
             'business-promo-free-delivery-mixed-flows',
@@ -1060,7 +1060,7 @@ export class SettlementScenarioHarnessService {
             ],
         });
 
-        await this.financialService.createOrderSettlements(order as any, items as any, order.driverId);
+        await this.financialService.createOrderSettlements(order, items, order.driverId);
 
         return this.evaluateScenario(
             'business-promo-free-delivery-business-covers-driver',
@@ -1127,7 +1127,7 @@ export class SettlementScenarioHarnessService {
             ],
         });
 
-        await this.financialService.createOrderSettlements(order as any, items as any, order.driverId);
+        await this.financialService.createOrderSettlements(order, items, order.driverId);
 
         return this.evaluateScenario(
             'business-promo-free-delivery-split-funding',
@@ -1194,7 +1194,7 @@ export class SettlementScenarioHarnessService {
             ],
         });
 
-        await this.financialService.createOrderSettlements(order as any, items as any, order.driverId);
+        await this.financialService.createOrderSettlements(order, items, order.driverId);
 
         return this.evaluateScenario(
             'business-promo-free-delivery-prepaid-via-platform',
@@ -1264,8 +1264,10 @@ export class SettlementScenarioHarnessService {
                 id: params.orderId,
                 displayId: params.displayId,
                 userId: IDS.customerUserId,
+                businessId: IDS.businessAId,
                 driverId: params.driverUserId,
-                price: params.subtotal,
+                basePrice: params.subtotal,
+                actualPrice: params.subtotal,
                 deliveryPrice: params.deliveryFee,
                 paymentCollection: params.paymentCollection,
                 status: 'DELIVERED',
@@ -1273,10 +1275,9 @@ export class SettlementScenarioHarnessService {
                 dropoffLng: 21.469,
                 dropoffAddress: 'Scenario Dropoff',
                 deliveredAt: now,
-                orderDate: now,
                 createdAt: now,
                 updatedAt: now,
-            } as any)
+            })
             .returning();
 
         await this.db.insert(orderItems).values(

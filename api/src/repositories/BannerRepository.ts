@@ -6,6 +6,8 @@ import { cache } from '@/lib/cache';
 /** NOTE: The banners table has an isDeleted column. All queries MUST filter by isDeleted=false.
  *  Deletions MUST set isDeleted=true instead of removing the row. See SOFT_DELETE_CONVENTION.md. */
 
+type BannerDisplayContext = 'HOME' | 'BUSINESS' | 'CATEGORY' | 'PRODUCT' | 'CART' | 'ALL';
+
 export interface BannerFilter {
     activeOnly?: boolean;
     businessId?: string;
@@ -72,16 +74,16 @@ export class BannerRepository {
         if (filter?.displayContext) {
             conditions.push(
                 or(
-                    eq(banners.displayContext, filter.displayContext as any),
-                    eq(banners.displayContext, 'ALL' as any),
+                    eq(banners.displayContext, filter.displayContext as BannerDisplayContext),
+                    eq(banners.displayContext, 'ALL'),
                 ) as SQL,
             );
         }
         if (filter?.includeScheduled) {
-            const now = new Date().toISOString();
+            const now = new Date();
             conditions.push(
-                or(isNull(banners.startsAt), lte(banners.startsAt, now as any)) as SQL,
-                or(isNull(banners.endsAt), gte(banners.endsAt, now as any)) as SQL,
+                or(isNull(banners.startsAt), lte(banners.startsAt, now)) as SQL,
+                or(isNull(banners.endsAt), gte(banners.endsAt, now)) as SQL,
             );
         }
 
@@ -98,23 +100,23 @@ export class BannerRepository {
         const cached = await cache.get<Banner[]>(cacheKey);
         if (cached) return cached;
 
-        const now = new Date().toISOString();
+        const now = new Date();
         const conditions: SQL[] = [
             eq(banners.isActive, true),
             eq(banners.isDeleted, false),
-            or(isNull(banners.startsAt), lte(banners.startsAt, now as any)) as SQL,
-            or(isNull(banners.endsAt), gte(banners.endsAt, now as any)) as SQL,
+            or(isNull(banners.startsAt), lte(banners.startsAt, now)) as SQL,
+            or(isNull(banners.endsAt), gte(banners.endsAt, now)) as SQL,
         ];
 
         if (displayContext) {
             conditions.push(
                 or(
-                    eq(banners.displayContext, displayContext as any),
-                    eq(banners.displayContext, 'ALL' as any),
+                    eq(banners.displayContext, displayContext as BannerDisplayContext),
+                    eq(banners.displayContext, 'ALL'),
                 ) as SQL,
             );
         } else {
-            conditions.push(eq(banners.displayContext, 'ALL' as any));
+            conditions.push(eq(banners.displayContext, 'ALL'));
         }
 
         const result = await this.db

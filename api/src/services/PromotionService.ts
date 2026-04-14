@@ -1,5 +1,5 @@
 import { DbType } from '@/database';
-import { DbPromotion, NewDbPromotion } from '@/database/schema';
+import { DbPromotion, NewDbPromotion, DbPromotionUsage, DbUserPromotion } from '@/database/schema';
 import { PromotionRepository, PromotionFilters, PromotionAudienceGroupFilters } from '@/repositories/PromotionRepository';
 import { SettlementRuleRepository } from '@/repositories/SettlementRuleRepository';
 import logger from '@/lib/logger';
@@ -50,6 +50,7 @@ export interface CreatePromotionInput {
 export interface UpdatePromotionInput {
     id: string;
     name?: string;
+    description?: string | null;
     code?: string;
 }
 
@@ -93,7 +94,7 @@ export class PromotionService {
             isActive: promo.isActive,
             startsAt: toISOString(promo.startsAt),
             endsAt: toISOString(promo.endsAt),
-            scheduleType: promo.scheduleType as any,
+            scheduleType: promo.scheduleType,
             scheduleTimezone: promo.scheduleTimezone,
             dailyStartTime: promo.dailyStartTime,
             dailyEndTime: promo.dailyEndTime,
@@ -166,8 +167,8 @@ export class PromotionService {
             code: input.code ? input.code.toUpperCase() : null,
             name: input.name,
             description: input.description || null,
-            type: input.type as any,
-            target: input.target as any,
+            type: input.type,
+            target: input.target,
             discountValue: input.discountValue || null,
             maxDiscountCap: input.maxDiscountCap || null,
             minOrderAmount: input.minOrderAmount || null,
@@ -181,20 +182,20 @@ export class PromotionService {
             startsAt: input.startsAt
                 ? typeof input.startsAt === 'string'
                     ? input.startsAt
-                    : (input.startsAt as any).toISOString()
+                    : (input.startsAt as Date).toISOString()
                 : null,
             endsAt: input.endsAt
                 ? typeof input.endsAt === 'string'
                     ? input.endsAt
-                    : (input.endsAt as any).toISOString()
+                    : (input.endsAt as Date).toISOString()
                 : null,
-            scheduleType: (input.scheduleType ?? 'DATE_RANGE') as any,
+            scheduleType: input.scheduleType ?? 'DATE_RANGE',
             scheduleTimezone: input.scheduleTimezone ?? null,
             dailyStartTime: input.dailyStartTime ?? null,
             dailyEndTime: input.dailyEndTime ?? null,
             activeWeekdays: input.activeWeekdays && input.activeWeekdays.length > 0 ? input.activeWeekdays : null,
             newUserWindowDays: input.newUserWindowDays ?? null,
-            creatorType: input.creatorType as any,
+            creatorType: input.creatorType,
             creatorId: input.creatorId ?? null,
             createdBy: null, // Will be set by GraphQL resolver
             isRecovery: input.isRecovery ?? false,
@@ -345,12 +346,12 @@ export class PromotionService {
 
     async updatePromotion(input: UpdatePromotionInput): Promise<DbPromotion> {
         // Editing supports name, description, and code
-        const updates: any = {};
+        const updates: Partial<DbPromotion> = {};
 
         if (input.name !== undefined) updates.name = input.name;
 
-        if ((input as any).description !== undefined) {
-            const description = String((input as any).description ?? '').trim();
+        if (input.description !== undefined) {
+            const description = String(input.description ?? '').trim();
             updates.description = description.length > 0 ? description : null;
         }
 
@@ -392,7 +393,7 @@ export class PromotionService {
         await this.repository.assignToUsers(promotionId, Array.from(resolvedUserIds), expiresAt ?? null);
     }
 
-    async listPromotionAudienceGroups(filters?: PromotionAudienceGroupFilters): Promise<any[]> {
+    async listPromotionAudienceGroups(filters?: PromotionAudienceGroupFilters) {
         return this.repository.listAudienceGroups(filters);
     }
 
@@ -453,7 +454,7 @@ export class PromotionService {
             expiresAt?: string;
         },
         userData: { role?: string; userId?: string },
-    ): Promise<any[]> {
+    ): Promise<DbUserPromotion[]> {
         const expiresAt = input.expiresAt ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
         const promo = await this.createPromotion(
@@ -478,7 +479,7 @@ export class PromotionService {
 
         // Store the orderId reference on this recovery promotion
         if (input.orderId) {
-            await this.repository.update(String(promo.id), { orderId: input.orderId } as any);
+            await this.repository.update(String(promo.id), { orderId: input.orderId });
         }
 
         await this.repository.assignToUsers(String(promo.id), input.userIds, expiresAt);
@@ -521,7 +522,7 @@ export class PromotionService {
         }
 
         // Check minimum order amount
-        if (promo.minOrderAmount && orderSubtotal < parseFloat(promo.minOrderAmount as any)) {
+        if (promo.minOrderAmount && orderSubtotal < Number(promo.minOrderAmount)) {
             return { 
                 valid: false, 
                 reason: `Minimum order amount of ${promo.minOrderAmount} required` 
@@ -554,7 +555,7 @@ export class PromotionService {
         return { valid: true, promotion: promo };
     }
 
-    async getPromotionUsage(promotionId: string, limit = 500, offset = 0): Promise<any[]> {
+    async getPromotionUsage(promotionId: string, limit = 500, offset = 0): Promise<DbPromotionUsage[]> {
         return this.repository.getUsageByPromotion(promotionId, limit, offset);
     }
 
@@ -585,7 +586,7 @@ export class PromotionService {
                 currentGlobalUsage: promo.currentGlobalUsage + 1,
                 totalUsageCount: promo.totalUsageCount + 1,
                 totalRevenue: (promo.totalRevenue || 0) + discountAmount,
-            } as any);
+            });
         }
 
         // Update user metadata

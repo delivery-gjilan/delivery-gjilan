@@ -36,7 +36,7 @@ export class SettlementRequestRepository {
         limit?: number;
         offset?: number;
     }): Promise<DbSettlementRequest[]> {
-        let query: any = this.db.select().from(settlementRequests);
+        let query = this.db.select().from(settlementRequests).$dynamic();
         const conditions = [];
 
         if (filters.businessId) {
@@ -46,10 +46,10 @@ export class SettlementRequestRepository {
             conditions.push(eq(settlementRequests.driverId, filters.driverId));
         }
         if (filters.entityType) {
-            conditions.push(eq(settlementRequests.entityType, filters.entityType as any));
+            conditions.push(eq(settlementRequests.entityType, filters.entityType as 'DRIVER' | 'BUSINESS'));
         }
         if (filters.status) {
-            conditions.push(eq(settlementRequests.status, filters.status as any));
+            conditions.push(eq(settlementRequests.status, filters.status as 'PENDING' | 'ACCEPTED' | 'REJECTED'));
         }
 
         if (conditions.length > 0) {

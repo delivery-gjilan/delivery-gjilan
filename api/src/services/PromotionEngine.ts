@@ -4,7 +4,8 @@ import {
     userPromotions, 
     promotionUsage, 
     userPromoMetadata,
-    promotionBusinessEligibility
+    promotionBusinessEligibility,
+    DbPromotion,
 } from '@/database/schema/promotions';
 import { orders } from '@/database/schema';
 import { users } from '@/database/schema/users';
@@ -295,8 +296,8 @@ export class PromotionEngine {
                 case 'NEW_USERS':
                     isEligible =
                         withinPerUserLimit &&
-                        this.isWithinNewUserWindow(userRow?.createdAt ?? null, Number((promo as any).newUserWindowDays ?? 0), nowDate);
-                    log.debug({ isEligible, newUserWindowDays: (promo as any).newUserWindowDays }, 'promo:newUsers');
+                        this.isWithinNewUserWindow(userRow?.createdAt ?? null, Number(promo.newUserWindowDays ?? 0), nowDate);
+                    log.debug({ isEligible, newUserWindowDays: promo.newUserWindowDays }, 'promo:newUsers');
                     break;
 
                 case 'SPECIFIC_USERS':
@@ -315,8 +316,8 @@ export class PromotionEngine {
                 continue;
             }
 
-            if ((promo as any).scheduleType === 'RECURRING') {
-                const withinRecurringWindow = this.isWithinRecurringWindow(promo as any, nowDate);
+            if (promo.scheduleType === 'RECURRING') {
+                const withinRecurringWindow = this.isWithinRecurringWindow(promo, nowDate);
                 if (!withinRecurringWindow) {
                     log.debug({ promoId: promo.id }, 'promo:skip:outsideRecurringWindow');
                     continue;
@@ -346,8 +347,8 @@ export class PromotionEngine {
                 id: promo.id,
                 code: promo.code,
                 name: promo.name,
-                type: promo.type as any,
-                target: promo.target as any,
+                type: promo.type,
+                target: promo.target,
                 discountValue: promo.discountValue ? Number(promo.discountValue) : null,
                 maxDiscountCap: promo.maxDiscountCap ? Number(promo.maxDiscountCap) : null,
                 freeDelivery,
@@ -548,7 +549,7 @@ export class PromotionEngine {
         if (promo.endsAt && promo.endsAt < now) {
             throw AppError.businessRule('Promotion has expired');
         }
-        if ((promo as any).scheduleType === 'RECURRING' && !this.isWithinRecurringWindow(promo as any, nowDate)) {
+        if (promo.scheduleType === 'RECURRING' && !this.isWithinRecurringWindow(promo, nowDate)) {
             throw AppError.businessRule('Promotion is not active in the current time window');
         }
         if (promo.minOrderAmount && cart.subtotal < Number(promo.minOrderAmount)) {
@@ -594,7 +595,7 @@ export class PromotionEngine {
             case 'NEW_USERS': {
                 const withinWindow = this.isWithinNewUserWindow(
                     userRow?.createdAt ?? null,
-                    Number((promo as any).newUserWindowDays ?? 0),
+                    Number(promo.newUserWindowDays ?? 0),
                     nowDate,
                 );
                 if (!withinWindow) {
@@ -769,7 +770,7 @@ export class PromotionEngine {
 
     // ==================== HELPER METHODS ====================
 
-    private calculateDiscount(promo: any, subtotal: number): number {
+    private calculateDiscount(promo: DbPromotion, subtotal: number): number {
         let discount = 0;
 
         switch (promo.type) {
@@ -805,7 +806,7 @@ export class PromotionEngine {
         return normalizeMoney(Math.min(discount, subtotal)); // Can't discount more than subtotal
     }
 
-    private checkFreeDelivery(promo: any): boolean {
+    private checkFreeDelivery(promo: DbPromotion): boolean {
         if (promo.type === 'FREE_DELIVERY') return true;
         
         // Check threshold reward
@@ -814,7 +815,7 @@ export class PromotionEngine {
         return false;
     }
 
-    private async checkCodeEligibility(promo: any, userId: string): Promise<boolean> {
+    private async checkCodeEligibility(promo: DbPromotion, userId: string): Promise<boolean> {
         // Check if user-specific usage limit exceeded
         if (promo.maxUsagePerUser) {
             const [usage] = await this.db
@@ -855,7 +856,7 @@ export class PromotionEngine {
         return !!assignment;
     }
 
-    private async checkConditionalEligibility(promo: any, cart: CartContext): Promise<boolean> {
+    private async checkConditionalEligibility(promo: DbPromotion, cart: CartContext): Promise<boolean> {
         if (!promo.spendThreshold) return true;
         return cart.subtotal >= Number(promo.spendThreshold);
     }
@@ -883,7 +884,7 @@ export class PromotionEngine {
         return eligible.length > 0;
     }
 
-    private async checkUsageLimits(promo: any, userId: string): Promise<boolean> {
+    private async checkUsageLimits(promo: DbPromotion, userId: string): Promise<boolean> {
         // Global limit
         if (promo.maxGlobalUsage && promo.currentGlobalUsage >= promo.maxGlobalUsage) {
             return false;

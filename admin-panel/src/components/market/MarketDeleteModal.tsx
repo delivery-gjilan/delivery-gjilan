@@ -49,7 +49,7 @@ export default function MarketDeleteModal({ modal, onClose, onConfirm }: MarketD
     return (
         <Modal isOpen={!!modal} onClose={onClose} title={`Delete ${modal.type}`}>
             <div className="space-y-4">
-                <p className="text-gray-300">
+                <p className="text-zinc-300">
                     Are you sure you want to delete <strong>{modal.name}</strong>?
                 </p>
                 {modal.type === 'category' && (

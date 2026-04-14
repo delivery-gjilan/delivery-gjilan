@@ -25,7 +25,7 @@ export class AuditLogger {
         action: ActionType;
         entityType: EntityType;
         entityId?: string;
-        metadata?: Record<string, any>;
+        metadata?: Record<string, unknown>;
     }): Promise<void> {
         try {
             const actorType = this.getActorType();
@@ -88,14 +88,14 @@ export function createAuditLogger(db: Database, context: GraphQLContext): AuditL
  * Quick helper to log changes with before/after values
  */
 export function createChangeMetadata(
-    oldValue: any,
-    newValue: any,
+    oldValue: unknown,
+    newValue: unknown,
     changedFields?: string[]
-): Record<string, any> {
+): Record<string, unknown> {
     return {
         oldValue,
         newValue,
-        changedFields: changedFields || Object.keys(newValue || {}),
+        changedFields: changedFields || Object.keys((newValue as Record<string, unknown>) || {}),
         timestamp: new Date().toISOString(),
     };
 }
