@@ -364,7 +364,7 @@ export default function AddressPickerMap({ onSelect, initialLocation }: AddressP
                                 <MapPin size={12} className="shrink-0 text-[var(--muted)]" />
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm truncate">{f.text}</p>
-                                    {f.context?.length > 0 && (
+                                    {(f.context?.length ?? 0) > 0 && (
                                         <p className="text-xs text-[var(--muted)] truncate">{f.context.map((c: any) => c.text).join(", ")}</p>
                                     )}
                                 </div>

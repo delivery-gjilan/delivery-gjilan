@@ -36,6 +36,7 @@ import dynamic from "next/dynamic";
 const AddressPickerMap = dynamic(() => import("@/components/checkout/AddressPickerMap"), { ssr: false });
 import { isPointInPolygon } from "@/lib/pointInPolygon";
 import { useOrderModalsStore } from "@/store/orderModalsStore";
+import type { GqlAddress, GqlDeliveryZone, GqlPromotion } from "@/types/graphql";
 
 type CheckoutStep = 1 | 2 | 3;
 
@@ -226,12 +227,12 @@ export function CheckoutFlow({ onClose, drawerMode = false }: CheckoutFlowProps)
     );
 
     const handleSelectSavedAddress = useCallback(
-        (addr: any) => {
+        (addr: GqlAddress) => {
             const loc: SelectedLocation = {
                 latitude: addr.latitude,
                 longitude: addr.longitude,
                 address: addr.displayName ?? addr.addressName ?? "",
-                label: addr.addressName,
+                label: addr.addressName ?? undefined,
                 addressId: addr.id,
             };
             const inZone = isLocationInZone(loc);

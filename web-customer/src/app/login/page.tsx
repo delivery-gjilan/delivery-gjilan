@@ -42,7 +42,7 @@ function LoginContent() {
             });
             const data = (res.data as any)?.login;
             if (data?.token && data?.user) {
-                loginWithToken(data.token, data.refreshToken, data.user);
+                loginWithToken(data.token, data.refreshToken ?? null, data.user);
                 const nextPath = searchParams.get("next");
                 const safeNext = nextPath && nextPath.startsWith("/") ? nextPath : "/";
                 router.push(safeNext);
