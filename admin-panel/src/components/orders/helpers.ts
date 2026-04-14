@@ -109,18 +109,18 @@ export function parseAdminNote(adminNote?: string | null): { tag: string; note: 
     return null;
 }
 
-export const normalizeOrderBusinesses = (order: any): OrderBusiness[] => {
+export const normalizeOrderBusinesses = (order: Pick<Order, 'businesses'> | null | undefined): OrderBusiness[] => {
     if (!Array.isArray(order?.businesses)) return [];
-    return order.businesses.map((biz: any) => ({
+    return order.businesses.map((biz) => ({
         ...biz,
         items: Array.isArray(biz?.items) ? biz.items : [],
     }));
 };
 
-export const getOrderBusinessesSafe = (order: any): OrderBusiness[] =>
+export const getOrderBusinessesSafe = (order: Pick<Order, 'businesses'> | null | undefined): OrderBusiness[] =>
     Array.isArray(order?.businesses) ? order.businesses : [];
 
-export const getBusinessItemsSafe = (business: any): OrderItem[] =>
+export const getBusinessItemsSafe = (business: Partial<OrderBusiness> | null | undefined): OrderItem[] =>
     Array.isArray(business?.items) ? business.items : [];
 
 export const roundMoney = (value: number) => Math.round(value * 100) / 100;

@@ -39,7 +39,7 @@ export default function Home() {
         pollInterval: 30_000,
     });
 
-    const m = (metricsData as any)?.myDriverMetrics;
+    const m = metricsData?.myDriverMetrics;
     const grossToday = m?.grossEarningsToday ?? 0;
     const netToday = m?.netEarningsToday ?? 0;
     const deliveredToday = m?.deliveredTodayCount ?? 0;
@@ -61,7 +61,7 @@ export default function Home() {
         try {
             setOnline(newStatus);
             const result = await updateOnlineStatus({ variables: { isOnline: newStatus } });
-            const updatedUser = (result.data as any)?.updateDriverOnlineStatus;
+            const updatedUser = result.data?.updateDriverOnlineStatus;
             if (updatedUser) setUser(updatedUser);
         } catch {
             setOnline(!newStatus);

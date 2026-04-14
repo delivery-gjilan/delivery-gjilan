@@ -1,8 +1,8 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
 // ─── Businesses Queries ───
 
-export const GET_BUSINESSES = gql`
+export const GET_BUSINESSES = graphql(`
     query GetBusinesses {
         businesses {
             id
@@ -32,9 +32,9 @@ export const GET_BUSINESSES = gql`
             updatedAt
         }
     }
-`;
+`);
 
-export const GET_BUSINESS = gql`
+export const GET_BUSINESS = graphql(`
     query GetBusiness($id: ID!) {
         business(id: $id) {
             id
@@ -63,11 +63,11 @@ export const GET_BUSINESS = gql`
             createdAt
         }
     }
-`;
+`);
 
 // ─── Businesses Mutations ───
 
-export const CREATE_BUSINESS = gql`
+export const CREATE_BUSINESS = graphql(`
     mutation CreateBusiness($input: CreateBusinessInput!) {
         createBusiness(input: $input) {
             id
@@ -76,9 +76,9 @@ export const CREATE_BUSINESS = gql`
             isActive
         }
     }
-`;
+`);
 
-export const UPDATE_BUSINESS = gql`
+export const UPDATE_BUSINESS = graphql(`
     mutation UpdateBusiness($id: ID!, $input: UpdateBusinessInput!) {
         updateBusiness(id: $id, input: $input) {
             id
@@ -89,10 +89,10 @@ export const UPDATE_BUSINESS = gql`
             prepTimeOverrideMinutes
         }
     }
-`;
+`);
 
-export const DELETE_BUSINESS = gql`
+export const DELETE_BUSINESS = graphql(`
     mutation DeleteBusiness($id: ID!) {
         deleteBusiness(id: $id)
     }
-`;
+`);

@@ -42,7 +42,7 @@ export function useAcceptOrderMutation({
         if (!isOnline || !isNetworkConnected) {
             useOrderAcceptStore.getState().setAcceptError('You are offline. Please check your connection.');
             useOrderAcceptStore.getState().setAccepting(false);
-            (useOrderAcceptStore.getState() as any)._acceptingRef = false;
+            useOrderAcceptStore.getState()._acceptingRef = false;
             return;
         }
 
@@ -54,9 +54,9 @@ export function useAcceptOrderMutation({
             lastOrdersRefreshAt.current = 0;
             void refetchOrders();
             onSuccess();
-        } catch (err: any) {
-            const msg = (err?.message ?? '').toLowerCase();
-            console.error('[accept] assignDriverToOrder failed:', err?.message, err?.graphQLErrors);
+        } catch (err: unknown) {
+            const msg = ((err as Error)?.message ?? '').toLowerCase();
+            console.error('[accept] assignDriverToOrder failed:', (err as Error)?.message, (err as Record<string, unknown>)?.graphQLErrors);
             if (msg.includes('already') || msg.includes('assigned') || msg.includes('taken')) {
                 useOrderAcceptStore.getState().setTakenByOther(true);
             } else {
@@ -66,7 +66,7 @@ export function useAcceptOrderMutation({
                 } else if (msg.includes('not available') || msg.includes('not available for driver')) {
                     useOrderAcceptStore.getState().setAcceptError('This order is no longer available.');
                 } else {
-                    useOrderAcceptStore.getState().setAcceptError(`Failed to accept: ${err?.message ?? 'Please try again.'}`);
+                    useOrderAcceptStore.getState().setAcceptError(`Failed to accept: ${(err as Error)?.message ?? 'Please try again.'}`);
                 }
             }
         } finally {

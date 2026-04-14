@@ -1,8 +1,8 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
 // ─── Users Queries ───
 
-export const GET_USERS = gql`
+export const GET_USERS = graphql(`
     query GetUsers {
         users(limit: 500) {
             id
@@ -21,9 +21,9 @@ export const GET_USERS = gql`
             }
         }
     }
-`;
+`);
 
-export const USER_BEHAVIOR_QUERY = gql`
+export const USER_BEHAVIOR_QUERY = graphql(`
     query UserBehavior($userId: ID!) {
         userBehavior(userId: $userId) {
             userId
@@ -37,11 +37,11 @@ export const USER_BEHAVIOR_QUERY = gql`
             lastDeliveredAt
         }
     }
-`;
+`);
 
 // ─── Users Mutations ───
 
-export const CREATE_USER = gql`
+export const CREATE_USER = graphql(`
     mutation CreateUser(
         $email: String!
         $password: String!
@@ -72,9 +72,9 @@ export const CREATE_USER = gql`
             message
         }
     }
-`;
+`);
 
-export const UPDATE_USER = gql`
+export const UPDATE_USER = graphql(`
     mutation UpdateUser(
         $id: ID!
         $firstName: String!
@@ -98,15 +98,15 @@ export const UPDATE_USER = gql`
             role
         }
     }
-`;
+`);
 
-export const DELETE_USER = gql`
+export const DELETE_USER = graphql(`
     mutation DeleteUser($id: ID!) {
         deleteUser(id: $id)
     }
-`;
+`);
 
-export const UPDATE_USER_NOTE = gql`
+export const UPDATE_USER_NOTE = graphql(`
     mutation UpdateUserNote($userId: ID!, $note: String, $flagColor: String) {
         updateUserNote(userId: $userId, note: $note, flagColor: $flagColor) {
             id
@@ -114,13 +114,13 @@ export const UPDATE_USER_NOTE = gql`
             flagColor
         }
     }
-`;
+`);
 
-export const SET_USER_PERMISSIONS = gql`
+export const SET_USER_PERMISSIONS = graphql(`
     mutation SetUserPermissions($userId: ID!, $permissions: [UserPermission!]!) {
         setUserPermissions(userId: $userId, permissions: $permissions) {
             id
             permissions
         }
     }
-`;
+`);

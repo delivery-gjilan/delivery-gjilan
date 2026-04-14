@@ -713,7 +713,7 @@ await persistCache({
 | # | Area | Issue | Priority |
 |---|---|---|---|
 | Q1 | `ADMIN_ROLES` duplicated 3× | Identical `['ADMIN', 'SUPER_ADMIN']` constant in `authStore.ts`, `useAuth.ts`, and `useAuthInitialization.ts`. Extract to `utils/constants.ts`. | Low |
-| Q2 | `as any` casts | `useAuth.ts` casts mutation result as `any`; `useOperationalOrderAlerts.ts` casts `data as any`. Use generated `LoginMutation` / `GetOrdersQuery` types. | Medium |
+| Q2 | Page-level cast residue | Shared auth, order-alert, PTT, order, ops, and notification layers use generated GraphQL result types, but large screen files still contain page-level `any` usage and route/framework casts. Continue reducing these from screens inward. | Medium |
 | Q3 | `business/` and `driver/` folders empty | Route folders exist but contain no screen files — CRUD for businesses and drivers is absent from the app. Either implement or remove the dead folders. | Low |
 | Q4 | `BottomSheet.snapPoints` dead prop | The `snapPoints` prop is declared in the API but not implemented. Remove or implement. | Low |
 | Q5 | `LoadingScreen` default export | All other components use named exports; `LoadingScreen` uses default export. Standardize. | Low |
@@ -726,7 +726,7 @@ await persistCache({
 | R1 | `cacheReady` rejection unhandled | `lib/graphql/providers.tsx` only calls `.then(() => setCacheRestored(true))` — if `cacheReady` rejects (persistence failure), the app never renders. Add `.catch(() => setCacheRestored(true))`. | High |
 | R2 | `cacheReady.catch` swallowed | `apolloClient.ts` swallows the `persistCache` rejection with an empty `.catch`. Errors must propagate to `cacheReady` so that `Providers` can handle them. | High |
 | R3 | Agora PTT no reconnection | `useAdminPtt` has no reconnect logic for dropped Agora sessions mid-call. If the WS subscription drops, `AdminPttSignal` stops firing silently. | Medium |
-| R4 | `useOperationalOrderAlerts` untyped data | `data as any` for `GET_ORDERS` polling. A type mismatch in the response would silently break new-order detection. | Medium |
+| R4 | Screen-layer type drift | The shared alert/query hooks are typed, but several screen components still reshape large GraphQL payloads locally. Keep the hook outputs as the typed boundary and avoid reintroducing `any` in screens. | Medium |
 | R5 | `formatTime`/`formatDate` no locale | Both use `toLocaleString()` without a fixed locale — output varies by device region setting. Pass a fixed locale for consistent admin UI. | Low |
 | R6 | MAPBOX_TOKEN empty string fallback | `EXPO_PUBLIC_MAPBOX_TOKEN` falls back to `''` silently — map renders blank without any error message or user feedback. | Low |
 

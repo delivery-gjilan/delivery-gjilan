@@ -79,6 +79,22 @@ export type AddUserAddressInput = {
   priority?: InputMaybe<Scalars['Int']['input']>;
 };
 
+/** Signal sent from a driver to all listening admins */
+export type AdminPttSignal = {
+  __typename?: 'AdminPttSignal';
+  action: DriverPttSignalAction;
+  channelName: Scalars['String']['output'];
+  driverId: Scalars['ID']['output'];
+  timestamp: Scalars['DateTime']['output'];
+};
+
+export type AdoptCatalogProductInput = {
+  businessId: Scalars['ID']['input'];
+  categoryId: Scalars['ID']['input'];
+  price: Scalars['Float']['input'];
+  sourceProductId: Scalars['ID']['input'];
+};
+
 export type AgoraRtcCredentials = {
   __typename?: 'AgoraRtcCredentials';
   appId: Scalars['String']['output'];
@@ -111,7 +127,14 @@ export type ApplicablePromotion = {
   type: PromotionType;
 };
 
+export enum ApprovalReason {
+  FirstOrder = 'FIRST_ORDER',
+  HighValue = 'HIGH_VALUE',
+  OutOfZone = 'OUT_OF_ZONE'
+}
+
 export type AssignPromotionToUserInput = {
+  audienceGroupIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   expiresAt?: InputMaybe<Scalars['String']['input']>;
   promotionId: Scalars['ID']['input'];
   userIds: Array<Scalars['ID']['input']>;
@@ -155,17 +178,42 @@ export type AuthResponse = {
 
 export type Banner = {
   __typename?: 'Banner';
+  business?: Maybe<Business>;
+  businessId?: Maybe<Scalars['ID']['output']>;
   createdAt: Scalars['DateTime']['output'];
+  displayContext: BannerDisplayContext;
+  endsAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['ID']['output'];
   imageUrl: Scalars['String']['output'];
   isActive: Scalars['Boolean']['output'];
   linkTarget?: Maybe<Scalars['String']['output']>;
   linkType?: Maybe<Scalars['String']['output']>;
+  mediaType: BannerMediaType;
+  product?: Maybe<Product>;
+  productId?: Maybe<Scalars['ID']['output']>;
+  promotion?: Maybe<Promotion>;
+  promotionId?: Maybe<Scalars['ID']['output']>;
   sortOrder: Scalars['Int']['output'];
+  startsAt?: Maybe<Scalars['DateTime']['output']>;
   subtitle?: Maybe<Scalars['String']['output']>;
   title?: Maybe<Scalars['String']['output']>;
   updatedAt: Scalars['DateTime']['output'];
 };
+
+export enum BannerDisplayContext {
+  All = 'ALL',
+  Business = 'BUSINESS',
+  Cart = 'CART',
+  Category = 'CATEGORY',
+  Home = 'HOME',
+  Product = 'PRODUCT'
+}
+
+export enum BannerMediaType {
+  Gif = 'GIF',
+  Image = 'IMAGE',
+  Video = 'VIDEO'
+}
 
 export enum BannerType {
   Info = 'INFO',
@@ -173,23 +221,42 @@ export enum BannerType {
   Warning = 'WARNING'
 }
 
+export type BulkSetInventoryInput = {
+  businessId: Scalars['ID']['input'];
+  items: Array<BulkSetInventoryItem>;
+};
+
+export type BulkSetInventoryItem = {
+  costPrice?: InputMaybe<Scalars['Float']['input']>;
+  lowStockThreshold?: InputMaybe<Scalars['Int']['input']>;
+  productId: Scalars['ID']['input'];
+  quantity: Scalars['Int']['input'];
+};
+
 export type Business = {
   __typename?: 'Business';
   activePromotion?: Maybe<BusinessPromotion>;
+  activePromotionsDisplay: Array<BusinessPromotionDisplay>;
   avgPrepTimeMinutes: Scalars['Int']['output'];
   businessType: BusinessType;
+  category?: Maybe<Scalars['String']['output']>;
   commissionPercentage: Scalars['Float']['output'];
   createdAt: Scalars['Date']['output'];
   description?: Maybe<Scalars['String']['output']>;
+  featuredSortOrder: Scalars['Int']['output'];
   id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
   isActive: Scalars['Boolean']['output'];
+  isFeatured: Scalars['Boolean']['output'];
   isOpen: Scalars['Boolean']['output'];
   isTemporarilyClosed: Scalars['Boolean']['output'];
   location: Location;
+  minOrderAmount: Scalars['Float']['output'];
   name: Scalars['String']['output'];
   phoneNumber?: Maybe<Scalars['String']['output']>;
   prepTimeOverrideMinutes?: Maybe<Scalars['Int']['output']>;
+  ratingAverage: Scalars['Float']['output'];
+  ratingCount: Scalars['Int']['output'];
   schedule: Array<BusinessDayHours>;
   temporaryClosureReason?: Maybe<Scalars['String']['output']>;
   updatedAt: Scalars['Date']['output'];
@@ -300,12 +367,53 @@ export type BusinessMessageUser = {
   lastName: Scalars['String']['output'];
 };
 
+export type BusinessOrderFinancials = {
+  __typename?: 'BusinessOrderFinancials';
+  amountOwedByBusiness: Scalars['Float']['output'];
+  amountOwedToBusiness: Scalars['Float']['output'];
+  businessNetEarnings: Scalars['Float']['output'];
+  businessPrice: Scalars['Float']['output'];
+  customerPaid: Scalars['Float']['output'];
+  markupAmount: Scalars['Float']['output'];
+  orderId: Scalars['ID']['output'];
+  paymentCollection: OrderPaymentCollection;
+};
+
+export type BusinessPerformanceStat = {
+  __typename?: 'BusinessPerformanceStat';
+  avgOrderValue: Scalars['Float']['output'];
+  businessId: Scalars['ID']['output'];
+  businessName: Scalars['String']['output'];
+  imageUrl?: Maybe<Scalars['String']['output']>;
+  isFeatured: Scalars['Boolean']['output'];
+  totalOrders: Scalars['Int']['output'];
+  totalRevenue: Scalars['Float']['output'];
+};
+
 export type BusinessPromotion = {
   __typename?: 'BusinessPromotion';
+  code?: Maybe<Scalars['String']['output']>;
+  creatorType: PromotionCreatorType;
   description?: Maybe<Scalars['String']['output']>;
   discountValue?: Maybe<Scalars['Float']['output']>;
   id: Scalars['ID']['output'];
   name: Scalars['String']['output'];
+  spendThreshold?: Maybe<Scalars['Float']['output']>;
+  type: PromotionType;
+};
+
+export type BusinessPromotionDisplay = {
+  __typename?: 'BusinessPromotionDisplay';
+  applyMethod: PromotionApplyMethod;
+  code?: Maybe<Scalars['String']['output']>;
+  creatorType: PromotionCreatorType;
+  description?: Maybe<Scalars['String']['output']>;
+  discountValue?: Maybe<Scalars['Float']['output']>;
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+  priority: Scalars['Int']['output'];
+  requiresCode: Scalars['Boolean']['output'];
+  spendThreshold?: Maybe<Scalars['Float']['output']>;
   type: PromotionType;
 };
 
@@ -337,11 +445,18 @@ export type CartItemInput = {
 };
 
 export type CreateBannerInput = {
+  businessId?: InputMaybe<Scalars['ID']['input']>;
+  displayContext?: InputMaybe<BannerDisplayContext>;
+  endsAt?: InputMaybe<Scalars['DateTime']['input']>;
   imageUrl: Scalars['String']['input'];
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
   linkTarget?: InputMaybe<Scalars['String']['input']>;
   linkType?: InputMaybe<Scalars['String']['input']>;
+  mediaType?: InputMaybe<BannerMediaType>;
+  productId?: InputMaybe<Scalars['ID']['input']>;
+  promotionId?: InputMaybe<Scalars['ID']['input']>;
   sortOrder?: InputMaybe<Scalars['Int']['input']>;
+  startsAt?: InputMaybe<Scalars['DateTime']['input']>;
   subtitle?: InputMaybe<Scalars['String']['input']>;
   title?: InputMaybe<Scalars['String']['input']>;
 };
@@ -349,9 +464,11 @@ export type CreateBannerInput = {
 export type CreateBusinessInput = {
   avgPrepTimeMinutes?: InputMaybe<Scalars['Int']['input']>;
   businessType: BusinessType;
+  category?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   location: LocationInput;
+  minOrderAmount?: InputMaybe<Scalars['Float']['input']>;
   name: Scalars['String']['input'];
   phoneNumber?: InputMaybe<Scalars['String']['input']>;
   workingHours: WorkingHoursInput;
@@ -360,6 +477,7 @@ export type CreateBusinessInput = {
 export type CreateBusinessOwnerInput = {
   email: Scalars['String']['input'];
   firstName: Scalars['String']['input'];
+  isDemoAccount?: InputMaybe<Scalars['Boolean']['input']>;
   lastName: Scalars['String']['input'];
   password: Scalars['String']['input'];
 };
@@ -416,6 +534,7 @@ export type CreateOptionGroupInput = {
 export type CreateOptionInput = {
   displayOrder?: InputMaybe<Scalars['Int']['input']>;
   extraPrice?: InputMaybe<Scalars['Float']['input']>;
+  imageUrl?: InputMaybe<Scalars['String']['input']>;
   linkedProductId?: InputMaybe<Scalars['ID']['input']>;
   name: Scalars['String']['input'];
 };
@@ -428,12 +547,16 @@ export type CreateOrderChildItemInput = {
 export type CreateOrderInput = {
   deliveryPrice: Scalars['Float']['input'];
   driverNotes?: InputMaybe<Scalars['String']['input']>;
+  driverTip?: InputMaybe<Scalars['Float']['input']>;
   dropOffLocation: LocationInput;
   items: Array<CreateOrderItemInput>;
   paymentCollection?: InputMaybe<OrderPaymentCollection>;
+  priorityRequested?: InputMaybe<Scalars['Boolean']['input']>;
   prioritySurcharge?: InputMaybe<Scalars['Float']['input']>;
   promotionId?: InputMaybe<Scalars['ID']['input']>;
+  promotionIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   totalPrice: Scalars['Float']['input'];
+  userContextLocation?: InputMaybe<LocationInput>;
 };
 
 export type CreateOrderItemInput = {
@@ -448,6 +571,7 @@ export type CreateOrderItemInput = {
 export type CreateOrderItemOptionInput = {
   optionGroupId: Scalars['ID']['input'];
   optionId: Scalars['ID']['input'];
+  price?: InputMaybe<Scalars['Float']['input']>;
 };
 
 export type CreateProductCategoryInput = {
@@ -466,7 +590,7 @@ export type CreateProductInput = {
   isOnSale?: InputMaybe<Scalars['Boolean']['input']>;
   name: Scalars['String']['input'];
   price: Scalars['Float']['input'];
-  salePrice?: InputMaybe<Scalars['Float']['input']>;
+  saleDiscountPercentage?: InputMaybe<Scalars['Float']['input']>;
   subcategoryId?: InputMaybe<Scalars['ID']['input']>;
   variantGroupId?: InputMaybe<Scalars['ID']['input']>;
 };
@@ -481,19 +605,24 @@ export type CreateProductVariantGroupInput = {
   name: Scalars['String']['input'];
 };
 
+export type CreatePromotionAudienceGroupInput = {
+  description?: InputMaybe<Scalars['String']['input']>;
+  isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  name: Scalars['String']['input'];
+  userIds: Array<Scalars['ID']['input']>;
+};
+
 export type CreatePromotionInput = {
-  addDriverCommission?: InputMaybe<Scalars['Boolean']['input']>;
   code?: InputMaybe<Scalars['String']['input']>;
-  createSettlementRules?: InputMaybe<Scalars['Boolean']['input']>;
   creatorId?: InputMaybe<Scalars['ID']['input']>;
-  creatorType?: InputMaybe<Scalars['String']['input']>;
+  creatorType: PromotionCreatorType;
   description?: InputMaybe<Scalars['String']['input']>;
   discountValue?: InputMaybe<Scalars['Float']['input']>;
-  driverRuleAmount?: InputMaybe<Scalars['Float']['input']>;
-  driverRuleAmountType?: InputMaybe<SettlementAmountType>;
+  driverPayoutAmount?: InputMaybe<Scalars['Float']['input']>;
   eligibleBusinessIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   endsAt?: InputMaybe<Scalars['String']['input']>;
   isActive: Scalars['Boolean']['input'];
+  isRecovery?: InputMaybe<Scalars['Boolean']['input']>;
   isStackable: Scalars['Boolean']['input'];
   maxDiscountCap?: InputMaybe<Scalars['Float']['input']>;
   maxGlobalUsage?: InputMaybe<Scalars['Int']['input']>;
@@ -504,6 +633,7 @@ export type CreatePromotionInput = {
   spendThreshold?: InputMaybe<Scalars['Float']['input']>;
   startsAt?: InputMaybe<Scalars['String']['input']>;
   target: PromotionTarget;
+  targetAudienceGroupIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   targetUserIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   thresholdReward?: InputMaybe<Scalars['String']['input']>;
   type: PromotionType;
@@ -516,6 +646,7 @@ export type CreateSettlementRuleInput = {
   businessId?: InputMaybe<Scalars['ID']['input']>;
   direction: SettlementDirection;
   entityType: SettlementEntityType;
+  maxAmount?: InputMaybe<Scalars['Float']['input']>;
   name: Scalars['String']['input'];
   notes?: InputMaybe<Scalars['String']['input']>;
   promotionId?: InputMaybe<Scalars['ID']['input']>;
@@ -526,6 +657,7 @@ export type CreateUserInput = {
   businessId?: InputMaybe<Scalars['ID']['input']>;
   email: Scalars['String']['input'];
   firstName: Scalars['String']['input'];
+  isDemoAccount?: InputMaybe<Scalars['Boolean']['input']>;
   lastName: Scalars['String']['input'];
   password: Scalars['String']['input'];
   role: UserRole;
@@ -643,6 +775,23 @@ export type DriverBasicInfo = {
   lastName: Scalars['String']['output'];
   onlinePreference: Scalars['Boolean']['output'];
   phoneNumber?: Maybe<Scalars['String']['output']>;
+};
+
+/** Summary of a driver's cash position and settlement breakdown. */
+export type DriverCashSummary = {
+  __typename?: 'DriverCashSummary';
+  /** Total cash collected from delivered CASH_TO_DRIVER orders (totalPrice - businessPrice). */
+  cashCollected: Scalars['Float']['output'];
+  /** Net settlement balance: platformOwesYou - youOwePlatform. */
+  netSettlement: Scalars['Float']['output'];
+  /** Sum of unsettled PAYABLE settlements (platform owes driver). */
+  platformOwesYou: Scalars['Float']['output'];
+  /** Cash driver keeps after all settlements: cashCollected + netSettlement. */
+  takeHome: Scalars['Float']['output'];
+  /** Number of delivered orders in the period. */
+  totalDeliveries: Scalars['Int']['output'];
+  /** Sum of unsettled RECEIVABLE settlements (driver owes platform). */
+  youOwePlatform: Scalars['Float']['output'];
 };
 
 export type DriverConnection = {
@@ -774,6 +923,16 @@ export type DriverMessageUser = {
   lastName: Scalars['String']['output'];
 };
 
+export type DriverOrderFinancials = {
+  __typename?: 'DriverOrderFinancials';
+  amountToCollectFromCustomer: Scalars['Float']['output'];
+  amountToRemitToPlatform: Scalars['Float']['output'];
+  driverNetEarnings: Scalars['Float']['output'];
+  driverTip: Scalars['Float']['output'];
+  orderId: Scalars['ID']['output'];
+  paymentCollection: OrderPaymentCollection;
+};
+
 export type DriverPttSignal = {
   __typename?: 'DriverPttSignal';
   action: DriverPttSignalAction;
@@ -799,6 +958,21 @@ export type DriverRegisterInput = {
   phoneNumber?: InputMaybe<Scalars['String']['input']>;
 };
 
+/** Single data point in the platform earnings trend. */
+export type EarningsTrendPoint = {
+  __typename?: 'EarningsTrendPoint';
+  /** Number of settlements on this date. */
+  count: Scalars['Int']['output'];
+  /** Date bucket (YYYY-MM-DD). */
+  date: Scalars['String']['output'];
+  /** Net earnings (receivable - payable). */
+  net: Scalars['Float']['output'];
+  /** Total payable amount on this date. */
+  payable: Scalars['Float']['output'];
+  /** Total receivable amount on this date. */
+  receivable: Scalars['Float']['output'];
+};
+
 export enum EntityType {
   Business = 'BUSINESS',
   Category = 'CATEGORY',
@@ -810,6 +984,15 @@ export enum EntityType {
   Subcategory = 'SUBCATEGORY',
   User = 'USER'
 }
+
+export type GetBannersFilter = {
+  activeOnly?: InputMaybe<Scalars['Boolean']['input']>;
+  businessId?: InputMaybe<Scalars['ID']['input']>;
+  displayContext?: InputMaybe<BannerDisplayContext>;
+  includeScheduled?: InputMaybe<Scalars['Boolean']['input']>;
+  productId?: InputMaybe<Scalars['ID']['input']>;
+  promotionId?: InputMaybe<Scalars['ID']['input']>;
+};
 
 export type HourlyDistribution = {
   __typename?: 'HourlyDistribution';
@@ -824,7 +1007,69 @@ export type InitiateSignupInput = {
   firstName: Scalars['String']['input'];
   lastName: Scalars['String']['input'];
   password: Scalars['String']['input'];
-  referralCode?: InputMaybe<Scalars['String']['input']>;
+};
+
+export enum InventoryCoverageStatus {
+  FullyOwned = 'FULLY_OWNED',
+  MarketOnly = 'MARKET_ONLY',
+  PartiallyOwned = 'PARTIALLY_OWNED'
+}
+
+export type InventoryEarnings = {
+  __typename?: 'InventoryEarnings';
+  averageMargin: Scalars['Float']['output'];
+  orderCount: Scalars['Int']['output'];
+  products: Array<InventoryEarningsProduct>;
+  totalCost: Scalars['Float']['output'];
+  totalProfit: Scalars['Float']['output'];
+  totalRevenue: Scalars['Float']['output'];
+  totalUnitsSold: Scalars['Int']['output'];
+};
+
+export type InventoryEarningsProduct = {
+  __typename?: 'InventoryEarningsProduct';
+  cost: Scalars['Float']['output'];
+  margin: Scalars['Float']['output'];
+  productId: Scalars['ID']['output'];
+  productImageUrl?: Maybe<Scalars['String']['output']>;
+  productName: Scalars['String']['output'];
+  profit: Scalars['Float']['output'];
+  revenue: Scalars['Float']['output'];
+  unitsSold: Scalars['Int']['output'];
+};
+
+export type InventoryItem = {
+  __typename?: 'InventoryItem';
+  categoryName?: Maybe<Scalars['String']['output']>;
+  costPrice?: Maybe<Scalars['Float']['output']>;
+  id: Scalars['ID']['output'];
+  isLowStock: Scalars['Boolean']['output'];
+  lowStockThreshold?: Maybe<Scalars['Int']['output']>;
+  productBasePrice: Scalars['Float']['output'];
+  productId: Scalars['ID']['output'];
+  productImageUrl?: Maybe<Scalars['String']['output']>;
+  productMarkupPrice?: Maybe<Scalars['Float']['output']>;
+  productName: Scalars['String']['output'];
+  productNightPrice?: Maybe<Scalars['Float']['output']>;
+  quantity: Scalars['Int']['output'];
+  updatedAt?: Maybe<Scalars['DateTime']['output']>;
+};
+
+export type InventorySummary = {
+  __typename?: 'InventorySummary';
+  lowStockCount: Scalars['Int']['output'];
+  outOfStockCount: Scalars['Int']['output'];
+  totalStockValue: Scalars['Int']['output'];
+  totalTrackedProducts: Scalars['Int']['output'];
+};
+
+export type IssueRecoveryPromotionInput = {
+  discountValue?: InputMaybe<Scalars['Float']['input']>;
+  expiresAt?: InputMaybe<Scalars['String']['input']>;
+  orderId?: InputMaybe<Scalars['ID']['input']>;
+  reason: Scalars['String']['input'];
+  type: PromotionType;
+  userIds: Array<Scalars['ID']['input']>;
 };
 
 export type Location = {
@@ -874,15 +1119,16 @@ export type Mutation = {
   adminUpdateDriverLocation: User;
   /** Admin mutation to update per-driver settings (commission %, max active orders, vehicle ownership) */
   adminUpdateDriverSettings: User;
+  adoptCatalogProduct: Product;
   approveOrder: Order;
   assignDriverToOrder: Order;
   assignPromotionToUsers: Array<UserPromotion>;
   backfillSettlementsForDeliveredOrders: Scalars['Int']['output'];
+  banUser: User;
+  bulkSetInventory: Array<InventoryItem>;
   businessDeviceHeartbeat: Scalars['Boolean']['output'];
   businessDeviceOrderSignal: Scalars['Boolean']['output'];
   cancelOrder: Order;
-  /** Admin cancels an outstanding settlement request. */
-  cancelSettlementRequest: SettlementRequest;
   changeMyPassword: Scalars['Boolean']['output'];
   createBanner: Banner;
   createBusiness: Business;
@@ -898,11 +1144,13 @@ export type Mutation = {
   createProductSubcategory: ProductSubcategory;
   createProductVariantGroup: ProductVariantGroup;
   createPromotion: Promotion;
-  /** Admin creates a settlement request, notifying the business via push. */
+  createPromotionAudienceGroup: PromotionAudienceGroup;
+  /** Admin creates a settlement request, notifying the business or driver via push. */
   createSettlementRequest: SettlementRequest;
   createSettlementRule: SettlementRule;
   createTestOrder: Order;
   createUser: AuthResponse;
+  deductOrderStock: OrderCoverage;
   deleteBanner: Scalars['Boolean']['output'];
   deleteBusiness: Scalars['Boolean']['output'];
   deleteCampaign: Scalars['Boolean']['output'];
@@ -916,6 +1164,7 @@ export type Mutation = {
   deleteProductSubcategory: Scalars['Boolean']['output'];
   deleteProductVariantGroup: Scalars['Boolean']['output'];
   deletePromotion: Scalars['Boolean']['output'];
+  deletePromotionAudienceGroup: Scalars['Boolean']['output'];
   deleteSettlementRule: Scalars['Boolean']['output'];
   deleteUser: Scalars['Boolean']['output'];
   deleteUserAddress: Scalars['Boolean']['output'];
@@ -930,11 +1179,13 @@ export type Mutation = {
   driverNotifyCustomer: Scalars['Boolean']['output'];
   /** Driver self-registration — creates user (role=DRIVER) + driver profile row */
   driverRegister: DriverAuthResult;
+  /** Driver sends push-to-talk signal to all listening admins */
+  driverSendPttSignal: Scalars['Boolean']['output'];
   /** Driver battery telemetry update (recommended every 5-10 minutes) */
   driverUpdateBatteryStatus: DriverConnection;
-  generateReferralCode: Scalars['String']['output'];
   grantFreeDelivery: Scalars['Boolean']['output'];
   initiateSignup: AuthResponse;
+  issueRecoveryPromotion: Array<UserPromotion>;
   login: AuthResponse;
   logoutAllSessions: Scalars['Boolean']['output'];
   logoutCurrentSession: Scalars['Boolean']['output'];
@@ -949,13 +1200,17 @@ export type Mutation = {
   refreshToken: TokenRefreshResponse;
   registerDeviceToken: Scalars['Boolean']['output'];
   registerLiveActivityToken: Scalars['Boolean']['output'];
+  removeInventoryItem: Scalars['Boolean']['output'];
+  removeOrderItem: Order;
   removeUserFromPromotion: Scalars['Boolean']['output'];
   /** Business user replies to admin */
   replyToBusinessMessage: BusinessMessage;
   /** Driver replies to admin */
   replyToDriverMessage: DriverMessage;
+  requestPasswordReset: Scalars['Boolean']['output'];
   resendEmailVerification: SignupStepResponse;
-  /** Business owner accepts or disputes a pending settlement request. */
+  resetPassword: Scalars['Boolean']['output'];
+  /** Business/driver accepts or rejects a pending settlement request. */
   respondToSettlementRequest: SettlementRequest;
   runSettlementScenarioHarness: SettlementScenarioHarnessResult;
   /** Admin sends a message to a business user */
@@ -964,19 +1219,24 @@ export type Mutation = {
   /** Admin sends a message to a driver */
   sendDriverMessage: DriverMessage;
   sendPushNotification: SendNotificationResult;
+  setBusinessFeatured: Business;
   setBusinessSchedule: Array<BusinessDayHours>;
   setDefaultAddress: Scalars['Boolean']['output'];
   setDeliveryPricingTiers: Array<DeliveryPricingTier>;
+  setInventoryQuantity: InventoryItem;
+  setMyEmailOptOut: User;
   setMyPreferredLanguage: User;
   setOrderAdminNote: Order;
   setUserPermissions: User;
   /** Settle all unsettled settlements for a business. Supports partial payment. */
   settleWithBusiness: SettleResult;
-  /** Settle all unsettled settlements for a driver (always full). */
+  /** Settle unsettled settlements for a driver. Supports partial payment. */
   settleWithDriver: SettleResult;
   startPreparing: Order;
+  submitOrderReview: OrderReview;
   submitPhoneNumber: SignupStepResponse;
   trackPushTelemetry: Scalars['Boolean']['output'];
+  unadoptCatalogProduct: Scalars['Boolean']['output'];
   unregisterDeviceToken: Scalars['Boolean']['output'];
   unsettleSettlement: Settlement;
   updateBanner: Banner;
@@ -986,6 +1246,7 @@ export type Mutation = {
   updateDeliveryZone: DeliveryZone;
   updateDriverLocation: User;
   updateDriverOnlineStatus: User;
+  updateMyProfile: User;
   updateOption: Option;
   updateOptionGroup: OptionGroup;
   updateOrderStatus: Order;
@@ -996,6 +1257,7 @@ export type Mutation = {
   updateProductSubcategory: ProductSubcategory;
   updateProductsOrder: Scalars['Boolean']['output'];
   updatePromotion: Promotion;
+  updatePromotionAudienceGroup: PromotionAudienceGroup;
   updateSettlementRule: SettlementRule;
   updateStoreStatus: StoreStatus;
   updateUser: User;
@@ -1064,6 +1326,11 @@ export type MutationAdminUpdateDriverSettingsArgs = {
 };
 
 
+export type MutationAdoptCatalogProductArgs = {
+  input: AdoptCatalogProductInput;
+};
+
+
 export type MutationApproveOrderArgs = {
   id: Scalars['ID']['input'];
 };
@@ -1080,6 +1347,17 @@ export type MutationAssignPromotionToUsersArgs = {
 };
 
 
+export type MutationBanUserArgs = {
+  banned: Scalars['Boolean']['input'];
+  userId: Scalars['ID']['input'];
+};
+
+
+export type MutationBulkSetInventoryArgs = {
+  input: BulkSetInventoryInput;
+};
+
+
 export type MutationBusinessDeviceHeartbeatArgs = {
   input: BusinessDeviceHeartbeatInput;
 };
@@ -1093,11 +1371,6 @@ export type MutationBusinessDeviceOrderSignalArgs = {
 
 export type MutationCancelOrderArgs = {
   id: Scalars['ID']['input'];
-};
-
-
-export type MutationCancelSettlementRequestArgs = {
-  requestId: Scalars['ID']['input'];
 };
 
 
@@ -1178,12 +1451,16 @@ export type MutationCreatePromotionArgs = {
 };
 
 
+export type MutationCreatePromotionAudienceGroupArgs = {
+  input: CreatePromotionAudienceGroupInput;
+};
+
+
 export type MutationCreateSettlementRequestArgs = {
   amount: Scalars['Float']['input'];
-  businessId: Scalars['ID']['input'];
+  businessId?: InputMaybe<Scalars['ID']['input']>;
+  driverId?: InputMaybe<Scalars['ID']['input']>;
   note?: InputMaybe<Scalars['String']['input']>;
-  periodEnd: Scalars['Date']['input'];
-  periodStart: Scalars['Date']['input'];
 };
 
 
@@ -1194,6 +1471,11 @@ export type MutationCreateSettlementRuleArgs = {
 
 export type MutationCreateUserArgs = {
   input: CreateUserInput;
+};
+
+
+export type MutationDeductOrderStockArgs = {
+  orderId: Scalars['ID']['input'];
 };
 
 
@@ -1257,6 +1539,11 @@ export type MutationDeletePromotionArgs = {
 };
 
 
+export type MutationDeletePromotionAudienceGroupArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
 export type MutationDeleteSettlementRuleArgs = {
   id: Scalars['ID']['input'];
 };
@@ -1297,6 +1584,12 @@ export type MutationDriverRegisterArgs = {
 };
 
 
+export type MutationDriverSendPttSignalArgs = {
+  action: DriverPttSignalAction;
+  channelName: Scalars['String']['input'];
+};
+
+
 export type MutationDriverUpdateBatteryStatusArgs = {
   isCharging?: InputMaybe<Scalars['Boolean']['input']>;
   level: Scalars['Int']['input'];
@@ -1312,6 +1605,11 @@ export type MutationGrantFreeDeliveryArgs = {
 
 export type MutationInitiateSignupArgs = {
   input: InitiateSignupInput;
+};
+
+
+export type MutationIssueRecoveryPromotionArgs = {
+  input: IssueRecoveryPromotionInput;
 };
 
 
@@ -1377,6 +1675,20 @@ export type MutationRegisterLiveActivityTokenArgs = {
 };
 
 
+export type MutationRemoveInventoryItemArgs = {
+  businessId: Scalars['ID']['input'];
+  productId: Scalars['ID']['input'];
+};
+
+
+export type MutationRemoveOrderItemArgs = {
+  orderId: Scalars['ID']['input'];
+  orderItemId: Scalars['ID']['input'];
+  quantity?: InputMaybe<Scalars['Int']['input']>;
+  reason: Scalars['String']['input'];
+};
+
+
 export type MutationRemoveUserFromPromotionArgs = {
   promotionId: Scalars['ID']['input'];
   userId: Scalars['ID']['input'];
@@ -1395,9 +1707,20 @@ export type MutationReplyToDriverMessageArgs = {
 };
 
 
+export type MutationRequestPasswordResetArgs = {
+  email: Scalars['String']['input'];
+};
+
+
+export type MutationResetPasswordArgs = {
+  newPassword: Scalars['String']['input'];
+  token: Scalars['String']['input'];
+};
+
+
 export type MutationRespondToSettlementRequestArgs = {
   action: SettlementRequestAction;
-  disputeReason?: InputMaybe<Scalars['String']['input']>;
+  reason?: InputMaybe<Scalars['String']['input']>;
   requestId: Scalars['ID']['input'];
 };
 
@@ -1416,6 +1739,7 @@ export type MutationSendBusinessMessageArgs = {
 
 export type MutationSendCampaignArgs = {
   id: Scalars['ID']['input'];
+  promotionId?: InputMaybe<Scalars['ID']['input']>;
 };
 
 
@@ -1428,6 +1752,13 @@ export type MutationSendDriverMessageArgs = {
 
 export type MutationSendPushNotificationArgs = {
   input: SendPushNotificationInput;
+};
+
+
+export type MutationSetBusinessFeaturedArgs = {
+  id: Scalars['ID']['input'];
+  isFeatured: Scalars['Boolean']['input'];
+  sortOrder?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -1444,6 +1775,16 @@ export type MutationSetDefaultAddressArgs = {
 
 export type MutationSetDeliveryPricingTiersArgs = {
   input: SetDeliveryPricingTiersInput;
+};
+
+
+export type MutationSetInventoryQuantityArgs = {
+  input: SetInventoryQuantityInput;
+};
+
+
+export type MutationSetMyEmailOptOutArgs = {
+  optOut: Scalars['Boolean']['input'];
 };
 
 
@@ -1474,13 +1815,25 @@ export type MutationSettleWithBusinessArgs = {
 
 
 export type MutationSettleWithDriverArgs = {
+  amount?: InputMaybe<Scalars['Float']['input']>;
   driverId: Scalars['ID']['input'];
+  note?: InputMaybe<Scalars['String']['input']>;
+  paymentMethod?: InputMaybe<Scalars['String']['input']>;
+  paymentReference?: InputMaybe<Scalars['String']['input']>;
 };
 
 
 export type MutationStartPreparingArgs = {
   id: Scalars['ID']['input'];
   preparationMinutes: Scalars['Int']['input'];
+};
+
+
+export type MutationSubmitOrderReviewArgs = {
+  comment?: InputMaybe<Scalars['String']['input']>;
+  orderId: Scalars['ID']['input'];
+  quickFeedback?: InputMaybe<Array<Scalars['String']['input']>>;
+  rating: Scalars['Int']['input'];
 };
 
 
@@ -1491,6 +1844,11 @@ export type MutationSubmitPhoneNumberArgs = {
 
 export type MutationTrackPushTelemetryArgs = {
   input: TrackPushTelemetryInput;
+};
+
+
+export type MutationUnadoptCatalogProductArgs = {
+  id: Scalars['ID']['input'];
 };
 
 
@@ -1542,6 +1900,11 @@ export type MutationUpdateDriverLocationArgs = {
 
 export type MutationUpdateDriverOnlineStatusArgs = {
   isOnline: Scalars['Boolean']['input'];
+};
+
+
+export type MutationUpdateMyProfileArgs = {
+  input: UpdateMyProfileInput;
 };
 
 
@@ -1601,6 +1964,11 @@ export type MutationUpdateProductsOrderArgs = {
 
 export type MutationUpdatePromotionArgs = {
   input: UpdatePromotionInput;
+};
+
+
+export type MutationUpdatePromotionAudienceGroupArgs = {
+  input: UpdatePromotionAudienceGroupInput;
 };
 
 
@@ -1704,6 +2072,7 @@ export type Option = {
   displayOrder: Scalars['Int']['output'];
   extraPrice: Scalars['Float']['output'];
   id: Scalars['ID']['output'];
+  imageUrl?: Maybe<Scalars['String']['output']>;
   linkedProduct?: Maybe<Product>;
   linkedProductId?: Maybe<Scalars['ID']['output']>;
   name: Scalars['String']['output'];
@@ -1724,6 +2093,7 @@ export type OptionGroup = {
 export type Order = {
   __typename?: 'Order';
   adminNote?: Maybe<Scalars['String']['output']>;
+  approvalReasons?: Maybe<Array<ApprovalReason>>;
   businessId: Scalars['ID']['output'];
   businesses: Array<OrderBusiness>;
   cancellationReason?: Maybe<Scalars['String']['output']>;
@@ -1735,9 +2105,12 @@ export type Order = {
   driverArrivedAtPickup?: Maybe<Scalars['Date']['output']>;
   driverAssignedAt?: Maybe<Scalars['Date']['output']>;
   driverNotes?: Maybe<Scalars['String']['output']>;
+  driverTip: Scalars['Float']['output'];
   dropOffLocation: Location;
   estimatedReadyAt?: Maybe<Scalars['Date']['output']>;
   id: Scalars['ID']['output'];
+  /** Total base price of items fulfilled from operator inventory. Null when inventory mode is off or no stock was used. */
+  inventoryPrice?: Maybe<Scalars['Float']['output']>;
   locationFlagged: Scalars['Boolean']['output'];
   needsApproval: Scalars['Boolean']['output'];
   orderDate: Scalars['Date']['output'];
@@ -1749,7 +2122,10 @@ export type Order = {
   pickupLocations: Array<Location>;
   preparationMinutes?: Maybe<Scalars['Int']['output']>;
   preparingAt?: Maybe<Scalars['Date']['output']>;
+  prioritySurcharge: Scalars['Float']['output'];
   readyAt?: Maybe<Scalars['Date']['output']>;
+  review?: Maybe<OrderReview>;
+  settlementPreview?: Maybe<OrderSettlementPreview>;
   status: OrderStatus;
   totalPrice: Scalars['Float']['output'];
   updatedAt: Scalars['Date']['output'];
@@ -1761,6 +2137,38 @@ export type OrderBusiness = {
   __typename?: 'OrderBusiness';
   business: Business;
   items: Array<OrderItem>;
+};
+
+export type OrderConnection = {
+  __typename?: 'OrderConnection';
+  hasMore: Scalars['Boolean']['output'];
+  orders: Array<Order>;
+  totalCount: Scalars['Int']['output'];
+};
+
+export type OrderCoverage = {
+  __typename?: 'OrderCoverage';
+  allFromMarket: Scalars['Boolean']['output'];
+  allFromStock: Scalars['Boolean']['output'];
+  deducted: Scalars['Boolean']['output'];
+  fullyOwnedCount: Scalars['Int']['output'];
+  items: Array<OrderCoverageItem>;
+  marketOnlyCount: Scalars['Int']['output'];
+  orderId: Scalars['ID']['output'];
+  partiallyOwnedCount: Scalars['Int']['output'];
+  totalItems: Scalars['Int']['output'];
+};
+
+export type OrderCoverageItem = {
+  __typename?: 'OrderCoverageItem';
+  deducted: Scalars['Boolean']['output'];
+  fromMarket: Scalars['Int']['output'];
+  fromStock: Scalars['Int']['output'];
+  orderedQty: Scalars['Int']['output'];
+  productId: Scalars['ID']['output'];
+  productImageUrl?: Maybe<Scalars['String']['output']>;
+  productName: Scalars['String']['output'];
+  status: InventoryCoverageStatus;
 };
 
 export type OrderDriverLiveTracking = {
@@ -1779,6 +2187,8 @@ export type OrderItem = {
   childItems: Array<OrderItem>;
   id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
+  /** How many units of this item came from operator's personal inventory (0 = all from market). */
+  inventoryQuantity: Scalars['Int']['output'];
   name: Scalars['String']['output'];
   notes?: Maybe<Scalars['String']['output']>;
   parentOrderItemId?: Maybe<Scalars['ID']['output']>;
@@ -1810,6 +2220,48 @@ export type OrderPromotion = {
   id: Scalars['ID']['output'];
   promoCode?: Maybe<Scalars['String']['output']>;
   promotionId: Scalars['ID']['output'];
+};
+
+export type OrderReview = {
+  __typename?: 'OrderReview';
+  businessId: Scalars['ID']['output'];
+  comment?: Maybe<Scalars['String']['output']>;
+  createdAt: Scalars['DateTime']['output'];
+  id: Scalars['ID']['output'];
+  orderId: Scalars['ID']['output'];
+  quickFeedback: Array<Scalars['String']['output']>;
+  rating: Scalars['Int']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+  user?: Maybe<OrderReviewUser>;
+  userId: Scalars['ID']['output'];
+};
+
+export type OrderReviewUser = {
+  __typename?: 'OrderReviewUser';
+  firstName: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  lastName: Scalars['String']['output'];
+  phoneNumber?: Maybe<Scalars['String']['output']>;
+};
+
+export type OrderSettlementLineItem = {
+  __typename?: 'OrderSettlementLineItem';
+  amount: Scalars['Float']['output'];
+  businessId?: Maybe<Scalars['ID']['output']>;
+  direction: Scalars['String']['output'];
+  driverId?: Maybe<Scalars['ID']['output']>;
+  reason: Scalars['String']['output'];
+  ruleId?: Maybe<Scalars['ID']['output']>;
+  type: Scalars['String']['output'];
+};
+
+export type OrderSettlementPreview = {
+  __typename?: 'OrderSettlementPreview';
+  driverAssigned: Scalars['Boolean']['output'];
+  lineItems: Array<OrderSettlementLineItem>;
+  netMargin: Scalars['Float']['output'];
+  totalPayable: Scalars['Float']['output'];
+  totalReceivable: Scalars['Float']['output'];
 };
 
 export enum OrderStatus {
@@ -1847,6 +2299,7 @@ export type Product = {
   categoryId: Scalars['ID']['output'];
   createdAt: Scalars['String']['output'];
   description?: Maybe<Scalars['String']['output']>;
+  effectivePrice: Scalars['Float']['output'];
   id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
   isAvailable: Scalars['Boolean']['output'];
@@ -1857,8 +2310,9 @@ export type Product = {
   nightMarkedupPrice?: Maybe<Scalars['Float']['output']>;
   optionGroups: Array<OptionGroup>;
   price: Scalars['Float']['output'];
-  salePrice?: Maybe<Scalars['Float']['output']>;
+  saleDiscountPercentage?: Maybe<Scalars['Float']['output']>;
   sortOrder: Scalars['Int']['output'];
+  sourceProductId?: Maybe<Scalars['ID']['output']>;
   subcategoryId?: Maybe<Scalars['ID']['output']>;
   updatedAt: Scalars['String']['output'];
   variantGroup?: Maybe<ProductVariantGroup>;
@@ -1874,6 +2328,7 @@ export type ProductCard = {
   imageUrl?: Maybe<Scalars['String']['output']>;
   isOffer: Scalars['Boolean']['output'];
   name: Scalars['String']['output'];
+  orderCount: Scalars['Int']['output'];
   product?: Maybe<Product>;
   variants: Array<Product>;
 };
@@ -1921,7 +2376,7 @@ export type Promotion = {
   code?: Maybe<Scalars['String']['output']>;
   createdAt: Scalars['String']['output'];
   creatorId?: Maybe<Scalars['ID']['output']>;
-  creatorType: Scalars['String']['output'];
+  creatorType: PromotionCreatorType;
   currentGlobalUsage: Scalars['Int']['output'];
   description?: Maybe<Scalars['String']['output']>;
   discountValue?: Maybe<Scalars['Float']['output']>;
@@ -1929,12 +2384,14 @@ export type Promotion = {
   endsAt?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
   isActive: Scalars['Boolean']['output'];
+  isRecovery: Scalars['Boolean']['output'];
   isStackable: Scalars['Boolean']['output'];
   maxDiscountCap?: Maybe<Scalars['Float']['output']>;
   maxGlobalUsage?: Maybe<Scalars['Int']['output']>;
   maxUsagePerUser?: Maybe<Scalars['Int']['output']>;
   minOrderAmount?: Maybe<Scalars['Float']['output']>;
   name: Scalars['String']['output'];
+  orderId?: Maybe<Scalars['ID']['output']>;
   priority: Scalars['Int']['output'];
   spendThreshold?: Maybe<Scalars['Float']['output']>;
   startsAt?: Maybe<Scalars['String']['output']>;
@@ -1959,6 +2416,28 @@ export type PromotionAnalyticsResult = {
 export enum PromotionAppliesTo {
   Delivery = 'DELIVERY',
   Price = 'PRICE'
+}
+
+export enum PromotionApplyMethod {
+  Auto = 'AUTO',
+  CodeRequired = 'CODE_REQUIRED'
+}
+
+export type PromotionAudienceGroup = {
+  __typename?: 'PromotionAudienceGroup';
+  createdAt: Scalars['String']['output'];
+  description?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  isActive: Scalars['Boolean']['output'];
+  memberCount: Scalars['Int']['output'];
+  members: Array<User>;
+  name: Scalars['String']['output'];
+  updatedAt: Scalars['String']['output'];
+};
+
+export enum PromotionCreatorType {
+  Business = 'BUSINESS',
+  Platform = 'PLATFORM'
 }
 
 export type PromotionResult = {
@@ -2051,6 +2530,7 @@ export type PushTelemetrySummary = {
 
 export type Query = {
   __typename?: 'Query';
+  adminOrderReviews: Array<OrderReview>;
   auditLog?: Maybe<AuditLog>;
   auditLogs: AuditLogConnection;
   business?: Maybe<Business>;
@@ -2061,20 +2541,31 @@ export type Query = {
   businessMessageThreads: Array<BusinessMessageThread>;
   /** Admin: full conversation with a specific business user */
   businessMessages: Array<BusinessMessage>;
+  businessOrderFinancials?: Maybe<BusinessOrderFinancials>;
+  businessOrderReviews: Array<OrderReview>;
+  businessPerformanceStats: Array<BusinessPerformanceStat>;
   businesses: Array<Business>;
   calculateDeliveryPrice: DeliveryPriceResult;
   cancelledOrders: Array<Order>;
+  catalogProducts: Array<Product>;
   deliveryPricingConfig: DeliveryPricingConfig;
   deliveryPricingTiers: Array<DeliveryPricingTier>;
   deliveryZones: Array<DeliveryZone>;
   deviceTokens: Array<DeviceToken>;
   driverBalance: SettlementSummary;
+  /** Driver cash summary with settlement breakdown. Auto-scoped to current driver. */
+  driverCashSummary: DriverCashSummary;
   driverKPIs: Array<DriverKpi>;
   /** Admin: list of all driver threads with unread counts */
   driverMessageThreads: Array<DriverMessageThread>;
   /** Admin: full conversation with a specific driver */
   driverMessages: Array<DriverMessage>;
+  driverOrderFinancials?: Maybe<DriverOrderFinancials>;
   drivers: Array<User>;
+  /** Daily receivable earnings trend for the platform. */
+  earningsTrend: Array<EarningsTrendPoint>;
+  featuredBusinesses: Array<Business>;
+  getActiveBanners: Array<Banner>;
   getActiveGlobalPromotions: Array<Promotion>;
   /** Get Agora RTC credentials for the current authenticated user */
   getAgoraRtcCredentials: AgoraRtcCredentials;
@@ -2084,11 +2575,15 @@ export type Query = {
   getBanners: Array<Banner>;
   getPromotion?: Maybe<Promotion>;
   getPromotionAnalytics: PromotionAnalyticsResult;
+  getPromotionAudienceGroups: Array<PromotionAudienceGroup>;
   getPromotionThresholds: Array<PromotionThreshold>;
   getPromotionUsage: Array<PromotionUsage>;
+  getRecoveryPromotions: Array<Promotion>;
   getStoreStatus: StoreStatus;
   getUserPromoMetadata?: Maybe<UserPromoMetadata>;
   getUserPromotions: Array<UserPromotion>;
+  inventoryEarnings: InventoryEarnings;
+  inventorySummary: InventorySummary;
   me?: Maybe<User>;
   myAddresses: Array<UserAddress>;
   myBehavior?: Maybe<UserBehavior>;
@@ -2098,16 +2593,18 @@ export type Query = {
   myDriverMessages: Array<DriverMessage>;
   /** Get live metrics for the authenticated driver */
   myDriverMetrics: DriverDailyMetrics;
-  myReferralStats: ReferralStats;
+  myInventory: Array<InventoryItem>;
   notificationCampaign?: Maybe<NotificationCampaign>;
   notificationCampaigns: Array<NotificationCampaign>;
   offers: Array<Product>;
   operationalKPIs: OperationalKpIs;
   order?: Maybe<Order>;
-  orders: Array<Order>;
+  orderCoverage?: Maybe<OrderCoverage>;
+  orders: OrderConnection;
   ordersByStatus: Array<Order>;
   peakHourAnalysis: PeakHourAnalysis;
   previewCampaignAudience: AudiencePreview;
+  prioritySurchargeAmount: Scalars['Float']['output'];
   product?: Maybe<Product>;
   productCategories: Array<ProductCategory>;
   productCategory?: Maybe<ProductCategory>;
@@ -2116,11 +2613,14 @@ export type Query = {
   products: Array<ProductCard>;
   pushTelemetryEvents: Array<PushTelemetryEvent>;
   pushTelemetrySummary: PushTelemetrySummary;
+  /** Grouped settlement breakdown by category. */
+  settlementBreakdown: Array<SettlementBreakdownItem>;
   settlementPayment?: Maybe<SettlementPayment>;
   settlementPayments: Array<SettlementPayment>;
   settlementRequests: Array<SettlementRequest>;
   settlementRule?: Maybe<SettlementRule>;
   settlementRules: Array<SettlementRule>;
+  settlementRulesCount: Scalars['Int']['output'];
   settlementScenarioDefinitions: Array<SettlementScenarioDefinition>;
   settlementSummary: SettlementSummary;
   settlements: Array<Settlement>;
@@ -2129,6 +2629,14 @@ export type Query = {
   userBehavior?: Maybe<UserBehavior>;
   users: Array<User>;
   validatePromotions: PromotionResult;
+};
+
+
+export type QueryAdminOrderReviewsArgs = {
+  businessId: Scalars['ID']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  rating?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -2179,6 +2687,23 @@ export type QueryBusinessMessagesArgs = {
 };
 
 
+export type QueryBusinessOrderFinancialsArgs = {
+  businessId: Scalars['ID']['input'];
+  orderId: Scalars['ID']['input'];
+};
+
+
+export type QueryBusinessOrderReviewsArgs = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
+export type QueryBusinessPerformanceStatsArgs = {
+  days?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
 export type QueryCalculateDeliveryPriceArgs = {
   businessId: Scalars['ID']['input'];
   dropoffLat: Scalars['Float']['input'];
@@ -2202,6 +2727,12 @@ export type QueryDriverBalanceArgs = {
 };
 
 
+export type QueryDriverCashSummaryArgs = {
+  endDate?: InputMaybe<Scalars['Date']['input']>;
+  startDate?: InputMaybe<Scalars['Date']['input']>;
+};
+
+
 export type QueryDriverKpIsArgs = {
   driverId?: InputMaybe<Scalars['ID']['input']>;
   endDate: Scalars['String']['input'];
@@ -2216,6 +2747,25 @@ export type QueryDriverMessagesArgs = {
 };
 
 
+export type QueryDriverOrderFinancialsArgs = {
+  orderId: Scalars['ID']['input'];
+};
+
+
+export type QueryEarningsTrendArgs = {
+  businessId?: InputMaybe<Scalars['ID']['input']>;
+  driverId?: InputMaybe<Scalars['ID']['input']>;
+  endDate: Scalars['Date']['input'];
+  startDate: Scalars['Date']['input'];
+  type?: InputMaybe<SettlementType>;
+};
+
+
+export type QueryGetActiveBannersArgs = {
+  displayContext?: InputMaybe<BannerDisplayContext>;
+};
+
+
 export type QueryGetAgoraRtcCredentialsArgs = {
   channelName: Scalars['String']['input'];
   role: AgoraRtcRole;
@@ -2223,6 +2773,7 @@ export type QueryGetAgoraRtcCredentialsArgs = {
 
 
 export type QueryGetAllPromotionsArgs = {
+  includeRecovery?: InputMaybe<Scalars['Boolean']['input']>;
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
@@ -2239,7 +2790,7 @@ export type QueryGetBannerArgs = {
 
 
 export type QueryGetBannersArgs = {
-  activeOnly?: InputMaybe<Scalars['Boolean']['input']>;
+  filter?: InputMaybe<GetBannersFilter>;
 };
 
 
@@ -2250,6 +2801,12 @@ export type QueryGetPromotionArgs = {
 
 export type QueryGetPromotionAnalyticsArgs = {
   promotionId: Scalars['ID']['input'];
+};
+
+
+export type QueryGetPromotionAudienceGroupsArgs = {
+  isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -2280,6 +2837,18 @@ export type QueryGetUserPromotionsArgs = {
 };
 
 
+export type QueryInventoryEarningsArgs = {
+  businessId: Scalars['ID']['input'];
+  endDate?: InputMaybe<Scalars['String']['input']>;
+  startDate?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryInventorySummaryArgs = {
+  businessId: Scalars['ID']['input'];
+};
+
+
 export type QueryMyBusinessMessagesArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
@@ -2289,6 +2858,11 @@ export type QueryMyBusinessMessagesArgs = {
 export type QueryMyDriverMessagesArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
+export type QueryMyInventoryArgs = {
+  businessId: Scalars['ID']['input'];
 };
 
 
@@ -2314,9 +2888,17 @@ export type QueryOrderArgs = {
 };
 
 
+export type QueryOrderCoverageArgs = {
+  orderId: Scalars['ID']['input'];
+};
+
+
 export type QueryOrdersArgs = {
+  endDate?: InputMaybe<Scalars['String']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
+  startDate?: InputMaybe<Scalars['String']['input']>;
+  statuses?: InputMaybe<Array<OrderStatus>>;
 };
 
 
@@ -2383,6 +2965,16 @@ export type QueryPushTelemetrySummaryArgs = {
 };
 
 
+export type QuerySettlementBreakdownArgs = {
+  businessId?: InputMaybe<Scalars['ID']['input']>;
+  driverId?: InputMaybe<Scalars['ID']['input']>;
+  endDate?: InputMaybe<Scalars['Date']['input']>;
+  isSettled?: InputMaybe<Scalars['Boolean']['input']>;
+  startDate?: InputMaybe<Scalars['Date']['input']>;
+  type?: InputMaybe<SettlementType>;
+};
+
+
 export type QuerySettlementPaymentArgs = {
   id: Scalars['ID']['input'];
 };
@@ -2401,6 +2993,8 @@ export type QuerySettlementPaymentsArgs = {
 
 export type QuerySettlementRequestsArgs = {
   businessId?: InputMaybe<Scalars['ID']['input']>;
+  driverId?: InputMaybe<Scalars['ID']['input']>;
+  entityType?: InputMaybe<SettlementType>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
   status?: InputMaybe<SettlementRequestStatus>;
@@ -2414,13 +3008,24 @@ export type QuerySettlementRuleArgs = {
 
 export type QuerySettlementRulesArgs = {
   filter?: InputMaybe<SettlementRuleFilterInput>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
+export type QuerySettlementRulesCountArgs = {
+  filter?: InputMaybe<SettlementRuleFilterInput>;
 };
 
 
 export type QuerySettlementSummaryArgs = {
   businessId?: InputMaybe<Scalars['ID']['input']>;
+  direction?: InputMaybe<SettlementDirection>;
   driverId?: InputMaybe<Scalars['ID']['input']>;
   endDate?: InputMaybe<Scalars['Date']['input']>;
+  isSettled?: InputMaybe<Scalars['Boolean']['input']>;
+  orderId?: InputMaybe<Scalars['ID']['input']>;
+  promotionId?: InputMaybe<Scalars['ID']['input']>;
   startDate?: InputMaybe<Scalars['Date']['input']>;
   type?: InputMaybe<SettlementType>;
 };
@@ -2434,6 +3039,8 @@ export type QuerySettlementsArgs = {
   isSettled?: InputMaybe<Scalars['Boolean']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
+  orderId?: InputMaybe<Scalars['ID']['input']>;
+  promotionId?: InputMaybe<Scalars['ID']['input']>;
   startDate?: InputMaybe<Scalars['Date']['input']>;
   status?: InputMaybe<SettlementStatus>;
   type?: InputMaybe<SettlementType>;
@@ -2461,36 +3068,6 @@ export type QueryValidatePromotionsArgs = {
   cart: CartContextInput;
   manualCode?: InputMaybe<Scalars['String']['input']>;
 };
-
-export type Referral = {
-  __typename?: 'Referral';
-  completedAt?: Maybe<Scalars['DateTime']['output']>;
-  createdAt: Scalars['DateTime']['output'];
-  id: Scalars['ID']['output'];
-  referralCode: Scalars['String']['output'];
-  referredUser?: Maybe<User>;
-  referredUserId?: Maybe<Scalars['ID']['output']>;
-  referrerUserId: Scalars['ID']['output'];
-  rewardAmount?: Maybe<Scalars['Float']['output']>;
-  rewardGiven: Scalars['Boolean']['output'];
-  status: ReferralStatus;
-};
-
-export type ReferralStats = {
-  __typename?: 'ReferralStats';
-  completedReferrals: Scalars['Int']['output'];
-  pendingReferrals: Scalars['Int']['output'];
-  referralCode: Scalars['String']['output'];
-  referrals: Array<Referral>;
-  totalReferrals: Scalars['Int']['output'];
-  totalRewardsEarned: Scalars['Float']['output'];
-};
-
-export enum ReferralStatus {
-  Completed = 'COMPLETED',
-  Expired = 'EXPIRED',
-  Pending = 'PENDING'
-}
 
 export type RegisterDeviceTokenInput = {
   appType: DeviceAppType;
@@ -2523,6 +3100,14 @@ export type SetDeliveryPricingTiersInput = {
   tiers: Array<CreateDeliveryPricingTierInput>;
 };
 
+export type SetInventoryQuantityInput = {
+  businessId: Scalars['ID']['input'];
+  costPrice?: InputMaybe<Scalars['Float']['input']>;
+  lowStockThreshold?: InputMaybe<Scalars['Int']['input']>;
+  productId: Scalars['ID']['input'];
+  quantity: Scalars['Int']['input'];
+};
+
 export type SettleResult = {
   __typename?: 'SettleResult';
   direction: SettlementPaymentDirection;
@@ -2547,6 +3132,8 @@ export type Settlement = {
   paidAt?: Maybe<Scalars['Date']['output']>;
   paymentMethod?: Maybe<Scalars['String']['output']>;
   paymentReference?: Maybe<Scalars['String']['output']>;
+  reason?: Maybe<Scalars['String']['output']>;
+  rule?: Maybe<SettlementRule>;
   ruleId?: Maybe<Scalars['ID']['output']>;
   settlementPayment?: Maybe<SettlementPayment>;
   sourcePayment?: Maybe<SettlementPayment>;
@@ -2559,6 +3146,21 @@ export enum SettlementAmountType {
   Fixed = 'FIXED',
   Percent = 'PERCENT'
 }
+
+/** Grouped settlement totals by category. */
+export type SettlementBreakdownItem = {
+  __typename?: 'SettlementBreakdownItem';
+  /** Category key (e.g. PLATFORM_COMMISSION, PROMOTION_COST, MARKUP_REMITTANCE, DELIVERY_COMMISSION). */
+  category: Scalars['String']['output'];
+  /** Number of settlements in this category. */
+  count: Scalars['Int']['output'];
+  /** Direction of these settlements. */
+  direction: SettlementDirection;
+  /** Human-readable label for the category. */
+  label: Scalars['String']['output'];
+  /** Total amount for this category. */
+  totalAmount: Scalars['Float']['output'];
+};
 
 export enum SettlementDirection {
   Payable = 'PAYABLE',
@@ -2594,33 +3196,29 @@ export enum SettlementPaymentDirection {
 export type SettlementRequest = {
   __typename?: 'SettlementRequest';
   amount: Scalars['Float']['output'];
-  business: Business;
+  business?: Maybe<Business>;
   createdAt: Scalars['Date']['output'];
-  currency: Scalars['String']['output'];
-  disputeReason?: Maybe<Scalars['String']['output']>;
-  expiresAt: Scalars['Date']['output'];
+  driver?: Maybe<User>;
+  entityType: SettlementType;
   id: Scalars['ID']['output'];
   note?: Maybe<Scalars['String']['output']>;
-  periodEnd: Scalars['Date']['output'];
-  periodStart: Scalars['Date']['output'];
-  requestedBy?: Maybe<User>;
+  reason?: Maybe<Scalars['String']['output']>;
   respondedAt?: Maybe<Scalars['Date']['output']>;
   respondedBy?: Maybe<User>;
+  settlementPayment?: Maybe<SettlementPayment>;
   status: SettlementRequestStatus;
   updatedAt: Scalars['Date']['output'];
 };
 
 export enum SettlementRequestAction {
   Accept = 'ACCEPT',
-  Dispute = 'DISPUTE'
+  Reject = 'REJECT'
 }
 
 export enum SettlementRequestStatus {
   Accepted = 'ACCEPTED',
-  Cancelled = 'CANCELLED',
-  Disputed = 'DISPUTED',
-  Expired = 'EXPIRED',
-  PendingApproval = 'PENDING_APPROVAL'
+  Pending = 'PENDING',
+  Rejected = 'REJECTED'
 }
 
 export type SettlementRule = {
@@ -2634,6 +3232,7 @@ export type SettlementRule = {
   entityType: SettlementEntityType;
   id: Scalars['ID']['output'];
   isActive: Scalars['Boolean']['output'];
+  maxAmount?: Maybe<Scalars['Float']['output']>;
   name: Scalars['String']['output'];
   notes?: Maybe<Scalars['String']['output']>;
   promotion?: Maybe<Promotion>;
@@ -2734,8 +3333,12 @@ export type StoreStatus = {
   bannerEnabled: Scalars['Boolean']['output'];
   bannerMessage?: Maybe<Scalars['String']['output']>;
   bannerType: BannerType;
+  businessGracePeriodMinutes: Scalars['Int']['output'];
   closedMessage?: Maybe<Scalars['String']['output']>;
   dispatchModeEnabled: Scalars['Boolean']['output'];
+  earlyDispatchLeadMinutes: Scalars['Int']['output'];
+  googleMapsNavEnabled: Scalars['Boolean']['output'];
+  inventoryModeEnabled: Scalars['Boolean']['output'];
   isStoreClosed: Scalars['Boolean']['output'];
 };
 
@@ -2749,6 +3352,8 @@ export type Subscription = {
   adminBusinessMessageReceived: BusinessMessage;
   /** Admin receives replies from a specific driver in real-time */
   adminMessageReceived: DriverMessage;
+  /** Admin listens for push-to-talk signals from any driver */
+  adminPttSignal: AdminPttSignal;
   allOrdersUpdated: Array<Order>;
   auditLogCreated: AuditLog;
   /** Business user receives messages from admin in real-time */
@@ -2851,11 +3456,18 @@ export type TrackPushTelemetryInput = {
 };
 
 export type UpdateBannerInput = {
+  businessId?: InputMaybe<Scalars['ID']['input']>;
+  displayContext?: InputMaybe<BannerDisplayContext>;
+  endsAt?: InputMaybe<Scalars['DateTime']['input']>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
   linkTarget?: InputMaybe<Scalars['String']['input']>;
   linkType?: InputMaybe<Scalars['String']['input']>;
+  mediaType?: InputMaybe<BannerMediaType>;
+  productId?: InputMaybe<Scalars['ID']['input']>;
+  promotionId?: InputMaybe<Scalars['ID']['input']>;
   sortOrder?: InputMaybe<Scalars['Int']['input']>;
+  startsAt?: InputMaybe<Scalars['DateTime']['input']>;
   subtitle?: InputMaybe<Scalars['String']['input']>;
   title?: InputMaybe<Scalars['String']['input']>;
 };
@@ -2863,12 +3475,14 @@ export type UpdateBannerInput = {
 export type UpdateBusinessInput = {
   avgPrepTimeMinutes?: InputMaybe<Scalars['Int']['input']>;
   businessType?: InputMaybe<BusinessType>;
+  category?: InputMaybe<Scalars['String']['input']>;
   commissionPercentage?: InputMaybe<Scalars['Float']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
   isTemporarilyClosed?: InputMaybe<Scalars['Boolean']['input']>;
   location?: InputMaybe<LocationInput>;
+  minOrderAmount?: InputMaybe<Scalars['Float']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
   phoneNumber?: InputMaybe<Scalars['String']['input']>;
   prepTimeOverrideMinutes?: InputMaybe<Scalars['Int']['input']>;
@@ -2893,6 +3507,12 @@ export type UpdateDeliveryZoneInput = {
   sortOrder?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type UpdateMyProfileInput = {
+  firstName: Scalars['String']['input'];
+  lastName: Scalars['String']['input'];
+  phoneNumber?: InputMaybe<Scalars['String']['input']>;
+};
+
 export type UpdateOptionGroupInput = {
   displayOrder?: InputMaybe<Scalars['Int']['input']>;
   maxSelections?: InputMaybe<Scalars['Int']['input']>;
@@ -2903,6 +3523,7 @@ export type UpdateOptionGroupInput = {
 export type UpdateOptionInput = {
   displayOrder?: InputMaybe<Scalars['Int']['input']>;
   extraPrice?: InputMaybe<Scalars['Float']['input']>;
+  imageUrl?: InputMaybe<Scalars['String']['input']>;
   linkedProductId?: InputMaybe<Scalars['ID']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
 };
@@ -2918,12 +3539,13 @@ export type UpdateProductInput = {
   description?: InputMaybe<Scalars['String']['input']>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   isAvailable?: InputMaybe<Scalars['Boolean']['input']>;
+  isOffer?: InputMaybe<Scalars['Boolean']['input']>;
   isOnSale?: InputMaybe<Scalars['Boolean']['input']>;
   markupPrice?: InputMaybe<Scalars['Float']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
   nightMarkedupPrice?: InputMaybe<Scalars['Float']['input']>;
   price?: InputMaybe<Scalars['Float']['input']>;
-  salePrice?: InputMaybe<Scalars['Float']['input']>;
+  saleDiscountPercentage?: InputMaybe<Scalars['Float']['input']>;
   sortOrder?: InputMaybe<Scalars['Int']['input']>;
   subcategoryId?: InputMaybe<Scalars['ID']['input']>;
   variantGroupId?: InputMaybe<Scalars['ID']['input']>;
@@ -2933,28 +3555,19 @@ export type UpdateProductSubcategoryInput = {
   name?: InputMaybe<Scalars['String']['input']>;
 };
 
-export type UpdatePromotionInput = {
-  code?: InputMaybe<Scalars['String']['input']>;
-  creatorId?: InputMaybe<Scalars['ID']['input']>;
-  creatorType?: InputMaybe<Scalars['String']['input']>;
+export type UpdatePromotionAudienceGroupInput = {
   description?: InputMaybe<Scalars['String']['input']>;
-  discountValue?: InputMaybe<Scalars['Float']['input']>;
-  eligibleBusinessIds?: InputMaybe<Array<Scalars['ID']['input']>>;
-  endsAt?: InputMaybe<Scalars['String']['input']>;
   id: Scalars['ID']['input'];
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
-  isStackable?: InputMaybe<Scalars['Boolean']['input']>;
-  maxDiscountCap?: InputMaybe<Scalars['Float']['input']>;
-  maxGlobalUsage?: InputMaybe<Scalars['Int']['input']>;
-  maxUsagePerUser?: InputMaybe<Scalars['Int']['input']>;
-  minOrderAmount?: InputMaybe<Scalars['Float']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
-  priority?: InputMaybe<Scalars['Int']['input']>;
-  spendThreshold?: InputMaybe<Scalars['Float']['input']>;
-  startsAt?: InputMaybe<Scalars['String']['input']>;
-  target?: InputMaybe<PromotionTarget>;
-  thresholdReward?: InputMaybe<Scalars['String']['input']>;
-  type?: InputMaybe<PromotionType>;
+  userIds?: InputMaybe<Array<Scalars['ID']['input']>>;
+};
+
+export type UpdatePromotionInput = {
+  code?: InputMaybe<Scalars['String']['input']>;
+  description?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['ID']['input'];
+  name?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type UpdateSettlementRuleInput = {
@@ -2963,6 +3576,7 @@ export type UpdateSettlementRuleInput = {
   appliesTo?: InputMaybe<Scalars['String']['input']>;
   direction?: InputMaybe<SettlementDirection>;
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  maxAmount?: InputMaybe<Scalars['Float']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
   notes?: InputMaybe<Scalars['String']['input']>;
   type?: InputMaybe<SettlementRuleType>;
@@ -2972,8 +3586,12 @@ export type UpdateStoreStatusInput = {
   bannerEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   bannerMessage?: InputMaybe<Scalars['String']['input']>;
   bannerType?: InputMaybe<BannerType>;
+  businessGracePeriodMinutes?: InputMaybe<Scalars['Int']['input']>;
   closedMessage?: InputMaybe<Scalars['String']['input']>;
   dispatchModeEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  earlyDispatchLeadMinutes?: InputMaybe<Scalars['Int']['input']>;
+  googleMapsNavEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  inventoryModeEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   isStoreClosed: Scalars['Boolean']['input'];
 };
 
@@ -2990,6 +3608,7 @@ export type UpdateUserInput = {
   businessId?: InputMaybe<Scalars['ID']['input']>;
   firstName: Scalars['String']['input'];
   id: Scalars['ID']['input'];
+  isDemoAccount?: InputMaybe<Scalars['Boolean']['input']>;
   lastName: Scalars['String']['input'];
   role: UserRole;
 };
@@ -3005,22 +3624,26 @@ export type User = {
   driverLocation?: Maybe<Location>;
   driverLocationUpdatedAt?: Maybe<Scalars['Date']['output']>;
   email: Scalars['String']['output'];
+  emailOptOut: Scalars['Boolean']['output'];
   emailVerified: Scalars['Boolean']['output'];
   firstName: Scalars['String']['output'];
   flagColor?: Maybe<Scalars['String']['output']>;
   hasOwnVehicle?: Maybe<Scalars['Boolean']['output']>;
   id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
+  isBanned: Scalars['Boolean']['output'];
+  isDemoAccount: Scalars['Boolean']['output'];
   isOnline: Scalars['Boolean']['output'];
+  isTrustedCustomer: Scalars['Boolean']['output'];
   lastName: Scalars['String']['output'];
   maxActiveOrders?: Maybe<Scalars['Int']['output']>;
   permissions: Array<UserPermission>;
   phoneNumber?: Maybe<Scalars['String']['output']>;
   phoneVerified: Scalars['Boolean']['output'];
   preferredLanguage: AppLanguage;
-  referralCode?: Maybe<Scalars['String']['output']>;
   role: UserRole;
   signupStep: SignupStep;
+  totalOrders: Scalars['Int']['output'];
 };
 
 export type UserAddress = {
@@ -3256,17 +3879,21 @@ export type TrackPushTelemetryMutationVariables = Exact<{
 
 export type TrackPushTelemetryMutation = { __typename?: 'Mutation', trackPushTelemetry: boolean };
 
-export type GetOrdersQueryVariables = Exact<{ [key: string]: never; }>;
+export type GetOrdersQueryVariables = Exact<{
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  statuses?: InputMaybe<Array<OrderStatus> | OrderStatus>;
+}>;
 
 
-export type GetOrdersQuery = { __typename?: 'Query', orders: Array<{ __typename?: 'Order', id: string, orderPrice: number, deliveryPrice: number, totalPrice: number, orderDate: any, updatedAt: any, status: OrderStatus, preparationMinutes?: number | null, estimatedReadyAt?: any | null, preparingAt?: any | null, user?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string, address?: string | null, phoneNumber?: string | null } | null, driver?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string, phoneNumber?: string | null } | null, dropOffLocation: { __typename?: 'Location', latitude: number, longitude: number, address: string }, businesses: Array<{ __typename?: 'OrderBusiness', business: { __typename?: 'Business', id: string, name: string, phoneNumber?: string | null, businessType: BusinessType, location: { __typename?: 'Location', latitude: number, longitude: number, address: string } }, items: Array<{ __typename?: 'OrderItem', productId: string, name: string, imageUrl?: string | null, quantity: number, unitPrice: number }> }> }> };
+export type GetOrdersQuery = { __typename?: 'Query', orders: { __typename?: 'OrderConnection', totalCount: number, hasMore: boolean, orders: Array<{ __typename?: 'Order', id: string, displayId: string, orderPrice: number, deliveryPrice: number, totalPrice: number, orderDate: any, updatedAt: any, status: OrderStatus, needsApproval: boolean, locationFlagged: boolean, approvalReasons?: Array<ApprovalReason> | null, preparationMinutes?: number | null, estimatedReadyAt?: any | null, preparingAt?: any | null, user?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string, address?: string | null, phoneNumber?: string | null } | null, driver?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string, phoneNumber?: string | null } | null, dropOffLocation: { __typename?: 'Location', latitude: number, longitude: number, address: string }, businesses: Array<{ __typename?: 'OrderBusiness', business: { __typename?: 'Business', id: string, name: string, phoneNumber?: string | null, businessType: BusinessType, location: { __typename?: 'Location', latitude: number, longitude: number, address: string } }, items: Array<{ __typename?: 'OrderItem', productId: string, name: string, imageUrl?: string | null, quantity: number, unitPrice: number }> }> }> } };
 
 export type GetOrderQueryVariables = Exact<{
   id: Scalars['ID']['input'];
 }>;
 
 
-export type GetOrderQuery = { __typename?: 'Query', order?: { __typename?: 'Order', id: string, orderPrice: number, deliveryPrice: number, totalPrice: number, orderDate: any, updatedAt: any, status: OrderStatus, preparationMinutes?: number | null, estimatedReadyAt?: any | null, preparingAt?: any | null, user?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string, address?: string | null, phoneNumber?: string | null } | null, driver?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string, phoneNumber?: string | null } | null, dropOffLocation: { __typename?: 'Location', latitude: number, longitude: number, address: string }, businesses: Array<{ __typename?: 'OrderBusiness', business: { __typename?: 'Business', id: string, name: string, phoneNumber?: string | null, businessType: BusinessType, location: { __typename?: 'Location', latitude: number, longitude: number, address: string } }, items: Array<{ __typename?: 'OrderItem', productId: string, name: string, imageUrl?: string | null, quantity: number, unitPrice: number }> }> } | null };
+export type GetOrderQuery = { __typename?: 'Query', order?: { __typename?: 'Order', id: string, displayId: string, orderPrice: number, deliveryPrice: number, totalPrice: number, orderDate: any, updatedAt: any, status: OrderStatus, needsApproval: boolean, locationFlagged: boolean, approvalReasons?: Array<ApprovalReason> | null, preparationMinutes?: number | null, estimatedReadyAt?: any | null, preparingAt?: any | null, user?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string, address?: string | null, phoneNumber?: string | null } | null, driver?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string, phoneNumber?: string | null } | null, dropOffLocation: { __typename?: 'Location', latitude: number, longitude: number, address: string }, businesses: Array<{ __typename?: 'OrderBusiness', business: { __typename?: 'Business', id: string, name: string, phoneNumber?: string | null, businessType: BusinessType, location: { __typename?: 'Location', latitude: number, longitude: number, address: string } }, items: Array<{ __typename?: 'OrderItem', productId: string, name: string, imageUrl?: string | null, quantity: number, unitPrice: number }> }> } | null };
 
 export type UpdateOrderStatusMutationVariables = Exact<{
   id: Scalars['ID']['input'];
@@ -3307,6 +3934,13 @@ export type AssignDriverToOrderMutationVariables = Exact<{
 
 export type AssignDriverToOrderMutation = { __typename?: 'Mutation', assignDriverToOrder: { __typename?: 'Order', id: string, status: OrderStatus, driver?: { __typename?: 'User', id: string, firstName: string, lastName: string } | null } };
 
+export type ApproveOrderMutationVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type ApproveOrderMutation = { __typename?: 'Mutation', approveOrder: { __typename?: 'Order', id: string, status: OrderStatus, needsApproval: boolean } };
+
 export type CreateTestOrderMutationVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -3315,7 +3949,37 @@ export type CreateTestOrderMutation = { __typename?: 'Mutation', createTestOrder
 export type AllOrdersUpdatedSubscriptionVariables = Exact<{ [key: string]: never; }>;
 
 
-export type AllOrdersUpdatedSubscription = { __typename?: 'Subscription', allOrdersUpdated: Array<{ __typename?: 'Order', id: string, orderPrice: number, deliveryPrice: number, totalPrice: number, orderDate: any, updatedAt: any, status: OrderStatus, preparationMinutes?: number | null, estimatedReadyAt?: any | null, preparingAt?: any | null, user?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string, address?: string | null, phoneNumber?: string | null } | null, driver?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string, phoneNumber?: string | null } | null, dropOffLocation: { __typename?: 'Location', latitude: number, longitude: number, address: string }, businesses: Array<{ __typename?: 'OrderBusiness', business: { __typename?: 'Business', id: string, name: string, businessType: BusinessType, phoneNumber?: string | null, location: { __typename?: 'Location', latitude: number, longitude: number, address: string } }, items: Array<{ __typename?: 'OrderItem', productId: string, name: string, imageUrl?: string | null, quantity: number, unitPrice: number }> }> }> };
+export type AllOrdersUpdatedSubscription = { __typename?: 'Subscription', allOrdersUpdated: Array<{ __typename?: 'Order', id: string, displayId: string, orderPrice: number, deliveryPrice: number, totalPrice: number, orderDate: any, updatedAt: any, status: OrderStatus, needsApproval: boolean, locationFlagged: boolean, approvalReasons?: Array<ApprovalReason> | null, preparationMinutes?: number | null, estimatedReadyAt?: any | null, preparingAt?: any | null, user?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string, address?: string | null, phoneNumber?: string | null } | null, driver?: { __typename?: 'User', id: string, firstName: string, lastName: string, email: string, phoneNumber?: string | null } | null, dropOffLocation: { __typename?: 'Location', latitude: number, longitude: number, address: string }, businesses: Array<{ __typename?: 'OrderBusiness', business: { __typename?: 'Business', id: string, name: string, businessType: BusinessType, phoneNumber?: string | null, location: { __typename?: 'Location', latitude: number, longitude: number, address: string } }, items: Array<{ __typename?: 'OrderItem', productId: string, name: string, imageUrl?: string | null, quantity: number, unitPrice: number }> }> }> };
+
+export type AdminSendPttSignalMutationVariables = Exact<{
+  driverIds: Array<Scalars['ID']['input']> | Scalars['ID']['input'];
+  channelName: Scalars['String']['input'];
+  action: DriverPttSignalAction;
+  muted?: InputMaybe<Scalars['Boolean']['input']>;
+}>;
+
+
+export type AdminSendPttSignalMutation = { __typename?: 'Mutation', adminSendPttSignal: boolean };
+
+export type AdminSetShiftDriversMutationVariables = Exact<{
+  driverIds: Array<Scalars['ID']['input']> | Scalars['ID']['input'];
+}>;
+
+
+export type AdminSetShiftDriversMutation = { __typename?: 'Mutation', adminSetShiftDrivers: boolean };
+
+export type GetAgoraRtcCredentialsQueryVariables = Exact<{
+  channelName: Scalars['String']['input'];
+  role: AgoraRtcRole;
+}>;
+
+
+export type GetAgoraRtcCredentialsQuery = { __typename?: 'Query', getAgoraRtcCredentials: { __typename?: 'AgoraRtcCredentials', appId: string, channelName: string, uid: number, token: string, expiresAt: any } };
+
+export type AdminPttSignalSubscriptionVariables = Exact<{ [key: string]: never; }>;
+
+
+export type AdminPttSignalSubscription = { __typename?: 'Subscription', adminPttSignal: { __typename?: 'AdminPttSignal', driverId: string, channelName: string, action: DriverPttSignalAction, timestamp: any } };
 
 export type GetUsersQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -3398,15 +4062,20 @@ export const MarkSettlementAsPaidDocument = {"kind":"Document","definitions":[{"
 export const RegisterDeviceTokenDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"RegisterDeviceToken"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"RegisterDeviceTokenInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"registerDeviceToken"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}]}]}}]} as unknown as DocumentNode<RegisterDeviceTokenMutation, RegisterDeviceTokenMutationVariables>;
 export const UnregisterDeviceTokenDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UnregisterDeviceToken"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"token"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"unregisterDeviceToken"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"token"},"value":{"kind":"Variable","name":{"kind":"Name","value":"token"}}}]}]}}]} as unknown as DocumentNode<UnregisterDeviceTokenMutation, UnregisterDeviceTokenMutationVariables>;
 export const TrackPushTelemetryDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"TrackPushTelemetry"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"TrackPushTelemetryInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"trackPushTelemetry"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}]}]}}]} as unknown as DocumentNode<TrackPushTelemetryMutation, TrackPushTelemetryMutationVariables>;
-export const GetOrdersDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetOrders"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"orders"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"IntValue","value":"200"}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"orderPrice"}},{"kind":"Field","name":{"kind":"Name","value":"deliveryPrice"}},{"kind":"Field","name":{"kind":"Name","value":"totalPrice"}},{"kind":"Field","name":{"kind":"Name","value":"orderDate"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"preparationMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"estimatedReadyAt"}},{"kind":"Field","name":{"kind":"Name","value":"preparingAt"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"address"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}}]}},{"kind":"Field","name":{"kind":"Name","value":"driver"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}}]}},{"kind":"Field","name":{"kind":"Name","value":"dropOffLocation"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}},{"kind":"Field","name":{"kind":"Name","value":"businesses"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"business"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}},{"kind":"Field","name":{"kind":"Name","value":"businessType"}},{"kind":"Field","name":{"kind":"Name","value":"location"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"productId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"imageUrl"}},{"kind":"Field","name":{"kind":"Name","value":"quantity"}},{"kind":"Field","name":{"kind":"Name","value":"unitPrice"}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetOrdersQuery, GetOrdersQueryVariables>;
-export const GetOrderDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetOrder"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"order"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"orderPrice"}},{"kind":"Field","name":{"kind":"Name","value":"deliveryPrice"}},{"kind":"Field","name":{"kind":"Name","value":"totalPrice"}},{"kind":"Field","name":{"kind":"Name","value":"orderDate"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"preparationMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"estimatedReadyAt"}},{"kind":"Field","name":{"kind":"Name","value":"preparingAt"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"address"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}}]}},{"kind":"Field","name":{"kind":"Name","value":"driver"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}}]}},{"kind":"Field","name":{"kind":"Name","value":"dropOffLocation"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}},{"kind":"Field","name":{"kind":"Name","value":"businesses"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"business"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}},{"kind":"Field","name":{"kind":"Name","value":"businessType"}},{"kind":"Field","name":{"kind":"Name","value":"location"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"productId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"imageUrl"}},{"kind":"Field","name":{"kind":"Name","value":"quantity"}},{"kind":"Field","name":{"kind":"Name","value":"unitPrice"}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetOrderQuery, GetOrderQueryVariables>;
+export const GetOrdersDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetOrders"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"statuses"}},"type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"OrderStatus"}}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"orders"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"statuses"},"value":{"kind":"Variable","name":{"kind":"Name","value":"statuses"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"totalCount"}},{"kind":"Field","name":{"kind":"Name","value":"hasMore"}},{"kind":"Field","name":{"kind":"Name","value":"orders"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"displayId"}},{"kind":"Field","name":{"kind":"Name","value":"orderPrice"}},{"kind":"Field","name":{"kind":"Name","value":"deliveryPrice"}},{"kind":"Field","name":{"kind":"Name","value":"totalPrice"}},{"kind":"Field","name":{"kind":"Name","value":"orderDate"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"needsApproval"}},{"kind":"Field","name":{"kind":"Name","value":"locationFlagged"}},{"kind":"Field","name":{"kind":"Name","value":"approvalReasons"}},{"kind":"Field","name":{"kind":"Name","value":"preparationMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"estimatedReadyAt"}},{"kind":"Field","name":{"kind":"Name","value":"preparingAt"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"address"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}}]}},{"kind":"Field","name":{"kind":"Name","value":"driver"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}}]}},{"kind":"Field","name":{"kind":"Name","value":"dropOffLocation"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}},{"kind":"Field","name":{"kind":"Name","value":"businesses"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"business"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}},{"kind":"Field","name":{"kind":"Name","value":"businessType"}},{"kind":"Field","name":{"kind":"Name","value":"location"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"productId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"imageUrl"}},{"kind":"Field","name":{"kind":"Name","value":"quantity"}},{"kind":"Field","name":{"kind":"Name","value":"unitPrice"}}]}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetOrdersQuery, GetOrdersQueryVariables>;
+export const GetOrderDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetOrder"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"order"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"displayId"}},{"kind":"Field","name":{"kind":"Name","value":"orderPrice"}},{"kind":"Field","name":{"kind":"Name","value":"deliveryPrice"}},{"kind":"Field","name":{"kind":"Name","value":"totalPrice"}},{"kind":"Field","name":{"kind":"Name","value":"orderDate"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"needsApproval"}},{"kind":"Field","name":{"kind":"Name","value":"locationFlagged"}},{"kind":"Field","name":{"kind":"Name","value":"approvalReasons"}},{"kind":"Field","name":{"kind":"Name","value":"preparationMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"estimatedReadyAt"}},{"kind":"Field","name":{"kind":"Name","value":"preparingAt"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"address"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}}]}},{"kind":"Field","name":{"kind":"Name","value":"driver"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}}]}},{"kind":"Field","name":{"kind":"Name","value":"dropOffLocation"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}},{"kind":"Field","name":{"kind":"Name","value":"businesses"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"business"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}},{"kind":"Field","name":{"kind":"Name","value":"businessType"}},{"kind":"Field","name":{"kind":"Name","value":"location"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"productId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"imageUrl"}},{"kind":"Field","name":{"kind":"Name","value":"quantity"}},{"kind":"Field","name":{"kind":"Name","value":"unitPrice"}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetOrderQuery, GetOrderQueryVariables>;
 export const UpdateOrderStatusDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateOrderStatus"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"status"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"OrderStatus"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateOrderStatus"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}},{"kind":"Argument","name":{"kind":"Name","value":"status"},"value":{"kind":"Variable","name":{"kind":"Name","value":"status"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}}]}}]}}]} as unknown as DocumentNode<UpdateOrderStatusMutation, UpdateOrderStatusMutationVariables>;
 export const StartPreparingDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"StartPreparing"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"preparationMinutes"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"startPreparing"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}},{"kind":"Argument","name":{"kind":"Name","value":"preparationMinutes"},"value":{"kind":"Variable","name":{"kind":"Name","value":"preparationMinutes"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"preparationMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"estimatedReadyAt"}},{"kind":"Field","name":{"kind":"Name","value":"preparingAt"}}]}}]}}]} as unknown as DocumentNode<StartPreparingMutation, StartPreparingMutationVariables>;
 export const UpdatePreparationTimeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdatePreparationTime"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"preparationMinutes"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updatePreparationTime"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}},{"kind":"Argument","name":{"kind":"Name","value":"preparationMinutes"},"value":{"kind":"Variable","name":{"kind":"Name","value":"preparationMinutes"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"preparationMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"estimatedReadyAt"}}]}}]}}]} as unknown as DocumentNode<UpdatePreparationTimeMutation, UpdatePreparationTimeMutationVariables>;
 export const CancelOrderDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CancelOrder"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"cancelOrder"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}}]}}]}}]} as unknown as DocumentNode<CancelOrderMutation, CancelOrderMutationVariables>;
 export const AssignDriverToOrderDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"AssignDriverToOrder"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"driverId"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"assignDriverToOrder"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}},{"kind":"Argument","name":{"kind":"Name","value":"driverId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"driverId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"driver"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}}]}},{"kind":"Field","name":{"kind":"Name","value":"status"}}]}}]}}]} as unknown as DocumentNode<AssignDriverToOrderMutation, AssignDriverToOrderMutationVariables>;
+export const ApproveOrderDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ApproveOrder"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"approveOrder"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"needsApproval"}}]}}]}}]} as unknown as DocumentNode<ApproveOrderMutation, ApproveOrderMutationVariables>;
 export const CreateTestOrderDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateTestOrder"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createTestOrder"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"totalPrice"}}]}}]}}]} as unknown as DocumentNode<CreateTestOrderMutation, CreateTestOrderMutationVariables>;
-export const AllOrdersUpdatedDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"subscription","name":{"kind":"Name","value":"AllOrdersUpdated"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"allOrdersUpdated"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"orderPrice"}},{"kind":"Field","name":{"kind":"Name","value":"deliveryPrice"}},{"kind":"Field","name":{"kind":"Name","value":"totalPrice"}},{"kind":"Field","name":{"kind":"Name","value":"orderDate"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"preparationMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"estimatedReadyAt"}},{"kind":"Field","name":{"kind":"Name","value":"preparingAt"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"address"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}}]}},{"kind":"Field","name":{"kind":"Name","value":"driver"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}}]}},{"kind":"Field","name":{"kind":"Name","value":"dropOffLocation"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}},{"kind":"Field","name":{"kind":"Name","value":"businesses"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"business"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"businessType"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}},{"kind":"Field","name":{"kind":"Name","value":"location"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"productId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"imageUrl"}},{"kind":"Field","name":{"kind":"Name","value":"quantity"}},{"kind":"Field","name":{"kind":"Name","value":"unitPrice"}}]}}]}}]}}]}}]} as unknown as DocumentNode<AllOrdersUpdatedSubscription, AllOrdersUpdatedSubscriptionVariables>;
+export const AllOrdersUpdatedDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"subscription","name":{"kind":"Name","value":"AllOrdersUpdated"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"allOrdersUpdated"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"displayId"}},{"kind":"Field","name":{"kind":"Name","value":"orderPrice"}},{"kind":"Field","name":{"kind":"Name","value":"deliveryPrice"}},{"kind":"Field","name":{"kind":"Name","value":"totalPrice"}},{"kind":"Field","name":{"kind":"Name","value":"orderDate"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"needsApproval"}},{"kind":"Field","name":{"kind":"Name","value":"locationFlagged"}},{"kind":"Field","name":{"kind":"Name","value":"approvalReasons"}},{"kind":"Field","name":{"kind":"Name","value":"preparationMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"estimatedReadyAt"}},{"kind":"Field","name":{"kind":"Name","value":"preparingAt"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"address"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}}]}},{"kind":"Field","name":{"kind":"Name","value":"driver"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}}]}},{"kind":"Field","name":{"kind":"Name","value":"dropOffLocation"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}},{"kind":"Field","name":{"kind":"Name","value":"businesses"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"business"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"businessType"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}},{"kind":"Field","name":{"kind":"Name","value":"location"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"productId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"imageUrl"}},{"kind":"Field","name":{"kind":"Name","value":"quantity"}},{"kind":"Field","name":{"kind":"Name","value":"unitPrice"}}]}}]}}]}}]}}]} as unknown as DocumentNode<AllOrdersUpdatedSubscription, AllOrdersUpdatedSubscriptionVariables>;
+export const AdminSendPttSignalDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"AdminSendPttSignal"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"driverIds"}},"type":{"kind":"NonNullType","type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"channelName"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"action"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DriverPttSignalAction"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"muted"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Boolean"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"adminSendPttSignal"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"driverIds"},"value":{"kind":"Variable","name":{"kind":"Name","value":"driverIds"}}},{"kind":"Argument","name":{"kind":"Name","value":"channelName"},"value":{"kind":"Variable","name":{"kind":"Name","value":"channelName"}}},{"kind":"Argument","name":{"kind":"Name","value":"action"},"value":{"kind":"Variable","name":{"kind":"Name","value":"action"}}},{"kind":"Argument","name":{"kind":"Name","value":"muted"},"value":{"kind":"Variable","name":{"kind":"Name","value":"muted"}}}]}]}}]} as unknown as DocumentNode<AdminSendPttSignalMutation, AdminSendPttSignalMutationVariables>;
+export const AdminSetShiftDriversDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"AdminSetShiftDrivers"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"driverIds"}},"type":{"kind":"NonNullType","type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"adminSetShiftDrivers"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"driverIds"},"value":{"kind":"Variable","name":{"kind":"Name","value":"driverIds"}}}]}]}}]} as unknown as DocumentNode<AdminSetShiftDriversMutation, AdminSetShiftDriversMutationVariables>;
+export const GetAgoraRtcCredentialsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetAgoraRtcCredentials"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"channelName"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"role"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"AgoraRtcRole"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getAgoraRtcCredentials"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"channelName"},"value":{"kind":"Variable","name":{"kind":"Name","value":"channelName"}}},{"kind":"Argument","name":{"kind":"Name","value":"role"},"value":{"kind":"Variable","name":{"kind":"Name","value":"role"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"appId"}},{"kind":"Field","name":{"kind":"Name","value":"channelName"}},{"kind":"Field","name":{"kind":"Name","value":"uid"}},{"kind":"Field","name":{"kind":"Name","value":"token"}},{"kind":"Field","name":{"kind":"Name","value":"expiresAt"}}]}}]}}]} as unknown as DocumentNode<GetAgoraRtcCredentialsQuery, GetAgoraRtcCredentialsQueryVariables>;
+export const AdminPttSignalDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"subscription","name":{"kind":"Name","value":"AdminPttSignal"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"adminPttSignal"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"driverId"}},{"kind":"Field","name":{"kind":"Name","value":"channelName"}},{"kind":"Field","name":{"kind":"Name","value":"action"}},{"kind":"Field","name":{"kind":"Name","value":"timestamp"}}]}}]}}]} as unknown as DocumentNode<AdminPttSignalSubscription, AdminPttSignalSubscriptionVariables>;
 export const GetUsersDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetUsers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"users"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"IntValue","value":"500"}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"role"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}},{"kind":"Field","name":{"kind":"Name","value":"address"}},{"kind":"Field","name":{"kind":"Name","value":"adminNote"}},{"kind":"Field","name":{"kind":"Name","value":"flagColor"}},{"kind":"Field","name":{"kind":"Name","value":"permissions"}},{"kind":"Field","name":{"kind":"Name","value":"business"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]}}]} as unknown as DocumentNode<GetUsersQuery, GetUsersQueryVariables>;
 export const UserBehaviorDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"UserBehavior"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"userId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"userBehavior"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"userId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"userId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"userId"}},{"kind":"Field","name":{"kind":"Name","value":"totalOrders"}},{"kind":"Field","name":{"kind":"Name","value":"deliveredOrders"}},{"kind":"Field","name":{"kind":"Name","value":"cancelledOrders"}},{"kind":"Field","name":{"kind":"Name","value":"totalSpend"}},{"kind":"Field","name":{"kind":"Name","value":"avgOrderValue"}},{"kind":"Field","name":{"kind":"Name","value":"firstOrderAt"}},{"kind":"Field","name":{"kind":"Name","value":"lastOrderAt"}},{"kind":"Field","name":{"kind":"Name","value":"lastDeliveredAt"}}]}}]}}]} as unknown as DocumentNode<UserBehaviorQuery, UserBehaviorQueryVariables>;
 export const CreateUserDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateUser"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"email"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"password"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"firstName"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"lastName"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"role"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UserRole"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"businessId"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createUser"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"email"},"value":{"kind":"Variable","name":{"kind":"Name","value":"email"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"password"},"value":{"kind":"Variable","name":{"kind":"Name","value":"password"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"firstName"},"value":{"kind":"Variable","name":{"kind":"Name","value":"firstName"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"lastName"},"value":{"kind":"Variable","name":{"kind":"Name","value":"lastName"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"role"},"value":{"kind":"Variable","name":{"kind":"Name","value":"role"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"businessId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"businessId"}}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"token"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"role"}},{"kind":"Field","name":{"kind":"Name","value":"businessId"}}]}},{"kind":"Field","name":{"kind":"Name","value":"message"}}]}}]}}]} as unknown as DocumentNode<CreateUserMutation, CreateUserMutationVariables>;

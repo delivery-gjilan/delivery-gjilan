@@ -18,13 +18,15 @@ type OrdersQueryResult = {
     };
 };
 
+type OrderItem = OrdersQueryResult['orders']['orders'][number];
+
 export function useOperationalOrderAlerts() {
     const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
     const initializedRef = useRef(false);
     const knownOrderIdsRef = useRef<Set<string>>(new Set());
     const latePendingNotifiedRef = useRef<Set<string>>(new Set());
-    const ordersRef = useRef<any[]>([]);
+    const ordersRef = useRef<OrderItem[]>([]);
 
     const { data } = useQuery<OrdersQueryResult>(GET_ORDERS, {
         variables: { limit: 200, offset: 0 },
@@ -50,7 +52,7 @@ export function useOperationalOrderAlerts() {
     }, []);
 
     const evaluateLatePending = useCallback(
-        async (orders: any[]) => {
+        async (orders: OrderItem[]) => {
             const now = Date.now();
             for (const order of orders) {
                 const isPendingLike = order.status === 'PENDING' || order.status === 'AWAITING_APPROVAL';
@@ -86,7 +88,7 @@ export function useOperationalOrderAlerts() {
         ordersRef.current = orders;
 
         if (!initializedRef.current && orders.length > 0) {
-            orders.forEach((order: any) => {
+            orders.forEach((order) => {
                 knownOrderIdsRef.current.add(order.id);
             });
             initializedRef.current = true;
@@ -102,7 +104,7 @@ export function useOperationalOrderAlerts() {
     useSubscription(ALL_ORDERS_SUBSCRIPTION, {
         skip: !isAuthenticated,
         onData: ({ data: subData }) => {
-            const incoming = (subData.data as { allOrdersUpdated?: any[] } | null)?.allOrdersUpdated;
+            const incoming = subData.data?.allOrdersUpdated;
             if (!incoming || incoming.length === 0) return;
 
             incoming.forEach((order) => {
@@ -114,9 +116,9 @@ export function useOperationalOrderAlerts() {
                 }
             });
 
-            const merged = new Map<string, any>();
-            ordersRef.current.forEach((order: any) => merged.set(order.id, order));
-            incoming.forEach((order: any) => merged.set(order.id, { ...merged.get(order.id), ...order }));
+            const merged = new Map<string, OrderItem>();
+            ordersRef.current.forEach((order) => merged.set(order.id, order));
+            incoming.forEach((order) => merged.set(order.id, { ...merged.get(order.id), ...order }));
             const nextOrders = Array.from(merged.values());
             ordersRef.current = nextOrders;
             void evaluateLatePending(nextOrders);

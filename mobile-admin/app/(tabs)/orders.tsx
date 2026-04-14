@@ -43,13 +43,13 @@ export default function OrdersScreen() {
     const [statusOrderId, setStatusOrderId] = useState<string | null>(null);
     const [showCompleted, setShowCompleted] = useState(true);
     const orderQueryVariables = useMemo(() => ({ limit: 200, offset: 0 }), []);
-    const { data, loading, refetch }: any = useQuery(GET_ORDERS, {
+    const { data, loading, refetch } = useQuery(GET_ORDERS, {
         variables: orderQueryVariables,
         fetchPolicy: 'network-only',
         nextFetchPolicy: 'cache-and-network',
         notifyOnNetworkStatusChange: true,
     });
-    const { data: driversData }: any = useQuery(GET_DRIVERS);
+    const { data: driversData } = useQuery(GET_DRIVERS);
     const refetchCooldownRef = useRef(0);
     const refetchInFlightRef = useRef(false);
     const refetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -94,18 +94,18 @@ export default function OrdersScreen() {
 
     useSubscription(ALL_ORDERS_SUBSCRIPTION, {
         onData: ({ data: subscriptionData }) => {
-            const incomingOrders = (subscriptionData.data as any)?.allOrdersUpdated as any[] | undefined;
+            const incomingOrders = subscriptionData.data?.allOrdersUpdated;
             if (!incomingOrders || incomingOrders.length === 0) {
                 scheduleRefetch();
                 return;
             }
 
-            apolloClient.cache.updateQuery({ query: GET_ORDERS, variables: orderQueryVariables }, (existing: any) => {
+            apolloClient.cache.updateQuery({ query: GET_ORDERS, variables: orderQueryVariables }, (existing) => {
                 const currentConnection = existing?.orders;
                 const currentOrders = Array.isArray(currentConnection?.orders) ? currentConnection.orders : [];
-                const byId = new Map(currentOrders.map((order: any) => [String(order?.id), order]));
+                const byId = new Map(currentOrders.map((order) => [String(order?.id), order]));
 
-                incomingOrders.forEach((order: any) => {
+                incomingOrders.forEach((order) => {
                     const existingOrder = byId.get(String(order?.id));
                     if (existingOrder && typeof existingOrder === 'object') {
                         byId.set(String(order?.id), { ...existingOrder, ...order });
@@ -127,7 +127,7 @@ export default function OrdersScreen() {
 
     const orders = data?.orders?.orders || [];
     const onlineDrivers = useMemo(
-        () => (driversData?.drivers || []).filter((driver: any) => driver.driverConnection?.connectionStatus === 'CONNECTED'),
+        () => (driversData?.drivers || []).filter((driver) => driver.driverConnection?.connectionStatus === 'CONNECTED'),
         [driversData],
     );
 
@@ -137,27 +137,27 @@ export default function OrdersScreen() {
     const [approveOrder, { loading: approvingOrder }] = useMutation(APPROVE_ORDER);
 
     const sortedOrders = useMemo(
-        () => [...orders].sort((a: any, b: any) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime()),
+        () => [...orders].sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime()),
         [orders],
     );
 
     const activeOrders = useMemo(
-        () => sortedOrders.filter((o: any) => ACTIVE_ORDER_STATUSES.includes(o.status)),
+        () => sortedOrders.filter((o) => ACTIVE_ORDER_STATUSES.includes(o.status)),
         [sortedOrders],
     );
 
     const completedOrders = useMemo(
-        () => sortedOrders.filter((o: any) => ['DELIVERED', 'CANCELLED'].includes(o.status)),
+        () => sortedOrders.filter((o) => ['DELIVERED', 'CANCELLED'].includes(o.status)),
         [sortedOrders],
     );
 
     const selectedOrderForAssign = useMemo(
-        () => orders.find((order: any) => order.id === assignOrderId) || null,
+        () => orders.find((order) => order.id === assignOrderId) || null,
         [orders, assignOrderId],
     );
 
     const selectedOrderForStatus = useMemo(
-        () => orders.find((order: any) => order.id === statusOrderId) || null,
+        () => orders.find((order) => order.id === statusOrderId) || null,
         [orders, statusOrderId],
     );
 
@@ -170,7 +170,7 @@ export default function OrdersScreen() {
     }, []);
 
     const getQuickActionLabel = useCallback(
-        (order: any) => {
+        (order: (typeof orders)[number]) => {
             if (order.status === 'AWAITING_APPROVAL') return 'Approve';
             if (order.status === 'PENDING') return t.orders.detail.startPreparing;
             if (order.status === 'PREPARING') return t.orders.detail.markReady;
@@ -189,15 +189,15 @@ export default function OrdersScreen() {
                 await assignDriver({ variables: { id: assignOrderId, driverId } });
                 setAssignOrderId(null);
                 await refetch();
-            } catch (err: any) {
-                Alert.alert('Error', err?.message || 'Failed to assign driver');
+            } catch (err: unknown) {
+                Alert.alert('Error', (err as Error)?.message || 'Failed to assign driver');
             }
         },
         [assignDriver, assignOrderId, refetch],
     );
 
     const handleQuickProgress = useCallback(
-        async (order: any) => {
+        async (order: (typeof orders)[number]) => {
             try {
                 if (order.status === 'AWAITING_APPROVAL') {
                     await approveOrder({ variables: { id: order.id } });
@@ -236,8 +236,8 @@ export default function OrdersScreen() {
                     await updateStatus({ variables: { id: order.id, status: 'DELIVERED' } });
                     await refetch();
                 }
-            } catch (err: any) {
-                Alert.alert('Error', err?.message || 'Failed to update order');
+            } catch (err: unknown) {
+                Alert.alert('Error', (err as Error)?.message || 'Failed to update order');
             }
         },
         [approveOrder, refetch, startPreparing, updateStatus],
@@ -251,16 +251,16 @@ export default function OrdersScreen() {
                 await updateStatus({ variables: { id: statusOrderId, status } });
                 setStatusOrderId(null);
                 await refetch();
-            } catch (err: any) {
-                Alert.alert('Error', err?.message || 'Failed to update status');
+            } catch (err: unknown) {
+                Alert.alert('Error', (err as Error)?.message || 'Failed to update status');
             }
         },
         [refetch, statusOrderId, updateStatus],
     );
 
     const renderOrderCard = useCallback(
-        (order: any, completed = false) => {
-            const items = (order.businesses || []).flatMap((businessBlock: any) => businessBlock.items || []);
+        (order: (typeof orders)[number], completed = false) => {
+            const items = (order.businesses || []).flatMap((businessBlock) => businessBlock.items || []);
             const previewItems = items.slice(0, 3);
             const hasMoreItems = items.length > previewItems.length;
             const statusColor = ORDER_STATUS_COLORS[order.status] || '#6b7280';
@@ -336,7 +336,7 @@ export default function OrdersScreen() {
                 </View>
 
                 <View className="mb-3">
-                    {order.businesses?.map((b: any, i: number) => (
+                    {order.businesses?.map((b, i: number) => (
                         <View key={i} className="flex-row items-center mb-1">
                             <Ionicons
                                 name={b.business?.businessType === 'RESTAURANT' ? 'restaurant' : 'storefront'}
@@ -349,7 +349,7 @@ export default function OrdersScreen() {
                         </View>
                     ))}
 
-                    {previewItems.map((item: any, index: number) => (
+                    {previewItems.map((item, index: number) => (
                         <Text key={`${order.id}-item-${index}`} className="text-xs ml-6" style={{ color: theme.colors.subtext }} numberOfLines={1}>
                             x{item.quantity} {item.name}
                         </Text>
@@ -454,7 +454,7 @@ export default function OrdersScreen() {
                 {activeOrders.length === 0 ? (
                     <EmptyState icon="receipt-outline" title="No active orders" message="Waiting for incoming orders" />
                 ) : (
-                    activeOrders.map((order: any) => renderOrderCard(order, false))
+                    activeOrders.map((order) => renderOrderCard(order, false))
                 )}
 
                 <View className="px-5 mt-2 mb-2">
@@ -473,7 +473,7 @@ export default function OrdersScreen() {
                     (completedOrders.length === 0 ? (
                         <EmptyState icon="checkmark-done-outline" title="No completed orders" message="Delivered and cancelled orders will appear here" />
                     ) : (
-                        completedOrders.map((order: any) => renderOrderCard(order, true))
+                        completedOrders.map((order) => renderOrderCard(order, true))
                     ))}
             </ScrollView>
 
@@ -487,7 +487,7 @@ export default function OrdersScreen() {
                         No drivers online
                     </Text>
                 ) : (
-                    onlineDrivers.map((driver: any) => (
+                    onlineDrivers.map((driver) => (
                         <TouchableOpacity
                             key={driver.id}
                             className="flex-row items-center p-3 rounded-xl mb-2"

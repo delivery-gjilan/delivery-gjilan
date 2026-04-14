@@ -5,7 +5,7 @@ import Reanimated, { FadeInDown } from 'react-native-reanimated';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import type { SelectedAddress } from './AddressPicker';
-import type { CartItem } from '../types';
+import type { CartItem, PromoResult } from '../types';
 import { CartItemRow } from './CartItemRow';
 import { PriceBreakdown } from './PriceBreakdown';
 import { DeliverySpeedPicker } from './DeliverySpeedPicker';
@@ -27,7 +27,7 @@ interface OrderReviewProps {
     prioritySurcharge: number;
     /** Promo */
     couponCode: string;
-    promoResult: any | null;
+    promoResult: PromoResult | null;
     promoError: string | null;
     manualPromoLoading: boolean;
     deliveryPromoDiscount: number;

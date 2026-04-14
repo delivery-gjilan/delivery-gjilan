@@ -16,7 +16,11 @@ import {
     RESPOND_TO_SETTLEMENT_REQUEST,
     GET_DRIVER_ORDER_FINANCIALS,
 } from '@/graphql/operations/driver';
+import type { GetMySettlementsQuery, GetMyDriverSettlementRequestsQuery, GetSettlementBreakdownQuery } from '@/gql/graphql';
 import { format, startOfDay, startOfMonth, startOfWeek, subMonths } from 'date-fns';
+
+type Settlement = GetMySettlementsQuery['settlements'][number];
+type BreakdownItem = GetSettlementBreakdownQuery['settlementBreakdown'][number];
 
 type Period = 'today' | 'week' | 'month' | 'last_month' | 'all';
 
@@ -68,8 +72,8 @@ export default function EarningsScreen() {
     const [disputeModalRequestId, setDisputeModalRequestId] = useState<string | null>(null);
     const [rejectReason, setRejectReason] = useState('');
     const [respondingId, setRespondingId] = useState<string | null>(null);
-    const [selectedSettlementOrder, setSelectedSettlementOrder] = useState<any>(null);
-    const [allSettlements, setAllSettlements] = useState<any[]>([]);
+    const [selectedSettlementOrder, setSelectedSettlementOrder] = useState<{ orderId: string; orderDisplayId: string | null; order: Settlement['order']; settlements: Settlement[]; totalReceivable: number; totalPayable: number; latestCreatedAt: string } | null>(null);
+    const [allSettlements, setAllSettlements] = useState<Settlement[]>([]);
     const [settlementOffset, setSettlementOffset] = useState(0);
     const [hasMoreSettlements, setHasMoreSettlements] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
@@ -101,7 +105,7 @@ export default function EarningsScreen() {
             variables: { startDate, endDate, limit: SETTLEMENT_PAGE_SIZE, offset: 0 },
             fetchPolicy: 'network-only',
             onCompleted: (data) => {
-                const rows = (data as any)?.settlements ?? [];
+                const rows = data?.settlements ?? [];
                 setAllSettlements(rows);
                 setSettlementOffset(rows.length);
                 setHasMoreSettlements(rows.length === SETTLEMENT_PAGE_SIZE);
@@ -121,22 +125,22 @@ export default function EarningsScreen() {
         { fetchPolicy: 'network-only' },
     );
 
-    const cash = (cashData as any)?.driverCashSummary;
-    const breakdownItems: any[] = (breakdownData as any)?.settlementBreakdown ?? [];
-    const settlements: any[] = allSettlements;
-    const pendingRequests: any[] = (requestsData as any)?.settlementRequests ?? [];
+    const cash = cashData?.driverCashSummary;
+    const breakdownItems = breakdownData?.settlementBreakdown ?? [];
+    const settlements = allSettlements;
+    const pendingRequests = requestsData?.settlementRequests ?? [];
 
     // Group settlements by direction for the list
     const groupedSettlements = useMemo(() => {
-        const receivable = settlements.filter((s: any) => s.direction === 'RECEIVABLE' && s.status === 'PENDING');
-        const payable = settlements.filter((s: any) => s.direction === 'PAYABLE' && s.status === 'PENDING');
+        const receivable = settlements.filter((s) => s.direction === 'RECEIVABLE' && s.status === 'PENDING');
+        const payable = settlements.filter((s) => s.direction === 'PAYABLE' && s.status === 'PENDING');
         return { receivable, payable };
     }, [settlements]);
 
     const settlementOrders = useMemo(() => {
-        const byOrder = new Map<string, any>();
+        const byOrder = new Map<string, { orderId: string; orderDisplayId: string | null; order: Settlement['order']; settlements: Settlement[]; totalReceivable: number; totalPayable: number; latestCreatedAt: string }>();
 
-        settlements.forEach((settlement: any) => {
+        settlements.forEach((settlement) => {
             const orderId = String(settlement.order?.id ?? settlement.id);
             const existing = byOrder.get(orderId);
             if (existing) {
@@ -172,7 +176,7 @@ export default function EarningsScreen() {
             const result = await fetchMoreSettlements({
                 variables: { startDate, endDate, limit: SETTLEMENT_PAGE_SIZE, offset: settlementOffset },
             });
-            const rows = (result.data as any)?.settlements ?? [];
+            const rows = result.data?.settlements ?? [];
             setAllSettlements(prev => [...prev, ...rows]);
             setSettlementOffset(prev => prev + rows.length);
             setHasMoreSettlements(rows.length === SETTLEMENT_PAGE_SIZE);
@@ -189,7 +193,7 @@ export default function EarningsScreen() {
 
     // ── Settlement request handlers ──
     const handleAccept = async (requestId: string) => {
-        const req = pendingRequests.find((r: any) => r.id === requestId);
+        const req = pendingRequests.find((r) => r.id === requestId);
         const amount = Number(req?.amount ?? 0);
         Alert.alert(
             t.earnings.accept_title,
@@ -203,8 +207,8 @@ export default function EarningsScreen() {
                             setRespondingId(requestId);
                             await respondToRequest({ variables: { requestId, action: 'ACCEPT' } });
                             await Promise.all([refetchRequests(), refetchCash(), refetchBreakdown(), refetchSettlements()]);
-                        } catch (err: any) {
-                            Alert.alert(t.common.error, err?.message ?? 'Failed');
+                        } catch (err: unknown) {
+                            Alert.alert(t.common.error, (err as Error)?.message ?? 'Failed');
                         } finally {
                             setRespondingId(null);
                         }
@@ -227,8 +231,8 @@ export default function EarningsScreen() {
             });
             setDisputeModalRequestId(null);
             await refetchRequests();
-        } catch (err: any) {
-            Alert.alert(t.common.error, err?.message ?? 'Failed');
+        } catch (err: unknown) {
+            Alert.alert(t.common.error, (err as Error)?.message ?? 'Failed');
         } finally {
             setRespondingId(null);
         }
@@ -240,8 +244,8 @@ export default function EarningsScreen() {
     const flowData = useMemo(() => {
         if (!cash) return null;
         // Split breakdown into "you owe" and "you receive"
-        const youOweItems = breakdownItems.filter((b: any) => b.direction === "RECEIVABLE");
-        const youReceiveItems = breakdownItems.filter((b: any) => b.direction === "PAYABLE");
+        const youOweItems = breakdownItems.filter((b) => b.direction === "RECEIVABLE");
+        const youReceiveItems = breakdownItems.filter((b) => b.direction === "PAYABLE");
         return { youOweItems, youReceiveItems };
     }, [cash, breakdownItems]);
 
@@ -251,45 +255,45 @@ export default function EarningsScreen() {
             AUTO_REMITTANCE: {
                 icon: "swap-horizontal-outline",
                 color: "#ef4444",
-                explain: (t.earnings as any).explain_markup ?? "Platform markup on product prices that you collected in cash",
+                explain: t.earnings.explain_markup ?? "Platform markup on product prices that you collected in cash",
             },
             STOCK_REMITTANCE: {
                 icon: "cube-outline",
                 color: "#a855f7",
-                explain: (t.earnings as any).explain_stock ?? "Products picked up from operator's stock — you didn't buy these",
+                explain: t.earnings.explain_stock ?? "Products picked up from operator's stock — you didn't buy these",
             },
             DELIVERY_COMMISSION: {
                 icon: "bicycle-outline",
                 color: direction === "PAYABLE" ? "#22c55e" : "#f59e0b",
-                explain: (t.earnings as any).explain_delivery ?? "Commission on delivery fee",
+                explain: t.earnings.explain_delivery ?? "Commission on delivery fee",
             },
             PLATFORM_COMMISSION: {
                 icon: "business-outline",
                 color: "#f59e0b",
-                explain: (t.earnings as any).explain_platform ?? "Platform commission on order value",
+                explain: t.earnings.explain_platform ?? "Platform commission on order value",
             },
             PROMOTION_COST: {
                 icon: "pricetag-outline",
                 color: "#f59e0b",
-                explain: (t.earnings as any).explain_promo ?? "Promotional adjustment",
+                explain: t.earnings.explain_promo ?? "Promotional adjustment",
             },
             DRIVER_TIP: {
                 icon: "heart-outline",
                 color: "#22c55e",
-                explain: (t.earnings as any).explain_tip ?? "Tips from customers — forwarded to you by the platform",
+                explain: t.earnings.explain_tip ?? "Tips from customers — forwarded to you by the platform",
             },
             CATALOG_REVENUE: {
                 icon: "storefront-outline",
                 color: "#ef4444",
-                explain: (t.earnings as any).explain_catalog ?? "Revenue from catalog products that you collected in cash",
+                explain: t.earnings.explain_catalog ?? "Revenue from catalog products that you collected in cash",
             },
         };
         return configs[category] ?? { icon: "help-circle-outline", color: "#6b7280", explain: "" };
     };
 
     // Get settlement reason label
-    const getSettlementLabel = (s: any) => {
-        if (s.direction === "PAYABLE") return (t.earnings as any).platform_owes_you ?? "Platform owes you";
+    const getSettlementLabel = (s: Settlement) => {
+        if (s.direction === "PAYABLE") return t.earnings.platform_owes_you ?? "Platform owes you";
         if (s.reason) {
             // Extract the parenthetical detail: "Stock item remittance (€8.50 items from operator inventory)"
             const match = s.reason.match(/\((.+)\)/);
@@ -300,14 +304,14 @@ export default function EarningsScreen() {
     };
 
     // Get settlement type tag
-    const getSettlementTag = (s: any) => {
-        if (s.direction === "PAYABLE") return { label: (t.earnings as any).you_receive ?? "You receive", color: "#22c55e" };
-        if (s.reason?.startsWith("Stock item")) return { label: (t.earnings as any).stock_remittance ?? "Stock Items", color: "#a855f7" };
-        if (s.reason?.startsWith("Markup")) return { label: (t.earnings as any).markup ?? "Markup", color: "#ef4444" };
-        if (s.reason?.startsWith("Priority")) return { label: (t.earnings as any).priority ?? "Priority Fee", color: "#ef4444" };
-        if (s.reason?.startsWith("Driver tip")) return { label: (t.earnings as any).tip_label ?? "Tip", color: "#22c55e" };
-        if (s.reason?.startsWith("Catalog product")) return { label: (t.earnings as any).catalog_label ?? "Catalog", color: "#ef4444" };
-        if (s.rule?.type === "DELIVERY_PRICE") return { label: (t.earnings as any).delivery_fee ?? "Delivery Fee", color: "#f59e0b" };
+    const getSettlementTag = (s: Settlement) => {
+        if (s.direction === "PAYABLE") return { label: t.earnings.you_receive ?? "You receive", color: "#22c55e" };
+        if (s.reason?.startsWith("Stock item")) return { label: t.earnings.stock_remittance ?? "Stock Items", color: "#a855f7" };
+        if (s.reason?.startsWith("Markup")) return { label: t.earnings.markup ?? "Markup", color: "#ef4444" };
+        if (s.reason?.startsWith("Priority")) return { label: t.earnings.priority ?? "Priority Fee", color: "#ef4444" };
+        if (s.reason?.startsWith("Driver tip")) return { label: t.earnings.tip_label ?? "Tip", color: "#22c55e" };
+        if (s.reason?.startsWith("Catalog product")) return { label: t.earnings.catalog_label ?? "Catalog", color: "#ef4444" };
+        if (s.rule?.type === "DELIVERY_PRICE") return { label: t.earnings.delivery_fee ?? "Delivery Fee", color: "#f59e0b" };
         return { label: t.earnings.commission, color: "#f59e0b" };
     };
 
@@ -372,10 +376,10 @@ export default function EarningsScreen() {
                                     </View>
                                     <View style={{ flex: 1 }}>
                                         <Text style={[es.flowStepLabel, { color: theme.colors.subtext }]}>
-                                            {(t.earnings as any).step_collected ?? "CASH COLLECTED"}
+                                            {t.earnings.step_collected ?? "CASH COLLECTED"}
                                         </Text>
                                         <Text style={[es.flowStepHint, { color: theme.colors.subtext }]}>
-                                            {(t.earnings as any).step_collected_hint ?? "Total cash received from customers"}
+                                            {t.earnings.step_collected_hint ?? "Total cash received from customers"}
                                         </Text>
                                     </View>
                                 </View>
@@ -404,10 +408,10 @@ export default function EarningsScreen() {
                                             </View>
                                             <View style={{ flex: 1 }}>
                                                 <Text style={[es.flowStepLabel, { color: "#ef4444" }]}>
-                                                    {(t.earnings as any).step_deductions ?? "DEDUCTIONS"}
+                                                    {t.earnings.step_deductions ?? "DEDUCTIONS"}
                                                 </Text>
                                                 <Text style={[es.flowStepHint, { color: theme.colors.subtext }]}>
-                                                    {(t.earnings as any).step_deductions_hint ?? "Amounts owed back to the platform"}
+                                                    {t.earnings.step_deductions_hint ?? "Amounts owed back to the platform"}
                                                 </Text>
                                             </View>
                                             <Text style={[es.flowSideAmount, { color: "#ef4444" }]}>
@@ -417,7 +421,7 @@ export default function EarningsScreen() {
 
                                         {/* Individual deduction items with explainers */}
                                         <View style={es.deductionList}>
-                                            {flowData.youOweItems.map((item: any, idx: number) => {
+                                            {flowData.youOweItems.map((item, idx: number) => {
                                                 const cfg = getCategoryConfig(item.category, item.direction);
                                                 return (
                                                     <View key={`${item.category}-${idx}`}>
@@ -470,10 +474,10 @@ export default function EarningsScreen() {
                                             </View>
                                             <View style={{ flex: 1 }}>
                                                 <Text style={[es.flowStepLabel, { color: theme.colors.income }]}>
-                                                    {(t.earnings as any).step_additions ?? "ADDITIONS"}
+                                                    {t.earnings.step_additions ?? "ADDITIONS"}
                                                 </Text>
                                                 <Text style={[es.flowStepHint, { color: theme.colors.subtext }]}>
-                                                    {(t.earnings as any).step_additions_hint ?? "Amounts the platform owes you"}
+                                                    {t.earnings.step_additions_hint ?? "Amounts the platform owes you"}
                                                 </Text>
                                             </View>
                                             <Text style={[es.flowSideAmount, { color: theme.colors.income }]}>
@@ -482,7 +486,7 @@ export default function EarningsScreen() {
                                         </View>
 
                                         <View style={es.deductionList}>
-                                            {flowData.youReceiveItems.map((item: any, idx: number) => {
+                                            {flowData.youReceiveItems.map((item, idx: number) => {
                                                 const cfg = getCategoryConfig(item.category, item.direction);
                                                 return (
                                                     <View key={`${item.category}-${idx}`}>
@@ -531,10 +535,10 @@ export default function EarningsScreen() {
                                     </View>
                                     <View style={{ flex: 1 }}>
                                         <Text style={[es.flowStepLabel, { color: theme.colors.income }]}>
-                                            {(t.earnings as any).take_home ?? "YOUR TAKE-HOME"}
+                                            {t.earnings.take_home ?? "YOUR TAKE-HOME"}
                                         </Text>
                                         <Text style={[es.flowStepHint, { color: theme.colors.subtext }]}>
-                                            {(t.earnings as any).take_home_formula ?? "Cash collected minus deductions plus additions"}
+                                            {t.earnings.take_home_formula ?? "Cash collected minus deductions plus additions"}
                                         </Text>
                                     </View>
                                 </View>
@@ -565,7 +569,7 @@ export default function EarningsScreen() {
                         <View style={es.sectionHeader}>
                             <View style={[es.sectionDot, { backgroundColor: "#f59e0b" }]} />
                             <Text style={[es.sectionTitle, { color: theme.colors.text }]}>
-                                {(t.earnings as any).settlement_requests ?? "Settlement Requests"}
+                                {t.earnings.settlement_requests ?? "Settlement Requests"}
                             </Text>
                             {pendingRequests.length > 0 && (
                                 <View style={es.pendingBadge}>
@@ -578,20 +582,20 @@ export default function EarningsScreen() {
                             <ActivityIndicator color="#f59e0b" style={{ marginTop: 12 }} />
                         ) : (
                             <View style={{ gap: 10, marginTop: 12 }}>
-                                {pendingRequests.map((req: any) => {
+                                {pendingRequests.map((req) => {
                                     const isResponding = respondingId === req.id;
                                     return (
                                         <View key={req.id} style={es.requestCard}>
                                             <View style={es.requestCardHeader}>
                                                 <View>
                                                     <Text style={es.requestAmountLabel}>
-                                                        {(t.earnings as any).settlement_requests ?? "Settlement Request"}
+                                                        {t.earnings.settlement_requests ?? "Settlement Request"}
                                                     </Text>
                                                     <Text style={es.requestAmount}>{formatCurrency(Number(req.amount ?? 0))}</Text>
                                                 </View>
                                                 <View style={es.awaitBadge}>
                                                     <Text style={es.awaitBadgeText}>
-                                                        {(t.earnings as any).awaiting_response ?? "AWAITING RESPONSE"}
+                                                        {t.earnings.awaiting_response ?? "AWAITING RESPONSE"}
                                                     </Text>
                                                 </View>
                                             </View>
@@ -611,7 +615,7 @@ export default function EarningsScreen() {
                                                 >
                                                     {isResponding ? <ActivityIndicator size="small" color="#22c55e" /> : (
                                                         <Text style={[es.reqActionText, { color: "#22c55e" }]}>
-                                                            {(t.earnings as any).accept ?? "Accept"}
+                                                            {t.earnings.accept ?? "Accept"}
                                                         </Text>
                                                     )}
                                                 </Pressable>
@@ -620,7 +624,7 @@ export default function EarningsScreen() {
                                                     style={[es.reqActionBtn, { backgroundColor: "#3b0000", borderColor: "#ef444440", opacity: isResponding ? 0.5 : 1 }]}
                                                 >
                                                     <Text style={[es.reqActionText, { color: "#ef4444" }]}>
-                                                        {(t.earnings as any).reject ?? (t.earnings as any).dispute ?? "Reject"}
+                                                        {t.earnings.reject ?? t.earnings.dispute ?? "Reject"}
                                                     </Text>
                                                 </Pressable>
                                             </View>
@@ -656,11 +660,11 @@ export default function EarningsScreen() {
                         </View>
                     ) : (
                         <View style={{ gap: 10, marginTop: 12 }}>
-                            {settlementOrders.map((orderGroup: any) => {
-                                const settlementsForOrder: any[] = orderGroup.settlements;
+                            {settlementOrders.map((orderGroup) => {
+                                const settlementsForOrder = orderGroup.settlements;
                                 const firstSettlement = settlementsForOrder[0];
-                                const businessNames = firstSettlement?.order?.businesses?.map((b: any) => b.business?.name).filter(Boolean).join(", ") ?? "—";
-                                const hasPending = settlementsForOrder.some((s: any) => s.status !== 'PAID');
+                                const businessNames = firstSettlement?.order?.businesses?.map((b) => b.business?.name).filter(Boolean).join(", ") ?? "—";
+                                const hasPending = settlementsForOrder.some((s) => s.status !== 'PAID');
                                 const netAmount = Number(orderGroup.totalPayable ?? 0) - Number(orderGroup.totalReceivable ?? 0);
                                 const amountColor = netAmount >= 0 ? theme.colors.income : '#f59e0b';
                                 const orderLabel = orderGroup.orderDisplayId ? `#${orderGroup.orderDisplayId}` : t.earnings.delivery;
@@ -746,7 +750,7 @@ export default function EarningsScreen() {
                                         <ActivityIndicator size="small" color={theme.colors.primary} />
                                     ) : (
                                         <Text style={[es.loadMoreText, { color: theme.colors.primary }]}>
-                                            {(t.earnings as any).load_more ?? "Load More"}
+                                            {t.earnings.load_more ?? "Load More"}
                                         </Text>
                                     )}
                                 </Pressable>
@@ -766,15 +770,15 @@ export default function EarningsScreen() {
                 <Pressable style={es.modalBackdrop} onPress={() => setSelectedSettlementOrder(null)} />
                 <View style={[es.detailModalSheet, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
                     {selectedSettlementOrder && (() => {
-                        const settlementsForOrder: any[] = selectedSettlementOrder.settlements ?? [];
-                        const fin = (financialsData as any)?.driverOrderFinancials;
-                        const ord = (financialsData as any)?.order;
+                        const settlementsForOrder = selectedSettlementOrder.settlements ?? [];
+                        const fin = financialsData?.driverOrderFinancials;
+                        const ord = financialsData?.order;
                         const totalReceivable = settlementsForOrder
-                            .filter((line: any) => line.direction === 'RECEIVABLE')
-                            .reduce((sum: number, line: any) => sum + Number(line.amount ?? 0), 0);
+                            .filter((line) => line.direction === 'RECEIVABLE')
+                            .reduce((sum: number, line) => sum + Number(line.amount ?? 0), 0);
                         const totalPayable = settlementsForOrder
-                            .filter((line: any) => line.direction === 'PAYABLE')
-                            .reduce((sum: number, line: any) => sum + Number(line.amount ?? 0), 0);
+                            .filter((line) => line.direction === 'PAYABLE')
+                            .reduce((sum: number, line) => sum + Number(line.amount ?? 0), 0);
                         const netAmount = totalPayable - totalReceivable;
                         const amountColor = netAmount >= 0 ? theme.colors.income : '#f59e0b';
                         const isCash = (fin?.paymentCollection ?? ord?.paymentCollection) === "CASH_TO_DRIVER";
@@ -785,7 +789,7 @@ export default function EarningsScreen() {
                                 <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingBottom: 4 }}>
                                     <View>
                                         <Text style={[es.modalTitle, { color: theme.colors.text }]}>
-                                            {(t.earnings as any).delivery_details ?? "Delivery Details"}
+                                            {t.earnings.delivery_details ?? "Delivery Details"}
                                         </Text>
                                         {(ord?.displayId || selectedSettlementOrder.orderDisplayId) && (
                                             <Text style={{ fontSize: 12, color: theme.colors.subtext, marginTop: 2 }}>
@@ -818,15 +822,15 @@ export default function EarningsScreen() {
                                                 </View>
                                                 <View style={es.detailRow}>
                                                     <Text style={[es.detailLabel, { color: theme.colors.subtext }]}>
-                                                        {(t.earnings as any).status ?? "Status"}
+                                                        {t.earnings.status ?? "Status"}
                                                     </Text>
                                                     <View style={[es.methodBadge, {
-                                                        backgroundColor: settlementsForOrder.some((line: any) => line.status !== 'PAID') ? '#f59e0b18' : theme.colors.income + '18',
+                                                        backgroundColor: settlementsForOrder.some((line) => line.status !== 'PAID') ? '#f59e0b18' : theme.colors.income + '18',
                                                     }]}>
                                                         <Text style={[es.methodBadgeText, {
-                                                            color: settlementsForOrder.some((line: any) => line.status !== 'PAID') ? '#f59e0b' : theme.colors.income,
+                                                            color: settlementsForOrder.some((line) => line.status !== 'PAID') ? '#f59e0b' : theme.colors.income,
                                                         }]}>
-                                                            {settlementsForOrder.some((line: any) => line.status !== 'PAID') ? t.earnings.pending : t.earnings.paid}
+                                                            {settlementsForOrder.some((line) => line.status !== 'PAID') ? t.earnings.pending : t.earnings.paid}
                                                         </Text>
                                                     </View>
                                                 </View>
@@ -835,9 +839,9 @@ export default function EarningsScreen() {
                                             {/* ── Settlement breakdown ── */}
                                             <View style={[es.detailSection, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
                                                 <Text style={[es.detailSectionTitle, { color: theme.colors.text }]}>
-                                                    {(t.earnings as any).settlement_breakdown ?? "Settlement Breakdown"}
+                                                    {t.earnings.settlement_breakdown ?? "Settlement Breakdown"}
                                                 </Text>
-                                                {settlementsForOrder.map((line: any) => {
+                                                {settlementsForOrder.map((line) => {
                                                     const lineIsPayable = line.direction === 'PAYABLE';
                                                     const lineTag = getSettlementTag(line);
                                                     return (
@@ -857,7 +861,7 @@ export default function EarningsScreen() {
                                                 <View style={[es.detailDivider, { backgroundColor: theme.colors.border }]} />
                                                 <View style={es.detailRow}>
                                                     <Text style={[es.detailLabel, { color: theme.colors.text, fontWeight: "700" }]}>
-                                                        {(t.earnings as any).net ?? "Net"}
+                                                        {t.earnings.net ?? "Net"}
                                                     </Text>
                                                     <Text style={[es.detailValue, { color: amountColor, fontWeight: "800", fontSize: 15 }]}>
                                                         {netAmount >= 0 ? '+' : '-'}{formatCurrency(Math.abs(netAmount))}
@@ -869,13 +873,13 @@ export default function EarningsScreen() {
                                             {ord && (
                                                 <View style={[es.detailSection, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
                                                     <Text style={[es.detailSectionTitle, { color: theme.colors.text }]}>
-                                                        {(t.earnings as any).order_info ?? "Order Info"}
+                                                        {t.earnings.order_info ?? "Order Info"}
                                                     </Text>
                                                     <View style={es.detailRow}>
                                                         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                                                             <Ionicons name="card-outline" size={14} color={theme.colors.subtext} />
                                                             <Text style={[es.detailLabel, { color: theme.colors.subtext }]}>
-                                                                {(t.earnings as any).payment_method ?? "Payment"}
+                                                                {t.earnings.payment_method ?? "Payment"}
                                                             </Text>
                                                         </View>
                                                         <View style={[es.methodBadge, {
@@ -890,14 +894,14 @@ export default function EarningsScreen() {
                                                                 color: isCash ? "#f59e0b" : "#3b82f6",
                                                             }]}>
                                                                 {isCash
-                                                                    ? ((t.earnings as any).cash_payment ?? "Cash")
-                                                                    : ((t.earnings as any).prepaid_payment ?? "Prepaid")}
+                                                                    ? (t.earnings.cash_payment ?? "Cash")
+                                                                    : (t.earnings.prepaid_payment ?? "Prepaid")}
                                                             </Text>
                                                         </View>
                                                     </View>
                                                     <View style={es.detailRow}>
                                                         <Text style={[es.detailLabel, { color: theme.colors.subtext }]}>
-                                                            {(t.earnings as any).order_date ?? "Order date"}
+                                                            {t.earnings.order_date ?? "Order date"}
                                                         </Text>
                                                         <Text style={[es.detailValue, { color: theme.colors.text }]}>
                                                             {formatDateTime(ord.orderDate)}
@@ -918,7 +922,7 @@ export default function EarningsScreen() {
                                                             <View style={{ flexDirection: "row", alignItems: "center", gap: 5, flex: 1 }}>
                                                                 <Ionicons name="bag-handle-outline" size={14} color={theme.colors.subtext} />
                                                                 <Text style={[es.detailValue, { color: theme.colors.subtext, flex: 1 }]} numberOfLines={2}>
-                                                                    {ord.pickupLocations.map((l: any) => l.address).filter(Boolean).join(" → ")}
+                                                                    {ord.pickupLocations.map((l) => l.address).filter(Boolean).join(" → ")}
                                                                 </Text>
                                                             </View>
                                                         </View>
@@ -940,14 +944,14 @@ export default function EarningsScreen() {
                                             {ord && (
                                                 <View style={[es.detailSection, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
                                                     <Text style={[es.detailSectionTitle, { color: theme.colors.text }]}>
-                                                        {(t.earnings as any).timeline ?? "Timeline"}
+                                                        {t.earnings.timeline ?? "Timeline"}
                                                     </Text>
                                                     {[
-                                                        { label: (t.earnings as any).assigned ?? "Assigned", time: ord.driverAssignedAt, icon: "person-outline" },
-                                                        { label: (t.earnings as any).preparing ?? "Preparing", time: ord.preparingAt, icon: "restaurant-outline" },
-                                                        { label: (t.earnings as any).ready ?? "Ready", time: ord.readyAt, icon: "checkmark-circle-outline" },
-                                                        { label: (t.earnings as any).picked_up ?? "Picked up", time: ord.outForDeliveryAt, icon: "bicycle-outline" },
-                                                        { label: (t.earnings as any).delivered ?? "Delivered", time: ord.deliveredAt, icon: "checkmark-done-outline" },
+                                                        { label: t.earnings.assigned ?? "Assigned", time: ord.driverAssignedAt, icon: "person-outline" },
+                                                        { label: t.earnings.preparing ?? "Preparing", time: ord.preparingAt, icon: "restaurant-outline" },
+                                                        { label: t.earnings.ready ?? "Ready", time: ord.readyAt, icon: "checkmark-circle-outline" },
+                                                        { label: t.earnings.picked_up ?? "Picked up", time: ord.outForDeliveryAt, icon: "bicycle-outline" },
+                                                        { label: t.earnings.delivered ?? "Delivered", time: ord.deliveredAt, icon: "checkmark-done-outline" },
                                                     ].filter((step) => step.time).map((step, idx) => (
                                                         <View key={idx} style={es.timelineRow}>
                                                             <View style={[es.timelineDot, { backgroundColor: step.time ? theme.colors.income + "25" : theme.colors.border }]}>
@@ -963,7 +967,7 @@ export default function EarningsScreen() {
                                             )}
 
                                             {/* ── Items by business ── */}
-                                            {ord?.businesses?.map((biz: any) => (
+                                            {ord?.businesses?.map((biz) => (
                                                 <View key={biz.business?.id ?? "biz"} style={[es.detailSection, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
                                                     <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 }}>
                                                         <Ionicons name="storefront-outline" size={14} color={theme.colors.primary} />
@@ -971,9 +975,9 @@ export default function EarningsScreen() {
                                                             {biz.business?.name ?? "Business"}
                                                         </Text>
                                                     </View>
-                                                    {biz.items?.map((item: any) => {
+                                                    {biz.items?.map((item) => {
                                                         const itemTotal = item.quantity * item.unitPrice;
-                                                        const optionsTotal = (item.selectedOptions ?? []).reduce((s: number, o: any) => s + (Number(o.priceAtOrder) * item.quantity), 0);
+                                                        const optionsTotal = (item.selectedOptions ?? []).reduce((s: number, o) => s + (Number(o.priceAtOrder) * item.quantity), 0);
                                                         return (
                                                             <View key={item.id} style={es.itemRow}>
                                                                 <View style={{ flex: 1 }}>
@@ -987,7 +991,7 @@ export default function EarningsScreen() {
                                                                     </View>
                                                                     {item.selectedOptions?.length > 0 && (
                                                                         <Text style={[es.itemOptions, { color: theme.colors.subtext }]} numberOfLines={2}>
-                                                                            {item.selectedOptions.map((o: any) => o.optionName).join(", ")}
+                                                                            {item.selectedOptions.map((o) => o.optionName).join(", ")}
                                                                         </Text>
                                                                     )}
                                                                     {item.notes ? (
@@ -995,7 +999,7 @@ export default function EarningsScreen() {
                                                                             "{item.notes}"
                                                                         </Text>
                                                                     ) : null}
-                                                                    {item.childItems?.length > 0 && item.childItems.map((child: any) => (
+                                                                    {item.childItems?.length > 0 && item.childItems.map((child) => (
                                                                         <Text key={child.id} style={[es.itemOptions, { color: theme.colors.subtext }]}>
                                                                             + {child.quantity}× {child.name}
                                                                         </Text>
@@ -1022,11 +1026,11 @@ export default function EarningsScreen() {
                                             {ord && (
                                                 <View style={[es.detailSection, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
                                                     <Text style={[es.detailSectionTitle, { color: theme.colors.text }]}>
-                                                        {(t.earnings as any).pricing ?? "Pricing"}
+                                                        {t.earnings.pricing ?? "Pricing"}
                                                     </Text>
                                                     <View style={es.detailRow}>
                                                         <Text style={[es.detailLabel, { color: theme.colors.subtext }]}>
-                                                            {(t.earnings as any).items_total ?? "Items"}
+                                                            {t.earnings.items_total ?? "Items"}
                                                         </Text>
                                                         <Text style={[es.detailValue, { color: theme.colors.text }]}>
                                                             {formatCurrency(Number(ord.orderPrice ?? 0))}
@@ -1034,7 +1038,7 @@ export default function EarningsScreen() {
                                                     </View>
                                                     <View style={es.detailRow}>
                                                         <Text style={[es.detailLabel, { color: theme.colors.subtext }]}>
-                                                            {(t.earnings as any).delivery_fee ?? "Delivery fee"}
+                                                            {t.earnings.delivery_fee ?? "Delivery fee"}
                                                         </Text>
                                                         <Text style={[es.detailValue, { color: theme.colors.text }]}>
                                                             {formatCurrency(Number(ord.deliveryPrice ?? 0))}
@@ -1043,7 +1047,7 @@ export default function EarningsScreen() {
                                                     {Number(ord.prioritySurcharge ?? 0) > 0 && (
                                                         <View style={es.detailRow}>
                                                             <Text style={[es.detailLabel, { color: theme.colors.subtext }]}>
-                                                                {(t.earnings as any).priority ?? "Priority fee"}
+                                                                {t.earnings.priority ?? "Priority fee"}
                                                             </Text>
                                                             <Text style={[es.detailValue, { color: theme.colors.text }]}>
                                                                 {formatCurrency(Number(ord.prioritySurcharge))}
@@ -1053,14 +1057,14 @@ export default function EarningsScreen() {
                                                     {Number(ord.driverTip ?? 0) > 0 && (
                                                         <View style={es.detailRow}>
                                                             <Text style={[es.detailLabel, { color: "#22c55e" }]}>
-                                                                <Ionicons name="heart" size={11} color="#22c55e" /> {(t.earnings as any).tip_label ?? "Tip"}
+                                                                <Ionicons name="heart" size={11} color="#22c55e" /> {t.earnings.tip_label ?? "Tip"}
                                                             </Text>
                                                             <Text style={[es.detailValue, { color: "#22c55e", fontWeight: "600" }]}>
                                                                 +{formatCurrency(Number(ord.driverTip))}
                                                             </Text>
                                                         </View>
                                                     )}
-                                                    {ord.orderPromotions?.length > 0 && ord.orderPromotions.map((promo: any, idx: number) => (
+                                                    {ord.orderPromotions?.length > 0 && ord.orderPromotions.map((promo, idx: number) => (
                                                         <View key={idx} style={es.detailRow}>
                                                             <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
                                                                 <Ionicons name="pricetag-outline" size={12} color="#a855f7" />
@@ -1076,7 +1080,7 @@ export default function EarningsScreen() {
                                                     <View style={[es.detailDivider, { backgroundColor: theme.colors.border }]} />
                                                     <View style={es.detailRow}>
                                                         <Text style={[es.detailLabel, { color: theme.colors.text, fontWeight: "700" }]}>
-                                                            {(t.earnings as any).total ?? "Total"}
+                                                            {t.earnings.total ?? "Total"}
                                                         </Text>
                                                         <Text style={[es.detailValue, { color: theme.colors.text, fontWeight: "800", fontSize: 15 }]}>
                                                             {formatCurrency(Number(ord.totalPrice ?? 0))}
@@ -1089,12 +1093,12 @@ export default function EarningsScreen() {
                                             {fin && (
                                                 <View style={[es.detailSection, { backgroundColor: theme.colors.income + "08", borderColor: theme.colors.income + "30" }]}>
                                                     <Text style={[es.detailSectionTitle, { color: theme.colors.income }]}>
-                                                        {(t.earnings as any).financial_breakdown ?? "Your Financials"}
+                                                        {t.earnings.financial_breakdown ?? "Your Financials"}
                                                     </Text>
                                                     {fin.amountToCollectFromCustomer > 0 && (
                                                         <View style={es.detailRow}>
                                                             <Text style={[es.detailLabel, { color: theme.colors.subtext }]}>
-                                                                {(t.earnings as any).collect_from_customer ?? "Collect from customer"}
+                                                                {t.earnings.collect_from_customer ?? "Collect from customer"}
                                                             </Text>
                                                             <Text style={[es.detailValue, { color: "#3b82f6", fontWeight: "700" }]}>
                                                                 {formatCurrency(fin.amountToCollectFromCustomer)}
@@ -1104,7 +1108,7 @@ export default function EarningsScreen() {
                                                     {fin.amountToRemitToPlatform > 0 && (
                                                         <View style={es.detailRow}>
                                                             <Text style={[es.detailLabel, { color: theme.colors.subtext }]}>
-                                                                {(t.earnings as any).remit_to_platform ?? "Remit to platform"}
+                                                                {t.earnings.remit_to_platform ?? "Remit to platform"}
                                                             </Text>
                                                             <Text style={[es.detailValue, { color: "#ef4444", fontWeight: "700" }]}>
                                                                 -{formatCurrency(fin.amountToRemitToPlatform)}
@@ -1116,7 +1120,7 @@ export default function EarningsScreen() {
                                                             <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
                                                                 <Ionicons name="heart" size={12} color="#22c55e" />
                                                                 <Text style={[es.detailLabel, { color: "#22c55e" }]}>
-                                                                    {(t.earnings as any).tip_included ?? "Tip included"}
+                                                                    {t.earnings.tip_included ?? "Tip included"}
                                                                 </Text>
                                                             </View>
                                                             <Text style={[es.detailValue, { color: "#22c55e", fontWeight: "700" }]}>
@@ -1127,7 +1131,7 @@ export default function EarningsScreen() {
                                                     <View style={[es.detailDivider, { backgroundColor: theme.colors.income + "25" }]} />
                                                     <View style={es.detailRow}>
                                                         <Text style={[es.detailLabel, { color: theme.colors.income, fontWeight: "700" }]}>
-                                                            {(t.earnings as any).your_earnings ?? "Your earnings"}
+                                                            {t.earnings.your_earnings ?? "Your earnings"}
                                                         </Text>
                                                         <Text style={[es.detailValue, { color: theme.colors.income, fontWeight: "900", fontSize: 18 }]}>
                                                             {formatCurrency(fin.driverNetEarnings)}
@@ -1158,12 +1162,12 @@ export default function EarningsScreen() {
                     <Pressable style={es.modalBackdrop} onPress={() => setDisputeModalRequestId(null)} />
                     <View style={[es.modalSheet, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
                         <Text style={[es.modalTitle, { color: theme.colors.text }]}>
-                            {(t.earnings as any).reject_title ?? (t.earnings as any).dispute_title ?? "Reject Settlement"}
+                            {t.earnings.reject_title ?? t.earnings.dispute_title ?? "Reject Settlement"}
                         </Text>
                         <TextInput
                             value={rejectReason}
                             onChangeText={setRejectReason}
-                            placeholder={(t.earnings as any).reject_placeholder ?? (t.earnings as any).dispute_placeholder ?? "Reason (optional)"}
+                            placeholder={t.earnings.reject_placeholder ?? t.earnings.dispute_placeholder ?? "Reason (optional)"}
                             placeholderTextColor={theme.colors.subtext}
                             multiline
                             numberOfLines={3}
@@ -1189,7 +1193,7 @@ export default function EarningsScreen() {
                                     <ActivityIndicator size="small" color="#fff" />
                                 ) : (
                                     <Text style={es.modalSubmitText}>
-                                        {(t.earnings as any).reject_submit ?? (t.earnings as any).dispute_submit ?? "Submit"}
+                                        {t.earnings.reject_submit ?? t.earnings.dispute_submit ?? "Submit"}
                                     </Text>
                                 )}
                             </Pressable>

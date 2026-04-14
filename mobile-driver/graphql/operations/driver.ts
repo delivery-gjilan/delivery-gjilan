@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const GET_MY_DRIVER_METRICS = gql`
+export const GET_MY_DRIVER_METRICS = graphql(`
     query GetMyDriverMetrics {
         myDriverMetrics {
             activeOrdersCount
@@ -13,9 +13,8 @@ export const GET_MY_DRIVER_METRICS = gql`
             connectionStatus
         }
     }
-`;
-
-export const GET_MY_SETTLEMENTS = gql`
+`);
+export const GET_MY_SETTLEMENTS = graphql(`
     query GetMySettlements($status: SettlementStatus, $startDate: Date, $endDate: Date, $limit: Int, $offset: Int) {
         settlements(
             type: DRIVER
@@ -54,9 +53,8 @@ export const GET_MY_SETTLEMENTS = gql`
             }
         }
     }
-`;
-
-export const GET_MY_SETTLEMENT_SUMMARY = gql`
+`);
+export const GET_MY_SETTLEMENT_SUMMARY = graphql(`
     query GetMySettlementSummary($startDate: Date, $endDate: Date) {
         settlementSummary(
             type: DRIVER
@@ -70,9 +68,8 @@ export const GET_MY_SETTLEMENT_SUMMARY = gql`
             pendingCount
         }
     }
-`;
-
-export const GET_DRIVER_CASH_SUMMARY = gql`
+`);
+export const GET_DRIVER_CASH_SUMMARY = graphql(`
     query GetDriverCashSummary($startDate: Date, $endDate: Date) {
         driverCashSummary(startDate: $startDate, endDate: $endDate) {
             cashCollected
@@ -83,9 +80,8 @@ export const GET_DRIVER_CASH_SUMMARY = gql`
             takeHome
         }
     }
-`;
-
-export const GET_SETTLEMENT_BREAKDOWN = gql`
+`);
+export const GET_SETTLEMENT_BREAKDOWN = graphql(`
     query GetSettlementBreakdown($isSettled: Boolean, $startDate: Date, $endDate: Date) {
         settlementBreakdown(
             type: DRIVER
@@ -100,9 +96,8 @@ export const GET_SETTLEMENT_BREAKDOWN = gql`
             direction
         }
     }
-`;
-
-export const GET_MY_SETTLEMENT_REQUESTS = gql`
+`);
+export const GET_MY_SETTLEMENT_REQUESTS = graphql(`
     query GetMyDriverSettlementRequests($status: SettlementRequestStatus, $limit: Int) {
         settlementRequests(status: $status, limit: $limit) {
             id
@@ -120,9 +115,8 @@ export const GET_MY_SETTLEMENT_REQUESTS = gql`
             }
         }
     }
-`;
-
-export const GET_DRIVER_ORDER_FINANCIALS = gql`
+`);
+export const GET_DRIVER_ORDER_FINANCIALS = graphql(`
     query GetDriverOrderFinancials($orderId: ID!) {
         driverOrderFinancials(orderId: $orderId) {
             orderId
@@ -189,9 +183,8 @@ export const GET_DRIVER_ORDER_FINANCIALS = gql`
             }
         }
     }
-`;
-
-export const RESPOND_TO_SETTLEMENT_REQUEST = gql`
+`);
+export const RESPOND_TO_SETTLEMENT_REQUEST = graphql(`
     mutation RespondToSettlementRequest(
         $requestId: ID!
         $action: SettlementRequestAction!
@@ -208,4 +201,4 @@ export const RESPOND_TO_SETTLEMENT_REQUEST = gql`
             reason
         }
     }
-`;
+`);

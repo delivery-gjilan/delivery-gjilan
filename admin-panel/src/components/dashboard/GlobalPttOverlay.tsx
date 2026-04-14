@@ -20,13 +20,13 @@ export default function GlobalPttOverlay() {
     skip: !driverTalkingId,
   });
 
-  const drivers: any[] = driversData?.drivers ?? [];
+  const drivers = driversData?.drivers ?? [];
 
   if (!isTalking && !driverTalkingId && !pttError) return null;
 
   const talkingDriverName = (() => {
     if (!driverTalkingId) return null;
-    const d = drivers.find((d: any) => d.id === driverTalkingId);
+    const d = drivers.find((d) => d.id === driverTalkingId);
     return d ? `${d.firstName} ${d.lastName}`.trim() : "Driver";
   })();
 

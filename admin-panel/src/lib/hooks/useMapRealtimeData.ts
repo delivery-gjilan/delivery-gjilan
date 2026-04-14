@@ -9,6 +9,7 @@ import {
     DriversUpdatedDocument,
     GetOrdersDocument,
 } from '@/gql/graphql';
+import type { DriversQuery } from '@/gql/graphql';
 import { playNewOrderAlert } from '@/lib/audio/orderAlert';
 import { toast } from 'sonner';
 
@@ -16,9 +17,11 @@ const SUBSCRIPTION_REFETCH_COOLDOWN_MS = 1500;
 const DRIVER_POLL_MS = 30000; // polling is a fallback only; subscription is primary
 const DRIVER_SUBSCRIPTION_FRESH_MS = 20000;
 
+type DriverItem = DriversQuery['drivers'][number];
+
 /** Merge incoming drivers into existing list, keeping the newest location per driver. */
-function mergeDriversByTimestamp(existing: any[], incoming: any[]): any[] {
-    const byId = new globalThis.Map<string, any>((existing || []).map((d: any) => [d.id, d]));
+function mergeDriversByTimestamp(existing: DriverItem[], incoming: DriverItem[]): DriverItem[] {
+    const byId = new globalThis.Map<string, DriverItem>((existing || []).map((d) => [d.id, d]));
     for (const driver of incoming) {
         const prev = byId.get(driver.id);
         if (prev?.driverLocationUpdatedAt && driver.driverLocationUpdatedAt) {
@@ -45,7 +48,7 @@ export function useMapRealtimeData() {
     } = useQuery(DriversDocument, { fetchPolicy: 'no-cache' });
     const { data: orderData, refetch: refetchOrders } = useQuery(GetOrdersDocument);
 
-    const [driversLive, setDriversLive] = useState<any[]>([]);
+    const [driversLive, setDriversLive] = useState<DriverItem[]>([]);
     const [realtimeHealth, setRealtimeHealth] = useState({
         driverLastSubAtMs: 0,
         orderLastSubAtMs: 0,
@@ -89,8 +92,8 @@ export function useMapRealtimeData() {
     }, [startPolling, stopPolling]);
 
     useEffect(() => {
-        if ((driverData as any)?.drivers) {
-            const drivers = (driverData as any).drivers as any[];
+        if (driverData?.drivers) {
+            const drivers = driverData.drivers;
             const s = drivers[0];
             console.log(`[RT:poll] ${drivers.length} drivers`, s ? `${s.id.slice(0,8)} lat=${s.driverLocation?.latitude} updatedAt=${s.driverLocationUpdatedAt}` : 'empty');
             setDriversLive((prev) => mergeDriversByTimestamp(prev, drivers));
@@ -98,11 +101,11 @@ export function useMapRealtimeData() {
     }, [driverData]);
 
     useEffect(() => {
-        const connection = (orderData as any)?.orders;
+        const connection = orderData?.orders;
         const currentOrders = Array.isArray(connection?.orders) ? connection.orders : [];
         if (currentOrders.length === 0) return;
 
-        currentOrders.forEach((order: any) => {
+        currentOrders.forEach((order) => {
             if (order?.id) knownOrderIdsRef.current.add(String(order.id));
         });
 
@@ -111,9 +114,9 @@ export function useMapRealtimeData() {
 
     useSubscription(AllOrdersUpdatedDocument, {
         onData: ({ data: subscriptionData }) => {
-            const incomingOrders = (subscriptionData.data as any)?.allOrdersUpdated as any[] | undefined;
+            const incomingOrders = subscriptionData.data?.allOrdersUpdated;
             if (incomingOrders && incomingOrders.length > 0) {
-                const validIncomingOrders = incomingOrders.filter((order: any) =>
+                const validIncomingOrders = incomingOrders.filter((order) =>
                     order && typeof order === 'object' && order.id,
                 );
 
@@ -128,7 +131,7 @@ export function useMapRealtimeData() {
                     return;
                 }
 
-                const newActiveOrders = validIncomingOrders.filter((order: any) => {
+                const newActiveOrders = validIncomingOrders.filter((order) => {
                     const isKnown = knownOrderIdsRef.current.has(String(order.id));
                     if (isKnown) return false;
                     return order.status !== 'DELIVERED' && order.status !== 'CANCELLED';
@@ -136,7 +139,7 @@ export function useMapRealtimeData() {
 
                 const shouldAlert = hasInitializedKnownIdsRef.current && newActiveOrders.length > 0;
 
-                validIncomingOrders.forEach((order: any) => {
+                validIncomingOrders.forEach(() => {
                     knownOrderIdsRef.current.add(String(order.id));
                 });
 
@@ -146,7 +149,7 @@ export function useMapRealtimeData() {
 
                 if (shouldAlert) {
                     void playNewOrderAlert();
-                    const inventoryOrders = newActiveOrders.filter((o: any) =>
+                    const inventoryOrders = newActiveOrders.filter((o) =>
                         o.inventoryPrice != null && Number(o.inventoryPrice) > 0
                     );
                     if (inventoryOrders.length > 0) {
@@ -158,16 +161,16 @@ export function useMapRealtimeData() {
                 }
 
                 setRealtimeHealth((prev) => ({ ...prev, orderLastSubAtMs: Date.now() }));
-                apolloClient.cache.updateQuery({ query: GetOrdersDocument }, (existing: any) => {
+                apolloClient.cache.updateQuery({ query: GetOrdersDocument }, (existing) => {
                     const connection = existing?.orders;
                     const currentOrders = Array.isArray(connection?.orders) ? connection.orders : [];
-                    const byId = new globalThis.Map<string, any>(
-                        currentOrders.map((order: any) => [String(order?.id), order]),
+                    const byId = new globalThis.Map(
+                        currentOrders.map((order) => [String(order?.id), order]),
                     );
 
-                    validIncomingOrders.forEach((order: any) => {
+                    validIncomingOrders.forEach((order) => {
                         const existingOrder = byId.get(String(order?.id));
-                        byId.set(String(order?.id), { ...existingOrder, ...order });
+                        byId.set(String(order?.id), existingOrder ? { ...existingOrder, ...order } : order);
                     });
 
                     return {
@@ -193,7 +196,7 @@ export function useMapRealtimeData() {
 
     useSubscription(DriversUpdatedDocument, {
         onData: ({ data: subscriptionData }) => {
-            const incoming = (subscriptionData.data as any)?.driversUpdated as any[] | undefined;
+            const incoming = subscriptionData.data?.driversUpdated;
             const s = incoming?.[0];
             console.log(`[RT:sub] ${incoming?.length ?? 0} drivers`, s ? `${s.id.slice(0,8)} lat=${s.driverLocation?.latitude} updatedAt=${s.driverLocationUpdatedAt}` : 'empty');
             if (!incoming || incoming.length === 0) return;
@@ -212,9 +215,9 @@ export function useMapRealtimeData() {
         },
     });
 
-    const businesses = useMemo(() => (businessData as any)?.businesses ?? [], [businessData]);
-    const connection = (orderData as any)?.orders;
-    const orders = useMemo(() => (Array.isArray(connection?.orders) ? connection.orders : []) as any[], [connection]);
+    const businesses = useMemo(() => businessData?.businesses ?? [], [businessData]);
+    const orderConnection = orderData?.orders;
+    const orders = useMemo(() => (Array.isArray(orderConnection?.orders) ? orderConnection.orders : []), [orderConnection]);
     const drivers = useMemo(() => driversLive ?? [], [driversLive]);
 
     return {

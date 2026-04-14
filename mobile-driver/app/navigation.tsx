@@ -18,6 +18,7 @@ import DriverMessageBanner from '@/components/DriverMessageBanner';
 import type { AlertType } from '@/components/DriverMessageBanner';
 import { DRIVER_MESSAGE_RECEIVED_SUB } from '@/graphql/operations/driverMessages';
 import { useTranslations } from '@/hooks/useTranslations';
+import type { DriverOrder } from '@/utils/types';
 import * as Haptics from 'expo-haptics';
 
 /* â”€â”€â”€ Screen constants â”€â”€â”€ */
@@ -148,20 +149,20 @@ export default function NavigationScreen() {
         skip: !order?.id,
         variables: { orderId: order?.id },
         onData: ({ data: subData }) => {
-            const updatedOrder = (subData.data as any)?.orderStatusUpdated;
+            const updatedOrder = subData.data?.orderStatusUpdated;
             if (!updatedOrder?.id) return;
 
-            apolloClient.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
+            apolloClient.cache.updateQuery({ query: GET_ORDERS }, (existing) => {
                 const prev = existing?.orders?.orders;
                 if (!Array.isArray(prev)) return existing;
 
                 if (updatedOrder.status === 'DELIVERED' || updatedOrder.status === 'CANCELLED') {
-                    return { ...existing, orders: { ...existing.orders, orders: prev.filter((o: any) => o.id !== updatedOrder.id) } };
+                    return { ...existing, orders: { ...existing.orders, orders: prev.filter((o) => o.id !== updatedOrder.id) } };
                 }
 
                 return {
                     ...existing,
-                    orders: { ...existing.orders, orders: prev.map((o: any) => (o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o)) },
+                    orders: { ...existing.orders, orders: prev.map((o) => (o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o)) },
                 };
             });
 
@@ -180,8 +181,8 @@ export default function NavigationScreen() {
 
     /* â”€â”€ Filter assigned orders â”€â”€ */
     const assignedOrders = useMemo(() => {
-        const orders = (data as any)?.orders?.orders ?? [];
-        return orders.filter((o: any) => {
+        const orders = data?.orders?.orders ?? [];
+        return orders.filter((o) => {
             if (o.status === 'DELIVERED' || o.status === 'CANCELLED') return false;
             return o.driver?.id === currentDriverId;
         });
@@ -189,10 +190,10 @@ export default function NavigationScreen() {
 
     /* â”€â”€ Guard: if the active order was externally completed/cancelled (admin), exit navigation â”€â”€ */
     useEffect(() => {
-        const orders = (data as any)?.orders?.orders;
+        const orders = data?.orders?.orders;
         if (!orders) return; // query not yet resolved
         if (!order) return;
-        const liveOrder = orders.find((o: any) => o.id === order.id);
+        const liveOrder = orders.find((o) => o.id === order.id);
         if (!liveOrder || liveOrder.status === 'DELIVERED' || liveOrder.status === 'CANCELLED') {
             resetSuccessAnimation();
             stopNavigation();
@@ -227,9 +228,9 @@ export default function NavigationScreen() {
 
     /* â”€â”€ Detect newly assigned orders and show toast â”€â”€ */
     useEffect(() => {
-        const currentIds = new Set(assignedOrders.map((o: any) => String(o.id)));
+        const currentIds = new Set(assignedOrders.map((o) => String(o.id)));
         if (prevOrderIdsRef.current.size > 0) {
-            const newOrders = assignedOrders.filter((o: any) => !prevOrderIdsRef.current.has(String(o.id)));
+            const newOrders = assignedOrders.filter((o) => !prevOrderIdsRef.current.has(String(o.id)));
             if (newOrders.length > 0) {
                 const newest = newOrders[0];
                 const bizName = newest.businesses?.[0]?.business?.name ?? 'New order';
@@ -266,8 +267,8 @@ export default function NavigationScreen() {
     const reassignedAlertShownRef = useRef(false);
     useEffect(() => {
         if (!order?.id || !isNavigating) return;
-        const allOrders = (data as any)?.orders?.orders ?? [];
-        const rawOrder = allOrders.find((o: any) => o.id === order.id);
+        const allOrders = data?.orders?.orders ?? [];
+        const rawOrder = allOrders.find((o) => o.id === order.id);
         // If the order is DELIVERED or CANCELLED by us, don't show the alert â€”
         // the onConfirm / onCancel handlers already call stopNavigation and navigate away.
         if (!rawOrder) return; // not yet in cache â€” wait
@@ -309,7 +310,7 @@ export default function NavigationScreen() {
 
     /* â”€â”€ Callbacks â”€â”€ */
     const handleRouteProgressChanged = useCallback(
-        (event: any) => {
+        (event: { nativeEvent?: { distanceRemaining?: number; durationRemaining?: number; fractionTraveled?: number; location?: { latitude: number; longitude: number } } }) => {
             const eventData = event?.nativeEvent ?? event ?? {};
             const { distanceRemaining, durationRemaining, fractionTraveled, location } = eventData;
             
@@ -337,7 +338,7 @@ export default function NavigationScreen() {
     }, [clearNavigationLocation, resetSuccessAnimation, stopNavigation, router]);
 
     const handleWaypointArrival = useCallback(
-        (_event: any) => {
+        (_event: unknown) => {
             if (phase === 'to_pickup' && order?.dropoff) {
                 setShowPickupPanel(true);
             }
@@ -362,7 +363,7 @@ export default function NavigationScreen() {
     }, []);
 
     /* â”€â”€ Switch to different order â”€â”€ */
-    const switchToOrder = useCallback((newOrder: any) => {
+    const switchToOrder = useCallback((newOrder: DriverOrder) => {
         if (!currentOrigin) return;
         const navOrder = buildNavOrder(newOrder);
         if (!navOrder) return;
@@ -502,7 +503,7 @@ export default function NavigationScreen() {
 
             {/* â•â•â• Today's earnings floating pill â•â•â• */}
             {(() => {
-                const metrics = (metricsData as any)?.myDriverMetrics;
+                const metrics = metricsData?.myDriverMetrics;
                 const net = Number(metrics?.netEarningsToday ?? 0).toFixed(2);
                 const count = metrics?.deliveredTodayCount ?? 0;
                 return (
@@ -542,7 +543,7 @@ export default function NavigationScreen() {
                         snapToAlignment="start"
                         decelerationRate="fast"
                     >
-                        {assignedOrders.map((o: any) => {
+                        {assignedOrders.map((o) => {
                             const statusColor = STATUS_COLORS[o.status] ?? '#6B7280';
                             const isFocused = o.id === order?.id;
                             const bizName = o.businesses?.[0]?.business?.name ?? '?';
@@ -650,7 +651,7 @@ export default function NavigationScreen() {
                 // durationRemainingS is ~0 at waypoint arrival (we just arrived at pickup).
                 // The dropoff ETA will come from the nav SDK once the next leg loads — pass null for now.
                 // Look up live order data to get prep ETA
-                const liveOrder = assignedOrders.find((o: any) => o.id === order?.id);
+                const liveOrder = assignedOrders.find((o) => o.id === order?.id);
                 const pickupPrepMins = (() => {
                     if (liveOrder?.status !== 'PREPARING' || !liveOrder?.estimatedReadyAt) return null;
                     const diff = Math.ceil((new Date(liveOrder.estimatedReadyAt).getTime() - nowTs) / 60_000);
@@ -749,7 +750,7 @@ export default function NavigationScreen() {
 
             {/* â•â•â• Delivery arrival panel â•â•â• */}
             {showDeliveryPanel && (() => {
-                const fo = assignedOrders.find((o: any) => o.id === order?.id);
+                const fo = assignedOrders.find((o) => o.id === order?.id);
                 return (
                 <DeliverySlider
                     customerName={order?.customerName ?? ''}
@@ -788,10 +789,10 @@ export default function NavigationScreen() {
                         // Eagerly remove the delivered order from Apollo cache so the
                         // drive tab doesn't wait for a subscription round-trip to clear it.
                         if (deliveredId) {
-                            apolloClient.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => {
+                            apolloClient.cache.updateQuery({ query: GET_ORDERS }, (existing) => {
                                 const prev = existing?.orders?.orders;
                                 if (!Array.isArray(prev)) return existing;
-                                return { ...existing, orders: { ...existing.orders, orders: prev.filter((o: any) => o.id !== deliveredId) } };
+                                return { ...existing, orders: { ...existing.orders, orders: prev.filter((o) => o.id !== deliveredId) } };
                             });
                         }
                         resetSuccessAnimation();
@@ -799,7 +800,7 @@ export default function NavigationScreen() {
                         clearNavigationLocation();
                         stopNavigation();
                         // If there's another active order, switch to it instead of going back
-                        const remaining = assignedOrders.filter((o: any) => o.id !== order?.id);
+                        const remaining = assignedOrders.filter((o) => o.id !== order?.id);
                         if (remaining.length > 0) {
                             switchToOrder(remaining[0]);
                         } else {
@@ -813,7 +814,7 @@ export default function NavigationScreen() {
                         Animated.timing(mapDimOpacity, { toValue: 1, duration: 350, useNativeDriver: true }).start();
 
                         // Spring the success card up from the panel area to screen centre
-                        const fo2 = assignedOrders.find((o: any) => o.id === order?.id);
+                        const fo2 = assignedOrders.find((o) => o.id === order?.id);
                         setSuccessCardPrice(fo2?.deliveryPrice ?? 0);
                         successCardStartTimerRef.current = setTimeout(() => {
                             if (!successAnimationActiveRef.current) return;
@@ -858,7 +859,7 @@ export default function NavigationScreen() {
                         clearNavigationLocation();
                         stopNavigation();
                         // If there's another active order, switch to it instead of going back
-                        const remaining = assignedOrders.filter((o: any) => o.id !== order?.id);
+                        const remaining = assignedOrders.filter((o) => o.id !== order?.id);
                         if (remaining.length > 0) {
                             switchToOrder(remaining[0]);
                         } else {

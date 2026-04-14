@@ -64,7 +64,7 @@ export function PromoSlider({ banners }: PromoSliderProps) {
         return () => clearInterval(interval);
     }, [banners.length]);
 
-    const onScroll = useCallback((event: any) => {
+    const onScroll = useCallback((event: { nativeEvent: { contentOffset: { x: number } } }) => {
         if (banners.length <= 1 || isLoopingRef.current) return;
         
         const offsetX = event.nativeEvent.contentOffset.x;

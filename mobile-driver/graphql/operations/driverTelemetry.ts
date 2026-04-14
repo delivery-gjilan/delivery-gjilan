@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const DRIVER_UPDATE_BATTERY_STATUS = gql`
+export const DRIVER_UPDATE_BATTERY_STATUS = graphql(`
   mutation DriverUpdateBatteryStatus($level: Int!, $optIn: Boolean!, $isCharging: Boolean) {
     driverUpdateBatteryStatus(level: $level, optIn: $optIn, isCharging: $isCharging) {
       batteryLevel
@@ -9,9 +9,8 @@ export const DRIVER_UPDATE_BATTERY_STATUS = gql`
       isCharging
     }
   }
-`;
-
-export const DRIVER_PTT_SIGNAL_SUBSCRIPTION = gql`
+`);
+export const DRIVER_PTT_SIGNAL_SUBSCRIPTION = graphql(`
   subscription DriverPttSignal($driverId: ID!) {
     driverPttSignal(driverId: $driverId) {
       driverId
@@ -22,9 +21,8 @@ export const DRIVER_PTT_SIGNAL_SUBSCRIPTION = gql`
       timestamp
     }
   }
-`;
-
-export const GET_AGORA_RTC_CREDENTIALS = gql`
+`);
+export const GET_AGORA_RTC_CREDENTIALS = graphql(`
   query GetAgoraRtcCredentials($channelName: String!, $role: AgoraRtcRole!) {
     getAgoraRtcCredentials(channelName: $channelName, role: $role) {
       appId
@@ -34,10 +32,9 @@ export const GET_AGORA_RTC_CREDENTIALS = gql`
       expiresAt
     }
   }
-`;
-
-export const DRIVER_SEND_PTT_SIGNAL = gql`
+`);
+export const DRIVER_SEND_PTT_SIGNAL = graphql(`
   mutation DriverSendPttSignal($channelName: String!, $action: DriverPttSignalAction!) {
     driverSendPttSignal(channelName: $channelName, action: $action)
   }
-`;
+`);

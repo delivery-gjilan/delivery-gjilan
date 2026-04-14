@@ -73,13 +73,13 @@ export default function MapScreen() {
         [],
     );
 
-    const { data: ordersData, loading: ordersLoading, refetch: refetchOrders }: any = useQuery(GET_ORDERS, {
+    const { data: ordersData, loading: ordersLoading, refetch: refetchOrders } = useQuery(GET_ORDERS, {
         variables: orderQueryVariables,
         fetchPolicy: 'network-only',
         nextFetchPolicy: 'cache-and-network',
         notifyOnNetworkStatusChange: true,
     });
-    const { data: driversData }: any = useQuery(GET_DRIVERS);
+    const { data: driversData } = useQuery(GET_DRIVERS);
 
     const ordersRefetchCooldownRef = useRef(0);
     const ordersRefetchInFlightRef = useRef(false);
@@ -117,18 +117,18 @@ export default function MapScreen() {
 
     useSubscription(ALL_ORDERS_SUBSCRIPTION, {
         onData: ({ data: subscriptionData }) => {
-            const incomingOrders = (subscriptionData.data as any)?.allOrdersUpdated as any[] | undefined;
+            const incomingOrders = subscriptionData.data?.allOrdersUpdated;
             if (!incomingOrders || incomingOrders.length === 0) {
                 scheduleOrdersRefetch();
                 return;
             }
 
-            apolloClient.cache.updateQuery({ query: GET_ORDERS, variables: orderQueryVariables }, (existing: any) => {
+            apolloClient.cache.updateQuery({ query: GET_ORDERS, variables: orderQueryVariables }, (existing) => {
                 const currentConnection = existing?.orders;
                 const currentOrders = Array.isArray(currentConnection?.orders) ? currentConnection.orders : [];
-                const byId = new Map(currentOrders.map((order: any) => [String(order?.id), order]));
+                const byId = new Map(currentOrders.map((order) => [String(order?.id), order]));
 
-                incomingOrders.forEach((order: any) => {
+                incomingOrders.forEach((order) => {
                     const existingOrder = byId.get(String(order?.id));
                     if (existingOrder && typeof existingOrder === 'object') {
                         byId.set(String(order?.id), { ...existingOrder, ...order });
@@ -138,7 +138,7 @@ export default function MapScreen() {
                 });
 
                 const filtered = Array.from(byId.values()).filter(
-                    (order: any) => order?.status && ACTIVE_ORDER_STATUSES.includes(order.status),
+                    (order) => order?.status && ACTIVE_ORDER_STATUSES.includes(order.status),
                 );
 
                 return {
@@ -153,12 +153,12 @@ export default function MapScreen() {
     });
     useSubscription(DRIVERS_UPDATED_SUBSCRIPTION, {
         onData: ({ data: subscriptionData }) => {
-            const updatedDrivers = (subscriptionData.data as any)?.driversUpdated as any[] | undefined;
+            const updatedDrivers = subscriptionData.data?.driversUpdated;
             if (!updatedDrivers || updatedDrivers.length === 0) return;
-            apolloClient.cache.updateQuery({ query: GET_DRIVERS }, (existing: any) => {
-                const currentDrivers: any[] = existing?.drivers || [];
-                const byId = new Map(currentDrivers.map((d: any) => [String(d?.id), d]));
-                updatedDrivers.forEach((driver: any) => {
+            apolloClient.cache.updateQuery({ query: GET_DRIVERS }, (existing) => {
+                const currentDrivers = existing?.drivers || [];
+                const byId = new Map(currentDrivers.map((d) => [String(d?.id), d]));
+                updatedDrivers.forEach((driver) => {
                     const existing = byId.get(String(driver?.id));
                     byId.set(String(driver?.id), existing ? { ...existing, ...driver } : driver);
                 });
@@ -171,17 +171,17 @@ export default function MapScreen() {
     const drivers = driversData?.drivers || [];
 
     const activeOrders = useMemo(
-        () => orders.filter((o: any) => ACTIVE_ORDER_STATUSES.includes(o.status)),
+        () => orders.filter((o) => ACTIVE_ORDER_STATUSES.includes(o.status)),
         [orders],
     );
 
     const onlineDrivers = useMemo(
-        () => drivers.filter((d: any) => d.driverConnection?.connectionStatus === 'CONNECTED'),
+        () => drivers.filter((d) => d.driverConnection?.connectionStatus === 'CONNECTED'),
         [drivers],
     );
 
     const focusedOrder = useMemo(
-        () => activeOrders.find((o: any) => o.id === focusedOrderId) ?? null,
+        () => activeOrders.find((o) => o.id === focusedOrderId) ?? null,
         [activeOrders, focusedOrderId],
     );
 
@@ -206,7 +206,7 @@ export default function MapScreen() {
 
                 try {
                     if ((order.status === 'READY' || order.status === 'PENDING') && order.driver) {
-                        const driver = drivers.find((d: any) => d.id === order.driver.id);
+                        const driver = drivers.find((d) => d.id === order.driver!.id);
                         const driverLocation = driver?.driverLocation || order.driver?.driverLocation;
                         if (!driverLocation) continue;
                         const driverPos = { longitude: driverLocation.longitude, latitude: driverLocation.latitude };
@@ -220,7 +220,7 @@ export default function MapScreen() {
                             setOrderRoutes((prev) => ({ ...prev, [order.id]: { toPickup, toDropoff, cacheKey } }));
                         }
                     } else if (order.status === 'OUT_FOR_DELIVERY' && order.driver) {
-                        const driver = drivers.find((d: any) => d.id === order.driver.id);
+                        const driver = drivers.find((d) => d.id === order.driver!.id);
                         const driverLocation = driver?.driverLocation || order.driver?.driverLocation;
                         if (!driverLocation) continue;
                         const driverPos = { longitude: driverLocation.longitude, latitude: driverLocation.latitude };
@@ -243,11 +243,11 @@ export default function MapScreen() {
         calcRoutes();
         }, 1500); // 1.5 s debounce — prevent hammering directions proxy on burst subscription updates
         return () => clearTimeout(debounceTimer);
-    }, [activeOrders.map((o: any) => `${o.id}-${o.driver?.id || 'none'}-${o.status}`).join(','), drivers]);
+    }, [activeOrders.map((o) => `${o.id}-${o.driver?.id || 'none'}-${o.status}`).join(','), drivers]);
 
     useEffect(() => {
         if (!trackingDriverId) return;
-        const trackedDriver = drivers.find((d: any) => d.id === trackingDriverId);
+        const trackedDriver = drivers.find((d) => d.id === trackingDriverId);
         const loc = trackedDriver?.driverLocation;
         if (loc?.latitude && loc?.longitude) {
             cameraRef.current?.setCamera({
@@ -267,12 +267,12 @@ export default function MapScreen() {
         setTrackingDriverId(null);
     }, []);
 
-    const focusOrder = useCallback((order: any) => {
+    const focusOrder = useCallback((order: (typeof activeOrders)[number]) => {
         setFocusedOrderId(order.id);
 
         const bizLoc = order.businesses?.[0]?.business?.location;
         const dropLoc = order.dropOffLocation;
-        const driverLoc = order.driver ? drivers.find((d: any) => d.id === order.driver.id)?.driverLocation : null;
+        const driverLoc = order.driver ? drivers.find((d) => d.id === order.driver!.id)?.driverLocation : null;
 
         const lats: number[] = [];
         const lngs: number[] = [];
@@ -317,8 +317,8 @@ export default function MapScreen() {
                 await assignDriver({ variables: { id: focusedOrderId, driverId } });
                 setAssignSheetVisible(false);
                 await refetchOrders();
-            } catch (err: any) {
-                Alert.alert('Error', err?.message || 'Failed to assign driver');
+            } catch (err: unknown) {
+                Alert.alert('Error', (err as Error)?.message || 'Failed to assign driver');
             }
         },
         [assignDriver, focusedOrderId, refetchOrders],
@@ -365,8 +365,8 @@ export default function MapScreen() {
                 await updateStatus({ variables: { id: focusedOrder.id, status: 'DELIVERED' } });
                 await refetchOrders();
             }
-        } catch (err: any) {
-            Alert.alert('Error', err?.message || 'Failed to update order');
+        } catch (err: unknown) {
+            Alert.alert('Error', (err as Error)?.message || 'Failed to update order');
         }
     }, [approveOrder, focusedOrder, refetchOrders, startPreparing, updateStatus]);
 
@@ -403,7 +403,7 @@ export default function MapScreen() {
                         }}
                     />
 
-                    {activeOrders.map((order: any) => {
+                    {activeOrders.map((order) => {
                         if (order.id === focusedOrderId) return null;
                         const route = orderRoutes[order.id];
                         if (!route) return null;
@@ -435,7 +435,7 @@ export default function MapScreen() {
                         </Mapbox.ShapeSource>
                     )}
 
-                    {drivers.map((driver: any) => {
+                    {drivers.map((driver) => {
                         const loc = driver.driverLocation;
                         if (!loc?.latitude || !loc?.longitude) return null;
                         const isOnline = driver.driverConnection?.connectionStatus === 'CONNECTED';
@@ -473,7 +473,7 @@ export default function MapScreen() {
                         );
                     })}
 
-                    {activeOrders.map((order: any) => {
+                    {activeOrders.map((order) => {
                         const statusColor = ORDER_STATUS_COLORS[order.status] || '#6b7280';
                         const isFocused = order.id === focusedOrderId;
                         const dropLoc = order.dropOffLocation;
@@ -518,7 +518,7 @@ export default function MapScreen() {
             {hasMapboxToken && onlineDrivers.length > 0 && (
                 <View style={[styles.driverSidebar, { top: insets.top + 16 }]}>
                     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 4 }}>
-                        {onlineDrivers.slice(0, 10).map((driver: any) => {
+                        {onlineDrivers.slice(0, 10).map((driver) => {
                             const isTracking = trackingDriverId === driver.id;
                             const loc = driver.driverLocation;
                             return (
@@ -558,7 +558,7 @@ export default function MapScreen() {
             {hasMapboxToken && activeOrders.length > 0 && !focusedOrder && (
                 <View style={[styles.orderStrip, { bottom: insets.bottom + 8 }]}>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12, gap: 10 }}>
-                        {activeOrders.map((order: any) => {
+                        {activeOrders.map((order) => {
                             const statusColor = ORDER_STATUS_COLORS[order.status] || '#6b7280';
                             const iconName = STATUS_ICONS[order.status] ?? 'ellipse-outline';
                             const bizName = order.businesses?.[0]?.business?.name ?? '?';
@@ -654,7 +654,7 @@ export default function MapScreen() {
                 {onlineDrivers.length === 0 ? (
                     <Text style={styles.assignEmptyText}>No drivers online</Text>
                 ) : (
-                    onlineDrivers.map((driver: any) => (
+                    onlineDrivers.map((driver) => (
                         <TouchableOpacity
                             key={driver.id}
                             style={styles.assignDriverRow}

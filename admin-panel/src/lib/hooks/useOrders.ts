@@ -12,9 +12,21 @@ import {
 import { ALL_ORDERS_SUBSCRIPTION } from '@/graphql/operations/orders/subscriptions';
 import { playNewOrderAlert } from '@/lib/audio/orderAlert';
 import { toast } from 'sonner';
+import type {
+    CancelOrderMutation,
+    GetOrderQuery,
+    GetOrdersByStatusQuery,
+    GetOrdersQuery,
+    GetOrdersQueryVariables,
+    OrderStatus,
+    UpdateOrderStatusMutation,
+} from '@/gql/graphql';
+
+type OrderList = GetOrdersQuery['orders']['orders'];
+type OrderItem = OrderList[number];
 
 export interface UseOrdersResult {
-    orders: any[];
+    orders: OrderList;
     totalCount: number;
     hasMore: boolean;
     loading: boolean;
@@ -23,13 +35,13 @@ export interface UseOrdersResult {
 }
 
 export interface UseOrderResult {
-    order: any | null;
+    order: GetOrderQuery['order'];
     loading: boolean;
     error?: string;
 }
 
 export interface UseOrdersByStatusResult {
-    orders: any[];
+    orders: GetOrdersByStatusQuery['ordersByStatus'];
     loading: boolean;
     error?: string;
     refetch: () => void;
@@ -38,7 +50,7 @@ export interface UseOrdersByStatusResult {
 export interface UseUpdateOrderStatusResult {
     update: (id: string, status: string) => Promise<{
         success: boolean;
-        data?: any;
+        data?: UpdateOrderStatusMutation;
         error?: string;
     }>;
     loading: boolean;
@@ -65,10 +77,13 @@ export interface UseOrdersOptions {
 export function useOrders(options: UseOrdersOptions = {}): UseOrdersResult {
     const { limit = 100, offset = 0, statuses, startDate, endDate } = options;
     const apolloClient = useApolloClient();
-    const variables: any = { limit, offset };
-    if (statuses) variables.statuses = statuses;
-    if (startDate) variables.startDate = startDate;
-    if (endDate) variables.endDate = endDate;
+    const variables: GetOrdersQueryVariables = {
+        limit,
+        offset,
+        ...(statuses && { statuses: statuses as OrderStatus[] }),
+        ...(startDate && { startDate }),
+        ...(endDate && { endDate }),
+    };
 
     // Initial query to load data - use network-only to avoid stale cache
     const { data, loading, error, refetch } = useQuery(GET_ORDERS, {
@@ -82,15 +97,15 @@ export function useOrders(options: UseOrdersOptions = {}): UseOrdersResult {
     const knownOrderIdsRef = useRef<Set<string>>(new Set());
     const hasInitializedKnownIdsRef = useRef(false);
 
-    const connection = (data as any)?.orders;
-    const ordersList = Array.isArray(connection?.orders) ? connection.orders : [];
+    const connection = data?.orders;
+    const ordersList: OrderList = Array.isArray(connection?.orders) ? connection.orders : [];
     const totalCount: number = connection?.totalCount ?? 0;
     const hasMore: boolean = connection?.hasMore ?? false;
 
     useEffect(() => {
         if (ordersList.length === 0) return;
 
-        ordersList.forEach((order: any) => {
+        ordersList.forEach((order) => {
             if (order?.id) knownOrderIdsRef.current.add(String(order.id));
         });
 
@@ -138,13 +153,13 @@ export function useOrders(options: UseOrdersOptions = {}): UseOrdersResult {
     // Real-time subscription for updates — refetch on signal
     useSubscription(ALL_ORDERS_SUBSCRIPTION, {
         onData: ({ data: subscriptionData }) => {
-            const incomingOrders = (subscriptionData.data as any)?.allOrdersUpdated as any[] | undefined;
+            const incomingOrders = subscriptionData.data?.allOrdersUpdated;
             if (!incomingOrders || incomingOrders.length === 0) {
                 scheduleRefetch();
                 return;
             }
 
-            const validIncomingOrders = incomingOrders.filter((order: any) =>
+            const validIncomingOrders = incomingOrders.filter((order) =>
                 order && typeof order === 'object' && order.id,
             );
 
@@ -153,7 +168,7 @@ export function useOrders(options: UseOrdersOptions = {}): UseOrdersResult {
                 return;
             }
 
-            const newActiveOrders = validIncomingOrders.filter((order: any) => {
+            const newActiveOrders = validIncomingOrders.filter((order) => {
                 const isKnown = knownOrderIdsRef.current.has(String(order.id));
                 if (isKnown) return false;
                 return order.status !== 'DELIVERED' && order.status !== 'CANCELLED';
@@ -161,7 +176,7 @@ export function useOrders(options: UseOrdersOptions = {}): UseOrdersResult {
 
             const shouldAlert = hasInitializedKnownIdsRef.current && newActiveOrders.length > 0;
 
-            validIncomingOrders.forEach((order: any) => {
+            validIncomingOrders.forEach((order) => {
                 knownOrderIdsRef.current.add(String(order.id));
             });
 
@@ -171,7 +186,7 @@ export function useOrders(options: UseOrdersOptions = {}): UseOrdersResult {
 
             if (shouldAlert) {
                 void playNewOrderAlert();
-                const inventoryOrders = newActiveOrders.filter((o: any) =>
+                const inventoryOrders = newActiveOrders.filter((o) =>
                     o.inventoryPrice != null && Number(o.inventoryPrice) > 0
                 );
                 if (inventoryOrders.length > 0) {
@@ -182,12 +197,12 @@ export function useOrders(options: UseOrdersOptions = {}): UseOrdersResult {
                 }
             }
 
-            apolloClient.cache.updateQuery({ query: GET_ORDERS, variables }, (existing: any) => {
+            apolloClient.cache.updateQuery({ query: GET_ORDERS, variables }, (existing) => {
                 const currentConnection = existing?.orders;
                 const currentOrders = Array.isArray(currentConnection?.orders) ? currentConnection.orders : [];
-                const byId = new Map(currentOrders.map((order: any) => [String(order?.id), order]));
+                const byId = new Map(currentOrders.map((order) => [String(order?.id), order]));
 
-                validIncomingOrders.forEach((order: any) => {
+                validIncomingOrders.forEach((order) => {
                     const existingOrder = byId.get(String(order?.id));
                     byId.set(String(order?.id), existingOrder ? { ...existingOrder, ...order } : order);
                 });
@@ -195,7 +210,7 @@ export function useOrders(options: UseOrdersOptions = {}): UseOrdersResult {
                 // Filter out orders that don't match the query's expected statuses
                 const expectedStatuses = statuses ?? ['AWAITING_APPROVAL', 'PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'];
                 const filtered = Array.from(byId.values()).filter(
-                    (order: any) => order?.status && expectedStatuses.includes(order.status),
+                    (order) => order?.status && expectedStatuses.includes(order.status),
                 );
 
                 return {
@@ -226,7 +241,7 @@ export function useOrder(id: string): UseOrderResult {
     });
 
     return {
-        order: (data as any)?.order || null,
+        order: data?.order || null,
         loading,
         error: error?.message,
     };
@@ -234,12 +249,12 @@ export function useOrder(id: string): UseOrderResult {
 
 export function useOrdersByStatus(status: string): UseOrdersByStatusResult {
     const { data, loading, error, refetch } = useQuery(GET_ORDERS_BY_STATUS, {
-        variables: { status: status as any },
+        variables: { status: status as OrderStatus },
         skip: !status,
     });
 
     return {
-        orders: (data as any)?.ordersByStatus || [],
+        orders: data?.ordersByStatus || [],
         loading,
         error: error?.message,
         refetch: () => refetch(),
@@ -252,7 +267,7 @@ export function useUpdateOrderStatus(): UseUpdateOrderStatusResult {
     return {
         update: async (id, status) => {
             try {
-                const result = await mutate({ variables: { id, status: status as any } });
+                const result = await mutate({ variables: { id, status: status as OrderStatus } });
                 return { success: true, data: result.data };
             } catch (err) {
                 return { success: false, error: (err as Error).message };

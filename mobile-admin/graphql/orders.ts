@@ -1,8 +1,8 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
 // ─── Orders Queries ───
 
-export const GET_ORDERS = gql`
+export const GET_ORDERS = graphql(`
     query GetOrders($limit: Int, $offset: Int, $statuses: [OrderStatus!]) {
         orders(limit: $limit, offset: $offset, statuses: $statuses) {
             totalCount
@@ -65,9 +65,9 @@ export const GET_ORDERS = gql`
             }
         }
     }
-`;
+`);
 
-export const GET_ORDER = gql`
+export const GET_ORDER = graphql(`
     query GetOrder($id: ID!) {
         order(id: $id) {
             id
@@ -126,20 +126,20 @@ export const GET_ORDER = gql`
             }
         }
     }
-`;
+`);
 
 // ─── Orders Mutations ───
 
-export const UPDATE_ORDER_STATUS = gql`
+export const UPDATE_ORDER_STATUS = graphql(`
     mutation UpdateOrderStatus($id: ID!, $status: OrderStatus!) {
         updateOrderStatus(id: $id, status: $status) {
             id
             status
         }
     }
-`;
+`);
 
-export const START_PREPARING = gql`
+export const START_PREPARING = graphql(`
     mutation StartPreparing($id: ID!, $preparationMinutes: Int!) {
         startPreparing(id: $id, preparationMinutes: $preparationMinutes) {
             id
@@ -149,9 +149,9 @@ export const START_PREPARING = gql`
             preparingAt
         }
     }
-`;
+`);
 
-export const UPDATE_PREPARATION_TIME = gql`
+export const UPDATE_PREPARATION_TIME = graphql(`
     mutation UpdatePreparationTime($id: ID!, $preparationMinutes: Int!) {
         updatePreparationTime(id: $id, preparationMinutes: $preparationMinutes) {
             id
@@ -159,18 +159,18 @@ export const UPDATE_PREPARATION_TIME = gql`
             estimatedReadyAt
         }
     }
-`;
+`);
 
-export const CANCEL_ORDER = gql`
+export const CANCEL_ORDER = graphql(`
     mutation CancelOrder($id: ID!) {
         cancelOrder(id: $id) {
             id
             status
         }
     }
-`;
+`);
 
-export const ASSIGN_DRIVER_TO_ORDER = gql`
+export const ASSIGN_DRIVER_TO_ORDER = graphql(`
     mutation AssignDriverToOrder($id: ID!, $driverId: ID) {
         assignDriverToOrder(id: $id, driverId: $driverId) {
             id
@@ -182,9 +182,9 @@ export const ASSIGN_DRIVER_TO_ORDER = gql`
             status
         }
     }
-`;
+`);
 
-export const APPROVE_ORDER = gql`
+export const APPROVE_ORDER = graphql(`
     mutation ApproveOrder($id: ID!) {
         approveOrder(id: $id) {
             id
@@ -192,9 +192,9 @@ export const APPROVE_ORDER = gql`
             needsApproval
         }
     }
-`;
+`);
 
-export const CREATE_TEST_ORDER = gql`
+export const CREATE_TEST_ORDER = graphql(`
     mutation CreateTestOrder {
         createTestOrder {
             id
@@ -202,11 +202,11 @@ export const CREATE_TEST_ORDER = gql`
             totalPrice
         }
     }
-`;
+`);
 
 // ─── Orders Subscriptions ───
 
-export const ALL_ORDERS_SUBSCRIPTION = gql`
+export const ALL_ORDERS_SUBSCRIPTION = graphql(`
     subscription AllOrdersUpdated {
         allOrdersUpdated {
             id
@@ -265,4 +265,4 @@ export const ALL_ORDERS_SUBSCRIPTION = gql`
             }
         }
     }
-`;
+`);

@@ -31,12 +31,12 @@ export function usePrepTimeAlerts(
 
     useSubscription(ALL_ORDERS_SUBSCRIPTION, {
         onData: ({ data: subscriptionData }) => {
-            const incomingOrders = (subscriptionData.data as any)?.allOrdersUpdated as any[] | undefined;
+            const incomingOrders = subscriptionData.data?.allOrdersUpdated;
             if (!incomingOrders) return;
 
             const newAlerts: PrepTimeAlert[] = [];
 
-            incomingOrders.forEach((order: any) => {
+            incomingOrders.forEach((order) => {
                 if (!order?.id || order.preparationMinutes == null) return;
 
                 // Only track PREPARING orders

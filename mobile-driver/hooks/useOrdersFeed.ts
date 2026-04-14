@@ -3,6 +3,7 @@ import { NetworkStatus } from '@apollo/client';
 import { AppState } from 'react-native';
 import { useApolloClient, useQuery, useSubscription } from '@apollo/client/react';
 import { GET_ORDERS, ALL_ORDERS_UPDATED } from '@/graphql/operations/orders';
+import type { DriverOrder } from '@/utils/types';
 
 /**
  * Manages the driver orders data layer:
@@ -16,7 +17,7 @@ export function useOrdersFeed(driverId: string | undefined) {
     const lastOrdersRefreshAt = useRef(0);
     const [networkReady, setNetworkReady] = useState(false);
     const [bootstrapExpired, setBootstrapExpired] = useState(false);
-    const [subscriptionOrders, setSubscriptionOrders] = useState<any[] | null>(null);
+    const [subscriptionOrders, setSubscriptionOrders] = useState<DriverOrder[] | null>(null);
 
     const { data, refetch, networkStatus } = useQuery(GET_ORDERS, {
         fetchPolicy: 'network-only',
@@ -27,7 +28,7 @@ export function useOrdersFeed(driverId: string | undefined) {
 
     // Mark network as ready once the first real response arrives
     useEffect(() => {
-        if (!networkReady && data && (data as any)?.orders?.orders && networkStatus === NetworkStatus.ready) {
+        if (!networkReady && data?.orders?.orders && networkStatus === NetworkStatus.ready) {
             setNetworkReady(true);
         }
     }, [networkStatus, networkReady, data]);
@@ -63,17 +64,17 @@ export function useOrdersFeed(driverId: string | undefined) {
     useSubscription(ALL_ORDERS_UPDATED, {
         skip: !driverId,
         onData: ({ data: subData }) => {
-            const incomingOrders = (subData.data as any)?.allOrdersUpdated as any[] | undefined;
+            const incomingOrders = subData.data?.allOrdersUpdated;
             if (incomingOrders === undefined || incomingOrders === null) {
                 void refreshOrders();
                 return;
             }
-            apolloClient.cache.updateQuery({ query: GET_ORDERS }, (existing: any) => ({
+            apolloClient.cache.updateQuery({ query: GET_ORDERS }, (existing) => ({
                 ...(existing ?? {}),
                 orders: {
                     ...(existing?.orders ?? {}),
                     orders: incomingOrders,
-                    __typename: 'OrderConnection',
+                    __typename: 'OrderConnection' as const,
                 },
             }));
             setSubscriptionOrders(incomingOrders);
@@ -92,17 +93,17 @@ export function useOrdersFeed(driverId: string | undefined) {
 
     const cachedOrders = useMemo(() => {
         try {
-            return ((apolloClient.readQuery({ query: GET_ORDERS }) as any)?.orders?.orders ?? []) as any[];
+            return apolloClient.readQuery({ query: GET_ORDERS })?.orders?.orders ?? [];
         } catch {
             return [];
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [apolloClient, data, subscriptionOrders]);
 
-    const orders: any[] = useMemo(() => {
+    const orders = useMemo(() => {
         // Prefer fresh query response, then live subscription payload.
         // Fall back to persisted Apollo cache ONLY after networkReady (prevents stale cold-start data).
-        return (data as any)?.orders?.orders ?? subscriptionOrders ?? (networkReady ? cachedOrders : []);
+        return data?.orders?.orders ?? subscriptionOrders ?? (networkReady ? cachedOrders : []);
     }, [data, subscriptionOrders, cachedOrders, networkReady]);
 
     const isOrdersBootstrapping =

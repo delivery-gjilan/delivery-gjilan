@@ -10,7 +10,7 @@ import { formatRelativeTime } from '@/utils/helpers';
 
 export default function OpsNotificationsScreen() {
     const theme = useTheme();
-    const { data, loading, refetch }: any = useQuery(GET_NOTIFICATION_CAMPAIGNS);
+    const { data, loading, refetch } = useQuery(GET_NOTIFICATION_CAMPAIGNS);
     const [sendCampaign] = useMutation(SEND_CAMPAIGN);
     const campaigns = data?.notificationCampaigns || [];
 
@@ -43,10 +43,10 @@ export default function OpsNotificationsScreen() {
             />
             <FlatList
                 data={campaigns}
-                keyExtractor={(item: any) => item.id}
+                keyExtractor={(item) => item.id}
                 contentContainerStyle={{ padding: 16 }}
                 refreshControl={<RefreshControl refreshing={loading} onRefresh={refetch} tintColor={theme.colors.primary} />}
-                renderItem={({ item }: { item: any }) => (
+                renderItem={({ item }) => (
                     <View className="rounded-xl p-4 mb-3" style={{ backgroundColor: theme.colors.card }}>
                         <View className="flex-row items-start justify-between mb-2">
                             <Text className="text-sm font-semibold flex-1" style={{ color: theme.colors.text }}>

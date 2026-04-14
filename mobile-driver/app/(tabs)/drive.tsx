@@ -17,6 +17,7 @@ import { buildNavOrder, orderToPhase } from '@/utils/orderToNavOrder';
 import { useOrderAcceptStore } from '@/store/orderAcceptStore';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useSharedOrderAccept } from '@/hooks/GlobalOrderAcceptContext';
+import type { DriverOrder } from '@/utils/types';
 import type { Feature, LineString } from 'geojson';
 
 /* â”€â”€â”€ Constants â”€â”€â”€ */
@@ -86,7 +87,7 @@ export default function MapScreen() {
 
     // â”€â”€ Adaptive GPS interval based on activity â”€â”€
     const hasActiveNavigation = useMemo(() => {
-        return assignedOrders.some((order: any) =>
+        return assignedOrders.some((order) =>
             order.status === 'READY' || order.status === 'OUT_FOR_DELIVERY'
         );
     }, [assignedOrders]);
@@ -142,7 +143,7 @@ export default function MapScreen() {
 
     // â”€â”€ Focused order object â”€â”€
     const focusedOrder = useMemo(
-        () => allMapOrders.find((o: any) => o.id === focusedOrderId) ?? null,
+        () => allMapOrders.find((o) => o.id === focusedOrderId) ?? null,
         [allMapOrders, focusedOrderId],
     );
 
@@ -242,7 +243,7 @@ export default function MapScreen() {
     }, [previewRouteCoords]);
 
     // â”€â”€ Focus on an order: fly camera to its pickup location â”€â”€
-    const focusOrder = useCallback((order: any) => {
+    const focusOrder = useCallback((order: DriverOrder) => {
         const bizLoc = order.businesses?.[0]?.business?.location;
         const dropLoc = order.dropOffLocation;
 
@@ -303,7 +304,7 @@ export default function MapScreen() {
         try {
             await updateOrderStatus({ variables: { id: targetId, status: 'OUT_FOR_DELIVERY' } });
             // Immediately launch turn-by-turn navigation to dropoff
-            const order = allMapOrders.find((o: any) => o.id === targetId);
+            const order = allMapOrders.find((o) => o.id === targetId);
             if (order && location) {
                 const navOrder = buildNavOrder(order);
                 if (navOrder) {
@@ -402,7 +403,7 @@ export default function MapScreen() {
     }, [currentCardIndex, assignedOrders.length]);
 
     // â”€â”€ Launch Mapbox Navigation SDK â”€â”€
-    const handleStartNavigation = useCallback((targetOrder?: any) => {
+    const handleStartNavigation = useCallback((targetOrder?: DriverOrder) => {
         const order = targetOrder ?? focusedOrder;
         if (!order || !location) return;
         const navOrder = buildNavOrder(order);
@@ -413,7 +414,7 @@ export default function MapScreen() {
         router.push('/navigation' as any);
     }, [focusedOrder, location, startNavigation, router]);
     // -- Open destination in Google Maps --
-    const openInGoogleMaps = useCallback((targetOrder?: any) => {
+    const openInGoogleMaps = useCallback((targetOrder?: DriverOrder) => {
         const order = targetOrder ?? focusedOrder;
         if (!order) return;
         const navOrder = buildNavOrder(order);
@@ -435,7 +436,7 @@ export default function MapScreen() {
     }, [focusedOrder]);
 
     // -- Navigation picker (In-App vs Google Maps) --
-    const handleNavigationPress = useCallback((targetOrder?: any) => {
+    const handleNavigationPress = useCallback((targetOrder?: DriverOrder) => {
         const order = targetOrder ?? focusedOrder;
         if (!order || !location) return;
 
@@ -600,7 +601,7 @@ export default function MapScreen() {
                 )}
 
                 {/* Order markers â€” pickup pins for assigned orders only; drop-off pins always */}
-                {allMapOrders.map((order: any) => {
+                {allMapOrders.map((order) => {
                     const statusColor = STATUS_COLORS[order.status] ?? '#6B7280';
                     const isAssigned = order.driver?.id === currentDriverId;
                     const isFocused = order.id === focusedOrderId;
@@ -674,7 +675,7 @@ export default function MapScreen() {
                 {(() => {
                     const t = assignedOrders.length === 1
                         ? assignedOrders[0]
-                        : assignedOrders.find((o: any) => o.id === focusedOrderId) ?? null;
+                        : assignedOrders.find((o) => o.id === focusedOrderId) ?? null;
                     if (t?.status !== 'READY') return null;
                     return (
                         <Pressable
@@ -823,16 +824,16 @@ export default function MapScreen() {
 
                         {/* Fulfillment guide — visible when order has stock items (i.e. was created during inventory mode) */}
                         {(() => {
-                            const allItems = order.businesses?.flatMap((b: any) => b.items ?? []) ?? [];
-                            const stockItems = allItems.filter((it: any) => (it.inventoryQuantity ?? 0) > 0);
-                            const marketItems = allItems.filter((it: any) => (it.quantity ?? 0) - (it.inventoryQuantity ?? 0) > 0);
+                            const allItems = order.businesses?.flatMap((b) => b.items ?? []) ?? [];
+                            const stockItems = allItems.filter((it) => (it.inventoryQuantity ?? 0) > 0);
+                            const marketItems = allItems.filter((it) => (it.quantity ?? 0) - (it.inventoryQuantity ?? 0) > 0);
                             if (stockItems.length === 0) return null;
                             return (
                                 <View style={styles.fulfillmentGuide}>
                                     {stockItems.length > 0 && (
                                         <View style={styles.fulfillmentSection}>
                                             <Text style={styles.fulfillmentHeader}>{t.drive.from_stock_label}</Text>
-                                            {stockItems.map((it: any, i: number) => (
+                                            {stockItems.map((it, i: number) => (
                                                 <Text key={i} style={styles.fulfillmentItem}>
                                                     {'📦 '}{it.inventoryQuantity}× {it.name}
                                                 </Text>
@@ -842,7 +843,7 @@ export default function MapScreen() {
                                     {marketItems.length > 0 && (
                                         <View style={[styles.fulfillmentSection, { marginTop: 6 }]}>
                                             <Text style={[styles.fulfillmentHeader, { color: '#6B7280' }]}>{t.drive.from_market_label}</Text>
-                                            {marketItems.map((it: any, i: number) => (
+                                            {marketItems.map((it, i: number) => (
                                                 <Text key={i} style={[styles.fulfillmentItem, { color: '#6B7280' }]}>
                                                     {'🛒 '}{it.quantity - (it.inventoryQuantity ?? 0)}× {it.name}
                                                 </Text>
@@ -905,7 +906,7 @@ export default function MapScreen() {
                 const idx = Math.min(currentCardIndex, assignedOrders.length - 1);
                 return (
                     <View style={[styles.dotPager, { bottom: BOTTOM_BAR_HEIGHT - 24 }]}>
-                        {assignedOrders.map((_: any, i: number) => (
+                        {assignedOrders.map((_, i: number) => (
                             <View
                                 key={i}
                                 style={[

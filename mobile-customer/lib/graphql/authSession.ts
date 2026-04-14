@@ -91,7 +91,7 @@ export async function refreshAccessToken(currentToken?: string | null): Promise<
         });
 
         const raw = await response.text();
-        let payload: any = null;
+        let payload: Record<string, unknown> | null = null;
         try {
             payload = raw ? JSON.parse(raw) : null;
         } catch {

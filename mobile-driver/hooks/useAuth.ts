@@ -2,7 +2,7 @@ import { useMutation } from '@apollo/client/react';
 import { useAuthStore } from '@/store/authStore';
 import { saveRefreshToken, saveToken } from '@/utils/secureTokenStore';
 import { LOGIN_MUTATION } from '@/graphql/operations/auth/login';
-import { User, UserRole } from '@/gql/graphql';
+import { UserRole } from '@/gql/graphql';
 
 export function useAuth() {
     const { login: storeLogin, logout: storeLogout } = useAuthStore();
@@ -14,13 +14,13 @@ export function useAuth() {
             variables: { input: { email, password } },
         });
 
-        const data = result.data as any;
+        const loginData = result.data?.login;
 
-        if (!data?.login) {
+        if (!loginData) {
             throw new Error('Login failed');
         }
 
-        const { token, refreshToken, user } = data.login;
+        const { token, refreshToken, user } = loginData;
 
         if (user?.role !== UserRole.Driver) {
             throw new Error('Access denied. Driver account required.');
@@ -30,9 +30,9 @@ export function useAuth() {
         if (refreshToken) {
             await saveRefreshToken(refreshToken);
         }
-        storeLogin(token, user as User);
+        storeLogin(token, user);
 
-        return data.login;
+        return loginData;
     };
 
     const logout = async () => {

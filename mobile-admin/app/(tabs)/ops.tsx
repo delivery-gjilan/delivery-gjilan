@@ -21,7 +21,7 @@ export default function OpsScreen() {
     const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([]);
     const [channelName, setChannelName] = useState(`${CHANNEL_PREFIX}-${Date.now()}`);
 
-    const { data: driversData, refetch: refetchDrivers }: any = useQuery(GET_DRIVERS);
+    const { data: driversData, refetch: refetchDrivers } = useQuery(GET_DRIVERS);
     const [setShiftDrivers, { loading: savingShift }] = useMutation(ADMIN_SET_SHIFT_DRIVERS);
 
     const { isTalking, isDriverTalking, pttError, startTalking, stopTalking, muteDrivers } = useAdminPtt(
@@ -31,7 +31,7 @@ export default function OpsScreen() {
     );
 
     const onlineDrivers = useMemo(
-        () => (driversData?.drivers || []).filter((d: any) => d.driverConnection?.connectionStatus === 'CONNECTED'),
+        () => (driversData?.drivers || []).filter((d) => d.driverConnection?.connectionStatus === 'CONNECTED'),
         [driversData],
     );
 
@@ -46,16 +46,16 @@ export default function OpsScreen() {
         }
         try {
             await startTalking();
-        } catch (err: any) {
-            Alert.alert('Error', err?.message || 'Failed to start PTT');
+        } catch (err: unknown) {
+            Alert.alert('Error', (err as Error)?.message || 'Failed to start PTT');
         }
     };
 
     const handleStopPtt = async () => {
         try {
             await stopTalking();
-        } catch (err: any) {
-            Alert.alert('Error', err?.message || 'Failed to stop PTT');
+        } catch (err: unknown) {
+            Alert.alert('Error', (err as Error)?.message || 'Failed to stop PTT');
         }
     };
 
@@ -63,8 +63,8 @@ export default function OpsScreen() {
         try {
             await setShiftDrivers({ variables: { driverIds: selectedDriverIds } });
             Alert.alert('Saved', 'Shift drivers updated.');
-        } catch (err: any) {
-            Alert.alert('Error', err?.message || 'Failed to update shift drivers');
+        } catch (err: unknown) {
+            Alert.alert('Error', (err as Error)?.message || 'Failed to update shift drivers');
         }
     };
 
@@ -99,7 +99,7 @@ export default function OpsScreen() {
                     </Text>
 
                     <View className="flex-row flex-wrap mt-3" style={{ gap: 8 }}>
-                        {onlineDrivers.map((driver: any) => {
+                        {onlineDrivers.map((driver) => {
                             const selected = selectedDriverIds.includes(driver.id);
                             return (
                                 <TouchableOpacity
@@ -206,8 +206,8 @@ export default function OpsScreen() {
                                 try {
                                     await setShiftDrivers({ variables: { driverIds: [] } });
                                     Alert.alert('Cleared', 'Shift restriction removed.');
-                                } catch (err: any) {
-                                    Alert.alert('Error', err?.message || 'Failed to clear shift drivers');
+                                } catch (err: unknown) {
+                                    Alert.alert('Error', (err as Error)?.message || 'Failed to clear shift drivers');
                                 }
                             }}
                             disabled={savingShift}

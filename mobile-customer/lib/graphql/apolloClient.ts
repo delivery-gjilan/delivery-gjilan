@@ -104,7 +104,7 @@ const errorLink = onError(({ error, operation, forward }) => {
         }
     } else {
         // Network or other error
-        const statusCode = 'statusCode' in error ? (error as any).statusCode : undefined;
+        const statusCode = 'statusCode' in error ? (error as Record<string, unknown>).statusCode : undefined;
         if (statusCode === 401) {
             console.warn('[Apollo] 401 received; preserving session until manual logout');
             return;

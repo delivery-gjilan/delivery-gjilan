@@ -10,11 +10,45 @@ import {
     CREATE_PRODUCT_VARIANT_GROUP,
     DELETE_PRODUCT_VARIANT_GROUP,
 } from '@/graphql/operations/products';
-import type { CreateProductInput, UpdateProductInput } from '@/gql/graphql';
+import type {
+    CreateProductInput,
+    CreateProductMutation,
+    CreateProductVariantGroupMutation,
+    ProductsAndCategoriesQuery,
+    UpdateProductInput,
+    UpdateProductMutation,
+} from '@/gql/graphql';
+
+type ProductCategoryList = ProductsAndCategoriesQuery['productCategories'];
+type ProductCard = ProductsAndCategoriesQuery['products'][number];
+type ProductVariant = NonNullable<ProductCard['variants']>[number];
+type ProductBase = NonNullable<ProductCard['product']>;
+
+type ProductListItem = {
+    id: string;
+    businessId: string;
+    categoryId: string;
+    subcategoryId: string | null;
+    variantGroupId: string | null;
+    variantGroupName: string | null;
+    name: string;
+    description: string | null;
+    imageUrl: string | null;
+    price: number;
+    markupPrice: number | null;
+    nightMarkedupPrice: number | null;
+    isOffer: boolean;
+    isOnSale: boolean;
+    saleDiscountPercentage: number | null;
+    isAvailable: boolean;
+    sortOrder: number;
+    hasOptionGroups: boolean;
+    sourceProductId: string | null;
+};
 
 export interface UseProductsResult {
-    products: any[];
-    categories: any[];
+    products: ProductListItem[];
+    categories: ProductCategoryList;
     loading: boolean;
     error?: string;
     refetch: () => void;
@@ -23,7 +57,7 @@ export interface UseProductsResult {
 export interface UseCreateProductResult {
     create: (input: CreateProductInput) => Promise<{
         success: boolean;
-        data?: any;
+        data?: CreateProductMutation;
         error?: string;
     }>;
     loading: boolean;
@@ -33,7 +67,7 @@ export interface UseCreateProductResult {
 export interface UseUpdateProductResult {
     update: (id: string, input: UpdateProductInput) => Promise<{
         success: boolean;
-        data?: any;
+        data?: UpdateProductMutation;
         error?: string;
     }>;
     loading: boolean;
@@ -61,7 +95,7 @@ export interface UseUpdateProductsOrderResult {
 export interface UseCreateProductVariantGroupResult {
     createVariantGroup: (input: { businessId: string; name: string }) => Promise<{
         success: boolean;
-        data?: any;
+        data?: CreateProductVariantGroupMutation['createProductVariantGroup'];
         error?: string;
     }>;
     loading: boolean;
@@ -84,13 +118,13 @@ export function useProducts(businessId: string): UseProductsResult {
     });
 
     const products = (data?.products || [])
-        .flatMap((card: any) => {
+        .flatMap((card) => {
             const product = card?.product;
             const variants = card?.variants || [];
 
             // Variant group card: expand each variant into its own row
             if (!product && variants.length > 0) {
-                return variants.map((v: any) => ({
+                return variants.map((v) => ({
                     id: v.id,
                     businessId: v.businessId ?? businessId,
                     categoryId: v.categoryId ?? '',
@@ -136,7 +170,7 @@ export function useProducts(businessId: string): UseProductsResult {
                 sourceProductId: product?.sourceProductId ?? null,
             }];
         })
-        .filter((p: any) => Boolean(p.categoryId));
+        .filter((p) => Boolean(p.categoryId));
 
     return {
         products,

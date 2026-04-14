@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, FormEvent, useMemo, useCallback } from "react";
+import { useState, FormEvent, useMemo, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@apollo/client/react";
 import { USERS_QUERY, USER_BEHAVIOR_QUERY } from "@/graphql/operations/users/queries";
 import {
@@ -18,7 +18,7 @@ import { useAuth } from "@/lib/auth-context";
 import {
     Pencil, Trash2, AlertCircle, ShieldBan, ShieldCheck, BadgeCheck,
     Search, X, Plus, User, Phone, Mail, MapPin, MessageSquare,
-    ChevronRight, Clock, Package, CircleDollarSign,
+    ChevronRight, Clock, Package, CircleDollarSign, ChevronLeft,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -90,7 +90,11 @@ interface OrderItem {
 }
 
 interface OrdersResponse {
-    orders: OrderItem[];
+    orders: {
+        orders: OrderItem[];
+        totalCount: number;
+        hasMore: boolean;
+    };
 }
 
 interface UserBehaviorItem {
@@ -220,8 +224,12 @@ export default function UsersPage() {
     const [userToBan, setUserToBan] = useState<UserItem | null>(null);
     const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
 
-    /* --- search & form --- */
+    /* --- search, debounce & pagination --- */
     const [searchTerm, setSearchTerm] = useState("");
+    const [debouncedSearch, setDebouncedSearch] = useState("");
+    const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const PAGE_SIZE = 20;
     const [formData, setFormData] = useState({
         email: "", password: "", firstName: "", lastName: "", role: "CUSTOMER", businessId: "", isDemoAccount: false,
     });
@@ -247,21 +255,35 @@ export default function UsersPage() {
         },
     );
 
-    /* --- derived: filtered users & orders --- */
-    const search = searchTerm.trim().toLowerCase();
+    /* --- debounce effect --- */
+    useEffect(() => {
+        if (debounceTimer.current) clearTimeout(debounceTimer.current);
+        debounceTimer.current = setTimeout(() => {
+            setDebouncedSearch(searchTerm.trim().toLowerCase());
+            setCurrentPage(1);
+        }, 300);
+        return () => { if (debounceTimer.current) clearTimeout(debounceTimer.current); };
+    }, [searchTerm]);
 
+    /* --- derived: filtered users & orders --- */
     const filteredUsers = useMemo(() => {
         const customers = data?.users?.filter((u) => u.role === "CUSTOMER") || [];
-        if (!search) return customers;
+        if (!debouncedSearch) return customers;
         return customers.filter((u) => {
             const name = `${u.firstName} ${u.lastName}`.toLowerCase();
-            return name.includes(search) || u.email.toLowerCase().includes(search) || (u.phoneNumber || "").toLowerCase().includes(search);
+            return name.includes(debouncedSearch) || u.email.toLowerCase().includes(debouncedSearch) || (u.phoneNumber || "").toLowerCase().includes(debouncedSearch);
         });
-    }, [data?.users, search]);
+    }, [data?.users, debouncedSearch]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
+    const pagedUsers = useMemo(() => {
+        const start = (currentPage - 1) * PAGE_SIZE;
+        return filteredUsers.slice(start, start + PAGE_SIZE);
+    }, [filteredUsers, currentPage]);
 
     const userOrders = useMemo(() => {
         if (!selectedUser) return [];
-        return (ordersData?.orders || [])
+        return (ordersData?.orders?.orders || [])
             .filter((o) => o.user?.id === selectedUser.id)
             .sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
     }, [ordersData?.orders, selectedUser]);
@@ -273,6 +295,10 @@ export default function UsersPage() {
         setPanelTab("overview");
         setIsEditingNote(false);
     }, []);
+
+    const goToPage = useCallback((page: number) => {
+        setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+    }, [totalPages]);
 
     const closePanel = useCallback(() => {
         setSelectedUserId(null);
@@ -434,12 +460,12 @@ export default function UsersPage() {
                 <div className={`transition-all duration-200 ${selectedUser ? "w-[380px] flex-shrink-0" : "w-full"}`}>
                     <div className={`bg-zinc-900/60 border border-zinc-800 rounded-xl overflow-hidden ${selectedUser ? "rounded-r-none border-r-0" : ""}`}>
                         {loading ? (
-                            <div className="p-8 text-center text-zinc-500">Loadingï¿½</div>
+                            <div className="p-8 text-center text-zinc-500">Loading…</div>
                         ) : !filteredUsers.length ? (
                             <div className="p-8 text-center text-zinc-500">No customers found.</div>
                         ) : (
-                            <div className="divide-y divide-zinc-800/60 max-h-[calc(100vh-220px)] overflow-y-auto">
-                                {filteredUsers.map((u) => {
+                            <div className="divide-y divide-zinc-800/60 max-h-[calc(100vh-268px)] overflow-y-auto">
+                                {pagedUsers.map((u) => {
                                     const flag = getFlag(u.flagColor);
                                     const isActive = selectedUser?.id === u.id;
                                     return (
@@ -490,6 +516,31 @@ export default function UsersPage() {
                             </div>
                         )}
                     </div>
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                        <div className="flex items-center justify-between px-4 py-2.5 border-t border-zinc-800/60">
+                            <span className="text-xs text-zinc-500">
+                                {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredUsers.length)} of {filteredUsers.length}
+                            </span>
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={() => goToPage(currentPage - 1)}
+                                    disabled={currentPage === 1}
+                                    className="p-1 rounded hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed text-zinc-400"
+                                >
+                                    <ChevronLeft size={15} />
+                                </button>
+                                <span className="text-xs text-zinc-400 px-2">{currentPage} / {totalPages}</span>
+                                <button
+                                    onClick={() => goToPage(currentPage + 1)}
+                                    disabled={currentPage === totalPages}
+                                    className="p-1 rounded hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed text-zinc-400"
+                                >
+                                    <ChevronRight size={15} />
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* ---- Detail panel ---- */}

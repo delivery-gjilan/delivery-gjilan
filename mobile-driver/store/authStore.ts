@@ -70,7 +70,7 @@ export const useAuthStore = create<AuthState>()(
             },
 
             setUser: (user) => {
-                const onlinePref = (user as any)?.driverConnection?.onlinePreference;
+                const onlinePref = user?.driverConnection?.onlinePreference;
                 set((state) => ({
                     user,
                     isAuthenticated: calculateIsAuthenticated(state.token, user),
@@ -89,7 +89,7 @@ export const useAuthStore = create<AuthState>()(
             setAppSessionActive: (appSessionActive) => set({ appSessionActive }),
 
             login: (token, user) => {
-                const onlinePref = (user as any)?.driverConnection?.onlinePreference;
+                const onlinePref = user?.driverConnection?.onlinePreference;
                 set({
                     token,
                     user,
@@ -131,7 +131,7 @@ export const useAuthStore = create<AuthState>()(
                 }
 
                 // Recalculate isAuthenticated after rehydration
-                const onlinePref = (state.user as any)?.driverConnection?.onlinePreference;
+                const onlinePref = state.user?.driverConnection?.onlinePreference;
                 state.isAuthenticated = calculateIsAuthenticated(state.token, state.user);
                 state.isOnline = typeof onlinePref === 'boolean' ? onlinePref : state.isOnline;
                 state.hasHydrated = true;

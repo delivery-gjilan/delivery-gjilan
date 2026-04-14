@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const GET_STORE_STATUS = gql`
+export const GET_STORE_STATUS = graphql(`
     query GetStoreStatus {
         getStoreStatus {
             isStoreClosed
@@ -13,9 +13,8 @@ export const GET_STORE_STATUS = gql`
             inventoryModeEnabled
         }
     }
-`;
-
-export const STORE_STATUS_UPDATED = gql`
+`);
+export const STORE_STATUS_UPDATED = graphql(`
     subscription StoreStatusUpdated {
         storeStatusUpdated {
             isStoreClosed
@@ -28,4 +27,4 @@ export const STORE_STATUS_UPDATED = gql`
             inventoryModeEnabled
         }
     }
-`;
+`);

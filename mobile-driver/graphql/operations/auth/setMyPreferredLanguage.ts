@@ -1,10 +1,10 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const SET_MY_PREFERRED_LANGUAGE_MUTATION = gql`
+export const SET_MY_PREFERRED_LANGUAGE_MUTATION = graphql(`
     mutation SetMyPreferredLanguage($language: AppLanguage!) {
         setMyPreferredLanguage(language: $language) {
             id
             preferredLanguage
         }
     }
-`;
+`);

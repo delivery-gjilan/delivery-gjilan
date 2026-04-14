@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, Image } from 'react-native';
+import { View, Text, TouchableOpacity, Image, ScrollView } from 'react-native';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useTheme } from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
@@ -63,18 +63,12 @@ export function ProductDetails({
     return (
         <View style={{ paddingBottom: 120 }}>
             {/* ── Name + Price + Description ── */}
-            <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 8 }}>
+            <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 4 }}>
                 <Text style={{ color: theme.colors.text, fontSize: 26, fontWeight: '800', letterSpacing: -0.3 }}>
                     {activeProduct.name}
                 </Text>
 
-                {(activeProduct.description || product.description) && (
-                    <Text style={{ color: theme.colors.subtext, fontSize: 15, lineHeight: 22, marginTop: 6 }}>
-                        {activeProduct.description || product.description}
-                    </Text>
-                )}
-
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
                     {preDiscountPrice != null ? (
                         <>
                             <Text style={{ color: theme.colors.expense, fontSize: 22, fontWeight: '800' }}>
@@ -85,23 +79,33 @@ export function ProductDetails({
                             </Text>
                         </>
                     ) : (
-                        <Text style={{ color: theme.colors.primary, fontSize: 22, fontWeight: '800' }}>
+                        <Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: '800' }}>
                             €{effectivePrice.toFixed(2)}
                         </Text>
                     )}
                 </View>
+
+                {(activeProduct.description || product.description) && (
+                    <Text style={{ color: theme.colors.subtext, fontSize: 14, lineHeight: 21, marginTop: 10 }}>
+                        {activeProduct.description || product.description}
+                    </Text>
+                )}
             </View>
 
             {/* ── Size / Variant Picker ── */}
             {selectableVariants.length > 1 && (
-                <View style={{ marginTop: 20 }}>
+                <View style={{ marginTop: 24 }}>
                     <SectionHeader
                         title={t.product.choose_size}
                         badge={t.product.required_badge}
                         badgeColor={theme.colors.primary}
                         theme={theme}
                     />
-                    <View style={{ flexDirection: 'row', paddingHorizontal: 20, gap: 10 }}>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={{ paddingHorizontal: 20, gap: 10 }}
+                    >
                         {selectableVariants.map((v) => {
                             const isActive = selectedVariantId === v.id;
                             const variantPrice = getEffectiveProductPrice(v);
@@ -111,16 +115,34 @@ export function ProductDetails({
                                     onPress={() => setSelectedVariantId(v.id)}
                                     activeOpacity={0.7}
                                     style={{
-                                        flex: 1,
-                                        paddingVertical: 14,
-                                        paddingHorizontal: 10,
-                                        borderRadius: 16,
+                                        minWidth: 100,
+                                        paddingVertical: 12,
+                                        paddingHorizontal: 16,
+                                        borderRadius: 14,
                                         borderWidth: 2,
                                         borderColor: isActive ? theme.colors.primary : theme.colors.border,
                                         backgroundColor: isActive ? theme.colors.primary + '12' : theme.colors.card,
                                         alignItems: 'center',
                                     }}
                                 >
+                                    {/* Check indicator */}
+                                    {isActive && (
+                                        <View
+                                            style={{
+                                                position: 'absolute',
+                                                top: 6,
+                                                right: 6,
+                                                width: 18,
+                                                height: 18,
+                                                borderRadius: 9,
+                                                backgroundColor: theme.colors.primary,
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                            }}
+                                        >
+                                            <Ionicons name="checkmark" size={12} color="#fff" />
+                                        </View>
+                                    )}
                                     <Text
                                         style={{
                                             fontWeight: '700',
@@ -136,32 +158,15 @@ export function ProductDetails({
                                             fontWeight: '600',
                                             fontSize: 13,
                                             color: isActive ? theme.colors.primary : theme.colors.subtext,
-                                            marginTop: 2,
+                                            marginTop: 3,
                                         }}
                                     >
                                         €{variantPrice.toFixed(2)}
                                     </Text>
-                                    {isActive && (
-                                        <View
-                                            style={{
-                                                position: 'absolute',
-                                                top: -1,
-                                                right: -1,
-                                                width: 22,
-                                                height: 22,
-                                                borderRadius: 11,
-                                                backgroundColor: theme.colors.primary,
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                            }}
-                                        >
-                                            <Ionicons name="checkmark" size={14} color="#fff" />
-                                        </View>
-                                    )}
                                 </TouchableOpacity>
                             );
                         })}
-                    </View>
+                    </ScrollView>
                 </View>
             )}
 
@@ -170,20 +175,21 @@ export function ProductDetails({
                 const isRequired = group.minSelections > 0;
                 const isSingleSelect = group.maxSelections === 1;
                 const count = selectedCount(group.id);
+                const isSatisfied = count >= group.minSelections;
 
                 return (
-                    <View key={group.id} style={{ marginTop: 24 }}>
+                    <View key={group.id} style={{ marginTop: 28 }}>
                         <SectionHeader
                             title={group.name}
                             badge={
                                 isRequired
-                                    ? count >= group.minSelections
+                                    ? isSatisfied
                                         ? undefined
                                         : t.product.required_badge
                                     : t.product.optional_badge
                             }
                             badgeColor={
-                                isRequired && count < group.minSelections
+                                isRequired && !isSatisfied
                                     ? theme.colors.expense
                                     : theme.colors.subtext
                             }
@@ -197,106 +203,107 @@ export function ProductDetails({
                             theme={theme}
                         />
 
-                        <View style={{ paddingHorizontal: 20, gap: 6 }}>
-                            {group.options.map((option, idx: number) => {
-                                const isSelected = selectedOptions[group.id]?.includes(option.id);
-                                const isFirst = idx === 0;
-                                const isLast = idx === group.options.length - 1;
+                        <View style={{ paddingHorizontal: 20 }}>
+                            <View
+                                style={{
+                                    borderRadius: 16,
+                                    overflow: 'hidden',
+                                    borderWidth: 1,
+                                    borderColor: theme.colors.border,
+                                }}
+                            >
+                                {group.options.map((option, idx: number) => {
+                                    const isSelected = selectedOptions[group.id]?.includes(option.id);
+                                    const isLast = idx === group.options.length - 1;
 
-                                return (
-                                    <TouchableOpacity
-                                        key={option.id}
-                                        onPress={() => handleOptionToggle(group.id, option.id, group.maxSelections)}
-                                        activeOpacity={0.65}
-                                        style={{
-                                            flexDirection: 'row',
-                                            alignItems: 'center',
-                                            paddingVertical: option.imageUrl ? 10 : 15,
-                                            paddingHorizontal: 16,
-                                            backgroundColor: isSelected ? theme.colors.primary + '0D' : theme.colors.card,
-                                            borderWidth: 1.5,
-                                            borderColor: isSelected ? theme.colors.primary : theme.colors.border,
-                                            borderTopLeftRadius: isFirst ? 16 : 6,
-                                            borderTopRightRadius: isFirst ? 16 : 6,
-                                            borderBottomLeftRadius: isLast ? 16 : 6,
-                                            borderBottomRightRadius: isLast ? 16 : 6,
-                                        }}
-                                    >
-                                        {/* Radio / Checkbox indicator */}
-                                        <View
+                                    return (
+                                        <TouchableOpacity
+                                            key={option.id}
+                                            onPress={() => handleOptionToggle(group.id, option.id, group.maxSelections)}
+                                            activeOpacity={0.65}
                                             style={{
-                                                width: 24,
-                                                height: 24,
-                                                borderRadius: isSingleSelect ? 12 : 7,
-                                                borderWidth: 2,
-                                                borderColor: isSelected ? theme.colors.primary : theme.colors.border,
-                                                backgroundColor: isSelected ? theme.colors.primary : 'transparent',
+                                                flexDirection: 'row',
                                                 alignItems: 'center',
-                                                justifyContent: 'center',
-                                                marginRight: option.imageUrl ? 12 : 14,
+                                                paddingVertical: option.imageUrl ? 10 : 14,
+                                                paddingHorizontal: 16,
+                                                backgroundColor: isSelected
+                                                    ? theme.colors.primary + '0A'
+                                                    : theme.colors.card,
+                                                borderBottomWidth: isLast ? 0 : 1,
+                                                borderBottomColor: theme.colors.border,
                                             }}
                                         >
-                                            {isSelected && (
-                                                <Ionicons name="checkmark" size={15} color="#fff" />
+                                            {/* Option thumbnail */}
+                                            {option.imageUrl && (
+                                                <Image
+                                                    source={{ uri: option.imageUrl }}
+                                                    style={{
+                                                        width: 48,
+                                                        height: 48,
+                                                        borderRadius: 10,
+                                                        marginRight: 12,
+                                                        backgroundColor: theme.colors.background,
+                                                    }}
+                                                    resizeMode="cover"
+                                                />
                                             )}
-                                        </View>
 
-                                        {/* Option thumbnail */}
-                                        {option.imageUrl && (
-                                            <Image
-                                                source={{ uri: option.imageUrl }}
-                                                style={{
-                                                    width: 44,
-                                                    height: 44,
-                                                    borderRadius: 10,
-                                                    marginRight: 12,
-                                                    backgroundColor: theme.colors.background,
-                                                }}
-                                                resizeMode="cover"
-                                            />
-                                        )}
-
-                                        {/* Option name */}
-                                        <Text
-                                            style={{
-                                                flex: 1,
-                                                fontSize: 15,
-                                                fontWeight: isSelected ? '600' : '500',
-                                                color: isSelected ? theme.colors.text : theme.colors.text,
-                                            }}
-                                        >
-                                            {option.name}
-                                        </Text>
-
-                                        {/* Price badge */}
-                                        {option.extraPrice > 0 && (
-                                            <View
-                                                style={{
-                                                    backgroundColor: isSelected ? theme.colors.primary + '18' : theme.colors.background,
-                                                    paddingHorizontal: 10,
-                                                    paddingVertical: 4,
-                                                    borderRadius: 10,
-                                                }}
-                                            >
+                                            {/* Option name + price */}
+                                            <View style={{ flex: 1, marginRight: 12 }}>
                                                 <Text
                                                     style={{
-                                                        color: isSelected ? theme.colors.primary : theme.colors.subtext,
-                                                        fontWeight: '700',
-                                                        fontSize: 13,
+                                                        fontSize: 15,
+                                                        fontWeight: isSelected ? '600' : '400',
+                                                        color: theme.colors.text,
                                                     }}
                                                 >
-                                                    +€{option.extraPrice.toFixed(2)}
+                                                    {option.name}
                                                 </Text>
+                                                {option.extraPrice > 0 ? (
+                                                    <Text
+                                                        style={{
+                                                            color: theme.colors.subtext,
+                                                            fontWeight: '500',
+                                                            fontSize: 13,
+                                                            marginTop: 2,
+                                                        }}
+                                                    >
+                                                        +€{option.extraPrice.toFixed(2)}
+                                                    </Text>
+                                                ) : (
+                                                    <Text
+                                                        style={{
+                                                            color: theme.colors.subtext,
+                                                            fontSize: 12,
+                                                            marginTop: 2,
+                                                        }}
+                                                    >
+                                                        {t.product.included}
+                                                    </Text>
+                                                )}
                                             </View>
-                                        )}
-                                        {option.extraPrice === 0 && (
-                                            <Text style={{ color: theme.colors.subtext, fontSize: 12, fontWeight: '500' }}>
-                                                {t.product.included}
-                                            </Text>
-                                        )}
-                                    </TouchableOpacity>
-                                );
-                            })}
+
+                                            {/* Radio / Checkbox indicator */}
+                                            <View
+                                                style={{
+                                                    width: 24,
+                                                    height: 24,
+                                                    borderRadius: isSingleSelect ? 12 : 6,
+                                                    borderWidth: 2,
+                                                    borderColor: isSelected ? theme.colors.primary : theme.colors.border,
+                                                    backgroundColor: isSelected ? theme.colors.primary : 'transparent',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                }}
+                                            >
+                                                {isSelected && (
+                                                    <Ionicons name="checkmark" size={14} color="#fff" />
+                                                )}
+                                            </View>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
                         </View>
                     </View>
                 );
@@ -321,14 +328,14 @@ function SectionHeader({
 }) {
     return (
         <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: '700', flex: 1 }}>
                     {title}
                 </Text>
                 {badge && (
                     <View
                         style={{
-                            backgroundColor: (badgeColor ?? theme.colors.primary) + '18',
+                            backgroundColor: (badgeColor ?? theme.colors.primary) + '15',
                             paddingHorizontal: 10,
                             paddingVertical: 3,
                             borderRadius: 8,

@@ -6,13 +6,14 @@ import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslations } from '@/hooks/useTranslations';
 import { calculateRouteDistance } from '@/utils/mapbox';
+import type { DriverOrder } from '@/utils/types';
 
 const COUNTDOWN_DURATION = 15;
 const RING_R = 20;
 const RING_C = 2 * Math.PI * RING_R;
 
 interface Props {
-    order: any;
+    order: DriverOrder;
     onAccept: (orderId: string) => void;
     onAcceptAndNavigate?: (orderId: string) => void;
     onSkip: () => void;
@@ -146,7 +147,7 @@ export function OrderAcceptSheet({
 
     // â”€â”€ Derived display values â”€â”€
     const bizName = order.businesses?.[0]?.business?.name ?? 'Business';
-    const allItems = (order.businesses ?? []).flatMap((b: any) => b.items ?? []);
+    const allItems = (order.businesses ?? []).flatMap((b) => b.items ?? []);
     const itemCount = allItems.length;
     const dropAddress = order.dropOffLocation?.address ?? '';
     const shortAddress = dropAddress.split(',')[0] || s.see_map;
@@ -261,7 +262,7 @@ export function OrderAcceptSheet({
                     {/* Items expanded list */}
                     {itemsExpanded && allItems.length > 0 && (
                         <View style={styles.itemsList}>
-                            {allItems.slice(0, 8).map((item: any, idx: number) => (
+                            {allItems.slice(0, 8).map((item, idx: number) => (
                                 <View key={idx} style={[styles.itemRow, idx < allItems.slice(0, 8).length - 1 && styles.itemRowBorder]}>
                                     <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
                                     <View style={styles.itemQtyBadge}>

@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { DriverOrder } from '@/utils/types';
 
 const STATUS_COLORS: Record<string, string> = {
     PENDING: '#f59e0b',
@@ -32,7 +33,7 @@ const STATUS_ICONS: Record<string, string> = {
 };
 
 interface Props {
-    order: any;
+    order: DriverOrder;
     routeInfo: { distanceKm: number; durationMin: number } | null;
     previewRouteInfo: { distanceKm: number; durationMin: number } | null;
     isAssignedToMe: boolean;
@@ -63,7 +64,7 @@ export function OrderDetailSheet({
         return () => clearInterval(id);
     }, []);
 
-    const handleLayout = useCallback((e: any) => {
+    const handleLayout = useCallback((e: { nativeEvent: { layout: { height: number } } }) => {
         onHeightChange?.(e.nativeEvent.layout.height);
     }, [onHeightChange]);
 
@@ -115,8 +116,8 @@ export function OrderDetailSheet({
         ? `${order.user.firstName} ${order.user.lastName}`.trim()
         : '';
     const dropAddress = order.dropOffLocation?.address ?? '';
-    const items: any[] = order.businesses?.flatMap((b: any) => b.items ?? []) ?? [];
-    const totalItems = items.reduce((s: number, i: any) => s + (i.quantity || 1), 0);
+    const items = order.businesses?.flatMap((b) => b.items ?? []) ?? [];
+    const totalItems = items.reduce((s, i) => s + (i.quantity || 1), 0);
     const deliveryPrice = Number(order.deliveryPrice ?? 0).toFixed(2);
     const driverTip = Number(order.driverTip ?? 0);
     const isDelivering = order.status === 'OUT_FOR_DELIVERY';
@@ -262,7 +263,7 @@ export function OrderDetailSheet({
 
                             {itemsExpanded && (
                                 <View style={styles.itemsList}>
-                                    {items.slice(0, 10).map((item: any, idx: number) => (
+                                    {items.slice(0, 10).map((item, idx: number) => (
                                         <View
                                             key={idx}
                                             style={[

@@ -43,7 +43,7 @@ export function useGlobalOrderAccept() {
         skip: !currentDriverId,
     });
     const maxActiveOrders: number =
-        (metricsData as any)?.myDriverMetrics?.maxActiveOrders ?? 5;
+        metricsData?.myDriverMetrics?.maxActiveOrders ?? 5;
 
     // ── Accept / skip / navigate mutations ──
     const { handleAcceptOrder, handleSkipOrder, handleAcceptAndNavigate } = useAcceptOrderMutation({
@@ -52,7 +52,7 @@ export function useGlobalOrderAccept() {
         refetchOrders: refreshOrders,
     });
 
-    const getEstimatedReadyMs = (order: any): number | null => {
+    const getEstimatedReadyMs = (order: { estimatedReadyAt?: string | null; preparingAt?: string | null; preparationMinutes?: number | null }): number | null => {
         const estimatedReadyRaw = order?.estimatedReadyAt;
         if (estimatedReadyRaw) {
             const estimatedReadyMs = new Date(estimatedReadyRaw).getTime();
@@ -96,22 +96,22 @@ export function useGlobalOrderAccept() {
 
     // ── Derived order lists ──
     const assignedOrders = useMemo(() => {
-        return orders.filter((o: any) => {
+        return orders.filter((o) => {
             if (o.status === 'DELIVERED' || o.status === 'CANCELLED') return false;
             return o.driver?.id === currentDriverId;
         });
     }, [orders, currentDriverId]);
 
     useEffect(() => {
-        const assignedIds = assignedOrders.map((order: any) => String(order.id));
+        const assignedIds = assignedOrders.map((order) => String(order.id));
         useOrderAcceptStore.getState().markAssignedOrders(assignedIds);
     }, [assignedOrders]);
 
     const availableOrders = useMemo(() => {
         if (dispatchModeEnabled) return [];
-        const assignedIds = assignedOrders.map((order: any) => String(order.id));
+        const assignedIds = assignedOrders.map((order) => String(order.id));
         const skippedIds = useOrderAcceptStore.getState().getActiveSkippedIds(assignedIds);
-        return orders.filter((o: any) => {
+        return orders.filter((o) => {
             if (o.driver?.id) return false;
             if (skippedIds.has(o.id)) return false;
             if (o.status === 'READY') return true;
@@ -120,7 +120,7 @@ export function useGlobalOrderAccept() {
                 return estimatedReadyMs !== null && estimatedReadyMs - now <= 5 * 60 * 1000;
             }
             return false;
-        }).sort((a: any, b: any) => {
+        }).sort((a, b) => {
             // Keep READY ahead of PREPARING, then sort PREPARING by nearest ETA.
             const rank = (status: string) => (status === 'READY' ? 0 : status === 'PREPARING' ? 1 : 2);
             const rankDiff = rank(a.status) - rank(b.status);
@@ -135,7 +135,7 @@ export function useGlobalOrderAccept() {
     // Pool shows ALL eligible orders regardless of skip — driver can still manually pick a skipped order.
     const poolOrders = useMemo(() => {
         if (dispatchModeEnabled) return [];
-        return orders.filter((o: any) => {
+        return orders.filter((o) => {
             if (o.driver?.id) return false;
             if (o.status === 'READY') return true;
             if (o.status === 'PREPARING') {
@@ -152,7 +152,7 @@ export function useGlobalOrderAccept() {
     // shows up-to-date fields (estimatedReadyAt, status, items) without a separate query.
     const liveOrder = useMemo(() => {
         if (!pendingOrder) return null;
-        return orders.find((o: any) => o.id === pendingOrder.id) ?? pendingOrder;
+        return orders.find((o) => o.id === pendingOrder.id) ?? pendingOrder;
     }, [pendingOrder, orders]);
 
     // ── Dismiss stale modal: clear pendingOrder if it's no longer in availableOrders ──
@@ -163,11 +163,11 @@ export function useGlobalOrderAccept() {
         const store = useOrderAcceptStore.getState();
         if (!store.pendingOrder) return;
         if (store.takenByOther || store.accepting) return;
-        const stillAvailable = availableOrders.some((o: any) => o.id === store.pendingOrder.id);
+        const stillAvailable = availableOrders.some((o) => o.id === store.pendingOrder.id);
         if (!stillAvailable) {
             // Check why it disappeared: still in the order list but now has a different driver
             // means someone else took it — show the overlay instead of silently dismissing.
-            const currentOrder = orders.find((o: any) => o.id === store.pendingOrder.id);
+            const currentOrder = orders.find((o) => o.id === store.pendingOrder.id);
             if (currentOrder?.driver?.id && currentOrder.driver.id !== currentDriverId) {
                 store.setTakenByOther(true);
             } else {
@@ -180,7 +180,7 @@ export function useGlobalOrderAccept() {
     // Depends on pendingOrder so after skip/dismiss the next order surfaces immediately.
     const availableOrdersSignature = useMemo(() => {
         return availableOrders
-            .map((o: any) => `${o.id}:${o.status}:${o.estimatedReadyAt ?? ''}:${o.preparingAt ?? ''}:${o.preparationMinutes ?? ''}`)
+            .map((o) => `${o.id}:${o.status}:${o.estimatedReadyAt ?? ''}:${o.preparingAt ?? ''}:${o.preparationMinutes ?? ''}`)
             .join('|');
     }, [availableOrders]);
 

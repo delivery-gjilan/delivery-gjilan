@@ -74,9 +74,9 @@ export function useAdminPtt(selectedDriverIds: string[], channelName: string, on
             setIsTalking(true);
 
             await sendPttSignal({ variables: { driverIds: selectedDriverIds, channelName, action: 'STARTED', muted: false } });
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.warn('[PTT-Admin-Send] Failed to start', err);
-            setPttError(err?.message || 'Failed to start PTT');
+            setPttError((err as Error)?.message || 'Failed to start PTT');
             if (sendEngineRef.current && sendChannelRef.current) {
                 try { await sendEngineRef.current.leaveChannel(); } catch { /* no-op */ }
             }
@@ -108,8 +108,8 @@ export function useAdminPtt(selectedDriverIds: string[], channelName: string, on
             await sendPttSignal({
                 variables: { driverIds: selectedDriverIds, channelName: sendChannelRef.current, action: muted ? 'MUTE' : 'UNMUTE', muted },
             });
-        } catch (err: any) {
-            setPttError(err?.message || 'Failed to send mute signal');
+        } catch (err: unknown) {
+            setPttError((err as Error)?.message || 'Failed to send mute signal');
         }
     }, [selectedDriverIds, sendPttSignal]);
 
@@ -184,7 +184,7 @@ export function useAdminPtt(selectedDriverIds: string[], channelName: string, on
     useSubscription(ADMIN_PTT_SIGNAL_SUBSCRIPTION, {
         skip: !isAuthenticated,
         onData: async ({ data }) => {
-            const signal = (data.data as any)?.adminPttSignal;
+            const signal = data.data?.adminPttSignal;
             if (!signal) return;
             if (signal.action === 'STARTED') {
                 setIsDriverTalking(false);

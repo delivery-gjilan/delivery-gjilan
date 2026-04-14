@@ -1,10 +1,11 @@
 import type { NavigationOrder, NavigationPhase } from '@/store/navigationStore';
+import type { DriverOrder } from './types';
 
 /**
  * Maps a raw GraphQL order object to a NavigationOrder suitable for navigationStore.
  * Used by drive.tsx (handleStartNavigation, handleMarkPickedUp) and navigation.tsx (switchToOrder).
  */
-export function buildNavOrder(order: any): NavigationOrder | null {
+export function buildNavOrder(order: DriverOrder): NavigationOrder | null {
     const bizLoc = order.businesses?.[0]?.business?.location;
     if (!bizLoc) return null;
 

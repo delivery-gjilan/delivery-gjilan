@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import type { DriverOrder } from '@/utils/types';
 
 const SKIP_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
@@ -17,7 +18,7 @@ const pruneTimestampMap = (entries: TimestampMap, now: number): TimestampMap => 
 };
 
 interface OrderAcceptState {
-    pendingOrder: any | null;
+    pendingOrder: DriverOrder | null;
     autoCountdown: boolean;
     accepting: boolean;
     acceptError: string | null;
@@ -30,7 +31,7 @@ interface OrderAcceptState {
     /** Ref-level debounce: prevents double-tap firing two mutations. */
     _acceptingRef: boolean;
 
-    setPendingOrder: (order: any | null, autoCountdown?: boolean) => void;
+    setPendingOrder: (order: DriverOrder | null, autoCountdown?: boolean) => void;
     skipOrder: () => void;
     setAccepting: (v: boolean) => void;
     setAcceptError: (msg: string | null) => void;
@@ -74,7 +75,7 @@ export const useOrderAcceptStore = create<OrderAcceptState>()(
             },
 
             setAccepting: (v) => {
-                (get() as any)._acceptingRef = v;
+                get()._acceptingRef = v;
                 set({ accepting: v });
             },
 
@@ -111,7 +112,7 @@ export const useOrderAcceptStore = create<OrderAcceptState>()(
             },
 
             tryLockAccept: () => {
-                const state = get() as any;
+                const state = get();
                 if (state._acceptingRef) return false;
                 state._acceptingRef = true;
                 return true;

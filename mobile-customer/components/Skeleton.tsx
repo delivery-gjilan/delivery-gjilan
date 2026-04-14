@@ -35,7 +35,7 @@ export function Skeleton({ width = '100%', height = 20, borderRadius = 8, style 
         outputRange: [0.3, 0.7],
     });
 
-    const computedStyle: any = {
+    const computedStyle: Record<string, unknown> = {
         height,
         borderRadius,
         backgroundColor: theme.colors.card,

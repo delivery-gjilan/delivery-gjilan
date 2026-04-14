@@ -21,6 +21,7 @@ import { CALCULATE_DELIVERY_PRICE } from '@/graphql/operations/deliveryPricing';
 import { GET_SERVICE_ZONES } from '@/graphql/operations/serviceZone';
 import { GET_BUSINESS_MINIMUM } from '@/graphql/operations/businesses';
 import type { UserAddress } from '@/gql/graphql';
+import type { PromoResult } from '../types';
 import { isPointInPolygon } from '@/utils/pointInPolygon';
 import { RepeatOrCustomizeModal } from '@/modules/business/components/RepeatOrCustomizeModal';
 import { useCartDataStore } from '../store/cartDataStore';
@@ -118,22 +119,7 @@ export const CartScreen = () => {
     const [setDefaultAddress] = useMutation(SET_DEFAULT_ADDRESS, {
         refetchQueries: [{ query: GET_MY_ADDRESSES }],
     });
-    const [promoResult, setPromoResult] = useState<{
-        promotionId: string | null;
-        promotionIds: string[];
-        code: string;
-        promotionSummary: string | null;
-        deliveryPromotionSummary: string | null;
-        orderDiscountAmount: number;
-        deliveryDiscountAmount: number;
-        autoApplyReason?: string | null;
-        selectionReason?: string | null;
-        discountAmount: number;
-        freeDeliveryApplied: boolean;
-        effectiveDeliveryPrice: number;
-        totalPrice: number;
-        source: 'eligible' | 'manual';
-    } | null>(null);
+    const [promoResult, setPromoResult] = useState<PromoResult | null>(null);
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const proceedButtonAnim = useRef(new Animated.Value(1)).current;
     const feeRequestSequenceRef = useRef(0);

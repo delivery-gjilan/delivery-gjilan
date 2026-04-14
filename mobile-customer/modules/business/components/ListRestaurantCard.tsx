@@ -20,7 +20,7 @@ const getPlaceholderImage = (id: string): string => {
     return FALLBACK_IMAGES[hash % FALLBACK_IMAGES.length];
 };
 
-function promoLabel(promo: NonNullable<ListRestaurantCardProps['activePromotion']>, t: any): string {
+function promoLabel(promo: NonNullable<ListRestaurantCardProps['activePromotion']>, t: ReturnType<typeof useTranslations>['t']): string {
     if (promo.type === 'PERCENTAGE' && promo.discountValue)
         return t.business.item_discount.replace('{{percent}}', String(Math.round(promo.discountValue)));
     if (promo.type === 'FIXED_AMOUNT' && promo.discountValue)

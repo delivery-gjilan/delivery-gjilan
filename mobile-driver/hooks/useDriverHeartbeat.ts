@@ -314,7 +314,7 @@ export function useDriverHeartbeat() {
         new Promise((_, reject) => 
           setTimeout(() => reject(new Error('GPS timeout')), 2000)
         ),
-      ]) as any;
+      ]) as Location.LocationObject;
       
       if (location) {
         const coords = {
@@ -428,7 +428,7 @@ export function useDriverHeartbeat() {
         },
       });
 
-      const data = (result.data as any)?.driverHeartbeat;
+      const data = result.data?.driverHeartbeat;
       if (data?.success) {
         lastHeartbeatSentRef.current = Date.now();
         consecutiveFailuresRef.current = 0; // Reset backoff on success
@@ -437,7 +437,7 @@ export function useDriverHeartbeat() {
       } else {
         console.warn('[Heartbeat] Failed:', result.error);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       consecutiveFailuresRef.current += 1;
       const failures = consecutiveFailuresRef.current;
 
@@ -446,7 +446,7 @@ export function useDriverHeartbeat() {
       const jitter = baseDelay * (0.8 + Math.random() * 0.4);
       const retryDelay = Math.round(jitter);
 
-      console.error(`[Heartbeat] Error (failure #${failures}), retrying in ${retryDelay}ms:`, err.message);
+      console.error(`[Heartbeat] Error (failure #${failures}), retrying in ${retryDelay}ms:`, (err as Error).message);
 
       // Mark as STALE after 3 consecutive failures
       if (failures >= 3) {

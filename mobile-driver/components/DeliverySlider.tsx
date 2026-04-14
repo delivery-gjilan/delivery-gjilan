@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable, ScrollView, Animated, PanResponder, 
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useTranslations } from '@/hooks/useTranslations';
+import type { DriverOrder } from '@/utils/types';
 
 const THUMB = 56;
 const TRACK_H = 62;
@@ -15,7 +16,7 @@ interface Props {
     arrivedNotifSent: boolean;
     arrivedAt: number;
     notifiedAt: number | null;
-    businesses: any[];
+    businesses: DriverOrder['businesses'];
     orderPrice: number;
     deliveryPrice: number;
     totalPrice: number;
@@ -188,7 +189,7 @@ export function DeliverySlider({
                         {businesses.length > 0 && (
                             <View style={styles.itemsSection}>
                                 <ScrollView style={{ maxHeight: 108 }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-                                    {businesses.flatMap((b: any) => b.items ?? []).map((item: any, i: number) => (
+                                    {businesses.flatMap((b) => b.items ?? []).map((item, i: number) => (
                                         <View key={i} style={styles.itemRow}>
                                             <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
                                             <Text style={styles.itemQty}>×{item.quantity}</Text>

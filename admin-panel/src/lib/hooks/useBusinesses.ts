@@ -8,24 +8,35 @@ import {
     UPDATE_BUSINESS,
     DELETE_BUSINESS,
 } from '@/graphql/operations/businesses';
+import type {
+    BusinessesQuery,
+    BusinessQuery,
+    CreateBusinessInput,
+    CreateBusinessMutation,
+    UpdateBusinessInput,
+    UpdateBusinessMutation,
+} from '@/gql/graphql';
+
+type BusinessList = BusinessesQuery['businesses'];
+type BusinessItem = BusinessList[number];
 
 export interface UseBusinessesResult {
-    businesses: any[];
+    businesses: BusinessList;
     loading: boolean;
     error?: string;
     refetch: () => void;
 }
 
 export interface UseBusinessResult {
-    business: any | null;
+    business: BusinessQuery['business'];
     loading: boolean;
     error?: string;
 }
 
 export interface UseCreateBusinessResult {
-    create: (input: any) => Promise<{
+    create: (input: CreateBusinessInput) => Promise<{
         success: boolean;
-        data?: any;
+        data?: CreateBusinessMutation;
         error?: string;
     }>;
     loading: boolean;
@@ -33,9 +44,9 @@ export interface UseCreateBusinessResult {
 }
 
 export interface UseUpdateBusinessResult {
-    update: (id: string, input: any) => Promise<{
+    update: (id: string, input: UpdateBusinessInput) => Promise<{
         success: boolean;
-        data?: any;
+        data?: UpdateBusinessMutation;
         error?: string;
     }>;
     loading: boolean;
@@ -55,7 +66,7 @@ export function useBusinesses(): UseBusinessesResult {
     const { data, loading, error, refetch } = useQuery(GET_BUSINESSES);
 
     return {
-        businesses: (data as any)?.businesses || [],
+        businesses: data?.businesses || [],
         loading,
         error: error?.message,
         refetch: () => refetch(),
@@ -69,7 +80,7 @@ export function useBusiness(id: string): UseBusinessResult {
     });
 
     return {
-        business: (data as any)?.business || null,
+        business: data?.business || null,
         loading,
         error: error?.message,
     };

@@ -261,9 +261,9 @@ describe('orders derivation priority', () => {
     const cachedOrders = [{ id: 'c1' }];
 
     function deriveOrders(
-        queryData: any[] | null,
-        subscriptionOrders: any[] | null,
-        cachedOrders: any[],
+        queryData: { id: string }[] | null,
+        subscriptionOrders: { id: string }[] | null,
+        cachedOrders: { id: string }[],
         networkReady: boolean,
     ) {
         return queryData ?? subscriptionOrders ?? (networkReady ? cachedOrders : []);

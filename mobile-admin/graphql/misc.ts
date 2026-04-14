@@ -1,37 +1,37 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
 // ─── Store Status ───
 
-export const GET_STORE_STATUS = gql`
+export const GET_STORE_STATUS = graphql(`
     query GetStoreStatus {
         getStoreStatus {
             isStoreClosed
             closedMessage
         }
     }
-`;
+`);
 
-export const UPDATE_STORE_STATUS = gql`
+export const UPDATE_STORE_STATUS = graphql(`
     mutation UpdateStoreStatus($input: UpdateStoreStatusInput!) {
         updateStoreStatus(input: $input) {
             isStoreClosed
             closedMessage
         }
     }
-`;
+`);
 
-export const SET_MY_PREFERRED_LANGUAGE = gql`
+export const SET_MY_PREFERRED_LANGUAGE = graphql(`
     mutation SetMyPreferredLanguage($language: AppLanguage!) {
         setMyPreferredLanguage(language: $language) {
             id
             preferredLanguage
         }
     }
-`;
+`);
 
 // ─── Notifications ───
 
-export const GET_NOTIFICATION_CAMPAIGNS = gql`
+export const GET_NOTIFICATION_CAMPAIGNS = graphql(`
     query GetNotificationCampaigns {
         notificationCampaigns {
             id
@@ -45,9 +45,9 @@ export const GET_NOTIFICATION_CAMPAIGNS = gql`
             sentAt
         }
     }
-`;
+`);
 
-export const SEND_CAMPAIGN = gql`
+export const SEND_CAMPAIGN = graphql(`
     mutation SendCampaign($id: ID!) {
         sendCampaign(id: $id) {
             id
@@ -57,9 +57,9 @@ export const SEND_CAMPAIGN = gql`
             sentAt
         }
     }
-`;
+`);
 
-export const CREATE_CAMPAIGN = gql`
+export const CREATE_CAMPAIGN = graphql(`
     mutation CreateCampaign($input: CreateCampaignInput!) {
         createCampaign(input: $input) {
             id
@@ -68,11 +68,11 @@ export const CREATE_CAMPAIGN = gql`
             status
         }
     }
-`;
+`);
 
 // ─── Settlements ───
 
-export const GET_SETTLEMENTS = gql`
+export const GET_SETTLEMENTS = graphql(`
     query GetSettlements(
         $type: SettlementType
         $status: SettlementStatus
@@ -97,9 +97,9 @@ export const GET_SETTLEMENTS = gql`
             createdAt
         }
     }
-`;
+`);
 
-export const MARK_SETTLEMENT_PAID = gql`
+export const MARK_SETTLEMENT_PAID = graphql(`
     mutation MarkSettlementAsPaid($settlementId: ID!) {
         markSettlementAsPaid(settlementId: $settlementId) {
             id
@@ -107,4 +107,4 @@ export const MARK_SETTLEMENT_PAID = gql`
             paidAt
         }
     }
-`;
+`);

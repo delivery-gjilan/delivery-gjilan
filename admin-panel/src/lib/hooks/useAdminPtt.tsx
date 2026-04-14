@@ -124,11 +124,12 @@ export function AdminPttProvider({ children }: { children: React.ReactNode }) {
         try {
           const agora = await getAgoraRTC();
           micTrack = await agora.createMicrophoneAudioTrack();
-        } catch (micErr: any) {
+        } catch (micErr: unknown) {
+          const micError = micErr as Record<string, unknown>;
           throw new Error(
-            micErr?.code === "DEVICE_NOT_FOUND"
+            micError?.code === "DEVICE_NOT_FOUND"
               ? "No microphone found. Please connect a microphone and try again."
-              : `Microphone error: ${micErr?.message || "unknown"}`,
+              : `Microphone error: ${(micErr as Error)?.message || "unknown"}`,
           );
         }
         await client.join(creds.appId, creds.channelName, creds.token, creds.uid);

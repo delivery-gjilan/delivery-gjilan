@@ -34,8 +34,8 @@ export default function OrderDetailScreen() {
     const [showDriverModal, setShowDriverModal] = useState(false);
     const [selectedPrepTime, setSelectedPrepTime] = useState(20);
 
-    const { data, loading, refetch }: any = useQuery(GET_ORDER, { variables: { id: orderId } });
-    const { data: driversData }: any = useQuery(GET_DRIVERS);
+    const { data, loading, refetch } = useQuery(GET_ORDER, { variables: { id: orderId } });
+    const { data: driversData } = useQuery(GET_DRIVERS);
 
     const [updateStatus, { loading: statusLoading }] = useMutation(UPDATE_ORDER_STATUS);
     const [startPreparing, { loading: prepLoading }] = useMutation(START_PREPARING);
@@ -65,8 +65,8 @@ export default function OrderDetailScreen() {
             });
             setShowPrepModal(false);
             refetch();
-        } catch (err: any) {
-            Alert.alert('Error', err.message);
+        } catch (err: unknown) {
+            Alert.alert('Error', (err as Error).message);
         }
     };
 
@@ -74,8 +74,8 @@ export default function OrderDetailScreen() {
         try {
             await updateStatus({ variables: { id: orderId, status } });
             refetch();
-        } catch (err: any) {
-            Alert.alert('Error', err.message);
+        } catch (err: unknown) {
+            Alert.alert('Error', (err as Error).message);
         }
     };
 
@@ -89,8 +89,8 @@ export default function OrderDetailScreen() {
                     try {
                         await cancelOrder({ variables: { id: orderId } });
                         refetch();
-                    } catch (err: any) {
-                        Alert.alert('Error', err.message);
+                    } catch (err: unknown) {
+                        Alert.alert('Error', (err as Error).message);
                     }
                 },
             },
@@ -102,13 +102,13 @@ export default function OrderDetailScreen() {
             await assignDriver({ variables: { id: orderId, driverId } });
             setShowDriverModal(false);
             refetch();
-        } catch (err: any) {
-            Alert.alert('Error', err.message);
+        } catch (err: unknown) {
+            Alert.alert('Error', (err as Error).message);
         }
     };
 
     const onlineDrivers = drivers.filter(
-        (d: any) => d.driverConnection?.connectionStatus === 'CONNECTED',
+        (d) => d.driverConnection?.connectionStatus === 'CONNECTED',
     );
 
     return (
@@ -211,7 +211,7 @@ export default function OrderDetailScreen() {
                 </View>
 
                 {/* Businesses & Items */}
-                {order.businesses?.map((b: any, i: number) => (
+                {order.businesses?.map((b, i: number) => (
                     <View key={i} className="rounded-2xl p-4 mb-3" style={{ backgroundColor: theme.colors.card }}>
                         <View className="flex-row items-center mb-2">
                             <Ionicons
@@ -223,7 +223,7 @@ export default function OrderDetailScreen() {
                                 {b.business?.name}
                             </Text>
                         </View>
-                        {b.items?.map((item: any, j: number) => (
+                        {b.items?.map((item, j: number) => (
                             <View key={j} className="flex-row items-center justify-between py-1.5" style={j > 0 ? { borderTopWidth: 1, borderTopColor: theme.colors.border } : {}}>
                                 <View className="flex-row items-center flex-1">
                                     <View className="w-6 h-6 rounded-md items-center justify-center mr-2" style={{ backgroundColor: `${theme.colors.primary}15` }}>
@@ -266,8 +266,8 @@ export default function OrderDetailScreen() {
                                 try {
                                     await approveOrder({ variables: { id: orderId } });
                                     refetch();
-                                } catch (err: any) {
-                                    Alert.alert('Error', err.message);
+                                } catch (err: unknown) {
+                                    Alert.alert('Error', (err as Error).message);
                                 }
                             }}
                             loading={approveLoading}
@@ -362,7 +362,7 @@ export default function OrderDetailScreen() {
                         No drivers online
                     </Text>
                 ) : (
-                    onlineDrivers.map((driver: any) => (
+                    onlineDrivers.map((driver) => (
                         <TouchableOpacity
                             key={driver.id}
                             className="flex-row items-center p-3 rounded-xl mb-2"

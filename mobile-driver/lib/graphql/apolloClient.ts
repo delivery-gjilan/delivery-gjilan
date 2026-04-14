@@ -42,8 +42,7 @@ const logLink = new ApolloLink((operation, forward) => {
     return forward(operation);
 });
 
-const errorLink = onError((errorContext: any) => {
-    const { graphQLErrors, networkError } = errorContext;
+const errorLink = onError(({ graphQLErrors, networkError }) => {
     if (graphQLErrors) {
         for (const err of graphQLErrors) {
             if (err.extensions?.code === 'UNAUTHENTICATED' || err.message === 'Unauthorized') {
@@ -53,7 +52,7 @@ const errorLink = onError((errorContext: any) => {
             }
         }
     }
-    if (networkError && 'statusCode' in networkError && (networkError as any).statusCode === 401) {
+    if (networkError && 'statusCode' in networkError && (networkError as Record<string, unknown>).statusCode === 401) {
         console.warn('[Apollo] 401 Unauthorized - token may need refresh');
         // DON'T auto-logout - let user stay logged in
         // This prevents forced logouts due to temporary auth issues or token expiry

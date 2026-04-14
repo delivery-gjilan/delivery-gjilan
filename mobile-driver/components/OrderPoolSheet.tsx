@@ -1,14 +1,15 @@
 ﻿import React, { useEffect, useRef } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, Animated, Image, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, Animated, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslations } from '@/hooks/useTranslations';
+import type { DriverOrder } from '@/utils/types';
 
 interface Props {
-    orders: any[];
+    orders: DriverOrder[];
     accepting?: boolean;
-    onAccept: (order: any) => void;
-    onAcceptAndNavigate: (order: any) => void;
+    onAccept: (order: DriverOrder) => void;
+    onAcceptAndNavigate: (order: DriverOrder) => void;
     onClose: () => void;
 }
 
@@ -79,13 +80,11 @@ export function OrderPoolSheet({ orders, accepting = false, onAccept, onAcceptAn
                         contentContainerStyle={styles.list}
                         keyboardShouldPersistTaps="handled"
                     >
-                        {orders.map((order: any) => {
+                        {orders.map((order) => {
                             const biz = order.businesses?.[0]?.business;
                             const bizName = biz?.name ?? 'Business';
-                            const bizImageUrl = biz?.imageUrl;
-                            const isRestaurant = biz?.businessType === 'RESTAURANT';
                             const itemCount = (order.businesses ?? []).reduce(
-                                (acc: number, b: any) => acc + (b.items?.length ?? 0), 0,
+                                (acc: number, b) => acc + (b.items?.length ?? 0), 0,
                             );
                             const dropAddress = order.dropOffLocation?.address ?? '';
                             const shortAddress = dropAddress.split(',')[0] || s.see_map;
@@ -112,17 +111,13 @@ export function OrderPoolSheet({ orders, accepting = false, onAccept, onAcceptAn
                                         <View style={styles.cardTop}>
                                             {/* Business avatar */}
                                             <View style={styles.bizAvatarWrap}>
-                                                {bizImageUrl ? (
-                                                    <Image source={{ uri: bizImageUrl }} style={styles.bizImage} />
-                                                ) : (
-                                                    <View style={styles.bizInitialWrap}>
+                                                <View style={styles.bizInitialWrap}>
                                                         <Ionicons
-                                                            name={isRestaurant ? 'restaurant' : 'storefront'}
+                                                            name="storefront"
                                                             size={16}
                                                             color="#a78bfa"
                                                         />
                                                     </View>
-                                                )}
                                             </View>
 
                                             <View style={styles.bizInfo}>

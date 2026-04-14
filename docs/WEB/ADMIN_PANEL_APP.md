@@ -449,13 +449,13 @@ Shows per-item fulfillment split (stock vs. market) for an order. Items categori
 
 | Hook | Purpose |
 |---|---|
-| `useAdminPtt` | Agora RTC context — admin PTT send + driver PTT receive via subscription |
-| `useOrders` | Orders query + `ALL_ORDERS_SUBSCRIPTION`; new-order beep + toast; refetch cooldown |
-| `useMapRealtimeData` | Drivers + orders + businesses for map; subscription-primary, 30s polling fallback; `mergeDriversByTimestamp()` |
+| `useAdminPtt` | Agora RTC context — admin PTT send + driver PTT receive via subscription; shared hook state is typed at the GraphQL boundary |
+| `useOrders` | Orders query + `ALL_ORDERS_SUBSCRIPTION`; new-order beep + toast; refetch cooldown; shared return shapes are typed from codegen |
+| `useMapRealtimeData` | Drivers + orders + businesses for map; subscription-primary, 30s polling fallback; `mergeDriversByTimestamp()`; shared realtime state is typed from codegen |
 | `useOrderRouteDistances` | Mapbox route calc per active order; recalc on >80m move or >60s elapsed |
-| `usePrepTimeAlerts` | Fires `PrepTimeAlert` when `preparationMinutes` increases on a PREPARING order; 10-min TTL auto-dismiss |
-| `useBusinesses` / `useBusiness` | Business query + CRUD mutations |
-| `useProducts` | Products + categories query for a business |
+| `usePrepTimeAlerts` | Fires `PrepTimeAlert` when `preparationMinutes` increases on a PREPARING order; 10-min TTL auto-dismiss; subscription payload is typed |
+| `useBusinesses` / `useBusiness` | Business query + CRUD mutations; shared return/mutation payloads are typed from codegen |
+| `useProducts` | Products + categories query for a business; flattened product list is normalized into a typed hook result |
 | `useProductCategories` | Category CRUD hooks |
 | `useProductSubcategories` | Subcategory CRUD hooks |
 

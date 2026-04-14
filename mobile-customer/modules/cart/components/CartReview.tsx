@@ -4,7 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import Reanimated, { FadeInDown } from 'react-native-reanimated';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
-import type { CartItem } from '../types';
+import type { CartItem, PromoResult } from '../types';
+import type { GetPromotionThresholdsQuery } from '@/gql/graphql';
 import { CartItemRow } from './CartItemRow';
 import { PromotionProgressBar } from './PromotionProgressBar';
 
@@ -15,11 +16,11 @@ interface CartReviewProps {
     minOrderAmount: number;
     amountUntilMinimum: number;
     /** Threshold-based promotion data */
-    applicableConditional: any | null;
+    applicableConditional: GetPromotionThresholdsQuery['getPromotionThresholds'][number] | null;
     spendThreshold: number | null | undefined;
     progress: number;
     amountRemaining: number;
-    promoResult: any | null;
+    promoResult: PromoResult | null;
     /** Pulse animation for the proceed button */
     pulseAnim: Animated.Value;
     formatCurrency: (value: number) => string;

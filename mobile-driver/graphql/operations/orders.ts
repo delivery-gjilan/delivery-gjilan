@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const GET_ORDERS = gql`
+export const GET_ORDERS = graphql(`
     query GetOrders {
         orders {
             orders {
@@ -52,9 +52,8 @@ export const GET_ORDERS = gql`
             }
         }
     }
-`;
-
-export const GET_ORDER = gql`
+`);
+export const GET_ORDER = graphql(`
     query GetOrder($id: ID!) {
         order(id: $id) {
             id
@@ -101,9 +100,8 @@ export const GET_ORDER = gql`
             }
         }
     }
-`;
-
-export const ASSIGN_DRIVER_TO_ORDER = gql`
+`);
+export const ASSIGN_DRIVER_TO_ORDER = graphql(`
     mutation AssignDriverToOrder($id: ID!, $driverId: ID) {
         assignDriverToOrder(id: $id, driverId: $driverId) {
             id
@@ -115,24 +113,21 @@ export const ASSIGN_DRIVER_TO_ORDER = gql`
             }
         }
     }
-`;
-
-export const UPDATE_ORDER_STATUS = gql`
+`);
+export const UPDATE_ORDER_STATUS = graphql(`
     mutation UpdateOrderStatus($id: ID!, $status: OrderStatus!) {
         updateOrderStatus(id: $id, status: $status) {
             id
             status
         }
     }
-`;
-
-export const DRIVER_NOTIFY_CUSTOMER = gql`
+`);
+export const DRIVER_NOTIFY_CUSTOMER = graphql(`
     mutation DriverNotifyCustomer($orderId: ID!, $kind: DriverCustomerNotificationKind!) {
         driverNotifyCustomer(orderId: $orderId, kind: $kind)
     }
-`;
-
-export const ALL_ORDERS_UPDATED = gql`
+`);
+export const ALL_ORDERS_UPDATED = graphql(`
     subscription AllOrdersUpdated {
         allOrdersUpdated {
             id
@@ -182,9 +177,8 @@ export const ALL_ORDERS_UPDATED = gql`
             }
         }
     }
-`;
-
-export const ORDER_STATUS_UPDATED = gql`
+`);
+export const ORDER_STATUS_UPDATED = graphql(`
     subscription OrderStatusUpdated($orderId: ID!) {
         orderStatusUpdated(orderId: $orderId) {
             id
@@ -196,4 +190,4 @@ export const ORDER_STATUS_UPDATED = gql`
             }
         }
     }
-`;
+`);

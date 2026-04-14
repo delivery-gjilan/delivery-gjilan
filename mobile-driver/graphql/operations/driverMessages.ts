@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const MY_DRIVER_MESSAGES = gql`
+export const MY_DRIVER_MESSAGES = graphql(`
     query MyDriverMessages($limit: Int, $offset: Int) {
         myDriverMessages(limit: $limit, offset: $offset) {
             id
@@ -13,9 +13,8 @@ export const MY_DRIVER_MESSAGES = gql`
             createdAt
         }
     }
-`;
-
-export const DRIVER_MESSAGE_RECEIVED_SUB = gql`
+`);
+export const DRIVER_MESSAGE_RECEIVED_SUB = graphql(`
     subscription DriverMessageReceived {
         driverMessageReceived {
             id
@@ -28,9 +27,8 @@ export const DRIVER_MESSAGE_RECEIVED_SUB = gql`
             createdAt
         }
     }
-`;
-
-export const REPLY_TO_DRIVER_MESSAGE = gql`
+`);
+export const REPLY_TO_DRIVER_MESSAGE = graphql(`
     mutation ReplyToDriverMessage($adminId: ID!, $body: String!) {
         replyToDriverMessage(adminId: $adminId, body: $body) {
             id
@@ -43,10 +41,9 @@ export const REPLY_TO_DRIVER_MESSAGE = gql`
             createdAt
         }
     }
-`;
-
-export const MARK_DRIVER_MESSAGES_READ_DRIVER = gql`
+`);
+export const MARK_DRIVER_MESSAGES_READ_DRIVER = graphql(`
     mutation MarkDriverMessagesReadDriver($otherUserId: ID!) {
         markDriverMessagesRead(otherUserId: $otherUserId)
     }
-`;
+`);

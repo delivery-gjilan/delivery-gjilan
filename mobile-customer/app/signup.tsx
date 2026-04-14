@@ -45,7 +45,7 @@ function CodeInput({
     value: string;
     onChange: (v: string) => void;
     length?: number;
-    theme: any;
+    theme: typeof DARK_AUTH_THEME;
     editable?: boolean;
 }) {
     const inputRef = useRef<TextInput>(null);
@@ -97,7 +97,7 @@ function InputRow({
 }: {
     icon: string;
     children: React.ReactNode;
-    theme: any;
+    theme: typeof DARK_AUTH_THEME;
     borderColor?: string;
 }) {
     return (
