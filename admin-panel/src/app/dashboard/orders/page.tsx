@@ -559,7 +559,7 @@ export default function OrdersPage() {
                             <span className="ml-2 text-zinc-600">({visibleActiveOrders.length})</span>
                         </div>
 
-                        <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,360px))] gap-4 flex-1 content-start">
+                        <div className="grid grid-cols-2 gap-4 flex-1 content-start">
                             {visibleActiveOrders.length === 0 ? (
                                 <div className="col-span-full text-center text-zinc-600 py-12">
                                     {debouncedSearch ? "No active orders matching your search" : "No active orders"}

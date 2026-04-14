@@ -218,21 +218,13 @@ export default function Topbar() {
 
               <div className="w-px h-4 bg-zinc-800" />
 
-              <div className="flex items-center gap-1.5 text-xs text-zinc-500">
-                <span>Order mode</span>
-                <span className="text-zinc-400">Currently:</span>
-                <span className={`font-medium ${dispatchModeEnabled ? 'text-amber-300' : 'text-emerald-300'}`}>
-                  {assignmentModeLabel}
-                </span>
-              </div>
-
               <button
                 onClick={handleToggleDispatch}
                 disabled={updating}
                 className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
                   dispatchModeEnabled
                     ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20'
-                    : 'text-zinc-500 hover:text-zinc-300'
+                    : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20'
                 }`}
                 title={dispatchModeEnabled ? 'Dispatch mode ON — you assign orders manually' : 'Self-assign mode — drivers race to accept'}
               >
