@@ -23,8 +23,8 @@ export default function ForgotPasswordPage() {
         try {
             await requestReset({ variables: { email: email.trim() } });
             setSent(true);
-        } catch (err: any) {
-            setError(err.message ?? t("auth.reset_error"));
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : t("auth.reset_error"));
         }
     };
 

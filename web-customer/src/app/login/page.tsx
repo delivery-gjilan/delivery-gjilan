@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/Input";
 import { LOGIN_MUTATION } from "@/graphql/operations/auth/login";
 import Link from "next/link";
 import { Loader2, Eye, EyeOff } from "lucide-react";
+import type { LoginResult } from "@/types/graphql";
 
 export default function LoginPage() {
     return (
@@ -40,7 +41,7 @@ function LoginContent() {
             const res = await loginMutation({
                 variables: { input: { email: email.trim(), password } },
             });
-            const data = (res.data as any)?.login;
+            const data = (res.data as { login?: LoginResult } | undefined)?.login;
             if (data?.token && data?.user) {
                 loginWithToken(data.token, data.refreshToken ?? null, data.user);
                 const nextPath = searchParams.get("next");
@@ -49,8 +50,8 @@ function LoginContent() {
             } else {
                 setError(data?.message ?? t("auth.login_failed"));
             }
-        } catch (err: any) {
-            setError(err.message ?? t("auth.login_failed"));
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : t("auth.login_failed"));
         }
     };
 

@@ -14,6 +14,7 @@ import { VERIFY_PHONE_MUTATION } from "@/graphql/operations/auth/verifyPhone";
 import { RESEND_EMAIL_VERIFICATION_MUTATION } from "@/graphql/operations/auth/resendEmailVerification";
 import Link from "next/link";
 import { Loader2, ArrowLeft, Check } from "lucide-react";
+import type { InitiateSignupResult, SignupStepResult } from "@/types/graphql";
 
 type SignupStep = "account" | "verify-email" | "add-phone" | "verify-phone" | "complete";
 
@@ -52,7 +53,7 @@ export default function SignupPage() {
                     input: { firstName: firstName.trim(), lastName: lastName.trim(), email: email.trim(), password },
                 },
             });
-            const data = (res.data as any)?.initiateSignup;
+            const data = (res.data as { initiateSignup?: InitiateSignupResult } | undefined)?.initiateSignup;
             if (data?.token && data?.user) {
                 loginWithToken(data.token, null, data.user);
                 setUserId(data.user.id);
@@ -60,8 +61,8 @@ export default function SignupPage() {
             } else {
                 setError(data?.message ?? t("auth.signup_failed"));
             }
-        } catch (err: any) {
-            setError(err.message ?? t("auth.signup_failed"));
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : t("auth.signup_failed"));
         }
     };
 
@@ -70,12 +71,12 @@ export default function SignupPage() {
         setError(null);
         try {
             const res = await verifyEmail({ variables: { input: { userId, code: emailCode } } });
-            const data = (res.data as any)?.verifyEmail;
+            const data = (res.data as { verifyEmail?: SignupStepResult } | undefined)?.verifyEmail;
             if (data?.currentStep) {
                 setStep("add-phone");
             }
-        } catch (err: any) {
-            setError(err.message ?? t("auth.verify_error"));
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : t("auth.verify_error"));
         }
     };
 
@@ -84,12 +85,12 @@ export default function SignupPage() {
         setError(null);
         try {
             const res = await submitPhone({ variables: { input: { userId, phoneNumber: phone.trim() } } });
-            const data = (res.data as any)?.submitPhoneNumber;
+            const data = (res.data as { submitPhoneNumber?: SignupStepResult } | undefined)?.submitPhoneNumber;
             if (data?.currentStep) {
                 setStep("verify-phone");
             }
-        } catch (err: any) {
-            setError(err.message ?? t("auth.verify_error"));
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : t("auth.verify_error"));
         }
     };
 
@@ -98,13 +99,13 @@ export default function SignupPage() {
         setError(null);
         try {
             const res = await verifyPhone({ variables: { input: { userId, code: phoneCode } } });
-            const data = (res.data as any)?.verifyPhone;
+            const data = (res.data as { verifyPhone?: SignupStepResult } | undefined)?.verifyPhone;
             if (data?.currentStep) {
                 setStep("complete");
                 setTimeout(() => router.push("/"), 2000);
             }
-        } catch (err: any) {
-            setError(err.message ?? t("auth.verify_error"));
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : t("auth.verify_error"));
         }
     };
 

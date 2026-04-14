@@ -44,8 +44,8 @@ function ResetPasswordContent() {
             await resetPassword({ variables: { token, newPassword: password } });
             setSuccess(true);
             setTimeout(() => router.push("/login"), 3000);
-        } catch (err: any) {
-            setError(err.message ?? t("auth.reset_error"));
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : t("auth.reset_error"));
         }
     };
 
