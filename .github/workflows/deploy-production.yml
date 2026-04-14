@@ -3,6 +3,9 @@ name: Deploy to Production
 on:
   push:
     branches: [main]
+    paths:
+      - "api/**"
+      - ".github/workflows/deploy-production.yml"
 
   # Allow manual deploys from GitHub UI
   workflow_dispatch:

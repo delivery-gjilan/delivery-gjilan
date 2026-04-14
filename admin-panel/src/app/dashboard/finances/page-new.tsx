@@ -10,20 +10,11 @@ import {
     MARK_SETTLEMENT_PARTIAL,
     UNSETTLE_SETTLEMENT,
 } from '@/graphql/operations/settlements/queries';
+import type { SettlementsPageQuery } from '@/gql/graphql';
 import { format, startOfDay, startOfMonth } from 'date-fns';
 import { toast } from 'sonner';
 
-interface Settlement {
-    id: string;
-    type: 'DRIVER_PAYMENT' | 'BUSINESS_PAYMENT';
-    driver?: { id: string; firstName: string; lastName: string; phoneNumber: string };
-    business?: { id: string; name: string };
-    order: { id: string; orderPrice: number; deliveryPrice: number; totalPrice: number };
-    amount: number;
-    status: 'PENDING' | 'PAID';
-    paidAt?: string;
-    createdAt: string;
-}
+type Settlement = SettlementsPageQuery['settlements'][number];
 
 export default function FinancesDashboard() {
     const [dateMode, setDateMode] = useState<'all' | 'today' | 'month' | 'custom'>('all');
@@ -81,7 +72,7 @@ export default function FinancesDashboard() {
         onCompleted: () => refetchSettlements(),
     });
 
-    const settlements: Settlement[] = (settlementsData?.settlements ?? []) as Settlement[];
+    const settlements: Settlement[] = settlementsData?.settlements ?? [];
 
     // Get unique businesses and drivers
     const { businesses, drivers } = useMemo(() => {
@@ -119,8 +110,8 @@ export default function FinancesDashboard() {
     // Sort by order total descending
     const sortedSettlements = useMemo(() => {
         return [...settlements].sort((a, b) => {
-            const aTotal = a.type === 'DRIVER_PAYMENT' ? a.order?.deliveryPrice ?? 0 : a.order?.orderPrice ?? 0;
-            const bTotal = b.type === 'DRIVER_PAYMENT' ? b.order?.deliveryPrice ?? 0 : b.order?.orderPrice ?? 0;
+            const aTotal = a.type === 'DRIVER' ? a.order?.deliveryPrice ?? 0 : a.order?.totalPrice ?? 0;
+            const bTotal = b.type === 'DRIVER' ? b.order?.deliveryPrice ?? 0 : b.order?.totalPrice ?? 0;
             return bTotal - aTotal;
         });
     }, [settlements]);
@@ -292,11 +283,11 @@ export default function FinancesDashboard() {
                             <tbody>
                                 {sortedSettlements.map((settlement) => {
                                     const orderValue =
-                                        settlement.type === 'DRIVER_PAYMENT'
+                                        settlement.type === 'DRIVER'
                                             ? settlement.order?.deliveryPrice ?? 0
-                                            : settlement.order?.orderPrice ?? 0;
+                                            : settlement.order?.totalPrice ?? 0;
                                     const recipient =
-                                        settlement.type === 'DRIVER_PAYMENT'
+                                        settlement.type === 'DRIVER'
                                             ? `${settlement.driver?.firstName} ${settlement.driver?.lastName}`
                                             : settlement.business?.name;
                                     const isPending = settlement.status === 'PENDING';
@@ -306,12 +297,12 @@ export default function FinancesDashboard() {
                                             <td className="px-4 py-3">
                                                 <span
                                                     className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
-                                                        settlement.type === 'DRIVER_PAYMENT'
+                                                        settlement.type === 'DRIVER'
                                                             ? 'bg-blue-500/20 text-blue-300'
                                                             : 'bg-green-500/20 text-green-300'
                                                     }`}
                                                 >
-                                                    {settlement.type === 'DRIVER_PAYMENT' ? 'Driver' : 'Business'}
+                                                    {settlement.type === 'DRIVER' ? 'Driver' : 'Business'}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3 text-white">{recipient}</td>
