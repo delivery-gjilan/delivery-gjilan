@@ -1013,6 +1013,40 @@ export default function Market() {
 
                 {/* ═══ 1: Content ═══ */}
                 <View onLayout={(e) => { productsContainerY.current = e.nativeEvent.layout.y; }}>
+                    {/* ─── Search Results (inline) ─── */}
+                    {isSearching && (
+                        <View style={{ paddingBottom: 60 }}>
+                            <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 }}>
+                                <Text style={{ color: theme.colors.subtext, fontSize: 13 }}>
+                                    {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} for "{searchQuery}"
+                                </Text>
+                            </View>
+                            {searchResults.length === 0 ? (
+                                <View style={{ alignItems: 'center', paddingVertical: 48 }}>
+                                    <Ionicons name="search" size={40} color={theme.colors.subtext} />
+                                    <Text style={{ fontSize: 16, fontWeight: '700', color: theme.colors.text, marginTop: 12 }}>
+                                        No results found
+                                    </Text>
+                                    <Text style={{ fontSize: 13, color: theme.colors.subtext, marginTop: 4 }}>
+                                        Try a different search term
+                                    </Text>
+                                </View>
+                            ) : (
+                                <View style={{ paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+                                    {searchResults.map((product) => (
+                                        <View key={product.id} style={{ width: (SCREEN_WIDTH - 44) / 2 }}>
+                                            <MarketProductCard
+                                                product={product.product ?? product}
+                                                onPress={handleProductPress}
+                                                businessType={BusinessType.Market}
+                                            />
+                                        </View>
+                                    ))}
+                                </View>
+                            )}
+                        </View>
+                    )}
+
                     <GestureDetector gesture={panGesture}>
                         <View style={{ overflow: 'hidden', width: SCREEN_WIDTH }}>
                         <Animated.View style={contentAnimatedStyle}>
@@ -1111,46 +1145,7 @@ export default function Market() {
                 </View>
             </Animated.ScrollView>
 
-            {/* ═══ Search Results Overlay ═══ */}
-            {isSearching && (
-                <View
-                    style={{
-                        position: 'absolute', top: stickyHeight.current, left: 0, right: 0, bottom: 0,
-                        backgroundColor: theme.colors.background, zIndex: 100,
-                    }}
-                >
-                    <RNScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 60 }}>
-                        <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 }}>
-                            <Text style={{ color: theme.colors.subtext, fontSize: 13 }}>
-                                {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} for "{searchQuery}"
-                            </Text>
-                        </View>
-                        {searchResults.length === 0 ? (
-                            <View style={{ alignItems: 'center', paddingVertical: 48 }}>
-                                <Ionicons name="search" size={40} color={theme.colors.subtext} />
-                                <Text style={{ fontSize: 16, fontWeight: '700', color: theme.colors.text, marginTop: 12 }}>
-                                    No results found
-                                </Text>
-                                <Text style={{ fontSize: 13, color: theme.colors.subtext, marginTop: 4 }}>
-                                    Try a different search term
-                                </Text>
-                            </View>
-                        ) : (
-                            <View style={{ paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-                                {searchResults.map((product) => (
-                                    <View key={product.id} style={{ width: (SCREEN_WIDTH - 44) / 2 }}>
-                                        <MarketProductCard
-                                            product={product.product ?? product}
-                                            onPress={handleProductPress}
-                                            businessType={BusinessType.Market}
-                                        />
-                                    </View>
-                                ))}
-                            </View>
-                        )}
-                    </RNScrollView>
-                </View>
-            )}
+
         </SafeAreaView>
     );
 }

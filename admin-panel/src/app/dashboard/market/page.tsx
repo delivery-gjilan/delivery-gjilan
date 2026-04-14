@@ -1,9 +1,8 @@
-﻿"use client";
+"use client";
 
 import { useState, useMemo, useEffect } from "react";
 import { useBusinesses } from "@/lib/hooks/useBusinesses";
 import { useAuth } from "@/lib/auth-context";
-import { getAuthToken } from "@/lib/utils/auth";
 import {
     useCategories,
     useCreateCategory,
@@ -27,24 +26,17 @@ import {
 } from "@/lib/hooks/useProducts";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
-import Modal from "@/components/ui/Modal";
 import Select from "@/components/ui/Select";
 import {
     Plus,
-    Edit2,
-    Trash2,
     Package,
     Search,
     ShoppingBag,
-    Tag,
     Grid3x3,
     LayoutGrid,
     X,
-    Eye,
-    EyeOff,
     GripVertical,
 } from "lucide-react";
-import type { CreateProductInput, UpdateProductInput } from "@/gql/graphql";
 import {
     DndContext,
     closestCenter,
@@ -58,65 +50,29 @@ import {
     arrayMove,
     SortableContext,
     sortableKeyboardCoordinates,
-    useSortable,
     verticalListSortingStrategy,
-    rectSortingStrategy,
 } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 
-/* ===============================================
-   TYPES
-=============================================== */
-
-interface Category {
-    id: string;
-    name: string;
-    isActive: boolean;
-}
-
-interface Subcategory {
-    id: string;
-    categoryId: string;
-    name: string;
-}
-
-interface Product {
-    id: string;
-    categoryId: string;
-    subcategoryId?: string | null;
-    variantGroupId?: string | null;
-    variantGroupName?: string | null;
-    name: string;
-    description?: string | null;
-    price: number;
-    markupPrice?: number | null;
-    nightMarkedupPrice?: number | null;
-    imageUrl?: string | null;
-    isOffer: boolean;
-    isOnSale: boolean;
-    saleDiscountPercentage?: number | null;
-    isAvailable: boolean;
-    sortOrder: number;
-}
+import ManageCategoriesPanel from "@/components/market/ManageCategoriesPanel";
+import ProductRow from "@/components/market/ProductRow";
+import CategoryModal from "@/components/market/CategoryModal";
+import SubcategoryModal from "@/components/market/SubcategoryModal";
+import ProductModal from "@/components/market/ProductModal";
+import MarketDeleteModal from "@/components/market/MarketDeleteModal";
+import type { Category, Subcategory } from "@/components/market/ManageCategoriesPanel";
+import type { Product } from "@/components/market/ProductRow";
+import type { CategoryModalState } from "@/components/market/CategoryModal";
+import type { SubcategoryModalState } from "@/components/market/SubcategoryModal";
+import type { ProductModalState } from "@/components/market/ProductModal";
+import type { DeleteModalData } from "@/components/market/MarketDeleteModal";
 
 interface VariantGroupOption {
     id: string;
     name: string;
 }
 
-type CategoryModalState = { open: boolean; mode: 'create' | 'edit'; data?: Category };
-type SubcategoryModalState = { open: boolean; mode: 'create' | 'edit'; categoryId?: string; data?: Subcategory };
-type ProductModalState = {
-    open: boolean;
-    mode: 'create' | 'edit';
-    categoryId?: string;
-    subcategoryId?: string;
-    data?: Product;
-};
-type VariantGroupCreateData = { id: string };
-
 /* ===============================================
-   MAIN COMPONENT
+   MAIN PAGE
 =============================================== */
 
 export default function MarketPage() {
@@ -151,9 +107,7 @@ export default function MarketPage() {
                 {marketBusiness && (
                     <div className="text-right">
                         <div className="text-sm text-gray-400">Business</div>
-                        <div className="text-base font-semibold text-purple-300">
-                            {marketBusiness.name}
-                        </div>
+                        <div className="text-base font-semibold text-purple-300">{marketBusiness.name}</div>
                     </div>
                 )}
             </div>
@@ -163,9 +117,7 @@ export default function MarketPage() {
             ) : (
                 <div className="bg-gray-900 border border-gray-800 rounded-xl p-12 text-center">
                     <ShoppingBag className="mx-auto mb-4 text-gray-600" size={48} />
-                    <p className="text-gray-400">
-                        No market business found. Create one first.
-                    </p>
+                    <p className="text-gray-400">No market business found. Create one first.</p>
                 </div>
             )}
         </div>
@@ -208,29 +160,15 @@ function MarketContent({ businessId }: { businessId: string }) {
     const { deleteVariantGroup } = useDeleteProductVariantGroup();
 
     // Modal states
-    const [categoryModal, setCategoryModal] = useState<CategoryModalState>({
-        open: false,
-        mode: 'create',
-    });
+    const [categoryModal, setCategoryModal] = useState<CategoryModalState>({ open: false, mode: 'create' });
     const [subcategoryModal, setSubcategoryModal] = useState<SubcategoryModalState>({ open: false, mode: 'create' });
     const [productModal, setProductModal] = useState<ProductModalState>({ open: false, mode: 'create' });
-    const [deleteModal, setDeleteModal] = useState<{
-        open: boolean;
-        type: 'category' | 'subcategory' | 'product';
-        id: string;
-        name: string;
-        isOffer?: boolean;
-        variantGroupId?: string;
-        variantGroupName?: string;
-        variantGroupCount?: number;
-    } | null>(null);
+    const [deleteModal, setDeleteModal] = useState<(DeleteModalData & { open: boolean }) | null>(null);
 
     // Drag and drop sensors
     const sensors = useSensors(
         useSensor(PointerSensor),
-        useSensor(KeyboardSensor, {
-            coordinateGetter: sortableKeyboardCoordinates,
-        })
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     );
 
     // Get subcategories for selected category
@@ -256,27 +194,21 @@ function MarketContent({ businessId }: { businessId: string }) {
     const filteredProducts = useMemo(() => {
         let filtered = [...products] as Product[];
 
-        // Filter by search
         if (searchQuery.trim()) {
             const query = searchQuery.toLowerCase();
             filtered = filtered.filter(
-                (p) =>
-                    p.name.toLowerCase().includes(query) ||
-                    p.description?.toLowerCase().includes(query)
+                (p) => p.name.toLowerCase().includes(query) || p.description?.toLowerCase().includes(query)
             );
         }
 
-        // Filter by category
         if (selectedCategoryId !== "all") {
             filtered = filtered.filter((p) => p.categoryId === selectedCategoryId);
         }
 
-        // Filter by subcategory
         if (selectedSubcategoryId !== "all") {
             filtered = filtered.filter((p) => p.subcategoryId === selectedSubcategoryId);
         }
 
-        // Apply custom order if in sort mode and order exists
         if (sortMode && productOrder.length > 0) {
             const orderMap = new Map(productOrder.map((id, index) => [id, index]));
             filtered.sort((a, b) => {
@@ -285,30 +217,26 @@ function MarketContent({ businessId }: { businessId: string }) {
                 return aOrder - bOrder;
             });
         } else {
-            // When not in sort mode, respect the database sortOrder
             filtered.sort((a, b) => a.sortOrder - b.sortOrder);
         }
 
         return filtered;
     }, [products, searchQuery, selectedCategoryId, selectedSubcategoryId, sortMode, productOrder]);
 
-    // Stable product IDs key for dependency
-    const productIdsKey = useMemo(() => 
-        products.map(p => p.id).sort().join(','),
-        [products]
-    );
+    // Stable product IDs key
+    const productIdsKey = useMemo(() => products.map((p) => p.id).sort().join(','), [products]);
 
     // Initialize product order
     useEffect(() => {
         if (productOrder.length === 0 && products.length > 0) {
             const initialOrder = [...products]
-                .filter(p => {
+                .filter((p) => {
                     if (selectedCategoryId !== "all" && p.categoryId !== selectedCategoryId) return false;
                     if (selectedSubcategoryId !== "all" && p.subcategoryId !== selectedSubcategoryId) return false;
                     return true;
                 })
                 .sort((a, b) => a.sortOrder - b.sortOrder)
-                .map(p => p.id);
+                .map((p) => p.id);
             setProductOrder(initialOrder);
         }
     }, [productIdsKey, productOrder.length, selectedCategoryId, selectedSubcategoryId]);
@@ -316,15 +244,12 @@ function MarketContent({ businessId }: { businessId: string }) {
     // Update product order when filters change in sort mode
     useEffect(() => {
         if (sortMode) {
-            // Recalculate filtered products without depending on filteredProducts memo
             let filtered = [...products] as Product[];
 
             if (searchQuery.trim()) {
                 const query = searchQuery.toLowerCase();
                 filtered = filtered.filter(
-                    (p) =>
-                        p.name.toLowerCase().includes(query) ||
-                        p.description?.toLowerCase().includes(query)
+                    (p) => p.name.toLowerCase().includes(query) || p.description?.toLowerCase().includes(query)
                 );
             }
 
@@ -337,14 +262,13 @@ function MarketContent({ businessId }: { businessId: string }) {
             }
 
             filtered.sort((a, b) => a.sortOrder - b.sortOrder);
-            setProductOrder(filtered.map(p => p.id));
+            setProductOrder(filtered.map((p) => p.id));
         }
     }, [sortMode, productIdsKey, selectedCategoryId, selectedSubcategoryId, searchQuery]);
 
     // Handle drag end
     const handleDragEnd = async (event: DragEndEvent) => {
         const { active, over } = event;
-
         if (over && active.id !== over.id) {
             let newOrder: string[] = [];
             setProductOrder((items) => {
@@ -354,12 +278,7 @@ function MarketContent({ businessId }: { businessId: string }) {
                 return newOrder;
             });
 
-            // Update sortOrder for the currently filtered/visible products only
-            const productsWithOrder = newOrder.map((id, index) => ({
-                id,
-                sortOrder: index,
-            }));
-
+            const productsWithOrder = newOrder.map((id, index) => ({ id, sortOrder: index }));
             await updateProductsOrder(businessId, productsWithOrder);
             await refetchProducts();
         }
@@ -369,24 +288,22 @@ function MarketContent({ businessId }: { businessId: string }) {
     const toggleSale = async (product: Product) => {
         await updateProduct(product.id, {
             isOnSale: !product.isOnSale,
-            saleDiscountPercentage: !product.isOnSale && !product.saleDiscountPercentage ? 20 : product.saleDiscountPercentage ?? undefined,
+            saleDiscountPercentage:
+                !product.isOnSale && !product.saleDiscountPercentage ? 20 : product.saleDiscountPercentage ?? undefined,
         });
         await refetchProducts();
     };
 
     // Quick toggle availability
     const toggleAvailability = async (product: Product) => {
-        await updateProduct(product.id, {
-            isAvailable: !product.isAvailable,
-        });
+        await updateProduct(product.id, { isAvailable: !product.isAvailable });
         await refetchProducts();
     };
 
     // Toggle sort mode
     const toggleSortMode = () => {
         if (!sortMode) {
-            // Entering sort mode - initialize order with current filtered products
-            setProductOrder(filteredProducts.map(p => p.id));
+            setProductOrder(filteredProducts.map((p) => p.id));
         }
         setSortMode(!sortMode);
     };
@@ -439,7 +356,11 @@ function MarketContent({ businessId }: { businessId: string }) {
                 <div className="bg-purple-500/20 border border-purple-500/50 rounded-lg p-3 flex items-center gap-3">
                     <GripVertical className="text-purple-400" size={20} />
                     <p className="text-purple-200 text-sm flex-1">
-                        <strong>Sort Mode Active:</strong> Drag and drop to reorder products{selectedCategoryId !== "all" ? ` in ${(categories as Category[]).find(c => c.id === selectedCategoryId)?.name}` : ""}.
+                        <strong>Sort Mode Active:</strong> Drag and drop to reorder products
+                        {selectedCategoryId !== "all"
+                            ? ` in ${(categories as Category[]).find((c) => c.id === selectedCategoryId)?.name}`
+                            : ""}
+                        .
                     </p>
                     <Button variant="outline" size="sm" onClick={toggleSortMode}>
                         Done
@@ -524,24 +445,24 @@ function MarketContent({ businessId }: { businessId: string }) {
             </div>
 
             {/* Products Table */}
-            <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-            >
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
                     {filteredProducts.length === 0 ? (
                         <div className="p-12 text-center">
                             <Package className="mx-auto mb-4 text-gray-600" size={48} />
                             <p className="text-gray-400 mb-4">
-                                {searchQuery
-                                    ? "No products found"
-                                    : "No products yet. Add your first product!"}
+                                {searchQuery ? "No products found" : "No products yet. Add your first product!"}
                             </p>
                             {!searchQuery && (
                                 <Button
                                     variant="primary"
-                                    onClick={() => setProductModal({ open: true, mode: 'create', categoryId: selectedCategoryId || undefined })}
+                                    onClick={() =>
+                                        setProductModal({
+                                            open: true,
+                                            mode: 'create',
+                                            categoryId: selectedCategoryId || undefined,
+                                        })
+                                    }
                                 >
                                     <Plus size={18} className="inline mr-2" />
                                     Add Product
@@ -554,9 +475,7 @@ function MarketContent({ businessId }: { businessId: string }) {
                                 <thead className="bg-gray-800/50 border-b border-gray-700">
                                     <tr>
                                         {sortMode && (
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider w-12">
-                                                
-                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider w-12" />
                                         )}
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider w-20">
                                             Image
@@ -591,7 +510,7 @@ function MarketContent({ businessId }: { businessId: string }) {
                                     </tr>
                                 </thead>
                                 <SortableContext
-                                    items={filteredProducts.map(p => p.id)}
+                                    items={filteredProducts.map((p) => p.id)}
                                     strategy={verticalListSortingStrategy}
                                     disabled={!sortMode}
                                 >
@@ -601,15 +520,17 @@ function MarketContent({ businessId }: { businessId: string }) {
                                                 key={product.id}
                                                 product={product}
                                                 categoryName={
-                                                    (categories as Category[]).find((c) => c.id === product.categoryId)?.name ||
-                                                    "Unknown"
+                                                    (categories as Category[]).find((c) => c.id === product.categoryId)
+                                                        ?.name || "Unknown"
                                                 }
                                                 subcategoryName={
                                                     (subcategories as Subcategory[]).find(
                                                         (s) => s.id === product.subcategoryId
                                                     )?.name
                                                 }
-                                                onEdit={() => setProductModal({ open: true, mode: 'edit', data: product })}
+                                                onEdit={() =>
+                                                    setProductModal({ open: true, mode: 'edit', data: product })
+                                                }
                                                 onDelete={() =>
                                                     setDeleteModal({
                                                         open: true,
@@ -620,7 +541,10 @@ function MarketContent({ businessId }: { businessId: string }) {
                                                         variantGroupId: product.variantGroupId || undefined,
                                                         variantGroupName: product.variantGroupName || undefined,
                                                         variantGroupCount: product.variantGroupId
-                                                            ? filteredProducts.filter((p) => p.variantGroupId === product.variantGroupId).length
+                                                            ? filteredProducts.filter(
+                                                                  (p) =>
+                                                                      p.variantGroupId === product.variantGroupId
+                                                              ).length
                                                             : 0,
                                                     })
                                                 }
@@ -636,7 +560,6 @@ function MarketContent({ businessId }: { businessId: string }) {
                     )}
                 </div>
             </DndContext>
-
 
             {/* Modals */}
             <CategoryModal
@@ -707,19 +630,17 @@ function MarketContent({ businessId }: { businessId: string }) {
                 }}
                 onCreateVariantGroup={async (name) => {
                     const result = await createVariantGroup({ businessId, name });
-                    if (result.success) {
-                        await refetchProducts();
-                    }
+                    if (result.success) await refetchProducts();
                     return result;
                 }}
             />
 
-            <DeleteModal
+            <MarketDeleteModal
                 modal={deleteModal}
                 onClose={() => setDeleteModal(null)}
                 onConfirm={async ({ deleteWholeVariantGroup }) => {
                     if (!deleteModal) return { success: false };
-                    
+
                     let result;
                     if (deleteModal.type === 'category') {
                         result = await deleteCategory(deleteModal.id);
@@ -735,1260 +656,11 @@ function MarketContent({ businessId }: { businessId: string }) {
                         }
                         if (result.success) await refetchProducts();
                     }
-                    
-                    if (result.success) {
-                        setDeleteModal(null);
-                    }
+
+                    if (result.success) setDeleteModal(null);
                     return result;
                 }}
             />
         </div>
     );
 }
-
-/* ===============================================
-   MANAGE CATEGORIES PANEL
-=============================================== */
-
-interface ManageCategoriesPanelProps {
-    categories: Category[];
-    subcategories: Subcategory[];
-    onClose: () => void;
-    onAddCategory: () => void;
-    onEditCategory: (cat: Category) => void;
-    onDeleteCategory: (cat: Category) => void;
-    onAddSubcategory: (catId: string) => void;
-    onEditSubcategory: (subcat: Subcategory) => void;
-    onDeleteSubcategory: (subcat: Subcategory) => void;
-}
-
-function ManageCategoriesPanel({
-    categories,
-    subcategories,
-    onClose,
-    onAddCategory,
-    onEditCategory,
-    onDeleteCategory,
-    onAddSubcategory,
-    onEditSubcategory,
-    onDeleteSubcategory,
-}: ManageCategoriesPanelProps) {
-    return (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-                    <Grid3x3 size={20} className="text-purple-400" />
-                    Manage Categories & Subcategories
-                </h2>
-                <Button variant="outline" size="sm" onClick={onClose}>
-                    <X size={16} />
-                </Button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Categories Section */}
-                <div>
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-medium text-gray-200">Categories</h3>
-                        <Button variant="primary" size="sm" onClick={onAddCategory}>
-                            <Plus size={14} className="mr-1" />
-                            Add
-                        </Button>
-                    </div>
-                    <div className="space-y-2">
-                        {categories.length === 0 ? (
-                            <p className="text-gray-500 text-sm text-center py-8">No categories yet</p>
-                        ) : (
-                            categories.map((cat) => (
-                                <div
-                                    key={cat.id}
-                                    className="bg-gray-800 border border-gray-700 rounded-lg p-3 flex items-center justify-between hover:border-purple-500/50 transition-colors"
-                                >
-                                    <div>
-                                        <div className="font-medium text-white">{cat.name}</div>
-                                        <div className="text-xs text-gray-500">
-                                            {subcategories.filter((s) => s.categoryId === cat.id).length}{" "}
-                                            subcategories
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => onAddSubcategory(cat.id)}
-                                            className="text-xs"
-                                        >
-                                            + Sub
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => onEditCategory(cat)}
-                                        >
-                                            <Edit2 size={14} />
-                                        </Button>
-                                        <Button
-                                            variant="danger"
-                                            size="sm"
-                                            onClick={() => onDeleteCategory(cat)}
-                                        >
-                                            <Trash2 size={14} />
-                                        </Button>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                </div>
-
-                {/* Subcategories Section */}
-                <div>
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-medium text-gray-200">All Subcategories</h3>
-                    </div>
-                    <div className="space-y-2">
-                        {subcategories.length === 0 ? (
-                            <p className="text-gray-500 text-sm text-center py-8">
-                                No subcategories yet
-                            </p>
-                        ) : (
-                            subcategories.map((subcat) => {
-                                const category = categories.find((c) => c.id === subcat.categoryId);
-                                return (
-                                    <div
-                                        key={subcat.id}
-                                        className="bg-gray-800 border border-gray-700 rounded-lg p-3 flex items-center justify-between hover:border-violet-500/50 transition-colors"
-                                    >
-                                        <div>
-                                            <div className="font-medium text-white">{subcat.name}</div>
-                                            <div className="text-xs text-gray-500">
-                                                in {category?.name || "Unknown"}
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => onEditSubcategory(subcat)}
-                                            >
-                                                <Edit2 size={14} />
-                                            </Button>
-                                            <Button
-                                                variant="danger"
-                                                size="sm"
-                                                onClick={() => onDeleteSubcategory(subcat)}
-                                            >
-                                                <Trash2 size={14} />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                );
-                            })
-                        )}
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-/* ===============================================
-   PRODUCT ROW (TABLE)
-=============================================== */
-
-interface ProductRowProps {
-    product: Product;
-    categoryName: string;
-    subcategoryName?: string;
-    onEdit: () => void;
-    onDelete: () => void;
-    onToggleSale: () => void;
-    onToggleAvailability: () => void;
-    sortMode: boolean;
-}
-
-function ProductRow({
-    product,
-    categoryName,
-    subcategoryName,
-    onEdit,
-    onDelete,
-    onToggleSale,
-    onToggleAvailability,
-    sortMode,
-}: ProductRowProps) {
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: product.id });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.5 : 1,
-    };
-
-    return (
-        <tr
-            ref={setNodeRef}
-            style={style}
-            className={`hover:bg-gray-800/50 transition-colors ${
-                sortMode ? 'cursor-grab active:cursor-grabbing' : ''
-            } ${isDragging ? 'bg-gray-800' : ''}`}
-        >
-            {/* Drag Handle */}
-            {sortMode && (
-                <td className="px-4 py-3">
-                    <div
-                        {...attributes}
-                        {...listeners}
-                        className="p-1.5 bg-purple-500/20 rounded cursor-grab active:cursor-grabbing hover:bg-purple-500/30"
-                    >
-                        <GripVertical size={16} className="text-purple-400" />
-                    </div>
-                </td>
-            )}
-
-            {/* Image */}
-            <td className="px-4 py-3">
-                <div className="w-12 h-12 bg-gray-800 rounded overflow-hidden flex-shrink-0">
-                    {product.imageUrl ? (
-                        <img
-                            src={product.imageUrl}
-                            alt={product.name}
-                            className="w-full h-full object-cover"
-                        />
-                    ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                            <Package size={20} className="text-gray-600" />
-                        </div>
-                    )}
-                </div>
-            </td>
-
-            {/* Product Name & Description */}
-            <td className="px-4 py-3">
-                <div className="flex flex-col">
-                    <span className="font-medium text-white text-sm">
-                        {product.name}
-                    </span>
-                    {product.description && (
-                        <span className="text-xs text-gray-500 truncate max-w-xs" title={product.description}>
-                            {product.description}
-                        </span>
-                    )}
-                </div>
-            </td>
-
-            {/* Category */}
-            <td className="px-4 py-3">
-                <span className="text-xs px-2 py-1 bg-purple-500/20 text-purple-300 rounded">
-                    {categoryName}
-                </span>
-            </td>
-
-            {/* Subcategory */}
-            <td className="px-4 py-3">
-                {subcategoryName ? (
-                    <span className="text-xs px-2 py-1 bg-violet-500/20 text-violet-300 rounded">
-                        {subcategoryName}
-                    </span>
-                ) : (
-                    <span className="text-gray-600 text-xs">â€”</span>
-                )}
-            </td>
-
-            {/* Price */}
-            <td className="px-4 py-3">
-                <div className="flex flex-col gap-0.5">
-                    {product.isOnSale && product.saleDiscountPercentage != null ? (
-                        <>
-                            <span className="font-bold text-green-400">
-                                ${(product.price * (1 - product.saleDiscountPercentage / 100)).toFixed(2)}
-                            </span>
-                            <span className="text-xs text-gray-500 line-through">
-                                ${product.price.toFixed(2)}
-                            </span>
-                        </>
-                    ) : (
-                        <span className="font-bold text-white">
-                            ${product.price.toFixed(2)}
-                        </span>
-                    )}
-                </div>
-            </td>
-
-            {/* Markup Price */}
-            <td className="px-4 py-3">
-                {product.markupPrice != null && product.markupPrice > 0 ? (
-                    <span className="font-medium text-zinc-200 tabular-nums">
-                        €{product.markupPrice.toFixed(2)}
-                    </span>
-                ) : (
-                    <span className="text-amber-400/70 text-xs">Not set</span>
-                )}
-            </td>
-
-            {/* Night Price */}
-            <td className="px-4 py-3">
-                {product.nightMarkedupPrice != null && product.nightMarkedupPrice > 0 ? (
-                    <span className="font-medium text-zinc-200 tabular-nums">
-                        €{product.nightMarkedupPrice.toFixed(2)}
-                    </span>
-                ) : (
-                    <span className="text-amber-400/70 text-xs">Not set</span>
-                )}
-            </td>
-
-            {/* On Sale Toggle */}
-            <td className="px-4 py-3 text-center">
-                <button
-                    onClick={onToggleSale}
-                    className={`p-2 rounded transition-colors ${
-                        product.isOnSale
-                            ? "bg-green-500/20 text-green-400 hover:bg-green-500/30"
-                            : "bg-gray-800 text-gray-500 hover:text-gray-300"
-                    }`}
-                    title={product.isOnSale ? "Remove from sale" : "Put on sale"}
-                >
-                    <Tag size={16} />
-                </button>
-            </td>
-
-            {/* Available Toggle */}
-            <td className="px-4 py-3 text-center">
-                <button
-                    onClick={onToggleAvailability}
-                    className={`p-2 rounded transition-colors ${
-                        product.isAvailable
-                            ? "bg-green-500/20 text-green-400 hover:bg-green-500/30"
-                            : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
-                    }`}
-                    title={product.isAvailable ? "Mark as unavailable" : "Mark as available"}
-                >
-                    {product.isAvailable ? <Eye size={16} /> : <EyeOff size={16} />}
-                </button>
-            </td>
-
-            {/* Actions */}
-            <td className="px-4 py-3 text-right">
-                <div className="flex items-center justify-end gap-2">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={onEdit}
-                        className="px-3 py-1.5"
-                    >
-                        <Edit2 size={14} />
-                    </Button>
-                    <Button
-                        variant="danger"
-                        size="sm"
-                        onClick={onDelete}
-                        className="px-3 py-1.5"
-                    >
-                        <Trash2 size={14} />
-                    </Button>
-                </div>
-            </td>
-        </tr>
-    );
-}
-
-/* ===============================================
-   OLD CATEGORY/SUBCATEGORY SECTIONS - REMOVED
-=============================================== */
-
-/* ===============================================
-   CATEGORY MODAL
-=============================================== */
-
-interface CategoryModalProps {
-    modal: CategoryModalState;
-    onClose: () => void;
-    onCreate: (name: string) => Promise<{ success: boolean; error?: string }>;
-    onUpdate: (id: string, name: string, isActive: boolean) => Promise<{ success: boolean; error?: string }>;
-}
-
-function CategoryModal({ modal, onClose, onCreate, onUpdate }: CategoryModalProps) {
-    const [name, setName] = useState('');
-    const [isActive, setIsActive] = useState(true);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-
-    // Initialize form when modal opens
-    useMemo(() => {
-        if (modal.open) {
-            if (modal.mode === 'edit' && modal.data) {
-                setName(modal.data.name);
-                setIsActive(modal.data.isActive);
-            } else {
-                setName('');
-                setIsActive(true);
-            }
-            setError('');
-        }
-    }, [modal.open, modal.mode, modal.data]);
-
-    const handleSubmit = async () => {
-        if (!name.trim()) {
-            setError('Category name is required');
-            return;
-        }
-
-        setLoading(true);
-        setError('');
-
-        const result =
-            modal.mode === 'create'
-                ? await onCreate(name)
-                : await onUpdate(modal.data!.id, name, isActive);
-
-        setLoading(false);
-
-        if (!result.success) {
-            setError(result.error || 'An error occurred');
-        }
-    };
-
-    return (
-        <Modal
-            isOpen={modal.open}
-            onClose={onClose}
-            title={modal.mode === 'create' ? 'Create Category' : 'Edit Category'}
-        >
-            <div className="space-y-4">
-                <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">
-                        Category Name *
-                    </label>
-                    <Input
-                        placeholder="e.g., Beverages, Snacks, Dairy"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && handleSubmit()}
-                    />
-                </div>
-
-                {modal.mode === 'edit' && (
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="checkbox"
-                            id="isActive"
-                            checked={isActive}
-                            onChange={(e) => setIsActive(e.target.checked)}
-                            className="w-4 h-4"
-                        />
-                        <label htmlFor="isActive" className="text-sm text-gray-300">
-                            Active
-                        </label>
-                    </div>
-                )}
-
-                {error && <p className="text-red-400 text-sm">{error}</p>}
-
-                <Button variant="primary" className="w-full" onClick={handleSubmit} disabled={loading}>
-                    {loading ? 'Saving...' : modal.mode === 'create' ? 'Create' : 'Save Changes'}
-                </Button>
-            </div>
-        </Modal>
-    );
-}
-
-/* ===============================================
-   SUBCATEGORY MODAL
-=============================================== */
-
-interface SubcategoryModalProps {
-    modal: SubcategoryModalState;
-    categories: Category[];
-    onClose: () => void;
-    onCreate: (categoryId: string, name: string) => Promise<{ success: boolean; error?: string }>;
-    onUpdate: (id: string, name: string) => Promise<{ success: boolean; error?: string }>;
-}
-
-function SubcategoryModal({ modal, categories, onClose, onCreate, onUpdate }: SubcategoryModalProps) {
-    const [categoryId, setCategoryId] = useState('');
-    const [name, setName] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-
-    useMemo(() => {
-        if (modal.open) {
-            if (modal.mode === 'edit' && modal.data) {
-                setCategoryId(modal.data.categoryId);
-                setName(modal.data.name);
-            } else {
-                setCategoryId(modal.categoryId || '');
-                setName('');
-            }
-            setError('');
-        }
-    }, [modal.open, modal.mode, modal.data, modal.categoryId]);
-
-    const handleSubmit = async () => {
-        if (!categoryId) {
-            setError('Please select a category');
-            return;
-        }
-        if (!name.trim()) {
-            setError('Subcategory name is required');
-            return;
-        }
-
-        setLoading(true);
-        setError('');
-
-        const result =
-            modal.mode === 'create'
-                ? await onCreate(categoryId, name)
-                : await onUpdate(modal.data!.id, name);
-
-        setLoading(false);
-
-        if (!result.success) {
-            setError(result.error || 'An error occurred');
-        }
-    };
-
-    return (
-        <Modal
-            isOpen={modal.open}
-            onClose={onClose}
-            title={modal.mode === 'create' ? 'Create Subcategory' : 'Edit Subcategory'}
-        >
-            <div className="space-y-4">
-                {modal.mode === 'create' ? (
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Category *
-                        </label>
-                        <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-                            <option value="">Select category</option>
-                            {categories.map((cat) => (
-                                <option key={cat.id} value={cat.id}>
-                                    {cat.name}
-                                </option>
-                            ))}
-                        </Select>
-                    </div>
-                ) : (
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">Category</label>
-                        <div className="text-gray-200">
-                            {categories.find((c) => c.id === categoryId)?.name || 'Unknown'}
-                        </div>
-                    </div>
-                )}
-
-                <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">
-                        Subcategory Name *
-                    </label>
-                    <Input
-                        placeholder="e.g., Soft Drinks, Chips, Milk"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && handleSubmit()}
-                    />
-                </div>
-
-                {error && <p className="text-red-400 text-sm">{error}</p>}
-
-                <Button variant="primary" className="w-full" onClick={handleSubmit} disabled={loading}>
-                    {loading ? 'Saving...' : modal.mode === 'create' ? 'Create' : 'Save Changes'}
-                </Button>
-            </div>
-        </Modal>
-    );
-}
-
-/* ===============================================
-   PRODUCT MODAL
-=============================================== */
-
-interface ProductModalProps {
-    modal: ProductModalState;
-    businessId: string;
-    categories: Category[];
-    subcategories: Subcategory[];
-    variantGroups: VariantGroupOption[];
-    onClose: () => void;
-    onCreate: (input: CreateProductInput) => Promise<{ success: boolean; error?: string }>;
-    onUpdate: (id: string, input: UpdateProductInput) => Promise<{ success: boolean; error?: string }>;
-    onCreateVariantGroup: (name: string) => Promise<{ success: boolean; data?: VariantGroupCreateData; error?: string }>;
-}
-
-function ProductModal({
-    modal,
-    businessId,
-    categories,
-    subcategories,
-    variantGroups,
-    onClose,
-    onCreate,
-    onUpdate,
-    onCreateVariantGroup,
-}: ProductModalProps) {
-    const [form, setForm] = useState({
-        categoryId: '',
-        subcategoryId: '',
-        variantGroupId: '',
-        name: '',
-        description: '',
-        price: '',
-        markupPrice: '',
-        nightMarkedupPrice: '',
-        saleDiscountPercentage: '',
-        imageUrl: '',
-        isOffer: false,
-        isVariant: false,
-        isOnSale: false,
-        isAvailable: true,
-    });
-    const [variantModalOpen, setVariantModalOpen] = useState(false);
-    const [imageFile, setImageFile] = useState<File | null>(null);
-    const [imagePreview, setImagePreview] = useState<string | null>(null);
-    const [uploadingImage, setUploadingImage] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-
-    // Filter subcategories based on selected category
-    const availableSubcategories = useMemo(() => {
-        if (!form.categoryId) return [];
-        return subcategories.filter((s) => s.categoryId === form.categoryId);
-    }, [form.categoryId, subcategories]);
-
-    useMemo(() => {
-        if (modal.open) {
-            if (modal.mode === 'edit' && modal.data) {
-                setForm({
-                    categoryId: modal.data.categoryId,
-                    subcategoryId: modal.data.subcategoryId || '',
-                    variantGroupId: modal.data.variantGroupId || '',
-                    name: modal.data.name,
-                    description: modal.data.description || '',
-                    price: modal.data.price.toString(),
-                    markupPrice: modal.data.markupPrice != null && modal.data.markupPrice > 0 ? modal.data.markupPrice.toString() : '',
-                    nightMarkedupPrice: modal.data.nightMarkedupPrice != null && modal.data.nightMarkedupPrice > 0 ? modal.data.nightMarkedupPrice.toString() : '',
-                    saleDiscountPercentage: modal.data.saleDiscountPercentage?.toString() || '',
-                    imageUrl: modal.data.imageUrl || '',
-                    isOffer: modal.data.isOffer || false,
-                    isVariant: Boolean(modal.data.variantGroupId),
-                    isOnSale: modal.data.isOnSale,
-                    isAvailable: modal.data.isAvailable,
-                });
-                setImagePreview(modal.data.imageUrl || null);
-            } else {
-                setForm({
-                    categoryId: modal.categoryId || '',
-                    subcategoryId: modal.subcategoryId || '',
-                    variantGroupId: '',
-                    name: '',
-                    description: '',
-                    price: '',
-                    markupPrice: '',
-                    nightMarkedupPrice: '',
-                    saleDiscountPercentage: '',
-                    imageUrl: '',
-                    isOffer: false,
-                    isVariant: false,
-                    isOnSale: false,
-                    isAvailable: true,
-                });
-                setImagePreview(null);
-            }
-            setImageFile(null);
-            setError('');
-        }
-    }, [modal.open, modal.mode, modal.data, modal.categoryId, modal.subcategoryId]);
-
-    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            setImageFile(file);
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setImagePreview(reader.result as string);
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    const uploadImage = async (file: File): Promise<string | null> => {
-        const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/graphql').replace(/\/graphql$/, '');
-        const formData = new FormData();
-        formData.append('image', file);
-        formData.append('folder', 'products');
-
-        const token = getAuthToken();
-        try {
-            const response = await fetch(`${apiBase}/api/upload/image`, {
-                method: 'POST',
-                headers: token ? { Authorization: `Bearer ${token}` } : {},
-                body: formData,
-            });
-
-            const data = await response.json();
-            if (data.success && data.url) {
-                return data.url;
-            }
-            throw new Error(data.error || 'Upload failed');
-        } catch (error) {
-            console.error('Image upload error:', error);
-            return null;
-        }
-    };
-
-    const deleteImage = async (imageUrl: string): Promise<void> => {
-        const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/graphql').replace(/\/graphql$/, '');
-        const token = getAuthToken();
-        try {
-            await fetch(`${apiBase}/api/upload/image`, {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-                body: JSON.stringify({ imageUrl }),
-            });
-        } catch {
-            console.warn('Failed to delete old image from S3:', imageUrl);
-        }
-    };
-
-    const handleSubmit = async () => {
-        if (!form.categoryId || !form.name.trim() || !form.price) {
-            setError('Please fill in all required fields');
-            return;
-        }
-
-        setLoading(true);
-        setError('');
-
-        let imageUrl = form.imageUrl;
-
-        if (imageFile) {
-            // Delete old S3 image before uploading replacement
-            if (modal.mode === 'edit' && form.imageUrl) {
-                await deleteImage(form.imageUrl);
-            }
-            setUploadingImage(true);
-            const uploadedUrl = await uploadImage(imageFile);
-            setUploadingImage(false);
-            if (uploadedUrl) {
-                imageUrl = uploadedUrl;
-            } else {
-                setError('Failed to upload image');
-                setLoading(false);
-                return;
-            }
-        }
-
-        const input: CreateProductInput | UpdateProductInput = {
-            categoryId: form.categoryId,
-            subcategoryId: form.subcategoryId || undefined,
-            variantGroupId: form.isVariant ? form.variantGroupId || undefined : undefined,
-            name: form.name,
-            description: form.description || undefined,
-            imageUrl: imageUrl || undefined,
-            price: parseFloat(form.price),
-            markupPrice: form.markupPrice ? parseFloat(form.markupPrice) : null,
-            nightMarkedupPrice: form.nightMarkedupPrice ? parseFloat(form.nightMarkedupPrice) : null,
-            isOffer: form.isOffer,
-            isOnSale: form.isOnSale,
-            saleDiscountPercentage: form.isOnSale && form.saleDiscountPercentage ? parseFloat(form.saleDiscountPercentage) : undefined,
-            isAvailable: form.isAvailable,
-        };
-
-        const result =
-            modal.mode === 'create'
-                ? await onCreate({ ...input, businessId } as CreateProductInput)
-                : await onUpdate(modal.data!.id, input as UpdateProductInput);
-
-        setLoading(false);
-
-        if (!result.success) {
-            setError(result.error || 'An error occurred');
-        }
-    };
-
-    return (
-        <Modal
-            isOpen={modal.open}
-            onClose={onClose}
-            title={modal.mode === 'create' ? 'Create Product' : 'Edit Product'}
-        >
-            <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
-                <div className="grid grid-cols-2 gap-3">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Category *
-                        </label>
-                        <Select
-                            value={form.categoryId}
-                            onChange={(e) =>
-                                setForm({ ...form, categoryId: e.target.value, subcategoryId: '' })
-                            }
-                        >
-                            <option value="">Select category</option>
-                            {categories.map((cat) => (
-                                <option key={cat.id} value={cat.id}>
-                                    {cat.name}
-                                </option>
-                            ))}
-                        </Select>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Subcategory
-                        </label>
-                        <Select
-                            value={form.subcategoryId}
-                            onChange={(e) => setForm({ ...form, subcategoryId: e.target.value })}
-                            disabled={!form.categoryId || availableSubcategories.length === 0}
-                        >
-                            <option value="">None</option>
-                            {availableSubcategories.map((subcat) => (
-                                <option key={subcat.id} value={subcat.id}>
-                                    {subcat.name}
-                                </option>
-                            ))}
-                        </Select>
-                    </div>
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">
-                        Product Name *
-                    </label>
-                    <Input
-                        placeholder="e.g., Coca-Cola 500ml"
-                        value={form.name}
-                        onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    />
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">
-                        Description
-                    </label>
-                    <textarea
-                        placeholder="Product description..."
-                        value={form.description}
-                        onChange={(e) => setForm({ ...form, description: e.target.value })}
-                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        rows={3}
-                    />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Price * ($)
-                        </label>
-                        <Input
-                            type="number"
-                            step="0.01"
-                            placeholder="0.00"
-                            value={form.price}
-                            onChange={(e) => setForm({ ...form, price: e.target.value })}
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Discount % (0–90)
-                        </label>
-                        <Input
-                            type="number"
-                            step="1"
-                            min="1"
-                            max="90"
-                            placeholder="e.g. 20"
-                            value={form.saleDiscountPercentage}
-                            onChange={(e) => setForm({ ...form, saleDiscountPercentage: e.target.value })}
-                            disabled={!form.isOnSale}
-                        />
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Markup Price (€)
-                        </label>
-                        <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="Settlement price"
-                            value={form.markupPrice}
-                            onChange={(e) => setForm({ ...form, markupPrice: e.target.value })}
-                        />
-                        <p className="text-[11px] text-gray-600 mt-0.5">For driver settlements only</p>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
-                            Night Price (€)
-                        </label>
-                        <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="23:00–06:00 price"
-                            value={form.nightMarkedupPrice}
-                            onChange={(e) => setForm({ ...form, nightMarkedupPrice: e.target.value })}
-                        />
-                        <p className="text-[11px] text-gray-600 mt-0.5">Active 23:00–06:00</p>
-                    </div>
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">Product Image</label>
-                    <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageChange}
-                        className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700"
-                    />
-                    {imagePreview && (
-                        <img
-                            src={imagePreview}
-                            alt="Preview"
-                            className="mt-2 w-32 h-32 object-cover rounded"
-                        />
-                    )}
-                </div>
-
-                <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="checkbox"
-                            id="isOffer"
-                            checked={form.isOffer}
-                            onChange={(e) =>
-                                setForm((prev) => ({
-                                    ...prev,
-                                    isOffer: e.target.checked,
-                                    isVariant: e.target.checked ? false : prev.isVariant,
-                                    variantGroupId: e.target.checked ? '' : prev.variantGroupId,
-                                }))
-                            }
-                            className="w-4 h-4"
-                        />
-                        <label htmlFor="isOffer" className="text-sm text-gray-300">
-                            Create as Deal / Offer
-                        </label>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="checkbox"
-                            id="isVariant"
-                            checked={form.isVariant}
-                            onChange={(e) => {
-                                const checked = e.target.checked;
-                                setForm((prev) => ({
-                                    ...prev,
-                                    isVariant: checked,
-                                    isOffer: checked ? false : prev.isOffer,
-                                }));
-                                if (checked) {
-                                    setVariantModalOpen(true);
-                                }
-                            }}
-                            className="w-4 h-4"
-                        />
-                        <label htmlFor="isVariant" className="text-sm text-gray-300">
-                            Add as Variant
-                        </label>
-                    </div>
-                </div>
-
-                {form.isVariant && (
-                    <div className="rounded-lg border border-violet-500/40 bg-violet-500/10 p-3 space-y-2">
-                        <div className="text-sm text-violet-200">
-                            {form.variantGroupId
-                                ? `Variant group selected: ${variantGroups.find((g) => g.id === form.variantGroupId)?.name || form.variantGroupId}`
-                                : "No variant group selected yet."}
-                        </div>
-                        <Button
-                            variant="outline"
-                            onClick={() => setVariantModalOpen(true)}
-                            className="w-full"
-                        >
-                            {form.variantGroupId ? 'Change Variant Group' : 'Choose or Create Variant Group'}
-                        </Button>
-                    </div>
-                )}
-
-                <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="checkbox"
-                            id="isOnSale"
-                            checked={form.isOnSale}
-                            onChange={(e) => setForm({ ...form, isOnSale: e.target.checked })}
-                            className="w-4 h-4"
-                        />
-                        <label htmlFor="isOnSale" className="text-sm text-gray-300">
-                            On Sale
-                        </label>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="checkbox"
-                            id="isAvailable"
-                            checked={form.isAvailable}
-                            onChange={(e) => setForm({ ...form, isAvailable: e.target.checked })}
-                            className="w-4 h-4"
-                        />
-                        <label htmlFor="isAvailable" className="text-sm text-gray-300">
-                            Available
-                        </label>
-                    </div>
-                </div>
-
-                {error && <p className="text-red-400 text-sm">{error}</p>}
-
-                <Button
-                    variant="primary"
-                    className="w-full"
-                    onClick={handleSubmit}
-                    disabled={loading || uploadingImage || (form.isVariant && !form.variantGroupId)}
-                >
-                    {uploadingImage
-                        ? 'Uploading Image...'
-                        : loading
-                        ? 'Saving...'
-                        : modal.mode === 'create'
-                        ? 'Create Product'
-                        : 'Save Changes'}
-                </Button>
-            </div>
-
-            <VariantGroupModal
-                isOpen={variantModalOpen}
-                existingGroups={variantGroups}
-                selectedGroupId={form.variantGroupId}
-                onClose={() => setVariantModalOpen(false)}
-                onSelect={(groupId) => {
-                    setForm((prev) => ({ ...prev, variantGroupId: groupId, isVariant: true, isOffer: false }));
-                    setVariantModalOpen(false);
-                }}
-                onCreate={async (name) => {
-                    const result = await onCreateVariantGroup(name);
-                    if (!result.success || !result.data?.id) {
-                        return { success: false, error: result.error || 'Failed to create variant group' };
-                    }
-                    setForm((prev) => ({
-                        ...prev,
-                        variantGroupId: result.data!.id,
-                        isVariant: true,
-                        isOffer: false,
-                    }));
-                    return { success: true };
-                }}
-            />
-        </Modal>
-    );
-}
-
-interface VariantGroupModalProps {
-    isOpen: boolean;
-    existingGroups: VariantGroupOption[];
-    selectedGroupId: string;
-    onClose: () => void;
-    onSelect: (groupId: string) => void;
-    onCreate: (name: string) => Promise<{ success: boolean; error?: string }>;
-}
-
-function VariantGroupModal({
-    isOpen,
-    existingGroups,
-    selectedGroupId,
-    onClose,
-    onSelect,
-    onCreate,
-}: VariantGroupModalProps) {
-    const [newName, setNewName] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-
-    useEffect(() => {
-        if (!isOpen) return;
-        setNewName('');
-        setError('');
-        setLoading(false);
-    }, [isOpen]);
-
-    const handleCreate = async () => {
-        if (!newName.trim()) {
-            setError('Variant group name is required');
-            return;
-        }
-
-        setLoading(true);
-        setError('');
-        const result = await onCreate(newName.trim());
-        setLoading(false);
-
-        if (!result.success) {
-            setError(result.error || 'Failed to create variant group');
-            return;
-        }
-
-        setNewName('');
-        onClose();
-    };
-
-    return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Select or Create Variant Group">
-            <div className="space-y-4">
-                <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">Existing Variant Groups</label>
-                    {existingGroups.length === 0 ? (
-                        <p className="text-sm text-gray-500">No variant groups yet. Create your first one below.</p>
-                    ) : (
-                        <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
-                            {existingGroups.map((group) => (
-                                <button
-                                    key={group.id}
-                                    type="button"
-                                    onClick={() => onSelect(group.id)}
-                                    className={`w-full text-left rounded-lg border px-3 py-2 text-sm transition-colors ${
-                                        selectedGroupId === group.id
-                                            ? 'border-violet-400 bg-violet-500/20 text-violet-100'
-                                            : 'border-gray-700 bg-gray-800 text-gray-200 hover:border-violet-500/50'
-                                    }`}
-                                >
-                                    {group.name}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                <div className="border-t border-gray-700 pt-4 space-y-2">
-                    <label className="block text-sm font-medium text-gray-400">Create New Variant Group</label>
-                    <Input
-                        placeholder="e.g., Coca-Cola Sizes"
-                        value={newName}
-                        onChange={(e) => setNewName(e.target.value)}
-                    />
-                    <Button variant="primary" className="w-full" onClick={handleCreate} disabled={loading}>
-                        {loading ? 'Creating...' : 'Create and Select'}
-                    </Button>
-                </div>
-
-                {error && <p className="text-red-400 text-sm">{error}</p>}
-            </div>
-        </Modal>
-    );
-}
-
-/* ===============================================
-   DELETE MODAL
-=============================================== */
-
-interface DeleteModalProps {
-    modal: {
-        type: 'category' | 'subcategory' | 'product';
-        id: string;
-        name: string;
-        isOffer?: boolean;
-        variantGroupId?: string;
-        variantGroupName?: string;
-        variantGroupCount?: number;
-    } | null;
-    onClose: () => void;
-    onConfirm: (options: { deleteWholeVariantGroup: boolean }) => Promise<{ success: boolean; error?: string }>;
-}
-
-function DeleteModal({ modal, onClose, onConfirm }: DeleteModalProps) {
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-    const [deleteWholeVariantGroup, setDeleteWholeVariantGroup] = useState(false);
-
-    useEffect(() => {
-        if (!modal) return;
-        setDeleteWholeVariantGroup(false);
-        setError('');
-    }, [modal]);
-
-    const handleConfirm = async () => {
-        setLoading(true);
-        setError('');
-
-        const result = await onConfirm({ deleteWholeVariantGroup });
-
-        setLoading(false);
-
-        if (!result.success) {
-            setError(result.error || 'An error occurred');
-        }
-    };
-
-    if (!modal) return null;
-
-    return (
-        <Modal isOpen={!!modal} onClose={onClose} title={`Delete ${modal.type}`}>
-            <div className="space-y-4">
-                <p className="text-gray-300">
-                    Are you sure you want to delete <strong>{modal.name}</strong>?
-                </p>
-                {modal.type === 'category' && (
-                    <p className="text-sm text-yellow-400">
-                        Warning: This will also delete all subcategories and products in this category.
-                    </p>
-                )}
-                {modal.type === 'subcategory' && (
-                    <p className="text-sm text-yellow-400">
-                        Warning: This will also delete all products in this subcategory.
-                    </p>
-                )}
-                {modal.type === 'product' && modal.isOffer && (
-                    <p className="text-sm text-amber-300">
-                        This item is currently marked as an offer/deal.
-                    </p>
-                )}
-                {modal.type === 'product' && modal.variantGroupId && (
-                    <div className="space-y-2 rounded-lg border border-violet-500/40 bg-violet-500/10 p-3">
-                        <p className="text-sm text-violet-200">
-                            This item belongs to variant group <strong>{modal.variantGroupName || modal.variantGroupId}</strong>
-                            {modal.variantGroupCount ? ` (${modal.variantGroupCount} variant${modal.variantGroupCount === 1 ? '' : 's'})` : ''}.
-                        </p>
-                        <label className="flex items-center gap-2 text-sm text-violet-100">
-                            <input
-                                type="checkbox"
-                                checked={deleteWholeVariantGroup}
-                                onChange={(e) => setDeleteWholeVariantGroup(e.target.checked)}
-                            />
-                            Delete entire variant group instead of just this variant
-                        </label>
-                    </div>
-                )}
-
-                {error && <p className="text-red-400 text-sm">{error}</p>}
-
-                <div className="flex justify-end gap-3">
-                    <Button variant="outline" onClick={onClose} disabled={loading}>
-                        Cancel
-                    </Button>
-                    <Button variant="danger" onClick={handleConfirm} disabled={loading}>
-                        {loading ? 'Deleting...' : 'Delete'}
-                    </Button>
-                </div>
-            </div>
-        </Modal>
-    );
-}
-
