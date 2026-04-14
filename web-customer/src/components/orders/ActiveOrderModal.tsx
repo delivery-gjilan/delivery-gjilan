@@ -198,7 +198,7 @@ export function ActiveOrderModal({ orderId, onClose }: ActiveOrderModalProps) {
 
     const currentStepIndex = useMemo(() => {
         if (status === "AWAITING_APPROVAL" || status === "CANCELLED") return -1;
-        return statusFlow.indexOf(customerVisibleStatus as typeof statusFlow[number]);
+        return statusFlow.findIndex((step) => step === customerVisibleStatus);
     }, [status, customerVisibleStatus, statusFlow]);
 
     /* ── Render ── */
