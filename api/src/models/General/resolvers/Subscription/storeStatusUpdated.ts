@@ -12,7 +12,7 @@ export const storeStatusUpdated: NonNullable<SubscriptionResolvers['storeStatusU
       closedMessage: payload.closedMessage ?? null,
       bannerEnabled: payload.bannerEnabled,
       bannerMessage: payload.bannerMessage ?? null,
-      bannerType: (payload.bannerType || 'INFO').toUpperCase() as any,
+      bannerType: (payload.bannerType || 'INFO').toUpperCase() as any, //mi ndreq anyt
       dispatchModeEnabled: (payload as any).dispatchModeEnabled ?? false,
       googleMapsNavEnabled: (payload as any).googleMapsNavEnabled ?? false,
       inventoryModeEnabled: (payload as any).inventoryModeEnabled ?? false,
