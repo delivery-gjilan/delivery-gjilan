@@ -535,21 +535,8 @@ export default function OrdersPage() {
                         <Button
                             size="sm"
                             onClick={async () => {
-                                console.log("[Orders][MockOrder] createTestOrder clicked", {
-                                    refetchQueries: ["GetOrders"],
-                                });
-                                try {
-                                    const result = await createTestOrder({ refetchQueries: ["GetOrders"] });
-                                    console.log("[Orders][MockOrder] createTestOrder success", {
-                                        operation: "CreateTestOrder",
-                                        orderId: result?.data?.createTestOrder?.id,
-                                        status: result?.data?.createTestOrder?.status,
-                                    });
-                                }
-                                catch (err) {
-                                    console.error("[Orders][MockOrder] createTestOrder failed", err);
-                                    toast.error(getErrorMessage(err, "Failed to create test order"));
-                                }
+                                try { await createTestOrder({ refetchQueries: ["GetOrders"] }); }
+                                catch (err) { toast.error(getErrorMessage(err, "Failed to create test order")); }
                             }}
                             disabled={creatingTestOrder}
                             className="flex items-center gap-2 border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
@@ -566,13 +553,13 @@ export default function OrdersPage() {
                 <div className="flex flex-1 overflow-hidden">
                     <StatusFilterRail statusCounts={statusCounts} active={activeStatusFilter} onChange={setActiveStatusFilter} />
 
-                    <div className="flex-1 overflow-y-auto px-4 py-3">
+                    <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col">
                         <div className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider mb-3">
                             {activeStatusFilter === "ALL" ? "All Active Orders" : STATUS_LABELS[activeStatusFilter as OrderStatus]}
                             <span className="ml-2 text-zinc-600">({visibleActiveOrders.length})</span>
                         </div>
 
-                        <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
+                        <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-4 flex-1 content-start">
                             {visibleActiveOrders.length === 0 ? (
                                 <div className="col-span-full text-center text-zinc-600 py-12">
                                     {debouncedSearch ? "No active orders matching your search" : "No active orders"}
@@ -851,7 +838,7 @@ export default function OrdersPage() {
 
                         {/* Active pagination */}
                         {!debouncedSearch && (
-                            <div className="flex items-center justify-between py-4 border-t border-zinc-800 mt-6">
+                            <div className="flex items-center justify-between py-4 border-t border-zinc-800 mt-auto pt-6">
                                 <span className="text-xs text-zinc-500">Page {ordersPage + 1} · {totalCount} active orders total</span>
                                 <div className="flex items-center gap-2">
                                     <Button variant="outline" size="sm" onClick={() => setOrdersPage(p => Math.max(0, p - 1))} disabled={ordersPage === 0 || loading}>Prev</Button>
