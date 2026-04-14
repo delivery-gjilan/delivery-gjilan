@@ -120,10 +120,10 @@ export default function EditBusinessModal({
             <div className="space-y-6">
                 {/* Basic Information */}
                 <div className="space-y-4">
-                    <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Basic Information</h3>
+                    <h3 className="text-sm font-semibold text-zinc-300 uppercase tracking-wide">Basic Information</h3>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">Business Name *</label>
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">Business Name *</label>
                         <Input
                             placeholder="e.g., My Restaurant"
                             value={form.name}
@@ -133,7 +133,7 @@ export default function EditBusinessModal({
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-1">Phone Number</label>
+                            <label className="block text-xs font-medium text-zinc-400 mb-1.5">Phone Number</label>
                             <Input
                                 placeholder="e.g., +383 44 123 456"
                                 value={form.phoneNumber}
@@ -141,7 +141,7 @@ export default function EditBusinessModal({
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-1">Business Type *</label>
+                            <label className="block text-xs font-medium text-zinc-400 mb-1.5">Business Type *</label>
                             <Select
                                 value={form.businessType}
                                 onChange={(e) => setForm({ ...form, businessType: e.target.value as BusinessType })}
@@ -154,12 +154,12 @@ export default function EditBusinessModal({
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">Business Image (optional)</label>
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">Business Image (optional)</label>
                         <input
                             type="file"
                             accept="image/jpeg,image/jpg,image/png,image/webp"
                             onChange={handleImageChange}
-                            className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer"
+                            className="block w-full text-sm text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-violet-600 file:text-white hover:file:bg-violet-500 cursor-pointer"
                         />
                         {editImagePreview && (
                             <div className="mt-2">
@@ -170,11 +170,11 @@ export default function EditBusinessModal({
                 </div>
 
                 {/* Location */}
-                <div className="border-t border-gray-700 pt-6 space-y-4">
-                    <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Location</h3>
+                <div className="border-t border-zinc-800 pt-6 space-y-4">
+                    <h3 className="text-sm font-semibold text-zinc-300 uppercase tracking-wide">Location</h3>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">Address *</label>
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">Address *</label>
                         <Input
                             placeholder="e.g., 123 Main Street, City"
                             value={form.location.address}
@@ -186,7 +186,7 @@ export default function EditBusinessModal({
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-1">Latitude</label>
+                            <label className="block text-xs font-medium text-zinc-400 mb-1.5">Latitude</label>
                             <Input
                                 placeholder="e.g., 41.3874"
                                 type="number"
@@ -201,7 +201,7 @@ export default function EditBusinessModal({
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-1">Longitude</label>
+                            <label className="block text-xs font-medium text-zinc-400 mb-1.5">Longitude</label>
                             <Input
                                 placeholder="e.g., 21.1432"
                                 type="number"
@@ -219,13 +219,13 @@ export default function EditBusinessModal({
                 </div>
 
                 {/* Operating Hours */}
-                <div className="border-t border-gray-700 pt-6 space-y-4">
-                    <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Default Hours</h3>
-                    <p className="text-xs text-gray-500">Fallback hours when no daily schedule is set</p>
+                <div className="border-t border-zinc-800 pt-6 space-y-4">
+                    <h3 className="text-sm font-semibold text-zinc-300 uppercase tracking-wide">Default Hours</h3>
+                    <p className="text-xs text-zinc-500">Fallback hours when no daily schedule is set</p>
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-1">Opens At</label>
+                            <label className="block text-xs font-medium text-zinc-400 mb-1.5">Opens At</label>
                             <Input
                                 type="time"
                                 value={form.workingHours.opensAt}
@@ -238,7 +238,7 @@ export default function EditBusinessModal({
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-1">Closes At</label>
+                            <label className="block text-xs font-medium text-zinc-400 mb-1.5">Closes At</label>
                             <Input
                                 type="time"
                                 value={form.workingHours.closesAt}
@@ -254,10 +254,10 @@ export default function EditBusinessModal({
                 </div>
 
                 {/* Minimum Order */}
-                <div className="border-t border-gray-700 pt-6 space-y-4">
-                    <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Ordering Rules</h3>
+                <div className="border-t border-zinc-800 pt-6 space-y-4">
+                    <h3 className="text-sm font-semibold text-zinc-300 uppercase tracking-wide">Ordering Rules</h3>
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">Minimum Order Amount (€)</label>
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">Minimum Order Amount (€)</label>
                         <Input
                             type="number"
                             min={0}
@@ -265,14 +265,14 @@ export default function EditBusinessModal({
                             value={form.minOrderAmount}
                             onChange={(e) => setForm({ ...form, minOrderAmount: parseFloat(e.target.value) || 0 })}
                         />
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-zinc-500 mt-1">
                             Set to 0 to disable. Customers cannot place an order below this subtotal.
                         </p>
                     </div>
                 </div>
 
                 {/* Per-day Schedule Editor */}
-                <div className="border-t border-gray-700 pt-6">
+                <div className="border-t border-zinc-800 pt-6">
                     {business && (
                         <ScheduleEditor
                             businessId={business.id}

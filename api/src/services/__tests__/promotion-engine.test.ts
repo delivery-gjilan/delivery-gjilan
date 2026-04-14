@@ -7,6 +7,7 @@
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { PromotionEngine, type ApplicablePromotion, type CartContext, type PromotionResult } from '../PromotionEngine';
+import type { DbType } from '@/database';
 
 // ---------------------------------------------------------------------------
 // Mirror of PromotionEngine.calculateDiscount (private method)
@@ -307,7 +308,7 @@ describe('applyPromotions stacking', () => {
 
 describe('PromotionEngine.applySelectedPromotions', () => {
     it('rejects when any selected promotion is no longer applicable', async () => {
-        const engine = new PromotionEngine({} as any);
+        const engine = new PromotionEngine({} as unknown as DbType);
         vi.spyOn(engine, 'getApplicablePromotions').mockResolvedValue([
             makePromo({ id: 'p1', isStackable: true, appliedAmount: 5 }),
         ]);
@@ -318,7 +319,7 @@ describe('PromotionEngine.applySelectedPromotions', () => {
     });
 
     it('rejects non-combinable selections when one promo is non-stackable', async () => {
-        const engine = new PromotionEngine({} as any);
+        const engine = new PromotionEngine({} as unknown as DbType);
         vi.spyOn(engine, 'getApplicablePromotions').mockResolvedValue([
             makePromo({ id: 'p1', priority: 50, isStackable: false, appliedAmount: 10 }),
             makePromo({ id: 'p2', priority: 20, isStackable: true, appliedAmount: 5 }),
@@ -330,7 +331,7 @@ describe('PromotionEngine.applySelectedPromotions', () => {
     });
 
     it('rejects multiple free-delivery selections', async () => {
-        const engine = new PromotionEngine({} as any);
+        const engine = new PromotionEngine({} as unknown as DbType);
         vi.spyOn(engine, 'getApplicablePromotions').mockResolvedValue([
             makePromo({ id: 'fd-1', priority: 40, isStackable: true, freeDelivery: true, appliedAmount: 0 }),
             makePromo({ id: 'fd-2', priority: 30, isStackable: true, freeDelivery: true, appliedAmount: 0 }),
@@ -342,7 +343,7 @@ describe('PromotionEngine.applySelectedPromotions', () => {
     });
 
     it('applies valid stackable selected promotions in priority order', async () => {
-        const engine = new PromotionEngine({} as any);
+        const engine = new PromotionEngine({} as unknown as DbType);
         vi.spyOn(engine, 'getApplicablePromotions').mockResolvedValue([
             makePromo({ id: 'low', priority: 10, isStackable: true, appliedAmount: 4 }),
             makePromo({ id: 'high', priority: 100, isStackable: true, appliedAmount: 9 }),
@@ -358,7 +359,7 @@ describe('PromotionEngine.applySelectedPromotions', () => {
     });
 
     it('guards final subtotal from going below zero', async () => {
-        const engine = new PromotionEngine({} as any);
+        const engine = new PromotionEngine({} as unknown as DbType);
         vi.spyOn(engine, 'getApplicablePromotions').mockResolvedValue([
             makePromo({ id: 'p1', priority: 10, isStackable: true, appliedAmount: 40 }),
             makePromo({ id: 'p2', priority: 5, isStackable: true, appliedAmount: 30 }),

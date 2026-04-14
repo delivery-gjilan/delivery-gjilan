@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -194,7 +194,7 @@ export default function CategoriesBlock({
      Render
     ============================================== */
 
-    if (loading) return <p className="text-gray-400">Loading categories...</p>;
+    if (loading) return <p className="text-zinc-400">Loading categories...</p>;
     if (error) return <p className="text-red-400">Error: {error}</p>;
 
     return (
@@ -281,7 +281,7 @@ export default function CategoriesBlock({
             </DndContext>
 
             {orderedCategories.length === 0 && (
-                <p className="text-gray-500 text-center py-4">
+                <p className="text-zinc-500 text-center py-4">
                     No categories yet.
                 </p>
             )}
@@ -298,7 +298,7 @@ export default function CategoriesBlock({
             >
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">
                             Category Name
                         </label>
                         <Input
@@ -333,7 +333,7 @@ export default function CategoriesBlock({
             >
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">
                             Category Name
                         </label>
                         <Input
@@ -369,7 +369,7 @@ export default function CategoriesBlock({
                 onClose={() => setDeleteId(null)}
                 title="Delete Category"
             >
-                <p className="text-gray-300 mb-4">
+                <p className="text-zinc-300 mb-4">
                     Are you sure you want to delete this category?
                 </p>
 

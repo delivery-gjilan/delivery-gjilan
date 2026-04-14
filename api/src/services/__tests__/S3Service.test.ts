@@ -28,15 +28,15 @@ const { mockSend } = vi.hoisted(() => {
 // (non-arrow) functions — arrow functions cannot be constructors.
 vi.mock('@aws-sdk/client-s3', () => ({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    S3Client: vi.fn(function (this: any) {
+    S3Client: vi.fn(function (this: Record<string, unknown>) {
         this.send = mockSend;
     }),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    PutObjectCommand: vi.fn(function (this: any, input: any) {
+    PutObjectCommand: vi.fn(function (this: Record<string, unknown>, input: Record<string, unknown>) {
         Object.assign(this, { _type: 'Put', ...input });
     }),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    DeleteObjectCommand: vi.fn(function (this: any, input: any) {
+    DeleteObjectCommand: vi.fn(function (this: Record<string, unknown>, input: Record<string, unknown>) {
         Object.assign(this, { _type: 'Delete', ...input });
     }),
 }));
@@ -54,7 +54,7 @@ function makeFile(name = 'photo.jpg', mimetype = 'image/jpeg'): Express.Multer.F
         fieldname: 'file',
         encoding: '7bit',
         size: 16,
-        stream: null as any,
+        stream: null as unknown as NodeJS.ReadableStream,
         destination: '',
         filename: '',
         path: '',

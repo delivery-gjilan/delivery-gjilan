@@ -106,14 +106,14 @@ export default function ScheduleEditor({ businessId, schedule, onSaved }: Props)
         <div className="space-y-4">
             <div className="flex items-center justify-between mb-2">
                 <div>
-                    <label className="block text-base font-semibold text-gray-200">
+                    <label className="block text-sm font-semibold text-zinc-200">
                         Weekly Schedule
                     </label>
-                    <p className="text-xs text-gray-500 mt-1">Set business hours for each day of the week</p>
+                    <p className="text-xs text-zinc-500 mt-1">Set business hours for each day of the week</p>
                 </div>
                 <button
                     type="button"
-                    className="text-xs px-3 py-1.5 rounded-md bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 transition-colors border border-purple-600/30"
+                    className="text-xs px-3 py-1.5 rounded-md bg-violet-600/20 text-violet-400 hover:bg-violet-600/30 transition-colors border border-violet-600/30"
                     onClick={applyToAll}
                 >
                     Copy Mon → All
@@ -126,8 +126,8 @@ export default function ScheduleEditor({ businessId, schedule, onSaved }: Props)
                         key={idx}
                         className={`flex items-center gap-3 rounded-lg border px-4 py-3 transition-all ${
                             day.enabled
-                                ? "border-gray-600 bg-gray-800/80"
-                                : "border-gray-800 bg-gray-900/40 opacity-60"
+                                ? "border-zinc-700 bg-zinc-800/80"
+                                : "border-zinc-800 bg-zinc-900/40 opacity-60"
                         }`}
                     >
                         {/* Toggle */}
@@ -136,9 +136,9 @@ export default function ScheduleEditor({ businessId, schedule, onSaved }: Props)
                                 type="checkbox"
                                 checked={day.enabled}
                                 onChange={(e) => updateDay(idx, { enabled: e.target.checked })}
-                                className="accent-purple-500 h-4 w-4 cursor-pointer"
+                                className="accent-violet-500 h-4 w-4 cursor-pointer"
                             />
-                            <span className="text-sm font-medium text-gray-200">{DAY_LABELS[idx]}</span>
+                            <span className="text-sm font-medium text-zinc-200">{DAY_LABELS[idx]}</span>
                         </label>
 
                         {/* Time pickers */}
@@ -150,7 +150,7 @@ export default function ScheduleEditor({ businessId, schedule, onSaved }: Props)
                                     onChange={(e) => updateDay(idx, { opensAt: e.target.value })}
                                     className="!py-2 text-sm"
                                 />
-                                <span className="text-gray-500 text-sm font-medium">to</span>
+                                <span className="text-zinc-500 text-sm font-medium">to</span>
                                 <Input
                                     type="time"
                                     value={day.closesAt}
@@ -159,7 +159,7 @@ export default function ScheduleEditor({ businessId, schedule, onSaved }: Props)
                                 />
                             </div>
                         ) : (
-                            <span className="text-sm text-gray-500 italic ml-auto">Closed</span>
+                            <span className="text-sm text-zinc-500 italic ml-auto">Closed</span>
                         )}
                     </div>
                 ))}

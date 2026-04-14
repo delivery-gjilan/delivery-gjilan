@@ -242,7 +242,7 @@ describe('GET /api/directions — Mapbox proxy', () => {
                 }, 15);
             }),
         );
-        vi.stubGlobal('fetch', delayedFetch as any);
+        vi.stubGlobal('fetch', delayedFetch as unknown as typeof globalThis.fetch);
 
         const [res1, res2] = await Promise.all([
             request(app)

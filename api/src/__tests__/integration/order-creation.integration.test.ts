@@ -1136,7 +1136,7 @@ describe('promotion combination validation', () => {
                     totalPrice: normalizeMoney(9),
                 }),
                 promotionIds: [IDS.promoStackableFreeDelivery, IDS.promoStackableFixed1],
-            } as any,
+            },
         );
         expect(order.id).toBeTruthy();
     });
@@ -1157,7 +1157,7 @@ describe('promotion combination validation', () => {
                         totalPrice: normalizeMoney(8),
                     }),
                     promotionIds: [IDS.promoNonStackableFixed2, IDS.promoStackableFreeDelivery],
-                } as any,
+                },
             ),
         ).rejects.toThrow('Selected promotions cannot be combined');
     });
@@ -1178,7 +1178,7 @@ describe('promotion combination validation', () => {
                         totalPrice: normalizeMoney(10),
                     }),
                     promotionIds: [IDS.promoStackableFreeDelivery, IDS.promoSecondFreeDelivery],
-                } as any,
+                },
             ),
         ).rejects.toThrow('Multiple free-delivery promotions cannot be combined');
     });
@@ -1200,7 +1200,7 @@ describe('promotion combination validation', () => {
                         totalPrice: normalizeMoney(8),
                     }),
                     promotionIds: [IDS.promoStackableFreeDelivery, IDS.promoStackableFixed1],
-                } as any,
+                },
             ),
         ).rejects.toThrow('Total price mismatch');
     });
@@ -1221,7 +1221,7 @@ describe('promotion combination validation', () => {
                         totalPrice: normalizeMoney(9),
                     }),
                     promotionIds: [IDS.promoStackableFreeDelivery, '00000000-0000-0000-0000-000000009999'],
-                } as any,
+                },
             ),
         ).rejects.toThrow('One or more selected promotions are no longer valid');
     });

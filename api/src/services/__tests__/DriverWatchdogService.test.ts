@@ -15,6 +15,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { DriverWatchdogService } from '../DriverWatchdogService';
 import { CONNECTION_THRESHOLDS } from '@/repositories/DriverRepository';
+import type { DriverRepository } from '@/repositories/DriverRepository';
+import type { AuthRepository } from '@/repositories/AuthRepository';
 
 // ── Silence logger ────────────────────────────────────────────────────────────
 vi.mock('@/lib/logger', () => ({
@@ -71,7 +73,7 @@ describe('DriverWatchdogService start/stop', () => {
         vi.useFakeTimers();
         driverRepo = makeDriverRepo();
         authRepo = makeAuthRepo();
-        svc = new DriverWatchdogService(driverRepo as any, authRepo as any);
+        svc = new DriverWatchdogService(driverRepo as unknown as DriverRepository, authRepo as unknown as AuthRepository);
     });
 
     afterEach(() => {
@@ -118,7 +120,7 @@ describe('DriverWatchdogService.trackHeartbeat', () => {
         vi.useFakeTimers();
         driverRepo = makeDriverRepo();
         authRepo = makeAuthRepo();
-        svc = new DriverWatchdogService(driverRepo as any, authRepo as any);
+        svc = new DriverWatchdogService(driverRepo as unknown as DriverRepository, authRepo as unknown as AuthRepository);
     });
 
     afterEach(() => {
@@ -181,7 +183,7 @@ describe('DriverWatchdogService.clearDriverTracking', () => {
     it('prevents stale/lost/disconnected callbacks from firing after clearing', async () => {
         vi.useFakeTimers();
         const driverRepo = makeDriverRepo();
-        const svc = new DriverWatchdogService(driverRepo as any, makeAuthRepo() as any);
+        const svc = new DriverWatchdogService(driverRepo as unknown as DriverRepository, makeAuthRepo() as unknown as AuthRepository);
 
         const now = Date.now();
         vi.setSystemTime(now);
@@ -205,7 +207,7 @@ describe('DriverWatchdogService.checkNow', () => {
     it('calls all three DB mark methods on a single check', async () => {
         vi.useFakeTimers();
         const driverRepo = makeDriverRepo();
-        const svc = new DriverWatchdogService(driverRepo as any, makeAuthRepo() as any);
+        const svc = new DriverWatchdogService(driverRepo as unknown as DriverRepository, makeAuthRepo() as unknown as AuthRepository);
 
         await svc.checkNow();
 
@@ -220,7 +222,7 @@ describe('DriverWatchdogService.checkNow', () => {
     it('queries connection status counts during each check', async () => {
         vi.useFakeTimers();
         const driverRepo = makeDriverRepo();
-        const svc = new DriverWatchdogService(driverRepo as any, makeAuthRepo() as any);
+        const svc = new DriverWatchdogService(driverRepo as unknown as DriverRepository, makeAuthRepo() as unknown as AuthRepository);
 
         await svc.checkNow();
         expect(driverRepo.getConnectionStatusCounts).toHaveBeenCalledOnce();

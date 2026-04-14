@@ -1,4 +1,4 @@
-ï»¿"use client";
+"use client";
 
 import { useState, useMemo, useEffect } from "react";
 import { useMutation, useQuery } from "@apollo/client/react";
@@ -106,7 +106,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
 
         const categoryMap = new Map(categories.map((c) => [c.id, c]));
 
-        // Build category â†’ subcategories â†’ products tree
+        // Build category ? subcategories ? products tree
         const categoryTree = categories.map((cat) => {
             const catProducts = products.filter((p) => p.categoryId === cat.id);
 
@@ -951,7 +951,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
     =============================================== */
 
     if (loading) {
-        return <p className="text-gray-400">Loading products...</p>;
+        return <p className="text-zinc-400">Loading products...</p>;
     }
 
     if (error) {
@@ -998,7 +998,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             </div>
 
             {sortMode && (
-                <p className="text-xs text-gray-400 mb-4">
+                <p className="text-xs text-zinc-400 mb-4">
                     Sorting is applied inside each category. Use arrow controls to move items up or down.
                 </p>
             )}
@@ -1037,7 +1037,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                         </h3>
 
                         {sortedItems.length === 0 ? (
-                            <p className="text-gray-500 text-sm">
+                            <p className="text-zinc-500 text-sm">
                                 No products here.
                             </p>
                         ) : (
@@ -1076,7 +1076,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                         className="h-12 w-12 rounded object-cover"
                                                     />
                                                 ) : (
-                                                    <span className="text-gray-400 text-xs">
+                                                    <span className="text-zinc-400 text-xs">
                                                         No image
                                                     </span>
                                                 )}
@@ -1114,7 +1114,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                 {subcategories.find((subcategory) => subcategory.id === p.subcategoryId)?.name || "-"}
                                             </Td>
 
-                                            <Td>â‚¬{p.price.toFixed(2)}</Td>
+                                            <Td>€{p.price.toFixed(2)}</Td>
 
                                             <Td>
                                                 {p.isOnSale &&
@@ -1205,7 +1205,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             >
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">
                             Category *
                         </label>
                         <Select
@@ -1228,7 +1228,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">
                             Subcategory
                         </label>
                         <Select
@@ -1253,7 +1253,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">
                             Product Name *
                         </label>
                         <Input
@@ -1269,7 +1269,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">
                             Description
                         </label>
                         <Input
@@ -1285,14 +1285,14 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">
                             Product Image
                         </label>
                         <input
                             type="file"
                             accept="image/jpeg,image/jpg,image/png,image/webp"
                             onChange={handleCreateImageChange}
-                            className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer"
+                            className="block w-full text-sm text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-violet-600 file:text-white hover:file:bg-violet-500 cursor-pointer"
                         />
                         {createImagePreview && (
                             <div className="mt-2">
@@ -1306,7 +1306,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">
                             Price *
                         </label>
                         <Input
@@ -1337,7 +1337,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                     })
                                 }
                             />
-                            <label htmlFor="createIsOffer" className="text-gray-300">
+                            <label htmlFor="createIsOffer" className="text-zinc-300">
                                 Create as Deal / Offer
                             </label>
                         </div>
@@ -1364,7 +1364,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                 }
                             }}
                         />
-                        <label htmlFor="createIsVariant" className="text-gray-300">
+                        <label htmlFor="createIsVariant" className="text-zinc-300">
                             Add as Variant
                         </label>
                     </div>
@@ -1393,13 +1393,13 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                 })
                             }
                         />
-                        <span className="text-gray-300">On Sale</span>
+                        <span className="text-zinc-300">On Sale</span>
                     </div>
 
                     {createForm.isOnSale && (
                         <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-1">
-                                Discount % (0â€“100)
+                            <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+                                Discount % (0–100)
                             </label>
                             <Input
                                 placeholder="e.g. 20"
@@ -1432,7 +1432,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                     </Button>
 
                     {isPlatformAdminRole && createForm.isOffer && (
-                        <p className="text-xs text-gray-400">
+                        <p className="text-xs text-zinc-400">
                             Tip: after saving this offer, you can configure option groups and choices in the Options modal.
                         </p>
                     )}
@@ -1449,9 +1449,9 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             >
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-2">Existing Variant Groups</label>
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">Existing Variant Groups</label>
                         {variantGroups.length === 0 ? (
-                            <p className="text-sm text-gray-500">No variant groups yet. Create one below.</p>
+                            <p className="text-sm text-zinc-500">No variant groups yet. Create one below.</p>
                         ) : (
                             <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
                                 {variantGroups.map((group) => (
@@ -1469,7 +1469,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                         className={`w-full text-left rounded-lg border px-3 py-2 text-sm transition-colors ${
                                             createForm.variantGroupId === group.id
                                                 ? 'border-violet-400 bg-violet-500/20 text-violet-100'
-                                                : 'border-gray-700 bg-gray-800 text-gray-200 hover:border-violet-500/50'
+                                                : 'border-zinc-800 bg-zinc-900 text-zinc-200 hover:border-violet-500/50'
                                         }`}
                                     >
                                         {group.name}
@@ -1479,8 +1479,8 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                         )}
                     </div>
 
-                    <div className="border-t border-gray-700 pt-4 space-y-2">
-                        <label className="block text-sm font-medium text-gray-400">Create New Variant Group</label>
+                    <div className="border-t border-zinc-800 pt-4 space-y-2">
+                        <label className="block text-sm font-medium text-zinc-400">Create New Variant Group</label>
                         <Input
                             placeholder="e.g., Burger Sizes"
                             value={newVariantGroupName}
@@ -1511,7 +1511,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             >
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">
                             Category *
                         </label>
                         <Select
@@ -1533,7 +1533,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">
                             Subcategory
                         </label>
                         <Select
@@ -1558,7 +1558,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">
                             Product Name *
                         </label>
                         <Input
@@ -1574,7 +1574,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">
                             Description
                         </label>
                         <Input
@@ -1590,14 +1590,14 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">
                             Product Image
                         </label>
                         <input
                             type="file"
                             accept="image/jpeg,image/jpg,image/png,image/webp"
                             onChange={handleEditImageChange}
-                            className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer"
+                            className="block w-full text-sm text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-violet-600 file:text-white hover:file:bg-violet-500 cursor-pointer"
                         />
                         {editImagePreview && (
                             <div className="mt-2">
@@ -1611,7 +1611,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">
                             Price *
                         </label>
                         <Input
@@ -1642,7 +1642,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                     })
                                 }
                             />
-                            <label htmlFor="editIsOffer" className="text-gray-300">
+                            <label htmlFor="editIsOffer" className="text-zinc-300">
                                 Mark as Deal / Offer
                             </label>
                         </div>
@@ -1669,7 +1669,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                 }
                             }}
                         />
-                        <label htmlFor="editIsVariant" className="text-gray-300">
+                        <label htmlFor="editIsVariant" className="text-zinc-300">
                             Part of Variant Group
                         </label>
                     </div>
@@ -1698,13 +1698,13 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                 })
                             }
                         />
-                        <span className="text-gray-300">On Sale</span>
+                        <span className="text-zinc-300">On Sale</span>
                     </div>
 
                     {editForm.isOnSale && (
                         <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-1">
-                                Discount % (0â€“100)
+                            <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+                                Discount % (0–100)
                             </label>
                             <Input
                                 placeholder="e.g. 20"
@@ -1734,7 +1734,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                 })
                             }
                         />
-                        <span className="text-gray-300">Available</span>
+                        <span className="text-zinc-300">Available</span>
                     </div>
 
                     {updateError && (
@@ -1762,9 +1762,9 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             >
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-2">Existing Variant Groups</label>
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">Existing Variant Groups</label>
                         {variantGroups.length === 0 ? (
-                            <p className="text-sm text-gray-500">No variant groups yet. Create one below.</p>
+                            <p className="text-sm text-zinc-500">No variant groups yet. Create one below.</p>
                         ) : (
                             <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
                                 {variantGroups.map((group) => (
@@ -1782,7 +1782,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                         className={`w-full text-left rounded-lg border px-3 py-2 text-sm transition-colors ${
                                             editForm.variantGroupId === group.id
                                                 ? 'border-violet-400 bg-violet-500/20 text-violet-100'
-                                                : 'border-gray-700 bg-gray-800 text-gray-200 hover:border-violet-500/50'
+                                                : 'border-zinc-800 bg-zinc-900 text-zinc-200 hover:border-violet-500/50'
                                         }`}
                                     >
                                         {group.name}
@@ -1792,8 +1792,8 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                         )}
                     </div>
 
-                    <div className="border-t border-gray-700 pt-4 space-y-2">
-                        <label className="block text-sm font-medium text-gray-400">Create New Variant Group</label>
+                    <div className="border-t border-zinc-800 pt-4 space-y-2">
+                        <label className="block text-sm font-medium text-zinc-400">Create New Variant Group</label>
                         <Input
                             placeholder="e.g., Pizza Sizes"
                             value={newEditVariantGroupName}
@@ -1822,7 +1822,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                 onClose={() => setDeleteTarget(null)}
                 title="Delete Product"
             >
-                <p className="text-gray-300 mb-4">
+                <p className="text-zinc-300 mb-4">
                     Are you sure you want to delete <strong>{deleteTarget?.name}</strong>?
                 </p>
 
@@ -1887,7 +1887,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                 title={`Manage Questions & Answers - ${optionsModal.productName}`}
             >
                 <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-zinc-400">
                         Use questions for sections (for example: "Choose Size") and answers for selectable choices (for example: "Large", "+$1.50").
                     </p>
 
@@ -1906,15 +1906,15 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                         </Button>
                     </div>
 
-                    <div className="rounded-lg border border-gray-700 bg-gray-800/60 p-3">
-                        <p className="text-sm font-medium text-gray-200 mb-2">Current Questions & Answers</p>
+                    <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-3">
+                        <p className="text-sm font-medium text-zinc-200 mb-2">Current Questions & Answers</p>
                         {productOptionsData?.product?.optionGroups?.length ? (
                             <div className="space-y-2">
                                 {productOptionsData.product.optionGroups.map((group) => (
-                                    <div key={group.id} className="rounded border border-gray-700 p-2">
+                                    <div key={group.id} className="rounded border border-zinc-800 p-2">
                                         <div className="flex items-center justify-between gap-2">
                                             <div className="flex-1 space-y-2">
-                                                <label className="block text-xs text-gray-400">Question title</label>
+                                                <label className="block text-xs text-zinc-400">Question title</label>
                                                 <Input
                                                     value={optionGroupDrafts[group.id]?.name ?? group.name}
                                                     onChange={(e) =>
@@ -1928,10 +1928,10 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                         }))
                                                     }
                                                 />
-                                                <p className="text-[11px] text-gray-500">Example: Choose Size, Pick a Drink, Select Extra Toppings</p>
+                                                <p className="text-[11px] text-zinc-500">Example: Choose Size, Pick a Drink, Select Extra Toppings</p>
                                                 <div className="grid grid-cols-2 gap-2">
                                                     <div>
-                                                        <label className="block text-xs text-gray-400 mb-1">Min selections</label>
+                                                        <label className="block text-xs text-zinc-400 mb-1">Min selections</label>
                                                     <Input
                                                         type="number"
                                                         value={optionGroupDrafts[group.id]?.min ?? group.minSelections}
@@ -1946,10 +1946,10 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                             }))
                                                         }
                                                     />
-                                                    <p className="text-[11px] text-gray-500 mt-1">Minimum answers required</p>
+                                                    <p className="text-[11px] text-zinc-500 mt-1">Minimum answers required</p>
                                                     </div>
                                                     <div>
-                                                        <label className="block text-xs text-gray-400 mb-1">Max selections</label>
+                                                        <label className="block text-xs text-zinc-400 mb-1">Max selections</label>
                                                     <Input
                                                         type="number"
                                                         value={optionGroupDrafts[group.id]?.max ?? group.maxSelections}
@@ -1964,7 +1964,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                             }))
                                                         }
                                                     />
-                                                    <p className="text-[11px] text-gray-500 mt-1">Maximum answers allowed</p>
+                                                    <p className="text-[11px] text-zinc-500 mt-1">Maximum answers allowed</p>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1998,16 +1998,16 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                             {group.options.map((opt) => (
                                                 <div key={opt.id} className="grid grid-cols-[48px_1fr_110px_auto_auto] gap-2 items-center">
                                                     <div className="relative">
-                                                        <label className="block text-xs text-gray-400 mb-1">Image</label>
+                                                        <label className="block text-xs text-zinc-400 mb-1">Image</label>
                                                         <label className="cursor-pointer block">
                                                             {(optionDrafts[opt.id]?.imagePreview || opt.imageUrl) ? (
                                                                 <img
                                                                     src={optionDrafts[opt.id]?.imagePreview || opt.imageUrl!}
                                                                     alt=""
-                                                                    className="w-10 h-10 rounded-lg object-cover border border-gray-600"
+                                                                    className="w-10 h-10 rounded-lg object-cover border border-zinc-700"
                                                                 />
                                                             ) : (
-                                                                <div className="w-10 h-10 rounded-lg border border-dashed border-gray-600 flex items-center justify-center text-gray-500 text-xs">+</div>
+                                                                <div className="w-10 h-10 rounded-lg border border-dashed border-zinc-700 flex items-center justify-center text-zinc-500 text-xs">+</div>
                                                             )}
                                                             <input
                                                                 type="file"
@@ -2031,7 +2031,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                         </label>
                                                     </div>
                                                     <div>
-                                                        <label className="block text-xs text-gray-400 mb-1">Answer text</label>
+                                                        <label className="block text-xs text-zinc-400 mb-1">Answer text</label>
                                                         <Input
                                                             value={optionDrafts[opt.id]?.name ?? opt.name}
                                                             onChange={(e) =>
@@ -2048,7 +2048,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                         />
                                                     </div>
                                                     <div>
-                                                        <label className="block text-xs text-gray-400 mb-1">Extra price</label>
+                                                        <label className="block text-xs text-zinc-400 mb-1">Extra price</label>
                                                         <Input
                                                             type="number"
                                                             step="0.01"
@@ -2085,18 +2085,18 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                 </div>
                                             ))}
 
-                                            <div className="grid grid-cols-[48px_1fr_110px_auto] gap-2 items-center border-t border-gray-700 pt-2 mt-2">
+                                            <div className="grid grid-cols-[48px_1fr_110px_auto] gap-2 items-center border-t border-zinc-800 pt-2 mt-2">
                                                 <div>
-                                                    <label className="block text-xs text-gray-400 mb-1">Image</label>
+                                                    <label className="block text-xs text-zinc-400 mb-1">Image</label>
                                                     <label className="cursor-pointer block">
                                                         {newOptionByGroup[group.id]?.imagePreview ? (
                                                             <img
                                                                 src={newOptionByGroup[group.id]!.imagePreview!}
                                                                 alt=""
-                                                                className="w-10 h-10 rounded-lg object-cover border border-gray-600"
+                                                                className="w-10 h-10 rounded-lg object-cover border border-zinc-700"
                                                             />
                                                         ) : (
-                                                            <div className="w-10 h-10 rounded-lg border border-dashed border-gray-600 flex items-center justify-center text-gray-500 text-xs">+</div>
+                                                            <div className="w-10 h-10 rounded-lg border border-dashed border-zinc-700 flex items-center justify-center text-zinc-500 text-xs">+</div>
                                                         )}
                                                         <input
                                                             type="file"
@@ -2120,7 +2120,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                     </label>
                                                 </div>
                                                 <div>
-                                                    <label className="block text-xs text-gray-400 mb-1">New answer text</label>
+                                                    <label className="block text-xs text-zinc-400 mb-1">New answer text</label>
                                                     <Input
                                                         placeholder="Add answer"
                                                         value={newOptionByGroup[group.id]?.name ?? ""}
@@ -2136,10 +2136,10 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                             }))
                                                         }
                                                     />
-                                                    <p className="text-[11px] text-gray-500 mt-1">Example: Medium, Coke, Add Ketchup</p>
+                                                    <p className="text-[11px] text-zinc-500 mt-1">Example: Medium, Coke, Add Ketchup</p>
                                                 </div>
                                                 <div>
-                                                    <label className="block text-xs text-gray-400 mb-1">Extra price</label>
+                                                    <label className="block text-xs text-zinc-400 mb-1">Extra price</label>
                                                     <Input
                                                         type="number"
                                                         step="0.01"
@@ -2157,7 +2157,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                             }))
                                                         }
                                                     />
-                                                    <p className="text-[11px] text-gray-500 mt-1">Enter amount added to base price</p>
+                                                    <p className="text-[11px] text-zinc-500 mt-1">Enter amount added to base price</p>
                                                 </div>
                                                 <Button
                                                     variant="primary"
@@ -2173,7 +2173,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                 ))}
                             </div>
                         ) : (
-                            <p className="text-sm text-gray-500">No option groups yet.</p>
+                            <p className="text-sm text-zinc-500">No option groups yet.</p>
                         )}
                     </div>
 
@@ -2279,7 +2279,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                 onClose={() => setOptionsDeleteTarget(null)}
                 title={optionsDeleteTarget?.kind === "group" ? "Delete Question" : "Delete Answer"}
             >
-                <p className="text-gray-300 mb-4">
+                <p className="text-zinc-300 mb-4">
                     Are you sure you want to delete <strong>{optionsDeleteTarget?.name}</strong>?
                 </p>
 
@@ -2376,7 +2376,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                 )}
                                             </div>
                                             <span className="text-sm text-zinc-400 flex-shrink-0">
-                                                â‚¬{cp.price.toFixed(2)}
+                                                €{cp.price.toFixed(2)}
                                             </span>
                                         </button>
                                     ));
@@ -2387,7 +2387,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                 ) : (
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-1">
+                            <label className="block text-xs font-medium text-zinc-400 mb-1.5">
                                 Category *
                             </label>
                             <Select
@@ -2406,8 +2406,8 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-1">
-                                Retail Price (â‚¬) *
+                            <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+                                Retail Price (€) *
                             </label>
                             <Input
                                 type="number"

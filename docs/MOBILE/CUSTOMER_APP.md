@@ -41,7 +41,7 @@ mobile-customer/
 │   ├── (tabs)/               # Main tab navigator
 │   │   ├── _layout.tsx       # 4 visible tabs
 │   │   ├── home.tsx          # Discover tab (banners, featured, categories)
-│   │   ├── restaurants.tsx   # Restaurant listing (filters, uniform preview cards with tappable product strip)
+│   │   ├── restaurants.tsx   # Restaurant listing (filters, pagination)
 │   │   ├── market.tsx        # Shops/market tab (category → shop → products)
 │   │   ├── profile.tsx       # User profile (cache-only reads)
 │   ├── business/[businessId] # Business detail + menu
@@ -109,7 +109,7 @@ index.tsx (Expo entry)
 | # | Tab | Icon | Screen | Key Behavior |
 |---|-----|------|--------|-------------|
 | 1 | Discover | compass | `home.tsx` | Banners carousel, category grid, featured restaurants, promo restaurants, open-now list. Out-of-zone check on first load. Focus refetch. |
-| 2 | Restaurants | restaurant | `restaurants.tsx` | Status filters (all/open/promo), category filters, unified restaurant preview cards with horizontal product thumbnails, product tap deep-links to `business/[businessId]?productId=...`, auto-scrolls to that product, and briefly highlights it for visual confirmation. |
+| 2 | Restaurants | restaurant | `restaurants.tsx` | Status filters (all/open/promo), category filters, FlatList with mixed item types (cards, featured, promo banners), pagination. |
 | 3 | Shops | basket | `market.tsx` | State machine: DISCOVER → SHOP → SUBCATEGORY → PRODUCTS. 2x2 category grid, Wolt-style tabs, hero header with collapse. |
 | 4 | Profile | person | `profile.tsx` | Cache-only reads. Menu sections: personal info, preferences (language, notifications), settings (theme), account (slide-to-delete). |
 Tab bar uses animated underline markers with spring physics (damping: 14, stiffness: 220).

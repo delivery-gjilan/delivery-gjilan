@@ -37,13 +37,13 @@ vi.mock('../../services/S3Service', () => ({
 }));
 
 vi.mock('@aws-sdk/client-s3', () => ({
-    S3Client: vi.fn(function (this: any) {
+    S3Client: vi.fn(function (this: Record<string, unknown>) {
         this.send = vi.fn();
     }),
-    PutObjectCommand: vi.fn(function (this: any, input: any) {
+    PutObjectCommand: vi.fn(function (this: Record<string, unknown>, input: Record<string, unknown>) {
         this.input = input;
     }),
-    DeleteObjectCommand: vi.fn(function (this: any, input: any) {
+    DeleteObjectCommand: vi.fn(function (this: Record<string, unknown>, input: Record<string, unknown>) {
         this.input = input;
     }),
 }));

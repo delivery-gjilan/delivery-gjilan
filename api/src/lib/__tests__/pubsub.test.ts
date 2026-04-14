@@ -156,7 +156,7 @@ async function awaitNext<T>(pending: Promise<IteratorResult<T>>, timeoutMs = 500
 
 describe('publish + subscribe round-trips', () => {
     it('delivers an allDriversChanged payload to a subscriber', async () => {
-        const PAYLOAD = { drivers: [{ id: 'drv-1' } as any] };
+        const PAYLOAD = { drivers: [{ id: 'drv-1' } as Record<string, unknown>] };
         const iter = subscribe(pubsub, topics.allDriversChanged())[Symbol.asyncIterator]();
 
         const pending = iter.next();          // ← start waiting first

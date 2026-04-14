@@ -14,12 +14,14 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SettlementCalculationEngine, type SettlementCalculation } from '../SettlementCalculationEngine';
+import type { DbOrder, DbOrderItem } from '@/database/schema';
+import type { DbType } from '@/database';
 
 // ---------------------------------------------------------------------------
 // Mock DB builder — simulates Drizzle's chainable query API
 // ---------------------------------------------------------------------------
 
-type QueryResult = Record<string, any>[];
+type QueryResult = Record<string, unknown>[];
 
 function noop() {
     return [];
@@ -29,12 +31,12 @@ function noop() {
  * Build a fake DB that lets us control the results of each `.select().from(table)`
  * chain.  tableResults maps a table reference to the rows that query should return.
  */
-function createMockDb(tableResults: Map<any, QueryResult> = new Map()) {
-    const db: any = {
-        select: vi.fn().mockImplementation((_cols?: any) => {
-            let resolvedTable: any = null;
-            const chain: any = {
-                from: vi.fn().mockImplementation((table: any) => {
+function createMockDb(tableResults: Map<unknown, QueryResult> = new Map()) {
+    const db = {
+        select: vi.fn().mockImplementation((_cols?: unknown) => {
+            let resolvedTable: unknown = null;
+            const chain: Record<string, unknown> = {
+                from: vi.fn().mockImplementation((table: unknown) => {
                     resolvedTable = table;
                     return chain;
                 }),
@@ -42,7 +44,7 @@ function createMockDb(tableResults: Map<any, QueryResult> = new Map()) {
                 limit: vi.fn().mockImplementation(() => chain),
                 groupBy: vi.fn().mockImplementation(() => chain),
                 leftJoin: vi.fn().mockImplementation(() => chain),
-                then: (resolve: any) => {
+                then: (resolve: (value: unknown) => unknown) => {
                     const rows = (resolvedTable && tableResults.get(resolvedTable)) ?? [];
                     return Promise.resolve(rows).then(resolve);
                 },
@@ -52,7 +54,7 @@ function createMockDb(tableResults: Map<any, QueryResult> = new Map()) {
         }),
         query: {},
     };
-    return db;
+    return db as unknown as DbType;
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +75,7 @@ interface OrderOverrides {
     status?: string;
 }
 
-function makeOrder(overrides: OrderOverrides = {}): any {
+function makeOrder(overrides: OrderOverrides = {}): DbOrder {
     return {
         id: 'id' in overrides ? overrides.id : 'order-1',
         paymentCollection: overrides.paymentCollection ?? 'CASH_TO_DRIVER',
@@ -89,7 +91,7 @@ function makeOrder(overrides: OrderOverrides = {}): any {
     };
 }
 
-function makeOrderItem(overrides: Partial<any> = {}): any {
+function makeOrderItem(overrides: Partial<DbOrderItem> = {}): DbOrderItem {
     return {
         id: 'item-1',
         orderId: 'order-1',
