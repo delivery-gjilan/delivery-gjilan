@@ -104,6 +104,17 @@ interface VariantGroupOption {
     name: string;
 }
 
+type CategoryModalState = { open: boolean; mode: 'create' | 'edit'; data?: Category };
+type SubcategoryModalState = { open: boolean; mode: 'create' | 'edit'; categoryId?: string; data?: Subcategory };
+type ProductModalState = {
+    open: boolean;
+    mode: 'create' | 'edit';
+    categoryId?: string;
+    subcategoryId?: string;
+    data?: Product;
+};
+type VariantGroupCreateData = { id: string };
+
 /* ===============================================
    MAIN COMPONENT
 =============================================== */
@@ -113,7 +124,7 @@ export default function MarketPage() {
     const { admin } = useAuth();
 
     const marketBusiness = useMemo(() => {
-        return businesses.find((business: any) => business.businessType === "MARKET");
+        return businesses.find((business) => business.businessType === "MARKET");
     }, [businesses]);
 
     const effectiveBusinessId = useMemo(() => {
@@ -197,23 +208,12 @@ function MarketContent({ businessId }: { businessId: string }) {
     const { deleteVariantGroup } = useDeleteProductVariantGroup();
 
     // Modal states
-    const [categoryModal, setCategoryModal] = useState<{ open: boolean; mode: 'create' | 'edit'; data?: any }>({
+    const [categoryModal, setCategoryModal] = useState<CategoryModalState>({
         open: false,
         mode: 'create',
     });
-    const [subcategoryModal, setSubcategoryModal] = useState<{
-        open: boolean;
-        mode: 'create' | 'edit';
-        categoryId?: string;
-        data?: any;
-    }>({ open: false, mode: 'create' });
-    const [productModal, setProductModal] = useState<{
-        open: boolean;
-        mode: 'create' | 'edit';
-        categoryId?: string;
-        subcategoryId?: string;
-        data?: any;
-    }>({ open: false, mode: 'create' });
+    const [subcategoryModal, setSubcategoryModal] = useState<SubcategoryModalState>({ open: false, mode: 'create' });
+    const [productModal, setProductModal] = useState<ProductModalState>({ open: false, mode: 'create' });
     const [deleteModal, setDeleteModal] = useState<{
         open: boolean;
         type: 'category' | 'subcategory' | 'product';
@@ -1108,7 +1108,7 @@ function ProductRow({
 =============================================== */
 
 interface CategoryModalProps {
-    modal: { open: boolean; mode: 'create' | 'edit'; data?: any };
+    modal: CategoryModalState;
     onClose: () => void;
     onCreate: (name: string) => Promise<{ success: boolean; error?: string }>;
     onUpdate: (id: string, name: string, isActive: boolean) => Promise<{ success: boolean; error?: string }>;
@@ -1204,7 +1204,7 @@ function CategoryModal({ modal, onClose, onCreate, onUpdate }: CategoryModalProp
 =============================================== */
 
 interface SubcategoryModalProps {
-    modal: { open: boolean; mode: 'create' | 'edit'; categoryId?: string; data?: any };
+    modal: SubcategoryModalState;
     categories: Category[];
     onClose: () => void;
     onCreate: (categoryId: string, name: string) => Promise<{ success: boolean; error?: string }>;
@@ -1312,13 +1312,7 @@ function SubcategoryModal({ modal, categories, onClose, onCreate, onUpdate }: Su
 =============================================== */
 
 interface ProductModalProps {
-    modal: {
-        open: boolean;
-        mode: 'create' | 'edit';
-        categoryId?: string;
-        subcategoryId?: string;
-        data?: any;
-    };
+    modal: ProductModalState;
     businessId: string;
     categories: Category[];
     subcategories: Subcategory[];
@@ -1326,7 +1320,7 @@ interface ProductModalProps {
     onClose: () => void;
     onCreate: (input: CreateProductInput) => Promise<{ success: boolean; error?: string }>;
     onUpdate: (id: string, input: UpdateProductInput) => Promise<{ success: boolean; error?: string }>;
-    onCreateVariantGroup: (name: string) => Promise<{ success: boolean; data?: any; error?: string }>;
+    onCreateVariantGroup: (name: string) => Promise<{ success: boolean; data?: VariantGroupCreateData; error?: string }>;
 }
 
 function ProductModal({
