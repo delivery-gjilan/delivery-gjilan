@@ -13,6 +13,7 @@ import { ALL_ORDERS_SUBSCRIPTION } from '@/graphql/operations/orders/subscriptio
 import { playNewOrderAlert } from '@/lib/audio/orderAlert';
 import { toast } from 'sonner';
 import type {
+    AllOrdersUpdatedSubscription,
     CancelOrderMutation,
     GetOrderQuery,
     GetOrdersByStatusQuery,
@@ -50,7 +51,7 @@ export interface UseOrdersByStatusResult {
 export interface UseUpdateOrderStatusResult {
     update: (id: string, status: string) => Promise<{
         success: boolean;
-        data?: UpdateOrderStatusMutation;
+        data?: UpdateOrderStatusMutation | null;
         error?: string;
     }>;
     loading: boolean;
@@ -151,7 +152,7 @@ export function useOrders(options: UseOrdersOptions = {}): UseOrdersResult {
     }, [refetch]);
 
     // Real-time subscription for updates — refetch on signal
-    useSubscription(ALL_ORDERS_SUBSCRIPTION, {
+    useSubscription<AllOrdersUpdatedSubscription>(ALL_ORDERS_SUBSCRIPTION, {
         onData: ({ data: subscriptionData }) => {
             const incomingOrders = subscriptionData.data?.allOrdersUpdated;
             if (!incomingOrders || incomingOrders.length === 0) {
@@ -187,7 +188,7 @@ export function useOrders(options: UseOrdersOptions = {}): UseOrdersResult {
             if (shouldAlert) {
                 void playNewOrderAlert();
                 const inventoryOrders = newActiveOrders.filter((o) =>
-                    o.inventoryPrice != null && Number(o.inventoryPrice) > 0
+                    (o as Record<string, unknown>).inventoryPrice != null && Number((o as Record<string, unknown>).inventoryPrice) > 0
                 );
                 if (inventoryOrders.length > 0) {
                     toast('📦 Stock order incoming', {
@@ -204,7 +205,7 @@ export function useOrders(options: UseOrdersOptions = {}): UseOrdersResult {
 
                 validIncomingOrders.forEach((order) => {
                     const existingOrder = byId.get(String(order?.id));
-                    byId.set(String(order?.id), existingOrder ? { ...existingOrder, ...order } : order);
+                    byId.set(String(order?.id), (existingOrder ? { ...existingOrder, ...order } : order) as OrderItem);
                 });
 
                 // Filter out orders that don't match the query's expected statuses
@@ -217,9 +218,10 @@ export function useOrders(options: UseOrdersOptions = {}): UseOrdersResult {
                     ...(existing ?? {}),
                     orders: {
                         ...(currentConnection ?? {}),
+                        totalCount: currentConnection?.totalCount ?? 0,
                         orders: filtered,
                     },
-                };
+                } as GetOrdersQuery;
             });
         },
     });

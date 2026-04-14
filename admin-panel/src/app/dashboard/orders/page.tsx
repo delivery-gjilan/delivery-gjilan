@@ -18,6 +18,7 @@ import { GET_ORDER_COVERAGE } from "@/graphql/operations/inventory/queries";
 import { DEDUCT_ORDER_STOCK } from "@/graphql/operations/inventory/mutations";
 import InventoryCoverageModal from "@/components/inventory/InventoryCoverageModal";
 import OrderDetailPanel from "@/components/orders/OrderDetailPanel";
+import CancelOrderModal from "@/components/orders/CancelOrderModal";
 import { Package, Store, Search, ArrowRight, MapPin, User, Plus, ChefHat, Timer, Copy, Check, Phone, Hash, MessageSquare, Calendar, X } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -392,7 +393,11 @@ export default function OrdersPage() {
             setPrepTimeModalOrder(order); setPrepTimeMinutes("20"); return;
         }
         if (newStatus === "CANCELLED") {
-            setCancelModalOrder(order); setCancelReason(""); return;
+            setCancelModalOrder(order);
+            setCancelReason("");
+            setCancelSettleDriver(false);
+            setCancelSettleBusiness(false);
+            return;
         }
         setUpdatingOrderId(order.id);
         const result = await updateStatus(order.id, newStatus as OrderStatus);
@@ -518,7 +523,6 @@ export default function OrdersPage() {
                 <div className="flex items-center gap-2">
                     {isSuperAdmin && (
                         <Button
-                            variant="outline"
                             size="sm"
                             onClick={async () => {
                                 try { await createTestOrder({ refetchQueries: ["GetOrders"] }); }
@@ -1111,61 +1115,19 @@ export default function OrdersPage() {
             </Modal>
 
             {/* ════ CANCEL ORDER MODAL ════ */}
-            <Modal isOpen={!!cancelModalOrder} onClose={() => { setCancelModalOrder(null); setCancelReason(""); setCancelSettleDriver(false); setCancelSettleBusiness(false); }} title="Cancel Order">
-                {cancelModalOrder && (() => {
-                    const preview = !isBusinessUser ? cancelModalOrder.settlementPreview ?? null : null;
-                    const hasDriver = !!cancelModalOrder.driver;
-                    const businessReceivable = preview ? preview.lineItems.filter((li) => li.direction === "RECEIVABLE" && li.businessId).reduce((s, li) => s + li.amount, 0) : 0;
-                    const driverPayable = preview ? preview.lineItems.filter((li) => li.direction === "PAYABLE" && li.driverId).reduce((s, li) => s + li.amount, 0) : 0;
-                    return (
-                        <div className="space-y-4">
-                            <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
-                                <div className="font-medium text-red-400">Order {cancelModalOrder.displayId}</div>
-                                {cancelModalOrder.user && <div className="text-sm text-zinc-400 mt-0.5">{cancelModalOrder.user.firstName} {cancelModalOrder.user.lastName}</div>}
-                                <div className="text-sm text-zinc-500 mt-1">€{cancelModalOrder.totalPrice.toFixed(2)}</div>
-                            </div>
-                            {preview && (
-                                <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-3 space-y-2">
-                                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Settlement on Cancellation</div>
-                                    <div className="text-[10px] text-zinc-600">Check to create a settlement even though the order is cancelled.</div>
-                                    <div className="space-y-2">
-                                        <label className="flex items-center justify-between gap-3 cursor-pointer">
-                                            <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                <input type="checkbox" checked={cancelSettleBusiness} onChange={(e) => setCancelSettleBusiness(e.target.checked)}
-                                                    className="w-4 h-4 shrink-0 rounded border-zinc-600 bg-zinc-800 accent-sky-400 cursor-pointer" />
-                                                <span className="text-xs text-zinc-400"><span className="text-sky-400 font-medium">Business</span><span className="text-zinc-600 mx-1">to</span><span className="text-zinc-300">Platform</span></span>
-                                            </div>
-                                            <span className={`font-semibold text-sm ${cancelSettleBusiness ? "text-sky-300" : "text-zinc-500"}`}>~€{businessReceivable.toFixed(2)}</span>
-                                        </label>
-                                        <label className={`flex items-center justify-between gap-3 ${hasDriver ? "cursor-pointer" : "cursor-not-allowed opacity-40"}`}>
-                                            <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                <input type="checkbox" checked={cancelSettleDriver} onChange={(e) => setCancelSettleDriver(e.target.checked)} disabled={!hasDriver}
-                                                    className="w-4 h-4 shrink-0 rounded border-zinc-600 bg-zinc-800 accent-amber-400 cursor-pointer disabled:cursor-not-allowed" />
-                                                <span className="text-xs text-zinc-400"><span className="text-zinc-300">Platform</span><span className="text-zinc-600 mx-1">to</span>
-                                                    <span className={hasDriver ? "text-amber-400 font-medium" : "text-zinc-500"}>{hasDriver ? `Driver (${cancelModalOrder.driver!.firstName} ${cancelModalOrder.driver!.lastName})` : "Driver (none)"}</span>
-                                                </span>
-                                            </div>
-                                            <span className={`font-semibold text-sm ${hasDriver ? (cancelSettleDriver ? "text-amber-300" : "text-zinc-500") : "text-zinc-600"}`}>~€{driverPayable.toFixed(2)}</span>
-                                        </label>
-                                    </div>
-                                </div>
-                            )}
-                            <div>
-                                <label className="block text-sm text-zinc-400 mb-2">Cancellation Reason *</label>
-                                <textarea value={cancelReason} onChange={(e) => setCancelReason(e.target.value)}
-                                    placeholder="e.g. Customer requested cancellation by phone..." rows={3}
-                                    className="w-full rounded-lg bg-[#09090b] border border-zinc-800 text-white text-sm px-3 py-2.5 placeholder:text-zinc-600 focus:outline-none focus:border-red-500/50 resize-none" />
-                            </div>
-                            <div className="flex gap-3 pt-2">
-                                <Button variant="outline" className="flex-1" onClick={() => { setCancelModalOrder(null); setCancelReason(""); }}>Go Back</Button>
-                                <Button className="flex-1 bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30" onClick={handleAdminCancel} disabled={cancellingOrder || !cancelReason.trim()}>
-                                    {cancellingOrder ? "Cancelling..." : "Confirm Cancel"}
-                                </Button>
-                            </div>
-                        </div>
-                    );
-                })()}
-            </Modal>
+            <CancelOrderModal
+                order={cancelModalOrder}
+                reason={cancelReason}
+                settleDriver={cancelSettleDriver}
+                settleBusiness={cancelSettleBusiness}
+                loading={cancellingOrder}
+                isBusinessUser={isBusinessUser}
+                onReasonChange={setCancelReason}
+                onSettleDriverChange={setCancelSettleDriver}
+                onSettleBusinessChange={setCancelSettleBusiness}
+                onConfirm={handleAdminCancel}
+                onClose={() => { setCancelModalOrder(null); setCancelReason(""); setCancelSettleDriver(false); setCancelSettleBusiness(false); }}
+            />
 
             {/* ════ INVENTORY COVERAGE MODAL ════ */}
             {inventoryModalOrder && (

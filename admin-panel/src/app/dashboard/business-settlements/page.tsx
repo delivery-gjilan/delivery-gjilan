@@ -20,7 +20,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/label';
 import { RefreshCw, Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { SettlementType, SettlementDirection, type SettlementsPageQuery } from '@/gql/graphql';
+import {
+  SettlementType,
+  SettlementDirection,
+  type GetBusinessBalanceQuery,
+  type GetBusinessOrderFinancialsQuery,
+  type GetSettlementRequestsQuery,
+  type SettlementsPageQuery,
+} from '@/gql/graphql';
 import {
   Dialog,
   DialogContent,
@@ -36,6 +43,24 @@ import {
 } from '@/graphql/operations/settlements/queries';
 
 type SettlementRecord = SettlementsPageQuery['settlements'][number];
+type SettlementRequestRecord = GetSettlementRequestsQuery['settlementRequests'][number];
+type OrderGroup = {
+  orderId: string;
+  orderDisplayId: string;
+  order: SettlementRecord['order'];
+  settlements: SettlementRecord[];
+  totalReceivable: number;
+  totalPayable: number;
+  latestCreatedAt: SettlementRecord['createdAt'];
+};
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return 'Failed to create request';
+}
 
 function directionBadge(direction: string | null | undefined) {
   if (direction === SettlementDirection.Receivable)
@@ -69,13 +94,13 @@ export default function BusinessSettlementsPage() {
   const [reqSubmitting, setReqSubmitting] = useState(false);
 
   // Order detail dialog
-  const [selectedOrderGroup, setSelectedOrderGroup] = useState<any>(null);
-  const [fetchFinancials, { data: financialsData, loading: financialsLoading }] = useLazyQuery(
+  const [selectedOrderGroup, setSelectedOrderGroup] = useState<OrderGroup | null>(null);
+  const [fetchFinancials, { data: financialsData, loading: financialsLoading }] = useLazyQuery<GetBusinessOrderFinancialsQuery>(
     GET_BUSINESS_ORDER_FINANCIALS,
     { fetchPolicy: 'network-only' },
   );
 
-  const { data, loading, refetch } = useQuery(GET_SETTLEMENTS_PAGE, {
+  const { data, loading, refetch } = useQuery<SettlementsPageQuery>(GET_SETTLEMENTS_PAGE, {
     variables: {
       type: SettlementType.Business,
       businessId,
@@ -87,13 +112,13 @@ export default function BusinessSettlementsPage() {
     fetchPolicy: 'cache-and-network',
   });
 
-  const { data: balanceData, loading: balanceLoading, refetch: refetchBalance } = useQuery(GET_BUSINESS_BALANCE, {
+  const { data: balanceData, loading: balanceLoading, refetch: refetchBalance } = useQuery<GetBusinessBalanceQuery>(GET_BUSINESS_BALANCE, {
     variables: { businessId },
     skip: !businessId,
     fetchPolicy: 'cache-and-network',
   });
 
-  const { data: requestsData, loading: requestsLoading, refetch: refetchRequests } = useQuery(GET_SETTLEMENT_REQUESTS, {
+  const { data: requestsData, loading: requestsLoading, refetch: refetchRequests } = useQuery<GetSettlementRequestsQuery>(GET_SETTLEMENT_REQUESTS, {
     variables: { businessId, limit: 20 },
     skip: !businessId,
     fetchPolicy: 'network-only',
@@ -103,27 +128,19 @@ export default function BusinessSettlementsPage() {
 
   const settlements: SettlementRecord[] = data?.settlements ?? [];
   const balance = balanceData?.businessBalance;
-  const settlementRequests = (requestsData as any)?.settlementRequests ?? [];
+  const settlementRequests: SettlementRequestRecord[] = requestsData?.settlementRequests ?? [];
 
   const normalized = searchQuery.trim().toLowerCase();
   const filtered = settlements.filter((s) => {
     if (!normalized) return true;
-    return [s.id, s.order?.id, (s as any).paymentReference, (s as any).paymentMethod]
+    return [s.id, s.order?.id, s.order?.displayId, s.business?.name]
       .filter(Boolean)
       .some((v) => v!.toString().toLowerCase().includes(normalized));
   });
 
   // Group filtered settlements by order
   const orderGroups = useMemo(() => {
-    const grouped: Record<string, {
-      orderId: string;
-      orderDisplayId: string;
-      order: any;
-      settlements: SettlementRecord[];
-      totalReceivable: number;
-      totalPayable: number;
-      latestCreatedAt: string;
-    }> = {};
+    const grouped: Record<string, OrderGroup> = {};
 
     filtered.forEach((s) => {
       const orderId = s.order?.id ?? s.id;
@@ -135,7 +152,7 @@ export default function BusinessSettlementsPage() {
           settlements: [],
           totalReceivable: 0,
           totalPayable: 0,
-          latestCreatedAt: s.createdAt as string,
+          latestCreatedAt: s.createdAt,
         };
       }
       grouped[orderId].settlements.push(s);
@@ -145,8 +162,8 @@ export default function BusinessSettlementsPage() {
       } else {
         grouped[orderId].totalPayable += amount;
       }
-      if (new Date(s.createdAt as string) > new Date(grouped[orderId].latestCreatedAt)) {
-        grouped[orderId].latestCreatedAt = s.createdAt as string;
+      if (new Date(s.createdAt).getTime() > new Date(grouped[orderId].latestCreatedAt).getTime()) {
+        grouped[orderId].latestCreatedAt = s.createdAt;
       }
     });
 
@@ -184,8 +201,8 @@ export default function BusinessSettlementsPage() {
       toast({ title: 'Request sent', description: `Settlement request of €${amount.toFixed(2)} submitted.` });
       setRequestDialogOpen(false);
       await refetchRequests();
-    } catch (err: any) {
-      toast({ title: 'Error', description: err?.message ?? 'Failed to create request', variant: 'destructive' });
+    } catch (error) {
+      toast({ title: 'Error', description: getErrorMessage(error), variant: 'destructive' });
     } finally {
       setReqSubmitting(false);
     }
@@ -254,7 +271,7 @@ export default function BusinessSettlementsPage() {
             {requestsLoading ? (
               <Skeleton className="h-10 w-full bg-gray-800" />
             ) : (
-              settlementRequests.map((req: any) => (
+              settlementRequests.map((req) => (
                 <div key={req.id} className="flex items-center justify-between rounded-lg border border-gray-800 bg-gray-950 px-3 py-2">
                   <div>
                     <span className="text-sm font-medium text-white">€{Number(req.amount).toFixed(2)}</span>
@@ -320,7 +337,7 @@ export default function BusinessSettlementsPage() {
           {/* Search */}
           <div className="relative flex-1 min-w-[200px]">
             <Input
-              placeholder="Search by order ID, reference…"
+              placeholder="Search by order ID or business…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="bg-gray-800 border-gray-700 text-white pl-3"

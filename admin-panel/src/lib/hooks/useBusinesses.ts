@@ -36,7 +36,7 @@ export interface UseBusinessResult {
 export interface UseCreateBusinessResult {
     create: (input: CreateBusinessInput) => Promise<{
         success: boolean;
-        data?: CreateBusinessMutation;
+        data?: CreateBusinessMutation | null;
         error?: string;
     }>;
     loading: boolean;
@@ -46,7 +46,7 @@ export interface UseCreateBusinessResult {
 export interface UseUpdateBusinessResult {
     update: (id: string, input: UpdateBusinessInput) => Promise<{
         success: boolean;
-        data?: UpdateBusinessMutation;
+        data?: UpdateBusinessMutation | null;
         error?: string;
     }>;
     loading: boolean;

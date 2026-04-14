@@ -70,7 +70,7 @@ const refreshAccessToken = async (): Promise<string | null> => {
         });
 
         const raw = await response.text();
-        let payload: Record<string, unknown> | null = null;
+        let payload: { data?: { refreshToken?: { token?: string; refreshToken?: string } }; errors?: Array<{ extensions?: { code?: string }; message?: string }> } | null = null;
         try {
             payload = raw ? JSON.parse(raw) : null;
         } catch {

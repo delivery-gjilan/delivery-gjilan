@@ -29,7 +29,7 @@ export interface UseProductSubcategoriesResult {
 export interface UseCreateProductSubcategoryResult {
     create: (input: CreateProductSubcategoryInput) => Promise<{
         success: boolean;
-        data?: CreateProductSubcategoryMutation;
+        data?: CreateProductSubcategoryMutation | null;
         error?: string;
     }>;
     loading: boolean;
@@ -39,7 +39,7 @@ export interface UseCreateProductSubcategoryResult {
 export interface UseUpdateProductSubcategoryResult {
     update: (id: string, input: UpdateProductSubcategoryInput) => Promise<{
         success: boolean;
-        data?: UpdateProductSubcategoryMutation;
+        data?: UpdateProductSubcategoryMutation | null;
         error?: string;
     }>;
     loading: boolean;

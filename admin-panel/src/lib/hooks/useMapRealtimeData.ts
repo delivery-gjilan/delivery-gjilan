@@ -9,7 +9,7 @@ import {
     DriversUpdatedDocument,
     GetOrdersDocument,
 } from '@/gql/graphql';
-import type { DriversQuery } from '@/gql/graphql';
+import type { AllOrdersUpdatedSubscription, DriversQuery, GetOrdersQuery } from '@/gql/graphql';
 import { playNewOrderAlert } from '@/lib/audio/orderAlert';
 import { toast } from 'sonner';
 
@@ -112,7 +112,7 @@ export function useMapRealtimeData() {
         hasInitializedKnownIdsRef.current = true;
     }, [orderData]);
 
-    useSubscription(AllOrdersUpdatedDocument, {
+    useSubscription<AllOrdersUpdatedSubscription>(AllOrdersUpdatedDocument, {
         onData: ({ data: subscriptionData }) => {
             const incomingOrders = subscriptionData.data?.allOrdersUpdated;
             if (incomingOrders && incomingOrders.length > 0) {
@@ -139,7 +139,7 @@ export function useMapRealtimeData() {
 
                 const shouldAlert = hasInitializedKnownIdsRef.current && newActiveOrders.length > 0;
 
-                validIncomingOrders.forEach(() => {
+                validIncomingOrders.forEach((order) => {
                     knownOrderIdsRef.current.add(String(order.id));
                 });
 
@@ -150,7 +150,7 @@ export function useMapRealtimeData() {
                 if (shouldAlert) {
                     void playNewOrderAlert();
                     const inventoryOrders = newActiveOrders.filter((o) =>
-                        o.inventoryPrice != null && Number(o.inventoryPrice) > 0
+                        (o as Record<string, unknown>).inventoryPrice != null && Number((o as Record<string, unknown>).inventoryPrice) > 0
                     );
                     if (inventoryOrders.length > 0) {
                         toast('📦 Stock order incoming', {
@@ -170,16 +170,17 @@ export function useMapRealtimeData() {
 
                     validIncomingOrders.forEach((order) => {
                         const existingOrder = byId.get(String(order?.id));
-                        byId.set(String(order?.id), existingOrder ? { ...existingOrder, ...order } : order);
+                        byId.set(String(order?.id), (existingOrder ? { ...existingOrder, ...order } : order) as GetOrdersQuery['orders']['orders'][number]);
                     });
 
                     return {
                         ...(existing ?? {}),
                         orders: {
                             ...(connection ?? {}),
+                            totalCount: connection?.totalCount ?? 0,
                             orders: Array.from(byId.values()),
                         },
-                    };
+                    } as GetOrdersQuery;
                 });
                 return;
             }
@@ -208,7 +209,7 @@ export function useMapRealtimeData() {
                 isDriverPollingRef.current = false;
             }
 
-            setDriversLive((prev) => mergeDriversByTimestamp(prev, incoming));
+            setDriversLive((prev) => mergeDriversByTimestamp(prev, incoming as DriverItem[]));
         },
         onError: (err) => {
             console.error('[RT:sub] driversUpdated subscription error:', err);

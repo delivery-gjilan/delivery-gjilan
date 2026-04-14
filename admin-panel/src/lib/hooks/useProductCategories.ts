@@ -32,7 +32,7 @@ export interface UseCategoriesResult {
 export interface UseCreateCategoryResult {
     create: (input: CreateProductCategoryInput) => Promise<{
         success: boolean;
-        data?: CreateProductCategoryMutation;
+        data?: CreateProductCategoryMutation | null;
         error?: string;
     }>;
     loading: boolean;
@@ -42,7 +42,7 @@ export interface UseCreateCategoryResult {
 export interface UseUpdateCategoryResult {
     update: (id: string, input: UpdateProductCategoryInput) => Promise<{
         success: boolean;
-        data?: UpdateProductCategoryMutation;
+        data?: UpdateProductCategoryMutation | null;
         error?: string;
     }>;
     loading: boolean;
@@ -133,7 +133,7 @@ export function useDeleteCategory(): UseDeleteCategoryResult {
 }
 
 export function useUpdateCategoriesOrder(): UseUpdateCategoriesOrderResult {
-    const [mutate, { loading, error }] = useMutation<UpdateUpdateCategoriesOrderMutation>(UPDATE_CATEGORIES_ORDER);
+    const [mutate, { loading, error }] = useMutation<UpdateProductCategoriesOrderMutation>(UPDATE_CATEGORIES_ORDER);
 
     return {
         updateOrder: async (businessId, categories) => {

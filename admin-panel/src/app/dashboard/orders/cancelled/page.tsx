@@ -7,60 +7,15 @@ import { ISSUE_RECOVERY_PROMOTION } from "@/graphql/operations/promotions/mutati
 import { GET_RECOVERY_PROMOTIONS } from "@/graphql/operations/promotions/queries";
 import { SEND_PUSH_NOTIFICATION } from "@/graphql/operations/notifications";
 import { Package, Store, User, Hash, Copy, Check, Phone, HeartHandshake, X, CheckCircle2 } from "lucide-react";
-import { PromotionType } from "@/gql/graphql";
+import { GetCancelledOrdersQuery, GetRecoveryPromotionsQuery, PromotionType } from "@/gql/graphql";
 import Link from "next/link";
 
 /* ---------------------------------------------------------
    TYPES
 --------------------------------------------------------- */
 
-interface OrderItem {
-    productId: string;
-    name: string;
-    quantity: number;
-    unitPrice?: number;
-}
-
-interface OrderBusiness {
-    business: {
-        id: string;
-        name: string;
-        businessType: string;
-    };
-    items: OrderItem[];
-}
-
-interface Location {
-    latitude: number;
-    longitude: number;
-    address: string;
-}
-
-interface CancelledOrder {
-    id: string;
-    displayId: string;
-    orderPrice: number;
-    deliveryPrice: number;
-    totalPrice: number;
-    orderDate: string;
-    cancelledAt?: string | null;
-    cancellationReason?: string | null;
-    user?: {
-        id: string;
-        firstName: string;
-        lastName: string;
-        email: string;
-        phoneNumber?: string | null;
-    } | null;
-    driver?: {
-        id: string;
-        firstName: string;
-        lastName: string;
-    } | null;
-    businesses: OrderBusiness[];
-    dropOffLocation: Location;
-    adminNote?: string | null;
-}
+type CancelledOrder = GetCancelledOrdersQuery["cancelledOrders"][number];
+type RecoveryPromotion = GetRecoveryPromotionsQuery["getRecoveryPromotions"][number];
 
 function parseAdminNote(adminNote?: string | null): { tag: string; note: string } | null {
     if (!adminNote) return null;
@@ -121,12 +76,12 @@ interface RecoveryTarget {
 }
 
 export default function CancelledOrdersPage() {
-    const { data, loading, error } = useQuery(GET_CANCELLED_ORDERS, {
+    const { data, loading, error } = useQuery<GetCancelledOrdersQuery>(GET_CANCELLED_ORDERS, {
         fetchPolicy: "cache-and-network",
         pollInterval: 30000,
     });
 
-    const { data: recoveryData, refetch: refetchRecovery } = useQuery(GET_RECOVERY_PROMOTIONS, {
+    const { data: recoveryData, refetch: refetchRecovery } = useQuery<GetRecoveryPromotionsQuery>(GET_RECOVERY_PROMOTIONS, {
         fetchPolicy: "cache-and-network",
     });
 
@@ -134,7 +89,7 @@ export default function CancelledOrdersPage() {
     // - for new promos: keyed by order UUID (orderId)
     // - legacy fallback: extract displayId from promo name like "[Recovery] Order #GJ-XXXX ..."
     const compensatedOrderIds = useMemo<Set<string>>(() => {
-        const promos: any[] = (recoveryData as any)?.getRecoveryPromotions ?? [];
+        const promos: RecoveryPromotion[] = recoveryData?.getRecoveryPromotions ?? [];
         const ids = new Set<string>();
         for (const promo of promos) {
             if (promo.orderId) {
@@ -162,7 +117,7 @@ export default function CancelledOrdersPage() {
     const [sendPush] = useMutation(SEND_PUSH_NOTIFICATION);
 
     const orders = useMemo<CancelledOrder[]>(() => {
-        const raw = (data as any)?.cancelledOrders ?? [];
+        const raw = data?.cancelledOrders ?? [];
         return [...raw].sort(
             (a: CancelledOrder, b: CancelledOrder) =>
                 new Date(b.cancelledAt ?? b.orderDate).getTime() -

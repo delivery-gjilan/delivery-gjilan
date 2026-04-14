@@ -210,6 +210,7 @@ The most complex page. Manages the full active + completed order pipeline.
 - STATUS_FLOW map drives "next status" button.
 - Approval modal for flagged orders (`FIRST_ORDER`, `HIGH_VALUE`, `OUT_OF_ZONE`). Suppressible via `[SUPPRESS_APPROVAL_MODAL]` marker in `adminNote`.
 - Trusted customer detection via `[TRUSTED_CUSTOMER]` adminNote marker, `isTrustedCustomer` field, or green `flagColor`.
+- Order cancellation uses shared `CancelOrderModal` with required reason, quick-reason presets, and optional settlement toggles (`settleDriver`, `settleBusiness`) before calling `AdminCancelOrder`.
 - Inventory coverage modal showing stock vs. market fulfillment.
 - Incident tagging (JSON stored in `adminNote`).
 - `usePrepTimeAlerts` for overrun notifications.
@@ -229,6 +230,7 @@ The most complex visual page. Full-screen Mapbox GL map with driver positions, o
 - Teleport guard (`DRIVER_TELEPORT_GUARD_METERS=800`) and GPS jitter dead zone (`DRIVER_JITTER_DEAD_ZONE_METERS=5`).
 - Adaptive gap timing: `500ms` → `15000ms` based on update frequency.
 - Per-driver/order warning thresholds: PENDING >2min, READY >3min, OUT_FOR_DELIVERY >10min.
+- Status-to-cancel transition opens the same `CancelOrderModal` used in Orders, keeping reason capture and settlement decisions consistent across both pages.
 - Driver/business chat panels with unread count tracking.
 - `// @ts-nocheck` — entire file bypasses TypeScript type safety.
 
@@ -335,9 +337,9 @@ Business picker + `<CategoriesBlock>` + `<SubcategoriesBlock>`. **Note:** `GET_B
 
 **GraphQL:** `GET_SETTLEMENTS_PAGE`, `GET_BUSINESS_BALANCE`, `GET_SETTLEMENT_REQUESTS`, `CREATE_SETTLEMENT_REQUEST`.
 
-**Key features:** Balance summary cards (total, pending, paid out). Settlement request dialog. Client-side filter/search on up to 200 records. `fetchPolicy: 'cache-and-network'` for balance + settlements.
+**Key features:** Balance summary cards (total, pending, paid out). Settlement request dialog. Order-grouped settlement rows with per-order financial breakdown modal (`GET_BUSINESS_ORDER_FINANCIALS`). Client-side filter/search on up to 200 records. `fetchPolicy: 'cache-and-network'` for balance + settlements.
 
-**Issues:** `// @ts-nocheck`. Client-side search with no server-side filtering for search terms.
+**Issues:** Client-side search with no server-side filtering for search terms.
 
 ### `/dashboard/productpricing` — Product Markup Pricing
 

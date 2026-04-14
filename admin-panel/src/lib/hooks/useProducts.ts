@@ -57,7 +57,7 @@ export interface UseProductsResult {
 export interface UseCreateProductResult {
     create: (input: CreateProductInput) => Promise<{
         success: boolean;
-        data?: CreateProductMutation;
+        data?: CreateProductMutation | null;
         error?: string;
     }>;
     loading: boolean;
@@ -67,7 +67,7 @@ export interface UseCreateProductResult {
 export interface UseUpdateProductResult {
     update: (id: string, input: UpdateProductInput) => Promise<{
         success: boolean;
-        data?: UpdateProductMutation;
+        data?: UpdateProductMutation | null;
         error?: string;
     }>;
     loading: boolean;

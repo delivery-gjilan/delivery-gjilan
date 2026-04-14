@@ -20,40 +20,13 @@ import {
 } from "@/graphql/operations/businesses";
 import ScheduleEditor from "@/components/businesses/ScheduleEditor";
 import { toast } from 'sonner';
+import { BusinessType, BusinessesQuery } from "@/gql/graphql";
 
 /* ---------------------------------------------------------
    GRAPHQL TYPES
 --------------------------------------------------------- */
 
-type BusinessType = "RESTAURANT" | "MARKET" | "PHARMACY";
-
-interface Location {
-    latitude: number;
-    longitude: number;
-    address: string;
-}
-
-interface WorkingHours {
-    opensAt: string;
-    closesAt: string;
-}
-
-interface Business {
-    id: string;
-    name: string;
-    phoneNumber?: string | null;
-    businessType: BusinessType;
-    imageUrl?: string | null;
-    isActive: boolean;
-    location?: Location;
-    workingHours?: WorkingHours;
-    schedule?: Array<{ id: string; dayOfWeek: number; opensAt: string; closesAt: string }>;
-    minOrderAmount?: number | null;
-}
-
-interface GetBusinessesData {
-    businesses: Business[];
-}
+type Business = BusinessesQuery["businesses"][number];
 
 /* ---------------------------------------------------------
    PAGE
@@ -65,7 +38,7 @@ export default function BusinessesPage() {
     /* --------------------------
      Apollo
   --------------------------- */
-    const { data, loading, refetch } = useQuery<GetBusinessesData>(GET_BUSINESSES);
+    const { data, loading, refetch } = useQuery<BusinessesQuery>(GET_BUSINESSES);
 
     const [createBusiness] = useMutation(CREATE_BUSINESS);
     const [createBusinessWithOwner] = useMutation(CREATE_BUSINESS_WITH_OWNER);
@@ -247,7 +220,7 @@ export default function BusinessesPage() {
         const businessInput = {
             name: createForm.name,
             phoneNumber: createForm.phoneNumber.trim() || null,
-            businessType: createForm.businessType as any,
+            businessType: createForm.businessType,
             imageUrl: imageUrl || null,
             location: {
                 latitude: createForm.location.latitude,
@@ -292,7 +265,7 @@ export default function BusinessesPage() {
         setCreateForm({
             name: "",
             phoneNumber: "",
-            businessType: "RESTAURANT",
+            businessType: "RESTAURANT" as BusinessType,
             imageUrl: "",
             createOwnerNow: true,
             ownerFirstName: "",
@@ -368,7 +341,7 @@ export default function BusinessesPage() {
                 input: {
                     name: editForm.name,
                     phoneNumber: editForm.phoneNumber.trim() || null,
-                    businessType: editForm.businessType as any,
+                    businessType: editForm.businessType,
                     imageUrl: imageUrl || null,
                     location: {
                         latitude: editForm.location.latitude,

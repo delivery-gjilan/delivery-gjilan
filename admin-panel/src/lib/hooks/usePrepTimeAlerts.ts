@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useApolloClient, useSubscription } from '@apollo/client/react';
+import type { AllOrdersUpdatedSubscription } from '@/gql/graphql';
 import { ALL_ORDERS_SUBSCRIPTION } from '@/graphql/operations/orders/subscriptions';
 
 export interface PrepTimeAlert {
@@ -29,7 +30,7 @@ export function usePrepTimeAlerts(
         }
     }, [setAlerts]);
 
-    useSubscription(ALL_ORDERS_SUBSCRIPTION, {
+    useSubscription<AllOrdersUpdatedSubscription>(ALL_ORDERS_SUBSCRIPTION, {
         onData: ({ data: subscriptionData }) => {
             const incomingOrders = subscriptionData.data?.allOrdersUpdated;
             if (!incomingOrders) return;

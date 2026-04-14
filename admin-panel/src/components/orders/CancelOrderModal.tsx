@@ -4,6 +4,13 @@ import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import type { Order } from "./types";
 
+const CANCEL_REASON_PRESETS = [
+    "Customer requested cancellation",
+    "Business temporarily unavailable",
+    "Driver unavailable for dispatch",
+    "Out-of-service delivery zone",
+];
+
 interface CancelOrderModalProps {
     order: Order | null;
     reason: string;
@@ -31,6 +38,8 @@ export default function CancelOrderModal({
     onConfirm,
     onClose,
 }: CancelOrderModalProps) {
+    const trimmedReason = reason.trim();
+
     return (
         <Modal
             isOpen={!!order}
@@ -139,6 +148,21 @@ export default function CancelOrderModal({
                             <label className="block text-sm text-zinc-400 mb-2">
                                 Cancellation Reason <span className="text-red-400">*</span>
                             </label>
+                            <div className="flex flex-wrap gap-2 mb-2">
+                                {CANCEL_REASON_PRESETS.map((preset) => (
+                                    <button
+                                        key={preset}
+                                        type="button"
+                                        onClick={() => onReasonChange(preset)}
+                                        className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${trimmedReason === preset
+                                            ? "bg-red-500/20 border-red-500/40 text-red-300"
+                                            : "bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-zinc-500"
+                                            }`}
+                                    >
+                                        {preset}
+                                    </button>
+                                ))}
+                            </div>
                             <textarea
                                 value={reason}
                                 onChange={(e) => onReasonChange(e.target.value)}
@@ -146,6 +170,10 @@ export default function CancelOrderModal({
                                 rows={3}
                                 className="w-full rounded-lg bg-[#09090b] border border-zinc-800 text-white text-sm px-3 py-2.5 placeholder:text-zinc-600 focus:outline-none focus:border-red-500/50 resize-none"
                             />
+                            <div className="mt-1 flex items-center justify-between text-[11px] text-zinc-500">
+                                <span>Reason is visible in admin audit trail.</span>
+                                <span>{reason.length}/240</span>
+                            </div>
                         </div>
                         <div className="flex gap-3 pt-2">
                             <Button variant="outline" className="flex-1" onClick={onClose}>
@@ -154,7 +182,7 @@ export default function CancelOrderModal({
                             <Button
                                 className="flex-1 bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30"
                                 onClick={onConfirm}
-                                disabled={loading || !reason.trim()}
+                                disabled={loading || !trimmedReason}
                             >
                                 {loading ? "Cancelling..." : "Confirm Cancel"}
                             </Button>
