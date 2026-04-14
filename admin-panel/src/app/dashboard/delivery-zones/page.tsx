@@ -148,9 +148,9 @@ function isPolygonFeature(feature: unknown): feature is PolygonFeature {
 }
 
 function isZoneGeoJsonFeature(
-  feature: ZoneGeoJsonFeature | null
+  feature: unknown
 ): feature is ZoneGeoJsonFeature {
-  return feature !== null;
+  return feature !== null && feature !== undefined;
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
