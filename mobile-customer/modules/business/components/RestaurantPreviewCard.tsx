@@ -1,50 +1,49 @@
 import React from 'react';
-import { View, Text, Image, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
-import { useTheme } from '@/hooks/useTheme';
+import { View, Text, Image, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '@/hooks/useTheme';
 import { useProducts } from '@/modules/product/hooks/useProducts';
 import { getEffectiveProductPrice } from '@/modules/product/utils/pricing';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-interface MenuItem {
+interface MenuPreviewItem {
+    id: string;
     name: string;
     price: string;
     imageUrl: string;
 }
 
-interface FeaturedRestaurantCardProps {
+interface RestaurantPreviewCardProps {
     id: string;
     name: string;
     logoUrl?: string;
-    /** Provide either menuItems (pre-loaded) or businessId (self-loads). */
-    menuItems?: MenuItem[];
-    businessId?: string;
+    businessId: string;
     onPress: (id: string) => void;
+    onProductPress?: (businessId: string, productId: string) => void;
 }
 
-export function FeaturedRestaurantCard({
+export function RestaurantPreviewCard({
     id,
     name,
     logoUrl,
-    menuItems: menuItemsProp,
     businessId,
     onPress,
-}: FeaturedRestaurantCardProps) {
-    const { products: rawProducts } = useProducts(businessId ?? '');
+    onProductPress,
+}: RestaurantPreviewCardProps) {
+    const theme = useTheme();
+    const { products: rawProducts } = useProducts(businessId);
 
-    const menuItems: MenuItem[] = menuItemsProp ?? rawProducts
+    const menuItems: MenuPreviewItem[] = rawProducts
         .filter((p) => {
-            const img = p.imageUrl || p.product?.imageUrl || p.variants?.[0]?.imageUrl;
-            return !!img;
+            const image = p.imageUrl || p.product?.imageUrl || p.variants?.[0]?.imageUrl;
+            return !!image;
         })
         .slice(0, 6)
         .map((p) => ({
+            id: p.id,
             name: p.name,
             price: `€${getEffectiveProductPrice((p.product || p.variants?.[0]) ?? { price: p.basePrice }).toFixed(2)}`,
             imageUrl: p.imageUrl || p.product?.imageUrl || p.variants?.[0]?.imageUrl || '',
         }));
-    const theme = useTheme();
 
     return (
         <TouchableOpacity
@@ -58,7 +57,6 @@ export function FeaturedRestaurantCard({
                 borderColor: theme.colors.border,
             }}
         >
-            {/* Restaurant Header */}
             <View
                 style={{
                     flexDirection: 'row',
@@ -94,16 +92,17 @@ export function FeaturedRestaurantCard({
                 <Ionicons name="chevron-forward" size={20} color={theme.colors.subtext} />
             </View>
 
-            {/* Menu Items Horizontal Scroll */}
             {menuItems.length > 0 && (
                 <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={{ paddingHorizontal: 12, gap: 8, paddingBottom: 12 }}
                 >
-                    {menuItems.map((item, idx) => (
-                        <View
-                            key={idx}
+                    {menuItems.map((item) => (
+                        <TouchableOpacity
+                            key={item.id}
+                            activeOpacity={0.85}
+                            onPress={() => onProductPress?.(businessId, item.id)}
                             style={{
                                 width: 140,
                                 borderRadius: 8,
@@ -138,7 +137,7 @@ export function FeaturedRestaurantCard({
                                     {item.price}
                                 </Text>
                             </View>
-                        </View>
+                        </TouchableOpacity>
                     ))}
                 </ScrollView>
             )}

@@ -12,7 +12,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import type { InfoBannerType } from '@/components/InfoBanner';
 import { useBusinesses } from '@/modules/business/hooks/useBusinesses';
-import { FeaturedRestaurantCard } from '@/modules/business/components/FeaturedRestaurantCard';
+import { RestaurantPreviewCard } from '../../modules/business/components/RestaurantPreviewCard';
 import { Skeleton } from '@/components/Skeleton';
 import { useTranslations } from '@/hooks/useTranslations';
 
@@ -107,10 +107,15 @@ export default function Restaurants() {
         return result;
     }, [restaurants, activeFilter, activeCategory]);
 
-    const promoRestaurant = useMemo(() => filteredRestaurants.find((r) => Boolean(r.activePromotion)) ?? null, [filteredRestaurants]);
-
     const handleBusinessPress = (businessId: string) => {
         router.push(`/business/${businessId}`);
+    };
+
+    const handleProductPress = (businessId: string, productId: string) => {
+        router.push({
+            pathname: '/business/[businessId]',
+            params: { businessId, productId },
+        });
     };
 
     const statusFilters: { key: FilterOption; label: string }[] = [
@@ -237,15 +242,15 @@ export default function Restaurants() {
                             const entering = hasAnimated.current
                                 ? undefined
                                 : FadeInDown.delay(Math.min(index, 8) * 65).duration(380).springify().damping(28).stiffness(160);
-
                             return (
                                 <Animated.View entering={entering}>
-                                    <FeaturedRestaurantCard
+                                    <RestaurantPreviewCard
                                         id={restaurant.id}
                                         name={restaurant.name}
                                         logoUrl={restaurant.imageUrl}
                                         businessId={restaurant.id}
                                         onPress={handleBusinessPress}
+                                        onProductPress={handleProductPress}
                                     />
                                 </Animated.View>
                             );

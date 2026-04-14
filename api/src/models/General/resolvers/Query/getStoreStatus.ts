@@ -3,6 +3,9 @@ import { getDB } from '@/database';
 import { storeSettings } from '@/database/schema/storeSettings';
 import { eq } from 'drizzle-orm';
 import { cache, coalesce } from '@/lib/cache';
+import logger from '@/lib/logger';
+
+const log = logger.child({ module: 'getStoreStatus' });
 
 const DEFAULT_STORE_STATUS = {
   isStoreClosed: false,
@@ -26,27 +29,33 @@ export const getStoreStatus: NonNullable<QueryResolvers['getStoreStatus']> = asy
   if (cached) return cached;
 
   const result = await coalesce(cache.keys.storeStatus(), async () => {
-    const db = await getDB();
-    const settings = await db
-      .select()
-      .from(storeSettings)
-      .where(eq(storeSettings.id, 'default'))
-      .limit(1);
+    try {
+      const db = await getDB();
+      const settings = await db
+        .select()
+        .from(storeSettings)
+        .where(eq(storeSettings.id, 'default'))
+        .limit(1);
 
-    if (settings.length === 0) return DEFAULT_STORE_STATUS;
+      if (settings.length === 0) return DEFAULT_STORE_STATUS;
 
-    return {
-      isStoreClosed: settings[0].isStoreClosed,
-      closedMessage: settings[0].closedMessage,
-      bannerEnabled: settings[0].bannerEnabled,
-      bannerMessage: settings[0].bannerMessage,
-      bannerType: (settings[0].bannerType || 'info').toUpperCase(),
-      dispatchModeEnabled: settings[0].dispatchModeEnabled,
-      googleMapsNavEnabled: settings[0].googleMapsNavEnabled,
-      inventoryModeEnabled: settings[0].inventoryModeEnabled,
-      earlyDispatchLeadMinutes: settings[0].earlyDispatchLeadMinutes,
-      businessGracePeriodMinutes: settings[0].businessGracePeriodMinutes,
-    };
+      return {
+        isStoreClosed: settings[0].isStoreClosed,
+        closedMessage: settings[0].closedMessage,
+        bannerEnabled: settings[0].bannerEnabled,
+        bannerMessage: settings[0].bannerMessage,
+        bannerType: (settings[0].bannerType || 'info').toUpperCase(),
+        dispatchModeEnabled: settings[0].dispatchModeEnabled,
+        googleMapsNavEnabled: settings[0].googleMapsNavEnabled,
+        inventoryModeEnabled: settings[0].inventoryModeEnabled,
+        earlyDispatchLeadMinutes: settings[0].earlyDispatchLeadMinutes,
+        businessGracePeriodMinutes: settings[0].businessGracePeriodMinutes,
+      };
+    } catch (error) {
+      // Keep dashboard pages usable even when storeSettings schema is temporarily out of sync.
+      log.error({ error }, 'storeSettings query failed; returning defaults');
+      return DEFAULT_STORE_STATUS;
+    }
   });
 
   await cache.set(cache.keys.storeStatus(), result, cache.TTL.STORE_STATUS);

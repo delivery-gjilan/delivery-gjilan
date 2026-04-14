@@ -32,6 +32,7 @@ type ProductCardItem = GetProductsQuery['products'][number];
 
 interface BusinessScreenProps {
     businessId: string;
+    focusProductId?: string;
 }
 
 type PromoLike = {
@@ -125,7 +126,7 @@ function CategoryTabs({
 // ═══════════════════════════════════════════════════════════════
 // ─── Main Screen ──────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════
-export function BusinessScreen({ businessId }: BusinessScreenProps) {
+export function BusinessScreen({ businessId, focusProductId }: BusinessScreenProps) {
     const theme = useTheme();
     const { t } = useTranslations();
     const insets = useSafeAreaInsets();
@@ -214,10 +215,13 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
     const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
     const [showPromoDetails, setShowPromoDetails] = useState(false);
     const [selectedPromoId, setSelectedPromoId] = useState<string | null>(null);
+    const [highlightedProductId, setHighlightedProductId] = useState<string | null>(null);
     const searchInputRef = useRef<TextInput>(null);
     const showStickySearchRef = useRef(false);
     const searchVisibilityProgress = useSharedValue(0);
     const sectionOffsetsRef = useRef<{ id: string; y: number }[]>([]);
+    const productOffsetsRef = useRef<Map<string, number>>(new Map());
+    const hasAppliedInitialProductFocus = useRef(false);
     const productsContainerY = useRef(0);
     const stickyHeight = useRef(0);
 
@@ -459,6 +463,10 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
         });
     }, [showStickySearch, searchVisibilityProgress]);
 
+    useEffect(() => {
+        hasAppliedInitialProductFocus.current = false;
+    }, [businessId, focusProductId]);
+
     const resolveActiveCategory = useCallback((offsetY: number) => {
         const positions = sectionOffsetsRef.current;
         if (positions.length === 0) {
@@ -540,6 +548,64 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
         }
         sectionOffsetsRef.current.sort((a, b) => a.y - b.y);
     }, []);
+
+    const handleProductLayout = useCallback((productId: string, e: LayoutChangeEvent) => {
+        const y = productsContainerY.current + e.nativeEvent.layout.y;
+        productOffsetsRef.current.set(productId, y);
+    }, []);
+
+    const resolveCategoryForProduct = useCallback((productId: string): string | null => {
+        const entries = Array.from(productsByCategory.entries());
+        for (const [categoryId, productCards] of entries) {
+            if (categoryId.startsWith('__')) continue;
+            if (productCards.some((p) => p.id === productId)) {
+                return categoryId;
+            }
+        }
+        return null;
+    }, [productsByCategory]);
+
+    useEffect(() => {
+        if (!focusProductId || hasAppliedInitialProductFocus.current || isSearching) {
+            return;
+        }
+
+        const scrollToFocusedProduct = () => {
+            const directOffset = productOffsetsRef.current.get(focusProductId);
+            if (typeof directOffset === 'number') {
+                const targetY = Math.max(0, directOffset - stickyHeight.current - 12);
+                scrollToY(targetY);
+                setHighlightedProductId(focusProductId);
+                hasAppliedInitialProductFocus.current = true;
+                return true;
+            }
+
+            const categoryId = resolveCategoryForProduct(focusProductId);
+            if (categoryId) {
+                scrollToCategory(categoryId);
+                return false;
+            }
+
+            return false;
+        };
+
+        if (scrollToFocusedProduct()) return;
+
+        requestAnimationFrame(() => {
+            if (scrollToFocusedProduct()) return;
+            setTimeout(() => {
+                scrollToFocusedProduct();
+            }, 140);
+        });
+    }, [focusProductId, isSearching, resolveCategoryForProduct, scrollToCategory, scrollToY]);
+
+    useEffect(() => {
+        if (!highlightedProductId) return;
+        const timer = setTimeout(() => {
+            setHighlightedProductId((current) => (current === highlightedProductId ? null : current));
+        }, 1600);
+        return () => clearTimeout(timer);
+    }, [highlightedProductId]);
 
     // ─── Compact header animated style ──────────────────────
     // Height goes 0→full so it doesn't create a black dead zone when invisible
@@ -1097,12 +1163,27 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                                     <View style={{ paddingHorizontal: 16 }}>
                                         {(productsByCategory.get('__offers') ?? []).map(
                                             (productCard) => (
-                                                <ProductCard
+                                                <View
                                                     key={productCard.id}
-                                                    productCard={productCard}
-                                                    businessType={business.businessType}
-                                                    isPopular={popularProductIds.has(productCard.id)}
-                                                />
+                                                    onLayout={(e) => handleProductLayout(productCard.id, e)}
+                                                    style={
+                                                        highlightedProductId === productCard.id
+                                                            ? {
+                                                                borderRadius: 18,
+                                                                borderWidth: 2,
+                                                                borderColor: theme.colors.primary + '66',
+                                                                backgroundColor: theme.colors.primary + '12',
+                                                                padding: 6,
+                                                            }
+                                                            : undefined
+                                                    }
+                                                >
+                                                    <ProductCard
+                                                        productCard={productCard}
+                                                        businessType={business.businessType}
+                                                        isPopular={popularProductIds.has(productCard.id)}
+                                                    />
+                                                </View>
                                             ),
                                         )}
                                     </View>
@@ -1141,11 +1222,26 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                                         <View style={{ paddingHorizontal: 16 }}>
                                             {catProducts.map((productCard, pIdx) => (
                                                 <Animated.View key={productCard.id} entering={FadeInDown.delay(catIdx * 60 + pIdx * 40).duration(350).springify().damping(28).stiffness(160)}>
-                                                <ProductCard
-                                                    productCard={productCard}
-                                                    businessType={business.businessType}
-                                                    isPopular={popularProductIds.has(productCard.id)}
-                                                />
+                                                    <View
+                                                        onLayout={(e) => handleProductLayout(productCard.id, e)}
+                                                        style={
+                                                            highlightedProductId === productCard.id
+                                                                ? {
+                                                                    borderRadius: 18,
+                                                                    borderWidth: 2,
+                                                                    borderColor: theme.colors.primary + '66',
+                                                                    backgroundColor: theme.colors.primary + '12',
+                                                                    padding: 6,
+                                                                }
+                                                                : undefined
+                                                        }
+                                                    >
+                                                        <ProductCard
+                                                            productCard={productCard}
+                                                            businessType={business.businessType}
+                                                            isPopular={popularProductIds.has(productCard.id)}
+                                                        />
+                                                    </View>
                                                 </Animated.View>
                                             ))}
                                         </View>
@@ -1171,12 +1267,27 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                                     <View style={{ paddingHorizontal: 16 }}>
                                         {(productsByCategory.get('__uncategorized') ?? []).map(
                                             (productCard) => (
-                                                <ProductCard
+                                                <View
                                                     key={productCard.id}
-                                                    productCard={productCard}
-                                                    businessType={business.businessType}
-                                                    isPopular={popularProductIds.has(productCard.id)}
-                                                />
+                                                    onLayout={(e) => handleProductLayout(productCard.id, e)}
+                                                    style={
+                                                        highlightedProductId === productCard.id
+                                                            ? {
+                                                                borderRadius: 18,
+                                                                borderWidth: 2,
+                                                                borderColor: theme.colors.primary + '66',
+                                                                backgroundColor: theme.colors.primary + '12',
+                                                                padding: 6,
+                                                            }
+                                                            : undefined
+                                                    }
+                                                >
+                                                    <ProductCard
+                                                        productCard={productCard}
+                                                        businessType={business.businessType}
+                                                        isPopular={popularProductIds.has(productCard.id)}
+                                                    />
+                                                </View>
                                             )
                                         )}
                                     </View>
@@ -1268,12 +1379,27 @@ export function BusinessScreen({ businessId }: BusinessScreenProps) {
                         ) : (
                             <View style={{ paddingHorizontal: 16 }}>
                                 {searchResults.map((productCard) => (
-                                    <ProductCard
+                                    <View
                                         key={productCard.id}
-                                        productCard={productCard}
-                                        businessType={business.businessType}
-                                        isPopular={popularProductIds.has(productCard.id)}
-                                    />
+                                        onLayout={(e) => handleProductLayout(productCard.id, e)}
+                                        style={
+                                            highlightedProductId === productCard.id
+                                                ? {
+                                                    borderRadius: 18,
+                                                    borderWidth: 2,
+                                                    borderColor: theme.colors.primary + '66',
+                                                    backgroundColor: theme.colors.primary + '12',
+                                                    padding: 6,
+                                                }
+                                                : undefined
+                                        }
+                                    >
+                                        <ProductCard
+                                            productCard={productCard}
+                                            businessType={business.businessType}
+                                            isPopular={popularProductIds.has(productCard.id)}
+                                        />
+                                    </View>
                                 ))}
                             </View>
                         )}

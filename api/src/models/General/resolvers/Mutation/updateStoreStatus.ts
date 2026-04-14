@@ -5,6 +5,9 @@ import { eq } from 'drizzle-orm';
 import { publish, pubsub, topics } from '@/lib/pubsub';
 import { GraphQLError } from 'graphql';
 import { cache } from '@/lib/cache';
+import logger from '@/lib/logger';
+
+const log = logger.child({ module: 'updateStoreStatus' });
 
 export const updateStoreStatus: NonNullable<MutationResolvers['updateStoreStatus']> = async (
   _parent,
@@ -18,13 +21,6 @@ export const updateStoreStatus: NonNullable<MutationResolvers['updateStoreStatus
   }
 
   const db = await getDB();
-
-  // Check if settings row exists
-  const existing = await db
-    .select()
-    .from(storeSettings)
-    .where(eq(storeSettings.id, 'default'))
-    .limit(1);
 
   const updateData: Record<string, any> = {
     isStoreClosed: input.isStoreClosed,
@@ -58,26 +54,41 @@ export const updateStoreStatus: NonNullable<MutationResolvers['updateStoreStatus
     updateData.businessGracePeriodMinutes = input.businessGracePeriodMinutes;
   }
 
-  if (existing.length === 0) {
-    // Insert new settings row
-    await db.insert(storeSettings).values({
-      id: 'default',
-      ...updateData,
-    });
-  } else {
-    // Update existing settings
-    await db
-      .update(storeSettings)
-      .set(updateData)
-      .where(eq(storeSettings.id, 'default'));
-  }
+  let current;
+  try {
+    // Check if settings row exists
+    const existing = await db
+      .select()
+      .from(storeSettings)
+      .where(eq(storeSettings.id, 'default'))
+      .limit(1);
 
-  // Re-read the current state to return complete data
-  const current = await db
-    .select()
-    .from(storeSettings)
-    .where(eq(storeSettings.id, 'default'))
-    .limit(1);
+    if (existing.length === 0) {
+      // Insert new settings row
+      await db.insert(storeSettings).values({
+        id: 'default',
+        ...updateData,
+      });
+    } else {
+      // Update existing settings
+      await db
+        .update(storeSettings)
+        .set(updateData)
+        .where(eq(storeSettings.id, 'default'));
+    }
+
+    // Re-read the current state to return complete data
+    current = await db
+      .select()
+      .from(storeSettings)
+      .where(eq(storeSettings.id, 'default'))
+      .limit(1);
+  } catch (error) {
+    log.error({ error }, 'storeSettings mutation failed');
+    throw new GraphQLError('Store settings schema is out of sync. Run latest migrations and retry.', {
+      extensions: { code: 'INTERNAL_SERVER_ERROR' },
+    });
+  }
 
   const row = current[0]!;
   const result = {
