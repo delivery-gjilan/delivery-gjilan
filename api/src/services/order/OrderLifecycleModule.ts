@@ -866,6 +866,11 @@ export class OrderLifecycleModule {
             : Math.min(removeQty, item.inventoryQuantity ?? 0);
         const inventoryPriceReduction = unitPrice * inventoryQtyReduction;
         const marketPriceReduction = priceReduction - inventoryPriceReduction;
+        // Markup on removed units: markup is the delta between markupPrice snapshot and basePrice
+        const itemMarkupPerUnit = item.markupPrice != null
+            ? Math.max(0, Number(item.markupPrice) - Number(item.basePrice))
+            : 0;
+        const markupReduction = itemMarkupPerUnit * removeQty;
 
         const [updatedOrder] = await db.transaction(async (tx) => {
             const now = new Date().toISOString();
@@ -901,6 +906,7 @@ export class OrderLifecycleModule {
                     actualPrice: sql`${ordersTable.actualPrice} - ${priceReduction}`,
                     businessPrice: sql`${ordersTable.businessPrice} - ${marketPriceReduction}`,
                     inventoryPrice: sql`${ordersTable.inventoryPrice} - ${inventoryPriceReduction}`,
+                    markupPrice: sql`GREATEST(0, COALESCE(${ordersTable.markupPrice}, 0) - ${markupReduction})`,
                 })
                 .where(eq(ordersTable.id, orderId))
                 .returning();

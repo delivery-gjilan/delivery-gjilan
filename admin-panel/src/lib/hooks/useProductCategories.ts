@@ -10,12 +10,20 @@ import {
 } from '@/graphql/operations/productCategories';
 import type {
     CreateProductCategoryInput,
+    CreateProductCategoryMutation,
+    DeleteProductCategoryMutation,
+    ProductCategoriesQuery,
+    ProductCategoriesQueryVariables,
     UpdateProductCategoryInput,
+    UpdateProductCategoryMutation,
+    UpdateProductCategoriesOrderMutation,
     ProductCategoryOrderInput,
 } from '@/gql/graphql';
 
+export type CategoryListItem = ProductCategoriesQuery['productCategories'][number];
+
 export interface UseCategoriesResult {
-    categories: any[];
+    categories: CategoryListItem[];
     loading: boolean;
     error?: string;
     refetch: () => void;
@@ -24,7 +32,7 @@ export interface UseCategoriesResult {
 export interface UseCreateCategoryResult {
     create: (input: CreateProductCategoryInput) => Promise<{
         success: boolean;
-        data?: any;
+        data?: CreateProductCategoryMutation;
         error?: string;
     }>;
     loading: boolean;
@@ -34,7 +42,7 @@ export interface UseCreateCategoryResult {
 export interface UseUpdateCategoryResult {
     update: (id: string, input: UpdateProductCategoryInput) => Promise<{
         success: boolean;
-        data?: any;
+        data?: UpdateProductCategoryMutation;
         error?: string;
     }>;
     loading: boolean;
@@ -60,7 +68,7 @@ export interface UseUpdateCategoriesOrderResult {
 }
 
 export function useCategories(businessId: string): UseCategoriesResult {
-    const { data, loading, error, refetch } = useQuery(GET_CATEGORIES, {
+    const { data, loading, error, refetch } = useQuery<ProductCategoriesQuery, ProductCategoriesQueryVariables>(GET_CATEGORIES, {
         variables: { businessId },
         skip: !businessId,
     });
@@ -74,7 +82,7 @@ export function useCategories(businessId: string): UseCategoriesResult {
 }
 
 export function useCreateCategory(): UseCreateCategoryResult {
-    const [mutate, { loading, error }] = useMutation(CREATE_CATEGORY);
+    const [mutate, { loading, error }] = useMutation<CreateProductCategoryMutation>(CREATE_CATEGORY);
 
     return {
         create: async (input) => {
@@ -91,7 +99,7 @@ export function useCreateCategory(): UseCreateCategoryResult {
 }
 
 export function useUpdateCategory(): UseUpdateCategoryResult {
-    const [mutate, { loading, error }] = useMutation(UPDATE_CATEGORY);
+    const [mutate, { loading, error }] = useMutation<UpdateProductCategoryMutation>(UPDATE_CATEGORY);
 
     return {
         update: async (id, input) => {
@@ -108,7 +116,7 @@ export function useUpdateCategory(): UseUpdateCategoryResult {
 }
 
 export function useDeleteCategory(): UseDeleteCategoryResult {
-    const [mutate, { loading, error }] = useMutation(DELETE_CATEGORY);
+    const [mutate, { loading, error }] = useMutation<DeleteProductCategoryMutation>(DELETE_CATEGORY);
 
     return {
         delete: async (id) => {
@@ -125,7 +133,7 @@ export function useDeleteCategory(): UseDeleteCategoryResult {
 }
 
 export function useUpdateCategoriesOrder(): UseUpdateCategoriesOrderResult {
-    const [mutate, { loading, error }] = useMutation(UPDATE_CATEGORIES_ORDER);
+    const [mutate, { loading, error }] = useMutation<UpdateUpdateCategoriesOrderMutation>(UPDATE_CATEGORIES_ORDER);
 
     return {
         updateOrder: async (businessId, categories) => {

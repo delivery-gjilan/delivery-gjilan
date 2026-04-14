@@ -33,8 +33,12 @@ import {
     useUpdateProductsOrder,
     useCreateProductVariantGroup,
     useDeleteProductVariantGroup,
+    type ProductListItem,
 } from "@/lib/hooks/useProducts";
-import { useProductSubcategories } from "@/lib/hooks/useProductSubcategories";
+import {
+    useProductSubcategories,
+    type SubcategoryListItem,
+} from "@/lib/hooks/useProductSubcategories";
 import type { CreateProductInput, UpdateProductInput } from "@/gql/graphql";
 import { toast } from 'sonner';
 import {
@@ -55,11 +59,6 @@ import { getAuthToken } from "@/lib/utils/auth";
 /* ===============================================
    TYPES
 =============================================== */
-
-interface Category {
-    id: string;
-    name: string;
-}
 
 interface Product {
     id: string;
@@ -102,7 +101,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
 
     function handleExport() {
         const subcategoryMap = new Map(
-            (subcategories as any[]).map((s: any) => [s.id, s])
+            subcategories.map((subcategory) => [subcategory.id, subcategory])
         );
 
         const categoryMap = new Map(categories.map((c) => [c.id, c]));
@@ -111,8 +110,8 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
         const categoryTree = categories.map((cat) => {
             const catProducts = products.filter((p) => p.categoryId === cat.id);
 
-            const subMap = new Map<string, any[]>();
-            const noSub: any[] = [];
+            const subMap = new Map<string, ProductListItem[]>();
+            const noSub: ProductListItem[] = [];
 
             catProducts.forEach((p) => {
                 if (p.subcategoryId) {
@@ -315,7 +314,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                 p.name.toLowerCase().includes(query) ||
                 p.description?.toLowerCase().includes(query) ||
                 categories.find(c => c.id === p.categoryId)?.name.toLowerCase().includes(query) ||
-                subcategories.find((s: any) => s.id === p.subcategoryId)?.name.toLowerCase().includes(query)
+                subcategories.find((subcategory) => subcategory.id === p.subcategoryId)?.name.toLowerCase().includes(query)
             );
         });
 
@@ -781,10 +780,12 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             return;
         }
 
+        const variantGroupId = result.data.id;
+
         await refetch();
         setCreateForm((prev) => ({
             ...prev,
-            variantGroupId: result.data.id,
+            variantGroupId,
             isOffer: false,
         }));
         setNewVariantGroupName("");
@@ -808,10 +809,12 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
             return;
         }
 
+        const variantGroupId = result.data.id;
+
         await refetch();
         setEditForm((prev) => ({
             ...prev,
-            variantGroupId: result.data.id,
+            variantGroupId,
             isOffer: false,
         }));
         setNewEditVariantGroupName("");
@@ -1108,7 +1111,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                             </Td>
 
                                             <Td>
-                                                {subcategories.find((s: any) => s.id === p.subcategoryId)?.name || "-"}
+                                                {subcategories.find((subcategory) => subcategory.id === p.subcategoryId)?.name || "-"}
                                             </Td>
 
                                             <Td>€{p.price.toFixed(2)}</Td>
@@ -1240,10 +1243,10 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                         >
                             <option value="">No subcategory</option>
                             {subcategories
-                                .filter((s: any) => s.categoryId === createForm.categoryId)
-                                .map((s: any) => (
-                                    <option key={s.id} value={s.id}>
-                                        {s.name}
+                                .filter((subcategory) => subcategory.categoryId === createForm.categoryId)
+                                .map((subcategory) => (
+                                    <option key={subcategory.id} value={subcategory.id}>
+                                        {subcategory.name}
                                     </option>
                                 ))}
                         </Select>
@@ -1545,10 +1548,10 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                         >
                             <option value="">No subcategory</option>
                             {subcategories
-                                .filter((s: any) => s.categoryId === editForm.categoryId)
-                                .map((s: any) => (
-                                    <option key={s.id} value={s.id}>
-                                        {s.name}
+                                .filter((subcategory) => subcategory.categoryId === editForm.categoryId)
+                                .map((subcategory) => (
+                                    <option key={subcategory.id} value={subcategory.id}>
+                                        {subcategory.name}
                                     </option>
                                 ))}
                         </Select>
@@ -2455,9 +2458,9 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                         setCatalogForm(null);
                                         setCatalogOpen(false);
                                         setCatalogSearch("");
-                                    } catch (err: any) {
+                                    } catch (err) {
                                         toast.error(
-                                            err?.message ?? "Failed to adopt product",
+                                            err instanceof Error ? err.message : "Failed to adopt product",
                                         );
                                     } finally {
                                         setCatalogAdopting(false);

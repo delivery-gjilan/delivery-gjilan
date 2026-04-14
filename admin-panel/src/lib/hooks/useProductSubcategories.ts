@@ -7,10 +7,20 @@ import {
     UPDATE_PRODUCT_SUBCATEGORY,
     DELETE_PRODUCT_SUBCATEGORY,
 } from '@/graphql/operations/productSubcategories';
-import type { CreateProductSubcategoryInput, UpdateProductSubcategoryInput } from '@/gql/graphql';
+import type {
+    CreateProductSubcategoryInput,
+    CreateProductSubcategoryMutation,
+    DeleteProductSubcategoryMutation,
+    ProductSubcategoriesByBusinessQuery,
+    ProductSubcategoriesByBusinessQueryVariables,
+    UpdateProductSubcategoryInput,
+    UpdateProductSubcategoryMutation,
+} from '@/gql/graphql';
+
+export type SubcategoryListItem = ProductSubcategoriesByBusinessQuery['productSubcategoriesByBusiness'][number];
 
 export interface UseProductSubcategoriesResult {
-    subcategories: any[];
+    subcategories: SubcategoryListItem[];
     loading: boolean;
     error?: string;
     refetch: () => void;
@@ -19,7 +29,7 @@ export interface UseProductSubcategoriesResult {
 export interface UseCreateProductSubcategoryResult {
     create: (input: CreateProductSubcategoryInput) => Promise<{
         success: boolean;
-        data?: any;
+        data?: CreateProductSubcategoryMutation;
         error?: string;
     }>;
     loading: boolean;
@@ -29,7 +39,7 @@ export interface UseCreateProductSubcategoryResult {
 export interface UseUpdateProductSubcategoryResult {
     update: (id: string, input: UpdateProductSubcategoryInput) => Promise<{
         success: boolean;
-        data?: any;
+        data?: UpdateProductSubcategoryMutation;
         error?: string;
     }>;
     loading: boolean;
@@ -46,7 +56,7 @@ export interface UseDeleteProductSubcategoryResult {
 }
 
 export function useProductSubcategories(businessId: string): UseProductSubcategoriesResult {
-    const { data, loading, error, refetch } = useQuery(GET_PRODUCT_SUBCATEGORIES_BY_BUSINESS, {
+    const { data, loading, error, refetch } = useQuery<ProductSubcategoriesByBusinessQuery, ProductSubcategoriesByBusinessQueryVariables>(GET_PRODUCT_SUBCATEGORIES_BY_BUSINESS, {
         variables: { businessId },
         skip: !businessId,
     });
@@ -60,7 +70,7 @@ export function useProductSubcategories(businessId: string): UseProductSubcatego
 }
 
 export function useCreateProductSubcategory(): UseCreateProductSubcategoryResult {
-    const [mutate, { loading, error }] = useMutation(CREATE_PRODUCT_SUBCATEGORY);
+    const [mutate, { loading, error }] = useMutation<CreateProductSubcategoryMutation>(CREATE_PRODUCT_SUBCATEGORY);
 
     return {
         create: async (input) => {
@@ -77,7 +87,7 @@ export function useCreateProductSubcategory(): UseCreateProductSubcategoryResult
 }
 
 export function useUpdateProductSubcategory(): UseUpdateProductSubcategoryResult {
-    const [mutate, { loading, error }] = useMutation(UPDATE_PRODUCT_SUBCATEGORY);
+    const [mutate, { loading, error }] = useMutation<UpdateProductSubcategoryMutation>(UPDATE_PRODUCT_SUBCATEGORY);
 
     return {
         update: async (id, input) => {
@@ -94,7 +104,7 @@ export function useUpdateProductSubcategory(): UseUpdateProductSubcategoryResult
 }
 
 export function useDeleteProductSubcategory(): UseDeleteProductSubcategoryResult {
-    const [mutate, { loading, error }] = useMutation(DELETE_PRODUCT_SUBCATEGORY);
+    const [mutate, { loading, error }] = useMutation<DeleteProductSubcategoryMutation>(DELETE_PRODUCT_SUBCATEGORY);
 
     return {
         delete: async (id) => {

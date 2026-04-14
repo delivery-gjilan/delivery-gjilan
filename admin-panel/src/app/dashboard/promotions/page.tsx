@@ -1137,7 +1137,7 @@ export default function PromotionsPage() {
                                     setSelectedAudienceGroupId(nextGroupId);
                                     const selected = audienceGroups.find((group) => group.id === nextGroupId);
                                     if (selected) {
-                                        setPromoUsers(selected.members ?? []);
+                                        setPromoUsers((selected.members ?? []) as PromoAssignUser[]);
                                         setPromoUserSearch("");
                                         setPromoGroupName(selected.name ?? promoGroupName);
                                     }
