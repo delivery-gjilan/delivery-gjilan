@@ -19,6 +19,7 @@ import { DEDUCT_ORDER_STOCK } from "@/graphql/operations/inventory/mutations";
 import InventoryCoverageModal from "@/components/inventory/InventoryCoverageModal";
 import OrderDetailPanel from "@/components/orders/OrderDetailPanel";
 import CancelOrderModal from "@/components/orders/CancelOrderModal";
+import type { CancelReasonCategory } from "@/components/orders/CancelOrderModal";
 import { Package, Store, Search, ArrowRight, MapPin, User, Plus, ChefHat, Timer, Copy, Check, Phone, Hash, MessageSquare, Calendar, X } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -183,6 +184,7 @@ export default function OrdersPage() {
     const [editPrepTimeMinutes, setEditPrepTimeMinutes] = useState<string>("");
     const [cancelModalOrder, setCancelModalOrder] = useState<Order | null>(null);
     const [cancelReason, setCancelReason] = useState<string>("");
+    const [cancelReasonCategory, setCancelReasonCategory] = useState<CancelReasonCategory | null>(null);
     const [cancelSettleDriver, setCancelSettleDriver] = useState<boolean>(false);
     const [cancelSettleBusiness, setCancelSettleBusiness] = useState<boolean>(false);
     const [approvalModalOrder, setApprovalModalOrder] = useState<Order | null>(null);
@@ -395,6 +397,7 @@ export default function OrdersPage() {
         if (newStatus === "CANCELLED") {
             setCancelModalOrder(order);
             setCancelReason("");
+            setCancelReasonCategory(null);
             setCancelSettleDriver(false);
             setCancelSettleBusiness(false);
             return;
@@ -417,10 +420,11 @@ export default function OrdersPage() {
         if (!cancelModalOrder) return;
         const trimmed = cancelReason.trim();
         if (!trimmed) { toast.warning("Please provide a cancellation reason."); return; }
+        const taggedReason = cancelReasonCategory ? `[${cancelReasonCategory}] ${trimmed}` : trimmed;
         try {
-            await adminCancelOrderMut({ variables: { id: cancelModalOrder.id, reason: trimmed, settleDriver: cancelSettleDriver, settleBusiness: cancelSettleBusiness } });
+            await adminCancelOrderMut({ variables: { id: cancelModalOrder.id, reason: taggedReason, settleDriver: cancelSettleDriver, settleBusiness: cancelSettleBusiness } });
             toast.success("Order cancelled successfully.");
-            setCancelModalOrder(null); setCancelReason(""); setCancelSettleDriver(false); setCancelSettleBusiness(false);
+            setCancelModalOrder(null); setCancelReason(""); setCancelReasonCategory(null); setCancelSettleDriver(false); setCancelSettleBusiness(false);
         } catch (err) { toast.error(getErrorMessage(err, "Failed to cancel order.")); }
     };
 
@@ -812,7 +816,7 @@ export default function OrdersPage() {
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
-                                                            onClick={() => { setCancelModalOrder(order); setCancelReason(""); setCancelSettleDriver(false); setCancelSettleBusiness(false); }}
+                                                            onClick={() => { setCancelModalOrder(order); setCancelReason(""); setCancelReasonCategory(null); setCancelSettleDriver(false); setCancelSettleBusiness(false); }}
                                                             className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
                                                         >
                                                             Cancel
@@ -1118,15 +1122,17 @@ export default function OrdersPage() {
             <CancelOrderModal
                 order={cancelModalOrder}
                 reason={cancelReason}
+                category={cancelReasonCategory}
                 settleDriver={cancelSettleDriver}
                 settleBusiness={cancelSettleBusiness}
                 loading={cancellingOrder}
                 isBusinessUser={isBusinessUser}
                 onReasonChange={setCancelReason}
+                onCategoryChange={setCancelReasonCategory}
                 onSettleDriverChange={setCancelSettleDriver}
                 onSettleBusinessChange={setCancelSettleBusiness}
                 onConfirm={handleAdminCancel}
-                onClose={() => { setCancelModalOrder(null); setCancelReason(""); setCancelSettleDriver(false); setCancelSettleBusiness(false); }}
+                onClose={() => { setCancelModalOrder(null); setCancelReason(""); setCancelReasonCategory(null); setCancelSettleDriver(false); setCancelSettleBusiness(false); }}
             />
 
             {/* ════ INVENTORY COVERAGE MODAL ════ */}

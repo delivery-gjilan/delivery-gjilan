@@ -25,18 +25,22 @@ import OrderReviewModalContainer from '@/components/OrderReviewModalContainer';
 import { useBackgroundLiveActivity } from '@/hooks/useBackgroundLiveActivity';
 import { useEffect } from 'react';
 import Mapbox from '@rnmapbox/maps';
+import { useActiveOrdersStore } from '@/modules/orders/store/activeOrdersStore';
+import { useAuthStore } from '@/store/authStore';
 
 // Inner component that uses Apollo Client (must be inside ApolloProvider)
 function AppContent() {
     const theme = useTheme();
     useStoreStatusInit();
     const { isStoreClosed, closedMessage, wasOpenOnEntry, loading: storeStatusLoading } = useStoreStatus();
+    const hasActiveOrders = useActiveOrdersStore((state) => state.hasActiveOrders);
+    const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
     // Initialize push notifications
     useNotifications();
 
     // Track active orders (query + subscription)
-    useActiveOrdersTracking();
+    const { loading: activeOrdersLoading } = useActiveOrdersTracking();
 
     // Start/update Live Activity from anywhere in the app when it moves to background.
     useBackgroundLiveActivity();
@@ -46,9 +50,17 @@ function AppContent() {
         return <LoadingScreen />;
     }
 
+    // When the app opens during a closed window, allow authenticated users with
+    // in-flight orders to enter so they can continue tracking/completing the order.
+    const needsActiveOrderExemptionCheck = isStoreClosed && !wasOpenOnEntry && isAuthenticated;
+    if (needsActiveOrderExemptionCheck && activeOrdersLoading) {
+        return <LoadingScreen />;
+    }
+
     // Only block users who opened the app while the store was already closed.
-    // Users already in the app continue browsing; the API rejects orders at creation time.
-    if (isStoreClosed && !wasOpenOnEntry) {
+    // Users already in the app continue browsing; users with active orders are also
+    // allowed through so they can monitor active deliveries while the store is closed.
+    if (isStoreClosed && !wasOpenOnEntry && !(isAuthenticated && hasActiveOrders)) {
         return <StoreClosedScreen message={closedMessage} />;
     }
 

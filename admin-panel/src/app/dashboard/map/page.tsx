@@ -26,6 +26,7 @@ import { GET_BUSINESS_DEVICE_HEALTH } from "@/graphql/operations/notifications";
 import { GET_ORDER_COVERAGE } from "@/graphql/operations/inventory/queries";
 import InventoryCoverageModal from "@/components/inventory/InventoryCoverageModal";
 import CancelOrderModal from "@/components/orders/CancelOrderModal";
+import type { CancelReasonCategory } from "@/components/orders/CancelOrderModal";
 import { getInitials, getAvatarColor } from "@/lib/avatarUtils";
 import { useAdminPtt } from "@/lib/hooks/useAdminPtt";
 
@@ -578,6 +579,7 @@ export default function MapPage() {
   // Cancel modal
   const [cancelModalOrderId, setCancelModalOrderId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState('');
+  const [cancelReasonCategory, setCancelReasonCategory] = useState<CancelReasonCategory | null>(null);
   const [cancelSettleDriver, setCancelSettleDriver] = useState(false);
   const [cancelSettleBusiness, setCancelSettleBusiness] = useState(false);
   // Approval modal
@@ -1332,6 +1334,7 @@ export default function MapPage() {
     if (status === 'CANCELLED') {
       setCancelModalOrderId(orderId);
       setCancelReason('');
+      setCancelReasonCategory(null);
       setCancelSettleDriver(false);
       setCancelSettleBusiness(false);
       return;
@@ -1389,10 +1392,11 @@ export default function MapPage() {
     if (!cancelModalOrderId) return;
     const trimmed = cancelReason.trim();
     if (!trimmed) { toast.warning('Please provide a cancellation reason.'); return; }
+    const taggedReason = cancelReasonCategory ? `[${cancelReasonCategory}] ${trimmed}` : trimmed;
     try {
-      await adminCancelOrder({ variables: { id: cancelModalOrderId, reason: trimmed, settleDriver: cancelSettleDriver, settleBusiness: cancelSettleBusiness } });
+      await adminCancelOrder({ variables: { id: cancelModalOrderId, reason: taggedReason, settleDriver: cancelSettleDriver, settleBusiness: cancelSettleBusiness } });
       toast.success('Order cancelled.');
-      setCancelModalOrderId(null); setCancelReason(''); setCancelSettleDriver(false); setCancelSettleBusiness(false);
+      setCancelModalOrderId(null); setCancelReason(''); setCancelReasonCategory(null); setCancelSettleDriver(false); setCancelSettleBusiness(false);
       setSelectedOrderId(null); setDetailPanelExpanded(false);
     } catch (err: any) {
       toast.error(err.message || 'Failed to cancel order.');
@@ -2783,15 +2787,17 @@ export default function MapPage() {
       <CancelOrderModal
         order={cancelModalOrder as any}
         reason={cancelReason}
+        category={cancelReasonCategory}
         settleDriver={cancelSettleDriver}
         settleBusiness={cancelSettleBusiness}
         loading={cancellingOrder}
         isBusinessUser={false}
         onReasonChange={setCancelReason}
+        onCategoryChange={setCancelReasonCategory}
         onSettleDriverChange={setCancelSettleDriver}
         onSettleBusinessChange={setCancelSettleBusiness}
         onConfirm={handleAdminCancel}
-        onClose={() => { setCancelModalOrderId(null); setCancelReason(''); setCancelSettleDriver(false); setCancelSettleBusiness(false); }}
+        onClose={() => { setCancelModalOrderId(null); setCancelReason(''); setCancelReasonCategory(null); setCancelSettleDriver(false); setCancelSettleBusiness(false); }}
       />
 
       {/* Approve Order Modal */}

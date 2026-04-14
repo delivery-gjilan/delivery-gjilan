@@ -210,7 +210,7 @@ The most complex page. Manages the full active + completed order pipeline.
 - STATUS_FLOW map drives "next status" button.
 - Approval modal for flagged orders (`FIRST_ORDER`, `HIGH_VALUE`, `OUT_OF_ZONE`). Suppressible via `[SUPPRESS_APPROVAL_MODAL]` marker in `adminNote`.
 - Trusted customer detection via `[TRUSTED_CUSTOMER]` adminNote marker, `isTrustedCustomer` field, or green `flagColor`.
-- Order cancellation uses shared `CancelOrderModal` with required reason, quick-reason presets, and optional settlement toggles (`settleDriver`, `settleBusiness`) before calling `AdminCancelOrder`.
+- Order cancellation uses shared `CancelOrderModal` with required reason, category tagging (`CUSTOMER_REQUEST`, `BUSINESS_ISSUE`, `DRIVER_ISSUE`, `LOGISTICS`, `SYSTEM`), quick-reason presets, and optional settlement toggles (`settleDriver`, `settleBusiness`) before calling `AdminCancelOrder`.
 - Inventory coverage modal showing stock vs. market fulfillment.
 - Incident tagging (JSON stored in `adminNote`).
 - `usePrepTimeAlerts` for overrun notifications.

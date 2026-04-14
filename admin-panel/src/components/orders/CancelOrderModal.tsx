@@ -4,21 +4,38 @@ import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import type { Order } from "./types";
 
-const CANCEL_REASON_PRESETS = [
-    "Customer requested cancellation",
-    "Business temporarily unavailable",
-    "Driver unavailable for dispatch",
-    "Out-of-service delivery zone",
+export type CancelReasonCategory =
+    | "CUSTOMER_REQUEST"
+    | "BUSINESS_ISSUE"
+    | "DRIVER_ISSUE"
+    | "LOGISTICS"
+    | "SYSTEM";
+
+const CATEGORY_OPTIONS: Array<{ value: CancelReasonCategory; label: string }> = [
+    { value: "CUSTOMER_REQUEST", label: "Customer" },
+    { value: "BUSINESS_ISSUE", label: "Business" },
+    { value: "DRIVER_ISSUE", label: "Driver" },
+    { value: "LOGISTICS", label: "Logistics" },
+    { value: "SYSTEM", label: "System" },
+];
+
+const CANCEL_REASON_PRESETS: Array<{ category: CancelReasonCategory; text: string }> = [
+    { category: "CUSTOMER_REQUEST", text: "Customer requested cancellation" },
+    { category: "BUSINESS_ISSUE", text: "Business temporarily unavailable" },
+    { category: "DRIVER_ISSUE", text: "Driver unavailable for dispatch" },
+    { category: "LOGISTICS", text: "Out-of-service delivery zone" },
 ];
 
 interface CancelOrderModalProps {
     order: Order | null;
     reason: string;
+    category: CancelReasonCategory | null;
     settleDriver: boolean;
     settleBusiness: boolean;
     loading: boolean;
     isBusinessUser: boolean;
     onReasonChange: (v: string) => void;
+    onCategoryChange: (v: CancelReasonCategory | null) => void;
     onSettleDriverChange: (v: boolean) => void;
     onSettleBusinessChange: (v: boolean) => void;
     onConfirm: () => void;
@@ -28,11 +45,13 @@ interface CancelOrderModalProps {
 export default function CancelOrderModal({
     order,
     reason,
+    category,
     settleDriver,
     settleBusiness,
     loading,
     isBusinessUser,
     onReasonChange,
+    onCategoryChange,
     onSettleDriverChange,
     onSettleBusinessChange,
     onConfirm,
@@ -149,17 +168,41 @@ export default function CancelOrderModal({
                                 Cancellation Reason <span className="text-red-400">*</span>
                             </label>
                             <div className="flex flex-wrap gap-2 mb-2">
+                                {CATEGORY_OPTIONS.map((option) => (
+                                    <button
+                                        key={option.value}
+                                        type="button"
+                                        onClick={() => onCategoryChange(option.value)}
+                                        className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${category === option.value
+                                            ? "bg-violet-500/20 border-violet-500/40 text-violet-300"
+                                            : "bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-zinc-500"
+                                            }`}
+                                    >
+                                        {option.label}
+                                    </button>
+                                ))}
+                                {category && (
+                                    <button
+                                        type="button"
+                                        onClick={() => onCategoryChange(null)}
+                                        className="px-2.5 py-1 rounded-full text-xs border bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-zinc-500"
+                                    >
+                                        Clear tag
+                                    </button>
+                                )}
+                            </div>
+                            <div className="flex flex-wrap gap-2 mb-2">
                                 {CANCEL_REASON_PRESETS.map((preset) => (
                                     <button
-                                        key={preset}
+                                        key={preset.text}
                                         type="button"
-                                        onClick={() => onReasonChange(preset)}
-                                        className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${trimmedReason === preset
+                                        onClick={() => { onCategoryChange(preset.category); onReasonChange(preset.text); }}
+                                        className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${trimmedReason === preset.text
                                             ? "bg-red-500/20 border-red-500/40 text-red-300"
                                             : "bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-zinc-500"
                                             }`}
                                     >
-                                        {preset}
+                                        {preset.text}
                                     </button>
                                 ))}
                             </div>
@@ -171,7 +214,7 @@ export default function CancelOrderModal({
                                 className="w-full rounded-lg bg-[#09090b] border border-zinc-800 text-white text-sm px-3 py-2.5 placeholder:text-zinc-600 focus:outline-none focus:border-red-500/50 resize-none"
                             />
                             <div className="mt-1 flex items-center justify-between text-[11px] text-zinc-500">
-                                <span>Reason is visible in admin audit trail.</span>
+                                <span>{category ? `Tag: ${category}` : "Reason is visible in admin audit trail."}</span>
                                 <span>{reason.length}/240</span>
                             </div>
                         </div>

@@ -1146,7 +1146,7 @@ function CategoryModal({ modal, onClose, onCreate, onUpdate }: CategoryModalProp
         const result =
             modal.mode === 'create'
                 ? await onCreate(name)
-                : await onUpdate(modal.data.id, name, isActive);
+                : await onUpdate(modal.data!.id, name, isActive);
 
         setLoading(false);
 
@@ -1246,7 +1246,7 @@ function SubcategoryModal({ modal, categories, onClose, onCreate, onUpdate }: Su
         const result =
             modal.mode === 'create'
                 ? await onCreate(categoryId, name)
-                : await onUpdate(modal.data.id, name);
+                : await onUpdate(modal.data!.id, name);
 
         setLoading(false);
 
@@ -1508,7 +1508,7 @@ function ProductModal({
         const result =
             modal.mode === 'create'
                 ? await onCreate({ ...input, businessId } as CreateProductInput)
-                : await onUpdate(modal.data.id, input as UpdateProductInput);
+                : await onUpdate(modal.data!.id, input as UpdateProductInput);
 
         setLoading(false);
 
@@ -1791,7 +1791,7 @@ function ProductModal({
                     }
                     setForm((prev) => ({
                         ...prev,
-                        variantGroupId: result.data.id,
+                        variantGroupId: result.data!.id,
                         isVariant: true,
                         isOffer: false,
                     }));
