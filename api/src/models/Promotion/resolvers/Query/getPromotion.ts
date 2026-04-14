@@ -8,7 +8,33 @@ export const getPromotion: NonNullable<QueryResolvers['getPromotion']> = async (
     const db = await getDB();
     
     const [promo] = await db
-        .select()
+        .select({
+            id: promotions.id,
+            name: promotions.name,
+            description: promotions.description,
+            code: promotions.code,
+            type: promotions.type,
+            target: promotions.target,
+            discountValue: promotions.discountValue,
+            maxDiscountCap: promotions.maxDiscountCap,
+            minOrderAmount: promotions.minOrderAmount,
+            spendThreshold: promotions.spendThreshold,
+            thresholdReward: promotions.thresholdReward,
+            maxGlobalUsage: promotions.maxGlobalUsage,
+            currentGlobalUsage: promotions.currentGlobalUsage,
+            maxUsagePerUser: promotions.maxUsagePerUser,
+            isStackable: promotions.isStackable,
+            priority: promotions.priority,
+            isActive: promotions.isActive,
+            isRecovery: promotions.isRecovery,
+            startsAt: promotions.startsAt,
+            endsAt: promotions.endsAt,
+            createdAt: promotions.createdAt,
+            totalUsageCount: promotions.totalUsageCount,
+            totalRevenue: promotions.totalRevenue,
+            creatorType: promotions.creatorType,
+            creatorId: promotions.creatorId,
+        })
         .from(promotions)
         .where(eq(promotions.id, id))
         .limit(1);
@@ -44,12 +70,12 @@ export const getPromotion: NonNullable<QueryResolvers['getPromotion']> = async (
         isActive: promo.isActive,
         startsAt: toISOString(promo.startsAt),
         endsAt: toISOString(promo.endsAt),
-        scheduleType: promo.scheduleType,
-        scheduleTimezone: promo.scheduleTimezone,
-        dailyStartTime: promo.dailyStartTime,
-        dailyEndTime: promo.dailyEndTime,
-        activeWeekdays: Array.isArray(promo.activeWeekdays) ? promo.activeWeekdays : [],
-        newUserWindowDays: promo.newUserWindowDays,
+        scheduleType: 'DATE_RANGE',
+        scheduleTimezone: null,
+        dailyStartTime: null,
+        dailyEndTime: null,
+        activeWeekdays: [],
+        newUserWindowDays: null,
         createdAt: toISOString(promo.createdAt)!,
         totalUsageCount: promo.totalUsageCount,
         totalRevenue: promo.totalRevenue || 0,

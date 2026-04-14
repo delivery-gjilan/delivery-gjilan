@@ -110,11 +110,8 @@ jobs:
             export IMAGE_TAG
             docker compose -f docker-compose.prod.yml pull api
 
-            # Start db and redis first (no-op if already running)
-            docker compose -f docker-compose.prod.yml up -d db redis
-
-            # Wait for postgres to be ready
-            sleep 5
+            # Start db and redis first, wait for healthchecks (no-op if already running)
+            docker compose -f docker-compose.prod.yml up -d --wait db redis
 
             # Run DB migrations
             docker compose -f docker-compose.prod.yml run --rm api node dist/migrate.js

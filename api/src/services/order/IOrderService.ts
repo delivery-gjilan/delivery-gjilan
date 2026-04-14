@@ -33,6 +33,16 @@ export interface IOrderService {
         driverNetEarnings: number;
         driverTip: number;
     } | null>;
+    getBusinessOrderFinancials(orderId: string, businessId: string): Promise<{
+        orderId: string;
+        paymentCollection: OrderPaymentCollection;
+        businessPrice: number;
+        markupAmount: number;
+        customerPaid: number;
+        amountOwedToBusiness: number;
+        amountOwedByBusiness: number;
+        businessNetEarnings: number;
+    } | null>;
     getOrdersByStatus(status: OrderStatus, limit?: number, offset?: number): Promise<Order[]>;
     getOrdersByUserId(userId: string, limit?: number, offset?: number): Promise<Order[]>;
     getActiveOrdersByUserId(userId: string): Promise<Order[]>;
@@ -58,7 +68,7 @@ export interface IOrderService {
     assignDriverToOrder(id: string, driverId: string | null, onlyIfUnassigned?: boolean): Promise<Order | null>;
     cancelOrder(id: string): Promise<Order>;
     adminCancelOrder(id: string, reason: string, settleDriver?: boolean, settleBusiness?: boolean): Promise<Order>;
-    removeOrderItem(orderId: string, orderItemId: string, reason: string): Promise<Order>;
+    removeOrderItem(orderId: string, orderItemId: string, reason: string, quantity?: number): Promise<Order>;
 
     // ── User behavior tracking ──
     updateUserBehaviorOnStatusChange(userId: string, fromStatus: OrderStatus, toStatus: OrderStatus, orderTotal: number, orderDate: string | null): Promise<void>;

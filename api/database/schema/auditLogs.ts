@@ -37,6 +37,7 @@ const actionTypeValues = [
     'ORDER_CANCELLED',
     'ORDER_ASSIGNED',
     'ORDER_DELIVERED',
+    'ORDER_ITEM_REMOVED',
     
     // Settlement management
     'SETTLEMENT_CREATED',

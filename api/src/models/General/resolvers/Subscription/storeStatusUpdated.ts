@@ -16,6 +16,8 @@ export const storeStatusUpdated: NonNullable<SubscriptionResolvers['storeStatusU
       dispatchModeEnabled: (payload as any).dispatchModeEnabled ?? false,
       googleMapsNavEnabled: (payload as any).googleMapsNavEnabled ?? false,
       inventoryModeEnabled: (payload as any).inventoryModeEnabled ?? false,
+      earlyDispatchLeadMinutes: (payload as any).earlyDispatchLeadMinutes ?? 5,
+      businessGracePeriodMinutes: (payload as any).businessGracePeriodMinutes ?? 0,
     };
   },
 };

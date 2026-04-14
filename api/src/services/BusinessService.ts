@@ -60,6 +60,7 @@ export class BusinessService {
             isOpen: true, // computed by field resolver
             ratingAverage: 0,
             ratingCount: 0,
+            activePromotionsDisplay: [], // computed by field resolver
         };
     }
 

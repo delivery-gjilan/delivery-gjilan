@@ -88,6 +88,9 @@ export class OrderService implements IOrderService {
     getDriverOrderFinancials(orderId: string, driverId: string) {
         return this.query.getDriverOrderFinancials(orderId, driverId);
     }
+    getBusinessOrderFinancials(orderId: string, businessId: string) {
+        return this.query.getBusinessOrderFinancials(orderId, businessId);
+    }
     getOrdersByStatus(status: OrderStatus, limit = 500, offset = 0): Promise<Order[]> {
         return this.query.getOrdersByStatus(status, limit, offset);
     }
@@ -155,8 +158,8 @@ export class OrderService implements IOrderService {
     adminCancelOrder(id: string, reason: string, settleDriver = false, settleBusiness = false): Promise<Order> {
         return this.lifecycle.adminCancelOrder(id, reason, settleDriver, settleBusiness);
     }
-    removeOrderItem(orderId: string, orderItemId: string, reason: string): Promise<Order> {
-        return this.lifecycle.removeOrderItem(orderId, orderItemId, reason);
+    removeOrderItem(orderId: string, orderItemId: string, reason: string, quantity?: number): Promise<Order> {
+        return this.lifecycle.removeOrderItem(orderId, orderItemId, reason, quantity);
     }
 
     // ── User behavior ──

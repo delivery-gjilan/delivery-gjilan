@@ -16,7 +16,34 @@ export const getRecoveryPromotions: NonNullable<QueryResolvers['getRecoveryPromo
     const db = await getDB();
 
     const promoList = await db
-        .select()
+        .select({
+            id: promotions.id,
+            name: promotions.name,
+            description: promotions.description,
+            code: promotions.code,
+            type: promotions.type,
+            target: promotions.target,
+            discountValue: promotions.discountValue,
+            maxDiscountCap: promotions.maxDiscountCap,
+            minOrderAmount: promotions.minOrderAmount,
+            spendThreshold: promotions.spendThreshold,
+            thresholdReward: promotions.thresholdReward,
+            maxGlobalUsage: promotions.maxGlobalUsage,
+            currentGlobalUsage: promotions.currentGlobalUsage,
+            maxUsagePerUser: promotions.maxUsagePerUser,
+            isStackable: promotions.isStackable,
+            priority: promotions.priority,
+            isActive: promotions.isActive,
+            isRecovery: promotions.isRecovery,
+            orderId: promotions.orderId,
+            startsAt: promotions.startsAt,
+            endsAt: promotions.endsAt,
+            createdAt: promotions.createdAt,
+            totalUsageCount: promotions.totalUsageCount,
+            totalRevenue: promotions.totalRevenue,
+            creatorType: promotions.creatorType,
+            creatorId: promotions.creatorId,
+        })
         .from(promotions)
         .where(and(eq(promotions.isDeleted, false), eq(promotions.isRecovery, true)));
 

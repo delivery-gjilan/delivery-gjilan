@@ -1,7 +1,7 @@
 import type { QueryResolvers } from './../../../../generated/types.generated';
 import { getDB } from '@/database';
 import { promotions, promotionBusinessEligibility } from '@/database/schema/promotions';
-import { and, or, isNull, isNotNull, lte, gte, eq } from 'drizzle-orm';
+import { and, or, isNull, isNotNull, lte, gte, eq, lt } from 'drizzle-orm';
 
 export const getPromotionThresholds: NonNullable<QueryResolvers['getPromotionThresholds']> = async (
   _parent,
@@ -13,7 +13,14 @@ export const getPromotionThresholds: NonNullable<QueryResolvers['getPromotionThr
 
   // Find active promotions with spend thresholds (any target/type)
   const promos = await db
-    .select()
+    .select({
+      id: promotions.id,
+      name: promotions.name,
+      code: promotions.code,
+      spendThreshold: promotions.spendThreshold,
+      priority: promotions.priority,
+      isActive: promotions.isActive,
+    })
     .from(promotions)
     .where(
       and(
@@ -23,7 +30,7 @@ export const getPromotionThresholds: NonNullable<QueryResolvers['getPromotionThr
         or(isNull(promotions.endsAt), gte(promotions.endsAt, now)),
         or(
           isNull(promotions.maxGlobalUsage),
-          promotions.currentGlobalUsage.lt(promotions.maxGlobalUsage)
+          lt(promotions.currentGlobalUsage, promotions.maxGlobalUsage)
         ),
         // only those with a spendThreshold
         isNotNull(promotions.spendThreshold)

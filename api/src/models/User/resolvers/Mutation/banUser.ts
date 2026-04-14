@@ -1,5 +1,6 @@
 import type { MutationResolvers } from '@/generated/types.generated';
 import { GraphQLError } from 'graphql';
+import { toUserParent } from '../utils/toUserParent';
 
 export const banUser: NonNullable<MutationResolvers['banUser']> = async (
     _parent,
@@ -44,5 +45,5 @@ export const banUser: NonNullable<MutationResolvers['banUser']> = async (
         });
     }
 
-    return updatedUser;
+    return toUserParent(updatedUser);
 };

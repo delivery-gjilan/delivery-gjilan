@@ -29,14 +29,11 @@ const userSelectColumns = {
     imageUrl: users.imageUrl,
     passwordResetToken: users.passwordResetToken,
     passwordResetExpiresAt: users.passwordResetExpiresAt,
+    isBanned: users.isBanned,
     createdAt: users.createdAt,
     updatedAt: users.updatedAt,
     deletedAt: users.deletedAt,
 };
-
-function withDefaultIsBanned(row: Omit<DbUser, 'isBanned'>): DbUser {
-    return { ...row, isBanned: false } as DbUser;
-}
 
 export class AuthRepository {
     constructor(private db: DbType) {}
@@ -68,7 +65,7 @@ export class AuthRepository {
             .select(userSelectColumns)
             .from(users)
             .where(and(eq(users.email, email), isNull(users.deletedAt)));
-        return user ? withDefaultIsBanned(user as Omit<DbUser, 'isBanned'>) : undefined;
+        return user ? (user as DbUser) : undefined;
     }
 
     async findById(id: string): Promise<DbUser | undefined> {
@@ -76,7 +73,7 @@ export class AuthRepository {
             .select(userSelectColumns)
             .from(users)
             .where(and(eq(users.id, id), isNull(users.deletedAt)));
-        return user ? withDefaultIsBanned(user as Omit<DbUser, 'isBanned'>) : undefined;
+        return user ? (user as DbUser) : undefined;
     }
 
     async updateSignupStep(userId: string, step: SignupStep): Promise<DbUser | undefined> {
@@ -235,7 +232,7 @@ export class AuthRepository {
             .where(isNull(users.deletedAt))
             .limit(limit)
             .offset(offset);
-        return rows.map((row) => withDefaultIsBanned(row as Omit<DbUser, 'isBanned'>));
+        return rows as DbUser[];
     }
 
     async findDrivers(): Promise<DbUser[]> {
@@ -243,7 +240,7 @@ export class AuthRepository {
             .select(userSelectColumns)
             .from(users)
             .where(and(eq(users.role, 'DRIVER'), isNull(users.deletedAt)));
-        return rows.map((row) => withDefaultIsBanned(row as Omit<DbUser, 'isBanned'>));
+        return rows as DbUser[];
     }
 
     async findDriversByIds(driverIds: string[]): Promise<DbUser[]> {
@@ -253,7 +250,7 @@ export class AuthRepository {
             .select(userSelectColumns)
             .from(users)
             .where(and(inArray(users.id, uniqueIds), eq(users.role, 'DRIVER'), isNull(users.deletedAt)));
-        return rows.map((row) => withDefaultIsBanned(row as Omit<DbUser, 'isBanned'>));
+        return rows as DbUser[];
     }
 
     async createRefreshTokenSession(userId: string, tokenHash: string, expiresAtIso: string): Promise<void> {
@@ -356,6 +353,7 @@ export class AuthRepository {
             adminNote?: string | null;
             flagColor?: string | null;
             preferredLanguage?: string;
+            isBanned?: boolean;
         }
     ): Promise<DbUser | undefined> {
         await this.db
