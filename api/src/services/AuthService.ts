@@ -103,7 +103,7 @@ export class AuthService {
         return {
             token,
             refreshToken,
-            user: (verifiedUser ?? user) as any,
+            user: (verifiedUser ?? user) as unknown as AuthResponse['user'],
             message: 'Account created. Please add your phone number.',
         };
     }
@@ -242,7 +242,7 @@ export class AuthService {
         return {
             token,
             refreshToken,
-            user: user as any,
+            user: user as unknown as AuthResponse['user'],
             message: 'Login successful',
         };
     }
@@ -389,7 +389,7 @@ export class AuthService {
 
         return {
             token,
-            user: user as any,
+            user: user as unknown as AuthResponse['user'],
             message: `User created successfully as ${role}`,
         };
     }

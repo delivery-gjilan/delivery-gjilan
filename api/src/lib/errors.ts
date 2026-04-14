@@ -49,7 +49,7 @@ export class AppError extends GraphQLError {
     }
 
     /** Wrap a Zod error into a single BAD_USER_INPUT GraphQLError */
-    static fromZodError(zodError: { issues: Array<{ path: any[]; message: string }> }) {
+    static fromZodError(zodError: { issues: Array<{ path: (string | number)[]; message: string }> }) {
         const messages = zodError.issues.map(
             (issue) => `${issue.path.join('.')}: ${issue.message}`,
         );

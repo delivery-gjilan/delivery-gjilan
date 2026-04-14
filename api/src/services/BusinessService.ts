@@ -72,7 +72,7 @@ export class BusinessService {
 
         const createdBusiness = await this.businessRepository.create({
             name: validatedInput.name,
-            description: (validatedInput as any).description ?? null,
+            description: input.description ?? null,
             phoneNumber: validatedInput.phoneNumber ?? null,
             imageUrl: validatedInput.imageUrl,
             businessType: validatedInput.businessType,

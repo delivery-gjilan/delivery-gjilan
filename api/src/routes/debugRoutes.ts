@@ -7,6 +7,10 @@ import logger from '@/lib/logger';
 
 const router = Router();
 
+interface AuthenticatedRequest extends Request {
+    userId?: string;
+}
+
 function requireAuth(req: Request, res: Response, next: () => void) {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -16,7 +20,7 @@ function requireAuth(req: Request, res: Response, next: () => void) {
     try {
         const token = authHeader.substring(7);
         const decoded = decodeJwtToken(token);
-        (req as any).userId = decoded.userId;
+        (req as AuthenticatedRequest).userId = decoded.userId;
         next();
     } catch {
         res.status(401).json({ error: 'Invalid or expired token' });
@@ -30,7 +34,7 @@ function requireAuth(req: Request, res: Response, next: () => void) {
  * Only available when NODE_ENV !== 'production'.
  */
 router.post('/test-push', requireAuth, async (req: Request, res: Response) => {
-    const userId = (req as any).userId as string;
+    const userId = (req as AuthenticatedRequest).userId!;
     logger.info({ userId }, 'debug:test-push — triggered');
 
     try {

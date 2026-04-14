@@ -729,8 +729,8 @@ export class NotificationService {
                     { orderId, activityId: tokenRecord.activityId, estimatedMinutes: updates.estimatedMinutes },
                     'Sent Live Activity update',
                 );
-            } catch (error: any) {
-                const code = error?.code;
+            } catch (error: unknown) {
+                const code = (error as Record<string, unknown>)?.code;
                 if (
                     code === 'messaging/registration-token-not-registered' ||
                     code === 'messaging/invalid-registration-token'
@@ -839,7 +839,7 @@ export class NotificationService {
                 }
 
                 logger.info({ orderId, activityId: tokenRecord.activityId }, 'Ended Live Activity');
-            } catch (error: any) {
+            } catch (error: unknown) {
                 logger.error({ error, orderId, activityId: tokenRecord.activityId }, 'Failed to end Live Activity');
             }
         }

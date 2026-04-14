@@ -179,7 +179,7 @@ export default function BusinessesPage() {
             <CreateBusinessModal
                 isOpen={createOpen}
                 onClose={() => setCreateOpen(false)}
-                onCreated={() => refetch()}
+                onCreated={async () => { await refetch(); }}
                 createBusiness={createBusiness}
                 createBusinessWithOwner={createBusinessWithOwner}
             />

@@ -135,7 +135,7 @@ export function getDriverServices() {
  * 
  * Add this to your GraphQL context initialization:
  */
-export function createContextWithDriverServices(baseContext: any) {
+export function createContextWithDriverServices(baseContext: Record<string, unknown>) {
   const { driverService, watchdogService } = getDriverServices();
 
   return {

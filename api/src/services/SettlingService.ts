@@ -120,13 +120,13 @@ export class SettlingService {
             const remainderCents = absNet - paymentCents;
             if (remainderCents > 0) {
                 remainderAmount = Number((remainderCents / 100).toFixed(2));
-                const remainderDirection = netCents >= 0 ? 'RECEIVABLE' : 'PAYABLE';
+                const remainderDirection: 'RECEIVABLE' | 'PAYABLE' = netCents >= 0 ? 'RECEIVABLE' : 'PAYABLE';
 
                 const [remainderSettlement] = await tx
                     .insert(settlements)
                     .values({
                         type: 'DRIVER',
-                        direction: remainderDirection as any,
+                        direction: remainderDirection,
                         driverId,
                         orderId: null,
                         amount: remainderAmount,
@@ -249,13 +249,13 @@ export class SettlingService {
             const remainderCents = absNet - paymentCents;
             if (remainderCents > 0) {
                 remainderAmount = Number((remainderCents / 100).toFixed(2));
-                const remainderDirection = netCents >= 0 ? 'RECEIVABLE' : 'PAYABLE';
+                const remainderDirection: 'RECEIVABLE' | 'PAYABLE' = netCents >= 0 ? 'RECEIVABLE' : 'PAYABLE';
 
                 const [remainderSettlement] = await tx
                     .insert(settlements)
                     .values({
                         type: 'BUSINESS',
-                        direction: remainderDirection as any,
+                        direction: remainderDirection,
                         businessId,
                         orderId: null,
                         amount: remainderAmount,

@@ -11,7 +11,7 @@
 
 import { DriverRepository, CONNECTION_THRESHOLDS } from '@/repositories/DriverRepository';
 import { AuthRepository } from '@/repositories/AuthRepository';
-import { pubsub, publish, topics } from '@/lib/pubsub';
+import { pubsub, publish, topics, type DriversUpdatedPayload } from '@/lib/pubsub';
 import logger from '@/lib/logger';
 
 const log = logger.child({ service: 'DriverWatchdog' });
@@ -196,7 +196,7 @@ export class DriverWatchdogService {
       if (userIds.length === 0) return;
       const drivers = await this.authRepository.findDriversByIds(userIds);
       if (drivers.length === 0) return;
-      publish(pubsub, topics.allDriversChanged(), { drivers } as any);
+      publish(pubsub, topics.allDriversChanged(), { drivers } as unknown as DriversUpdatedPayload);
     } catch (error) {
       log.error({ err: error }, 'watchdog:publish:error');
     }

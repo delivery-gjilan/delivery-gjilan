@@ -214,7 +214,7 @@ export class ProductService {
         const validatedInput = productValidator.validateUpdateProduct(input);
 
         // Extract variantGroupId from input and remap price → basePrice for DB
-        const { variantGroupId, price: graphqlPrice, ...rest } = validatedInput as any;
+        const { variantGroupId, price: graphqlPrice, ...rest } = validatedInput as { variantGroupId?: string | null; price?: number; [key: string]: unknown };
         const updateData: Record<string, unknown> = { ...rest };
         if (variantGroupId !== undefined) {
             updateData.groupId = variantGroupId;

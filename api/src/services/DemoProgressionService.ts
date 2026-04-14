@@ -182,7 +182,7 @@ async function maybeMarkReady(
         businessId: actors.businessId,
     });
 
-    await context.orderService.updateStatusWithSideEffects(orderId, 'READY', businessContext as any);
+    await context.orderService.updateStatusWithSideEffects(orderId, 'READY', businessContext);
 }
 
 async function maybePickUpOrder(
@@ -203,7 +203,7 @@ async function maybePickUpOrder(
         ? impersonateContext(context, { userId: actors.demoDriverId, role: 'DRIVER' })
         : impersonateContext(context, { userId: actors.adminUserId, role: 'SUPER_ADMIN' });
 
-    await context.orderService.updateStatusWithSideEffects(orderId, 'OUT_FOR_DELIVERY', pickupContext as any);
+    await context.orderService.updateStatusWithSideEffects(orderId, 'OUT_FOR_DELIVERY', pickupContext);
 }
 
 async function maybeDeliverOrder(
@@ -220,7 +220,7 @@ async function maybeDeliverOrder(
         ? impersonateContext(context, { userId: actors.demoDriverId, role: 'DRIVER' })
         : impersonateContext(context, { userId: actors.adminUserId, role: 'SUPER_ADMIN' });
 
-    await context.orderService.updateStatusWithSideEffects(orderId, 'DELIVERED', deliverContext as any);
+    await context.orderService.updateStatusWithSideEffects(orderId, 'DELIVERED', deliverContext);
 }
 
 export async function scheduleDemoOrderProgression(

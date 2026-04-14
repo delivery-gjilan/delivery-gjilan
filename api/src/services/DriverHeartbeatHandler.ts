@@ -13,7 +13,7 @@
 
 import { DriverRepository, CONNECTION_THRESHOLDS } from '@/repositories/DriverRepository';
 import { AuthRepository } from '@/repositories/AuthRepository';
-import { pubsub, publish, topics, type OrderDriverLiveTrackingPayload } from '@/lib/pubsub';
+import { pubsub, publish, topics, type OrderDriverLiveTrackingPayload, type DriversUpdatedPayload } from '@/lib/pubsub';
 import { DbDriver } from '@/database/schema/drivers';
 import { orders as ordersTable } from '@/database/schema';
 import { getDB } from '@/database';
@@ -238,7 +238,7 @@ export class DriverHeartbeatHandler {
       if (driverIds.length === 0) return;
       const drivers = await this.authRepository.findDriversByIds(driverIds);
       if (drivers.length === 0) return;
-      publish(pubsub, topics.allDriversChanged(), { drivers } as any);
+      publish(pubsub, topics.allDriversChanged(), { drivers } as unknown as DriversUpdatedPayload);
     } catch (error) {
       log.error({ err: error }, 'heartbeat:publish:error');
     }

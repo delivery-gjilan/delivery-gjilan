@@ -13,7 +13,7 @@ export class UserPermissionsRepository {
             .from(userPermissions)
             .where(eq(userPermissions.userId, userId));
         
-        return permissions.map((p: any) => p.permission as Permission);
+        return permissions.map((p) => p.permission as Permission);
     }
 
     /**
@@ -46,7 +46,7 @@ export class UserPermissionsRepository {
             .from(userPermissions)
             .where(eq(userPermissions.userId, userId));
         
-        const hasPermission = existing.some((p: any) => p.permission === permission);
+        const hasPermission = existing.some((p) => p.permission === permission);
         
         if (!hasPermission) {
             await db.insert(userPermissions).values({
