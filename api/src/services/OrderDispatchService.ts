@@ -31,6 +31,8 @@ import {
 import { cache } from '@/lib/cache';
 import { SHIFT_DRIVERS_CACHE_KEY } from '@/models/Driver/resolvers/Mutation/adminSetShiftDrivers';
 import { getEarlyDispatchQueue } from '@/queues/earlyDispatchQueue';
+import { storeSettings } from '@/database/schema/storeSettings';
+import { getDB } from '@/database';
 import logger from '@/lib/logger';
 
 const log = logger.child({ service: 'OrderDispatch' });
@@ -56,9 +58,11 @@ const DISPATCH_CACHE_TTL_S = 300; // 5 minutes
  * How many minutes before the estimated ready time to notify drivers.
  * This gives drivers time to travel to the business before the food is ready.
  * If prep time is ≤ this value, dispatch fires immediately on PREPARING.
+ *
+ * This is the fallback default — the actual value is read from
+ * store_settings.early_dispatch_lead_minutes at runtime.
  */
-const EARLY_DISPATCH_LEAD_MIN = 5;
-const EARLY_DISPATCH_LEAD_MS = EARLY_DISPATCH_LEAD_MIN * 60_000;
+const DEFAULT_EARLY_DISPATCH_LEAD_MIN = 5;
 
 // ── Internals ─────────────────────────────────────────────────────────────────
 
@@ -96,12 +100,27 @@ export class OrderDispatchService {
         private readonly driverRepository: DriverRepository,
     ) {}
 
+    /** Read the configured early-dispatch lead time (minutes) from store settings. */
+    private async getEarlyDispatchLeadMin(): Promise<number> {
+        try {
+            const db = await getDB();
+            const rows = await db
+                .select({ lead: storeSettings.earlyDispatchLeadMinutes })
+                .from(storeSettings)
+                .where(eq(storeSettings.id, 'default'))
+                .limit(1);
+            return rows[0]?.lead ?? DEFAULT_EARLY_DISPATCH_LEAD_MIN;
+        } catch {
+            return DEFAULT_EARLY_DISPATCH_LEAD_MIN;
+        }
+    }
+
     /**
-     * Schedule driver dispatch to fire EARLY_DISPATCH_LEAD_MIN minutes before the
+     * Schedule driver dispatch to fire earlyDispatchLeadMinutes before the
      * estimated ready time.  Call this immediately after `startPreparing` is saved.
      *
-     * - If preparationMinutes ≤ EARLY_DISPATCH_LEAD_MIN: dispatch fires immediately.
-     * - Otherwise: a BullMQ delayed job fires (preparationMinutes - EARLY_DISPATCH_LEAD_MIN)
+     * - If preparationMinutes ≤ earlyDispatchLeadMinutes: dispatch fires immediately.
+     * - Otherwise: a BullMQ delayed job fires (preparationMinutes - leadMin)
      *   minutes from now.  Jobs are persisted in Redis and survive process restarts.
      *
      * Job ID `early-dispatch:<orderId>` deduplicates — re-calling this (e.g. on reschedule)
@@ -112,7 +131,8 @@ export class OrderDispatchService {
         preparationMinutes: number,
         notificationService: NotificationService,
     ): Promise<void> {
-        const delayMs = Math.max(0, (preparationMinutes - EARLY_DISPATCH_LEAD_MIN) * 60_000);
+        const leadMin = await this.getEarlyDispatchLeadMin();
+        const delayMs = Math.max(0, (preparationMinutes - leadMin) * 60_000);
 
         if (delayMs === 0) {
             log.info({ orderId }, 'earlyDispatch:immediate');
@@ -155,9 +175,10 @@ export class OrderDispatchService {
         newPreparationMinutes: number,
         notificationService: NotificationService,
     ): Promise<void> {
-        const fireAt = preparingAtMs + Math.max(0, newPreparationMinutes - EARLY_DISPATCH_LEAD_MIN) * 60_000;
+        const leadMin = await this.getEarlyDispatchLeadMin();
+        const fireAt = preparingAtMs + Math.max(0, newPreparationMinutes - leadMin) * 60_000;
         const delayMs = Math.max(0, fireAt - Date.now());
-        const preparationMinutesFromNow = delayMs / 60_000 + EARLY_DISPATCH_LEAD_MIN;
+        const preparationMinutesFromNow = delayMs / 60_000 + leadMin;
 
         log.info({ orderId, newPreparationMinutes, delayMs }, 'earlyDispatch:rescheduled');
         await this.scheduleEarlyDispatch(orderId, preparationMinutesFromNow, notificationService);

@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const GET_ACTIVE_BANNERS = gql`
+export const GET_ACTIVE_BANNERS = graphql(`
     query GetActiveBanners($displayContext: BannerDisplayContext) {
         getActiveBanners(displayContext: $displayContext) {
             id
@@ -14,4 +14,4 @@ export const GET_ACTIVE_BANNERS = gql`
             isActive
         }
     }
-`;
+`);

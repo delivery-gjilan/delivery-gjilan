@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const GET_BUSINESSES = gql`
+export const GET_BUSINESSES = graphql(`
     query GetBusinesses {
         businesses {
             id
@@ -46,9 +46,8 @@ export const GET_BUSINESSES = gql`
             updatedAt
         }
     }
-`;
-
-export const GET_BUSINESS = gql`
+`);
+export const GET_BUSINESS = graphql(`
     query GetBusiness($id: ID!) {
         business(id: $id) {
             id
@@ -107,13 +106,12 @@ export const GET_BUSINESS = gql`
             updatedAt
         }
     }
-`;
-
-export const GET_BUSINESS_MINIMUM = gql`
+`);
+export const GET_BUSINESS_MINIMUM = graphql(`
     query GetBusinessMinimum($id: ID!) {
         business(id: $id) {
             id
             minOrderAmount
         }
     }
-`;
+`);

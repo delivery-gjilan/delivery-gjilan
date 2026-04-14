@@ -32,6 +32,7 @@ import {
 } from '@/graphql/business';
 import { useAuthStore } from '@/store/authStore';
 import { useTranslation } from '@/hooks/useTranslation';
+import { OrderStatus as GqlOrderStatus } from '@/gql/graphql';
 import * as Haptics from 'expo-haptics';
 
 type OrderStatus = 'PENDING' | 'PREPARING' | 'READY' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED';
@@ -181,7 +182,7 @@ type ScreenState = {
     prepModal: { visible: boolean; selectedTime: number; customTime: string };
     productModalOrder: Order | null;
     addTimeModal: { order: Order | null; amount: number; customTime: string };
-    removeItemModal: { data: { orderId: string; itemId: string; itemName: string } | null; reason: string };
+    removeItemModal: { data: { orderId: string; itemId: string; itemName: string; itemQuantity: number } | null; reason: string; quantityToRemove: number };
     completedView: { show: boolean; page: number };
 };
 
@@ -203,9 +204,10 @@ type ScreenAction =
     | { type: 'CLOSE_ADD_TIME_MODAL' }
     | { type: 'SET_ADD_TIME_AMOUNT'; amount: number }
     | { type: 'SET_CUSTOM_ADD_TIME'; value: string }
-    | { type: 'OPEN_REMOVE_ITEM_MODAL'; data: { orderId: string; itemId: string; itemName: string } }
+    | { type: 'OPEN_REMOVE_ITEM_MODAL'; data: { orderId: string; itemId: string; itemName: string; itemQuantity: number } }
     | { type: 'CLOSE_REMOVE_ITEM_MODAL' }
     | { type: 'SET_REMOVE_ITEM_REASON'; reason: string }
+    | { type: 'SET_REMOVE_ITEM_QUANTITY'; quantity: number }
     | { type: 'TOGGLE_COMPLETED' }
     | { type: 'SET_COMPLETED_PAGE'; page: number };
 
@@ -215,7 +217,7 @@ const initialScreenState: ScreenState = {
     prepModal: { visible: false, selectedTime: 20, customTime: '' },
     productModalOrder: null,
     addTimeModal: { order: null, amount: 10, customTime: '' },
-    removeItemModal: { data: null, reason: '' },
+    removeItemModal: { data: null, reason: '', quantityToRemove: 1 },
     completedView: { show: false, page: 0 },
 };
 
@@ -256,11 +258,13 @@ function screenReducer(state: ScreenState, action: ScreenAction): ScreenState {
         case 'SET_CUSTOM_ADD_TIME':
             return { ...state, addTimeModal: { ...state.addTimeModal, customTime: action.value } };
         case 'OPEN_REMOVE_ITEM_MODAL':
-            return { ...state, removeItemModal: { data: action.data, reason: '' } };
+            return { ...state, removeItemModal: { data: action.data, reason: '', quantityToRemove: 1 } };
         case 'CLOSE_REMOVE_ITEM_MODAL':
-            return { ...state, removeItemModal: { data: null, reason: '' } };
+            return { ...state, removeItemModal: { data: null, reason: '', quantityToRemove: 1 } };
         case 'SET_REMOVE_ITEM_REASON':
             return { ...state, removeItemModal: { ...state.removeItemModal, reason: action.reason } };
+        case 'SET_REMOVE_ITEM_QUANTITY':
+            return { ...state, removeItemModal: { ...state.removeItemModal, quantityToRemove: action.quantity } };
         case 'TOGGLE_COMPLETED':
             return { ...state, completedView: { show: !state.completedView.show, page: !state.completedView.show ? 0 : state.completedView.page } };
         case 'SET_COMPLETED_PAGE':
@@ -297,6 +301,7 @@ export default function OrdersScreen() {
     const customAddTime = addTimeModal.customTime;
     const removeItemModal = removeItemModalState.data;
     const removeItemReason = removeItemModalState.reason;
+    const removeItemQuantity = removeItemModalState.quantityToRemove;
     const showCompleted = completedView.show;
     const completedPage = completedView.page;
     const { width } = useWindowDimensions();
@@ -391,14 +396,14 @@ export default function OrdersScreen() {
 
     useSubscription(ORDERS_SUBSCRIPTION, {
         onData: ({ data: subscriptionData }) => {
-            const incomingOrders = subscriptionData.data?.allOrdersUpdated as any[] | undefined;
+            const incomingOrders = subscriptionData.data?.allOrdersUpdated;
             if (incomingOrders && incomingOrders.length > 0) {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                apolloClient.cache.updateQuery({ query: GET_BUSINESS_ORDERS }, (existing: any) => {
+                apolloClient.cache.updateQuery({ query: GET_BUSINESS_ORDERS }, (existing) => {
                     const currentOrders = Array.isArray(existing?.orders?.orders) ? existing.orders.orders : [];
-                    const byId = new Map(currentOrders.map((order: any) => [String(order?.id), order]));
+                    const byId = new Map(currentOrders.map((order) => [String(order?.id), order]));
 
-                    incomingOrders.forEach((order: any) => {
+                    incomingOrders.forEach((order) => {
                         const existingOrder = byId.get(String(order?.id));
                         byId.set(
                             String(order?.id),
@@ -552,18 +557,18 @@ export default function OrdersScreen() {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             dispatch({ type: 'CLOSE_ETA_MODAL' });
             refetch();
-        } catch (error: any) {
-            Alert.alert(t('common.error', 'Error'), error.message);
+        } catch (error: unknown) {
+            Alert.alert(t('common.error', 'Error'), error instanceof Error ? error.message : 'Failed');
         }
     };
 
     const handleMarkReady = async (orderId: string) => {
         try {
-            await updateStatus({ variables: { id: orderId, status: 'READY' as any } });
+            await updateStatus({ variables: { id: orderId, status: GqlOrderStatus.Ready } });
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             refetch();
-        } catch (error: any) {
-            Alert.alert(t('common.error', 'Error'), error.message);
+        } catch (error: unknown) {
+            Alert.alert(t('common.error', 'Error'), error instanceof Error ? error.message : 'Failed');
         }
     };
 
@@ -575,11 +580,11 @@ export default function OrdersScreen() {
                 style: 'destructive',
                 onPress: async () => {
                     try {
-                        await updateStatus({ variables: { id: orderId, status: 'CANCELLED' as any } });
+                        await updateStatus({ variables: { id: orderId, status: GqlOrderStatus.Cancelled } });
                         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
                         refetch();
-                    } catch (error: any) {
-                        Alert.alert(t('common.error', 'Error'), error.message);
+                    } catch (error: unknown) {
+                        Alert.alert(t('common.error', 'Error'), error instanceof Error ? error.message : 'Failed');
                     }
                 },
             },
@@ -616,14 +621,15 @@ export default function OrdersScreen() {
                     orderId: removeItemModal.orderId,
                     orderItemId: removeItemModal.itemId,
                     reason: removeItemReason.trim(),
+                    quantity: removeItemQuantity,
                 },
             });
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             dispatch({ type: 'CLOSE_REMOVE_ITEM_MODAL' });
             dispatch({ type: 'CLOSE_PRODUCT_MODAL' });
             refetch();
-        } catch (error: any) {
-            Alert.alert(t('common.error', 'Error'), error.message);
+        } catch (error: unknown) {
+            Alert.alert(t('common.error', 'Error'), error instanceof Error ? error.message : 'Failed');
         }
     };
 
@@ -639,8 +645,8 @@ export default function OrdersScreen() {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             dispatch({ type: 'CLOSE_ADD_TIME_MODAL' });
             refetch();
-        } catch (error: any) {
-            Alert.alert(t('common.error', 'Error'), error.message);
+        } catch (error: unknown) {
+            Alert.alert(t('common.error', 'Error'), error instanceof Error ? error.message : 'Failed');
         }
     };
 
@@ -658,8 +664,8 @@ export default function OrdersScreen() {
             });
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             await refetchBusinessOperations();
-        } catch (error: any) {
-            Alert.alert(t('common.error', 'Error'), error?.message ?? 'Failed to open store');
+        } catch (error: unknown) {
+            Alert.alert(t('common.error', 'Error'), error instanceof Error ? error.message : 'Failed to open store');
         }
     };
 
@@ -679,8 +685,8 @@ export default function OrdersScreen() {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             dispatch({ type: 'CLOSE_STORE_CLOSE_MODAL' });
             await refetchBusinessOperations();
-        } catch (error: any) {
-            Alert.alert(t('common.error', 'Error'), error?.message ?? 'Failed to close store');
+        } catch (error: unknown) {
+            Alert.alert(t('common.error', 'Error'), error instanceof Error ? error.message : 'Failed to close store');
         }
     };
 
@@ -704,8 +710,8 @@ export default function OrdersScreen() {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             dispatch({ type: 'CLOSE_PREP_MODAL' });
             await refetchBusinessOperations();
-        } catch (error: any) {
-            Alert.alert(t('common.error', 'Error'), error?.message ?? 'Failed to update prep time');
+        } catch (error: unknown) {
+            Alert.alert(t('common.error', 'Error'), error instanceof Error ? error.message : 'Failed to update prep time');
         }
     };
 
@@ -936,8 +942,7 @@ export default function OrdersScreen() {
                                                 <TouchableOpacity
                                                     hitSlop={8}
                                                     onPress={() => {
-                                                        setRemoveItemModal({ orderId: order.id, itemId: item.id, itemName: item.name });
-                                                        setRemoveItemReason('');
+                                                        dispatch({ type: 'OPEN_REMOVE_ITEM_MODAL', data: { orderId: order.id, itemId: item.id, itemName: item.name, itemQuantity: item.quantity } });
                                                     }}
                                                     style={{ marginLeft: 10, padding: 4 }}
                                                 >
@@ -1129,7 +1134,7 @@ export default function OrdersScreen() {
                         <RefreshControl refreshing={false} onRefresh={refetch} tintColor="#7C3AED" />
                     }
                     ListEmptyComponent={
-                        <View className="items-center justify-center py-10">
+                        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 48 }}>
                             <View
                                 className="w-24 h-24 rounded-2xl items-center justify-center mb-4"
                                 style={{
@@ -1237,11 +1242,7 @@ export default function OrdersScreen() {
                             </View>
                         ) : null
                     }
-                    contentContainerStyle={
-                        sortedOrders.length === 0 && completedOrders.length === 0
-                            ? { flexGrow: 1, justifyContent: 'center', paddingBottom: 20 }
-                            : { paddingTop: 6, paddingBottom: 20, paddingHorizontal: 4 }
-                    }
+                    contentContainerStyle={{ flexGrow: 1, paddingTop: 6, paddingBottom: 20, paddingHorizontal: 4 }}
                 />
             )}
 
@@ -1750,7 +1751,7 @@ export default function OrdersScreen() {
                                             {productModalOrder && productModalOrder.status !== 'DELIVERED' && productModalOrder.status !== 'CANCELLED' && (
                                                 <TouchableOpacity
                                                     onPress={() => {
-                                                        dispatch({ type: 'OPEN_REMOVE_ITEM_MODAL', data: { orderId: productModalOrder.id, itemId: item.id, itemName: item.name } });
+                                                        dispatch({ type: 'OPEN_REMOVE_ITEM_MODAL', data: { orderId: productModalOrder.id, itemId: item.id, itemName: item.name, itemQuantity: item.quantity } });
                                                     }}
                                                     style={{
                                                         marginTop: 10,
@@ -1804,6 +1805,53 @@ export default function OrdersScreen() {
                         <Text style={{ color: '#94a3b8', fontSize: 13, marginBottom: 16 }}>
                             "{removeItemModal?.itemName}" will be removed and the customer will be notified.
                         </Text>
+
+                        {/* Quantity selector — only show when item has quantity > 1 */}
+                        {(removeItemModal?.itemQuantity ?? 1) > 1 && (
+                            <View style={{ marginBottom: 16 }}>
+                                <Text style={{ color: '#94a3b8', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+                                    Quantity to remove (of {removeItemModal?.itemQuantity})
+                                </Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                    <TouchableOpacity
+                                        onPress={() => dispatch({ type: 'SET_REMOVE_ITEM_QUANTITY', quantity: Math.max(1, removeItemQuantity - 1) })}
+                                        disabled={removeItemQuantity <= 1}
+                                        style={{
+                                            width: 36, height: 36, borderRadius: 18,
+                                            backgroundColor: removeItemQuantity <= 1 ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.12)',
+                                            alignItems: 'center', justifyContent: 'center',
+                                        }}
+                                    >
+                                        <Ionicons name="remove" size={18} color={removeItemQuantity <= 1 ? '#475569' : '#f1f5f9'} />
+                                    </TouchableOpacity>
+                                    <Text style={{ color: '#f1f5f9', fontSize: 20, fontWeight: '800', minWidth: 30, textAlign: 'center' }}>
+                                        {removeItemQuantity}
+                                    </Text>
+                                    <TouchableOpacity
+                                        onPress={() => dispatch({ type: 'SET_REMOVE_ITEM_QUANTITY', quantity: Math.min(removeItemModal?.itemQuantity ?? 1, removeItemQuantity + 1) })}
+                                        disabled={removeItemQuantity >= (removeItemModal?.itemQuantity ?? 1)}
+                                        style={{
+                                            width: 36, height: 36, borderRadius: 18,
+                                            backgroundColor: removeItemQuantity >= (removeItemModal?.itemQuantity ?? 1) ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.12)',
+                                            alignItems: 'center', justifyContent: 'center',
+                                        }}
+                                    >
+                                        <Ionicons name="add" size={18} color={removeItemQuantity >= (removeItemModal?.itemQuantity ?? 1) ? '#475569' : '#f1f5f9'} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        onPress={() => dispatch({ type: 'SET_REMOVE_ITEM_QUANTITY', quantity: removeItemModal?.itemQuantity ?? 1 })}
+                                        style={{
+                                            paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12,
+                                            borderWidth: 1,
+                                            borderColor: removeItemQuantity === (removeItemModal?.itemQuantity ?? 1) ? '#ef4444' : 'rgba(255,255,255,0.15)',
+                                            backgroundColor: removeItemQuantity === (removeItemModal?.itemQuantity ?? 1) ? '#ef444418' : 'transparent',
+                                        }}
+                                    >
+                                        <Text style={{ color: removeItemQuantity === (removeItemModal?.itemQuantity ?? 1) ? '#ef4444' : '#94a3b8', fontSize: 12, fontWeight: '600' }}>All</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        )}
 
                         {/* Reason presets */}
                         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
@@ -1868,7 +1916,7 @@ export default function OrdersScreen() {
                                     backgroundColor: removeItemReason.trim() && !removingItem ? '#ef4444' : '#ef444460',
                                 }}
                             >
-                                <Text style={{ color: '#fff', fontWeight: '700' }}>{removingItem ? 'Removing…' : 'Remove'}</Text>
+                                <Text style={{ color: '#fff', fontWeight: '700' }}>{removingItem ? 'Removing…' : `Remove ${removeItemQuantity}×`}</Text>
                             </TouchableOpacity>
                         </View>
                     </Pressable>

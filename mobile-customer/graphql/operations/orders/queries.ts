@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const GET_ORDERS = gql`
+export const GET_ORDERS = graphql(`
     query GetOrders($limit: Int, $offset: Int) {
         orders(limit: $limit, offset: $offset) {
             totalCount
@@ -99,9 +99,8 @@ export const GET_ORDERS = gql`
             }
         }
     }
-`;
-
-export const GET_ORDER = gql`
+`);
+export const GET_ORDER = graphql(`
     query GetOrder($id: ID!) {
         order(id: $id) {
             id
@@ -215,9 +214,8 @@ export const GET_ORDER = gql`
             }
         }
     }
-`;
-
-export const GET_ORDERS_BY_STATUS = gql`
+`);
+export const GET_ORDERS_BY_STATUS = graphql(`
     query GetOrdersByStatus($status: OrderStatus!) {
         ordersByStatus(status: $status) {
             id
@@ -289,9 +287,8 @@ export const GET_ORDERS_BY_STATUS = gql`
             }
         }
     }
-`;
-
-export const GET_ORDER_DRIVER = gql`
+`);
+export const GET_ORDER_DRIVER = graphql(`
     query GetOrderDriver($id: ID!) {
         order(id: $id) {
             id
@@ -317,9 +314,8 @@ export const GET_ORDER_DRIVER = gql`
             }
         }
     }
-`;
-
-export const GET_ORDER_REVIEW_CONTEXT = gql`
+`);
+export const GET_ORDER_REVIEW_CONTEXT = graphql(`
     query GetOrderReviewContext($id: ID!) {
         order(id: $id) {
             id
@@ -335,9 +331,8 @@ export const GET_ORDER_REVIEW_CONTEXT = gql`
             }
         }
     }
-`;
-
-export const UNCOMPLETED_ORDERS = gql`
+`);
+export const UNCOMPLETED_ORDERS = graphql(`
     query UncompletedOrders {
         uncompletedOrders {
             id
@@ -413,10 +408,9 @@ export const UNCOMPLETED_ORDERS = gql`
             }
         }
     }
-`;
-
-export const GET_PRIORITY_SURCHARGE_AMOUNT = gql`
+`);
+export const GET_PRIORITY_SURCHARGE_AMOUNT = graphql(`
     query GetPrioritySurchargeAmount {
         prioritySurchargeAmount
     }
-`;
+`);

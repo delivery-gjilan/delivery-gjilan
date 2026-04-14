@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const GET_MY_ADDRESSES = gql`
+export const GET_MY_ADDRESSES = graphql(`
     query GetMyAddresses {
         myAddresses {
             id
@@ -12,9 +12,8 @@ export const GET_MY_ADDRESSES = gql`
             createdAt
         }
     }
-`;
-
-export const ADD_USER_ADDRESS = gql`
+`);
+export const ADD_USER_ADDRESS = graphql(`
     mutation AddUserAddress($input: AddUserAddressInput!) {
         addUserAddress(input: $input) {
             id
@@ -25,9 +24,8 @@ export const ADD_USER_ADDRESS = gql`
             priority
         }
     }
-`;
-
-export const UPDATE_USER_ADDRESS = gql`
+`);
+export const UPDATE_USER_ADDRESS = graphql(`
     mutation UpdateUserAddress($input: UpdateUserAddressInput!) {
         updateUserAddress(input: $input) {
             id
@@ -36,16 +34,14 @@ export const UPDATE_USER_ADDRESS = gql`
             priority
         }
     }
-`;
-
-export const DELETE_USER_ADDRESS = gql`
+`);
+export const DELETE_USER_ADDRESS = graphql(`
     mutation DeleteUserAddress($id: ID!) {
         deleteUserAddress(id: $id)
     }
-`;
-
-export const SET_DEFAULT_ADDRESS = gql`
+`);
+export const SET_DEFAULT_ADDRESS = graphql(`
     mutation SetDefaultAddress($id: ID!) {
         setDefaultAddress(id: $id)
     }
-`;
+`);

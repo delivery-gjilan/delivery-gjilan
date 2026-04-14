@@ -7,7 +7,7 @@ Nav: Pagination audit across all 6 apps. Start here to find unbounded queries.
 
 # Pagination Audit — Full System
 
-**Date:** 2026-03-26 (updated 2026-05-24 — full pagination pass: backend + all client safety caps + customer load-more + admin UI pagers)  
+**Date:** 2026-03-26 (updated 2026-04-13 — mobile-driver + mobile-business settlement pagination added)  
 **Scope:** `api/`, `admin-panel/`, `mobile-customer/`, `mobile-driver/`, `mobile-business/`, `mobile-admin/`
 
 ---
@@ -16,7 +16,7 @@ Nav: Pagination audit across all 6 apps. Start here to find unbounded queries.
 
 - **0 of 6 apps** use cursor-based pagination or `pageInfo`/`hasNextPage`.
 - **1 of 6 apps** has a working UI paginator (admin-panel audit logs only).
-- **All mobile apps** have zero `onEndReached` / `fetchMore` / `loadMore` calls — no infinite scroll anywhere.
+- **3 apps** now implement `fetchMore` load-more: `mobile-customer` (order history), `mobile-driver` (settlements), `mobile-business` (settlements).
 - Several API queries accept `limit`/`offset` but clients never pass them (dead args).
 - Multiple high-risk unbounded queries exist that will degrade at scale.
 
@@ -148,25 +148,25 @@ Nav: Pagination audit across all 6 apps. Start here to find unbounded queries.
 
 ## 4. mobile-driver
 
-**No `onEndReached` calls anywhere.** No `fetchMore`. No infinite scroll.
+**No `onEndReached` calls.** Settlement list now uses `fetchMore` with load-more button (`SETTLEMENT_PAGE_SIZE=20`).
 
 | Screen | File | Query | Pagination |
 |---|---|---|---|
 | Order map | `app/(tabs)/map.tsx` | `GET_ORDERS` (no limit) → `findForDriver` — **no DB limit** | 🔴 HIGH — unbounded driver order query |
 | Navigation | `app/(tabs)/navigation.tsx` | `GET_ORDERS` (no limit) | 🔴 HIGH — same |
-| Settlements | `app/(tabs)/add.tsx` | `GET_MY_SETTLEMENTS` with `limit: 50` hard-coded, no offset | ⚠️ Partial: hard cap 50, no load-more |
+| Settlements | `app/(tabs)/earnings.tsx` | `GET_MY_SETTLEMENTS` with `limit: 20`, `offset: 0` | ✅ **FIXED** — `SETTLEMENT_PAGE_SIZE=20`, `fetchMore` load-more button, offset tracking |
 | Messages | `app/(tabs)/messages.tsx` | `MY_DRIVER_MESSAGES` with `limit: 100` hard-coded | ⚠️ Partial: hard cap 100, no load-more |
 
 ---
 
 ## 5. mobile-business
 
-**No `onEndReached` calls anywhere.** No `fetchMore`. No infinite scroll.
+**No `onEndReached` calls.** Settlement list now uses `fetchMore` with load-more button (`PAGE_SIZE=20`).
 
 | Screen | File | Query | Pagination |
 |---|---|---|---|
 | Orders (live) | `app/(tabs)/index.tsx` | `GET_BUSINESS_ORDERS` (no limit) | 🟡 MEDIUM — large businesses with 100s orders |
-| Finances | `app/(tabs)/finances.tsx` | `GET_MY_BUSINESS_SETTLEMENTS` with `limit: 500` hard-coded | ⚠️ Partial: hard cap 500, no offset, no UI pager |
+| Finances | `app/(tabs)/finances.tsx` | `GET_MY_BUSINESS_SETTLEMENTS` with `limit: 20`, `offset: 0` | ✅ **FIXED** — `PAGE_SIZE=20`, `fetchMore` load-more button, offset tracking |
 | Settlement requests | `app/(tabs)/finances.tsx` | `GET_MY_SETTLEMENT_REQUESTS` with `limit: 20` | ⚠️ Only shows 20 requests |
 | Settlement history | `app/settlement-history.tsx` | `GET_MY_SETTLEMENT_REQUESTS` with `limit: 200` | ⚠️ Hard cap 200 |
 | Messages | `app/(tabs)/messages.tsx` | `MY_BUSINESS_MESSAGES` with `limit: 100` hard-coded | ⚠️ Partial |
@@ -214,8 +214,8 @@ Nav: Pagination audit across all 6 apps. Start here to find unbounded queries.
 | M2 | API `Order` (BUSINESS) | `getOrdersByBusinessId` — no limit on business order queries |
 | M3 | admin-panel finances | `GET_SETTLEMENTS` with no limit in `page-new.tsx` | ✅ **FIXED** — `limit: 1000` safety cap added |
 | M4 | admin-panel settlements page | Hard-coded `limit: 200` with no UI pager |
-| M5 | mobile-business finances | `GET_MY_BUSINESS_SETTLEMENTS` with `limit: 500` |
-| M6 | mobile-driver settlements | `GET_MY_SETTLEMENTS` with `limit: 50`, no offset |
+| M5 | mobile-business finances | `GET_MY_BUSINESS_SETTLEMENTS` with `limit: 20` | ✅ **FIXED** — `fetchMore` load-more with `PAGE_SIZE=20` |
+| M6 | mobile-driver settlements | `GET_MY_SETTLEMENTS` with `limit: 20`, offset tracking | ✅ **FIXED** — `fetchMore` load-more with `SETTLEMENT_PAGE_SIZE=20` |
 | M7 | API `businesses` | No limit on businesses query |
 | M8 | API/mobile message threads | `businessMessageThreads` / `driverMessageThreads` — no pagination |
 

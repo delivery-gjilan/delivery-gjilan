@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const MY_BUSINESS_MESSAGES = gql`
+export const MY_BUSINESS_MESSAGES = graphql(`
     query MyBusinessMessages($limit: Int, $offset: Int) {
         myBusinessMessages(limit: $limit, offset: $offset) {
             id
@@ -13,9 +13,9 @@ export const MY_BUSINESS_MESSAGES = gql`
             createdAt
         }
     }
-`;
+`);
 
-export const BUSINESS_MESSAGE_RECEIVED_SUB = gql`
+export const BUSINESS_MESSAGE_RECEIVED_SUB = graphql(`
     subscription BusinessMessageReceived {
         businessMessageReceived {
             id
@@ -28,9 +28,9 @@ export const BUSINESS_MESSAGE_RECEIVED_SUB = gql`
             createdAt
         }
     }
-`;
+`);
 
-export const REPLY_TO_BUSINESS_MESSAGE = gql`
+export const REPLY_TO_BUSINESS_MESSAGE = graphql(`
     mutation ReplyToBusinessMessage($adminId: ID!, $body: String!) {
         replyToBusinessMessage(adminId: $adminId, body: $body) {
             id
@@ -43,10 +43,10 @@ export const REPLY_TO_BUSINESS_MESSAGE = gql`
             createdAt
         }
     }
-`;
+`);
 
-export const MARK_BUSINESS_MESSAGES_READ_BUSINESS = gql`
+export const MARK_BUSINESS_MESSAGES_READ_BUSINESS = graphql(`
     mutation MarkBusinessMessagesReadBusiness($otherUserId: ID!) {
         markBusinessMessagesRead(otherUserId: $otherUserId)
     }
-`;
+`);

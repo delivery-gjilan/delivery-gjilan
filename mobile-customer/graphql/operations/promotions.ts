@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const VALIDATE_PROMOTIONS = gql`
+export const VALIDATE_PROMOTIONS = graphql(`
     query ValidatePromotions($cart: CartContextInput!, $manualCode: String) {
         validatePromotions(cart: $cart, manualCode: $manualCode) {
             totalDiscount
@@ -20,9 +20,8 @@ export const VALIDATE_PROMOTIONS = gql`
             }
         }
     }
-`;
-
-export const GET_APPLICABLE_PROMOTIONS = gql`
+`);
+export const GET_APPLICABLE_PROMOTIONS = graphql(`
     query GetApplicablePromotions($cart: CartContextInput!, $manualCode: String) {
         getApplicablePromotions(cart: $cart, manualCode: $manualCode) {
             id
@@ -35,9 +34,8 @@ export const GET_APPLICABLE_PROMOTIONS = gql`
             priority
         }
     }
-`;
-
-export const GET_PROMOTION_THRESHOLDS = gql`
+`);
+export const GET_PROMOTION_THRESHOLDS = graphql(`
     query GetPromotionThresholds($cart: CartContextInput!) {
         getPromotionThresholds(cart: $cart) {
             id
@@ -49,9 +47,8 @@ export const GET_PROMOTION_THRESHOLDS = gql`
             isActive
         }
     }
-`;
-
-export const GET_ACTIVE_GLOBAL_PROMOTIONS = gql`
+`);
+export const GET_ACTIVE_GLOBAL_PROMOTIONS = graphql(`
     query GetActiveGlobalPromotions {
         getActiveGlobalPromotions {
             id
@@ -64,9 +61,8 @@ export const GET_ACTIVE_GLOBAL_PROMOTIONS = gql`
             isActive
         }
     }
-`;
-
-export const GET_USER_PROMOTIONS = gql`
+`);
+export const GET_USER_PROMOTIONS = graphql(`
     query GetUserPromotions($userId: ID!) {
         getUserPromotions(userId: $userId) {
             id
@@ -89,4 +85,4 @@ export const GET_USER_PROMOTIONS = gql`
             }
         }
     }
-`;
+`);

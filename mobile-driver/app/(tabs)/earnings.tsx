@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo, useCallback } from 'react';
 import {
     View, Text, ScrollView, Pressable, ActivityIndicator, RefreshControl,
     Alert, Modal, KeyboardAvoidingView, Platform, TextInput, StyleSheet,
@@ -19,6 +19,8 @@ import {
 import { format, startOfDay, startOfMonth, startOfWeek, subMonths } from 'date-fns';
 
 type Period = 'today' | 'week' | 'month' | 'last_month' | 'all';
+
+const SETTLEMENT_PAGE_SIZE = 20;
 
 function getPeriodDates(period: Period): { startDate?: string; endDate?: string } {
     const now = new Date();
@@ -67,6 +69,10 @@ export default function EarningsScreen() {
     const [rejectReason, setRejectReason] = useState('');
     const [respondingId, setRespondingId] = useState<string | null>(null);
     const [selectedSettlementOrder, setSelectedSettlementOrder] = useState<any>(null);
+    const [allSettlements, setAllSettlements] = useState<any[]>([]);
+    const [settlementOffset, setSettlementOffset] = useState(0);
+    const [hasMoreSettlements, setHasMoreSettlements] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
 
     const PERIODS: { key: Period; label: string }[] = [
         { key: 'today', label: t.earnings.period_today },
@@ -89,9 +95,18 @@ export default function EarningsScreen() {
         { variables: { isSettled: false, startDate, endDate }, fetchPolicy: 'network-only' },
     );
 
-    const { data: settlementsData, loading: settlementsLoading, refetch: refetchSettlements } = useQuery(
+    const { data: settlementsData, loading: settlementsLoading, refetch: refetchSettlements, fetchMore: fetchMoreSettlements } = useQuery(
         GET_MY_SETTLEMENTS,
-        { variables: { startDate, endDate, limit: 50 }, fetchPolicy: 'network-only' },
+        {
+            variables: { startDate, endDate, limit: SETTLEMENT_PAGE_SIZE, offset: 0 },
+            fetchPolicy: 'network-only',
+            onCompleted: (data) => {
+                const rows = (data as any)?.settlements ?? [];
+                setAllSettlements(rows);
+                setSettlementOffset(rows.length);
+                setHasMoreSettlements(rows.length === SETTLEMENT_PAGE_SIZE);
+            },
+        },
     );
 
     const { data: requestsData, loading: requestsLoading, refetch: refetchRequests } = useQuery(
@@ -108,7 +123,7 @@ export default function EarningsScreen() {
 
     const cash = (cashData as any)?.driverCashSummary;
     const breakdownItems: any[] = (breakdownData as any)?.settlementBreakdown ?? [];
-    const settlements: any[] = (settlementsData as any)?.settlements ?? [];
+    const settlements: any[] = allSettlements;
     const pendingRequests: any[] = (requestsData as any)?.settlementRequests ?? [];
 
     // Group settlements by direction for the list
@@ -149,6 +164,22 @@ export default function EarningsScreen() {
             (a, b) => new Date(b.latestCreatedAt).getTime() - new Date(a.latestCreatedAt).getTime(),
         );
     }, [settlements]);
+
+    const handleLoadMoreSettlements = useCallback(async () => {
+        if (!hasMoreSettlements || settlementsLoading || loadingMore) return;
+        setLoadingMore(true);
+        try {
+            const result = await fetchMoreSettlements({
+                variables: { startDate, endDate, limit: SETTLEMENT_PAGE_SIZE, offset: settlementOffset },
+            });
+            const rows = (result.data as any)?.settlements ?? [];
+            setAllSettlements(prev => [...prev, ...rows]);
+            setSettlementOffset(prev => prev + rows.length);
+            setHasMoreSettlements(rows.length === SETTLEMENT_PAGE_SIZE);
+        } finally {
+            setLoadingMore(false);
+        }
+    }, [hasMoreSettlements, settlementsLoading, loadingMore, fetchMoreSettlements, settlementOffset, startDate, endDate]);
 
     const onRefresh = async () => {
         setRefreshing(true);
@@ -699,6 +730,27 @@ export default function EarningsScreen() {
                                     </Pressable>
                                 );
                             })}
+
+                            {/* Load More */}
+                            {hasMoreSettlements && (
+                                <Pressable
+                                    onPress={handleLoadMoreSettlements}
+                                    disabled={loadingMore}
+                                    style={[es.loadMoreBtn, {
+                                        backgroundColor: theme.colors.card,
+                                        borderColor: theme.colors.border,
+                                        opacity: loadingMore ? 0.7 : 1,
+                                    }]}
+                                >
+                                    {loadingMore ? (
+                                        <ActivityIndicator size="small" color={theme.colors.primary} />
+                                    ) : (
+                                        <Text style={[es.loadMoreText, { color: theme.colors.primary }]}>
+                                            {(t.earnings as any).load_more ?? "Load More"}
+                                        </Text>
+                                    )}
+                                </Pressable>
+                            )}
                         </View>
                     )}
                 </View>
@@ -1340,4 +1392,11 @@ const es = StyleSheet.create({
         paddingHorizontal: 5, paddingVertical: 1, alignSelf: "flex-start",
     },
     stockText: { fontSize: 10, fontWeight: "600", color: "#a855f7" },
+
+    /* load more */
+    loadMoreBtn: {
+        borderRadius: 14, paddingVertical: 14, alignItems: "center",
+        borderWidth: 1, marginTop: 4,
+    },
+    loadMoreText: { fontSize: 14, fontWeight: "700" },
 });

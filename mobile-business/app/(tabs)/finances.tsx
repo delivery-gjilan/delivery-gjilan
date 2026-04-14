@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
     View,
     Text,
@@ -31,6 +31,7 @@ import { GET_BUSINESS_ORDERS, GET_BUSINESS_ORDER_REVIEWS } from '@/graphql/order
 import { GET_BUSINESS_PRODUCTS } from '@/graphql/products';
 import { useAuthStore } from '@/store/authStore';
 import { useTranslation } from '@/hooks/useTranslation';
+import type { GetMyBusinessSettlementsQuery } from '@/gql/graphql';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -115,25 +116,29 @@ function formatDateTime(dateStr?: string | null) {
     }
 }
 
-function calculateOrderItemSubtotal(item: any): number {
+type SettlementOrderItem = GetMyBusinessSettlementsQuery['settlements'][number]['order'] extends infer O
+    ? NonNullable<O> extends { businesses: Array<{ items: Array<infer I> }> } ? I : never
+    : never;
+
+function calculateOrderItemSubtotal(item: SettlementOrderItem): number {
     const quantity = Number(item?.quantity ?? 0);
     const unitPrice = Number(item?.unitPrice ?? 0);
 
     const selectedOptionsTotal = (item?.selectedOptions ?? []).reduce(
-        (sum: number, opt: any) => sum + Number(opt?.priceAtOrder ?? 0),
+        (sum, opt) => sum + Number(opt?.priceAtOrder ?? 0),
         0,
     );
 
     const childItemsTotal = (item?.childItems ?? []).reduce(
-        (sum: number, child: any) => sum + calculateOrderItemSubtotal(child),
+        (sum, child) => sum + calculateOrderItemSubtotal(child as SettlementOrderItem),
         0,
     );
 
     return unitPrice * quantity + selectedOptionsTotal * quantity + childItemsTotal;
 }
 
-function calculateBusinessSubtotal(items: any[]): number {
-    return (items ?? []).reduce((sum: number, item: any) => sum + calculateOrderItemSubtotal(item), 0);
+function calculateBusinessSubtotal(items: SettlementOrderItem[]): number {
+    return (items ?? []).reduce((sum, item) => sum + calculateOrderItemSubtotal(item), 0);
 }
 
 
@@ -151,11 +156,14 @@ export default function FinancesScreen() {
     const [customStartInput, setCustomStartInput] = useState('');
     const [customEndInput, setCustomEndInput] = useState('');
     const [refreshing, setRefreshing] = useState(false);
-    const [currentPage, setCurrentPage] = useState(1);
+    const [allSettlements, setAllSettlements] = useState<GetMyBusinessSettlementsQuery['settlements']>([]);
+    const [settlementOffset, setSettlementOffset] = useState(0);
+    const [hasMoreSettlements, setHasMoreSettlements] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [disputeModalRequestId, setDisputeModalRequestId] = useState<string | null>(null);
     const [rejectReason, setRejectReason] = useState('');
     const [respondingId, setRespondingId] = useState<string | null>(null);
-    const [selectedSettlementOrder, setSelectedSettlementOrder] = useState<any | null>(null);
+    const [selectedSettlementOrder, setSelectedSettlementOrder] = useState<GetMyBusinessSettlementsQuery['settlements'][number] | null>(null);
 
     const businessId = user?.businessId ?? '';
 
@@ -179,8 +187,8 @@ export default function FinancesScreen() {
 
     const statsOrders = useMemo(() => {
         if (!businessId) return [];
-        return ((ordersData?.orders?.orders as any[]) ?? []).filter((o: any) =>
-            (o.businesses ?? []).some((b: any) => b.business?.id === businessId),
+        return (ordersData?.orders?.orders ?? []).filter((o) =>
+            (o.businesses ?? []).some((b) => b.business?.id === businessId),
         );
     }, [ordersData, businessId]);
 
@@ -191,17 +199,17 @@ export default function FinancesScreen() {
         else if (statsFilter === 'week') startDate = startOfWeek(now, { weekStartsOn: 1 });
         else if (statsFilter === 'month') startDate = startOfMonth(now);
         else return statsOrders;
-        return statsOrders.filter((o: any) => new Date(o.orderDate) >= startDate);
+        return statsOrders.filter((o) => new Date(o.orderDate) >= startDate);
     }, [statsOrders, statsFilter]);
 
-    const statsDelivered = useMemo(() => statsFilteredOrders.filter((o: any) => o.status === 'DELIVERED'), [statsFilteredOrders]);
+    const statsDelivered = useMemo(() => statsFilteredOrders.filter((o) => o.status === 'DELIVERED'), [statsFilteredOrders]);
 
     const statsKPIs = useMemo(() => {
-        const revenue = statsDelivered.reduce((sum: number, o: any) => {
-            const chunk = (o.businesses ?? []).find((b: any) => b.business?.id === businessId);
-            return sum + (chunk?.items ?? []).reduce((s: number, i: any) => s + Number(i.unitPrice ?? 0) * Number(i.quantity ?? 0), 0);
+        const revenue = statsDelivered.reduce((sum, o) => {
+            const chunk = (o.businesses ?? []).find((b) => b.business?.id === businessId);
+            return sum + (chunk?.items ?? []).reduce((s, i) => s + Number(i.unitPrice ?? 0) * Number(i.quantity ?? 0), 0);
         }, 0);
-        const cancelled = statsFilteredOrders.filter((o: any) => o.status === 'CANCELLED').length;
+        const cancelled = statsFilteredOrders.filter((o) => o.status === 'CANCELLED').length;
         const total = statsFilteredOrders.length;
         return {
             total,
@@ -215,11 +223,11 @@ export default function FinancesScreen() {
     // Top products by quantity sold
     const topProducts = useMemo(() => {
         const agg = new Map<string, { productId: string; name: string; quantity: number; revenue: number; imageUrl?: string | null }>();
-        statsDelivered.forEach((order: any) => {
+        statsDelivered.forEach((order) => {
             (order.businesses ?? [])
-                .filter((b: any) => b.business?.id === businessId)
-                .forEach((chunk: any) => {
-                    (chunk.items ?? []).forEach((item: any) => {
+                .filter((b) => b.business?.id === businessId)
+                .forEach((chunk) => {
+                    (chunk.items ?? []).forEach((item) => {
                         const key = item.productId || item.name;
                         const cur = agg.get(key) ?? { productId: key, name: item.name ?? 'Unknown', quantity: 0, revenue: 0, imageUrl: item.imageUrl ?? null };
                         cur.quantity += Number(item.quantity ?? 0);
@@ -239,24 +247,24 @@ export default function FinancesScreen() {
             return { date: d, label: format(d, 'EEE'), dayStart: startOfDay(d), revenue: 0 };
         });
         statsOrders
-            .filter((o: any) => o.status === 'DELIVERED')
-            .forEach((order: any) => {
+            .filter((o) => o.status === 'DELIVERED')
+            .forEach((order) => {
                 const orderDate = new Date(order.orderDate);
                 const day = days.find((d) => {
                     const next = subDays(d.dayStart, -1);
                     return orderDate >= d.dayStart && orderDate < next;
                 });
                 if (day) {
-                    const chunk = (order.businesses ?? []).find((b: any) => b.business?.id === businessId);
-                    day.revenue += (chunk?.items ?? []).reduce((s: number, i: any) => s + Number(i.unitPrice ?? 0) * Number(i.quantity ?? 0), 0);
+                    const chunk = (order.businesses ?? []).find((b) => b.business?.id === businessId);
+                    day.revenue += (chunk?.items ?? []).reduce((s, i) => s + Number(i.unitPrice ?? 0) * Number(i.quantity ?? 0), 0);
                 }
             });
         const max = Math.max(...days.map((d) => d.revenue), 1);
         return days.map((d) => ({ ...d, height: Math.max(4, (d.revenue / max) * 80) }));
     }, [statsOrders, businessId]);
 
-    const reviewsList = useMemo(() => (reviewsData?.businessOrderReviews as any[]) ?? [], [reviewsData]);
-    const avgRating = reviewsList.length > 0 ? reviewsList.reduce((s: number, r: any) => s + Number(r.rating ?? 0), 0) / reviewsList.length : 0;
+    const reviewsList = useMemo(() => reviewsData?.businessOrderReviews ?? [], [reviewsData]);
+    const avgRating = reviewsList.length > 0 ? reviewsList.reduce((s, r) => s + Number(r.rating ?? 0), 0) / reviewsList.length : 0;
 
     // Fetch last paid settlement to support "From Last Settlement" period
     const { data: lastPaidData, refetch: refetchLastPaid } = useQuery(
@@ -280,9 +288,9 @@ export default function FinancesScreen() {
 
     const [respondToRequest] = useMutation(RESPOND_TO_SETTLEMENT_REQUEST);
 
-    const pendingRequests: any[] = (requestsData as any)?.settlementRequests ?? [];
+    const pendingRequests = requestsData?.settlementRequests ?? [];
 
-    const lastPaidRaw = (lastPaidData as any)?.settlements?.[0];
+    const lastPaidRaw = lastPaidData?.settlements?.[0];
     const lastPaidDate: string | null =
         lastPaidRaw?.paidAt ?? lastPaidRaw?.createdAt ?? null;
 
@@ -311,15 +319,23 @@ export default function FinancesScreen() {
         data: settlementsData,
         loading: settlementsLoading,
         refetch: refetchSettlements,
+        fetchMore: fetchMoreSettlements,
     } = useQuery(GET_MY_BUSINESS_SETTLEMENTS, {
         variables: {
             businessId,
             startDate,
             endDate,
-            limit: 500,
+            limit: PAGE_SIZE,
+            offset: 0,
         },
         skip: !businessId,
         fetchPolicy: 'network-only',
+        onCompleted: (data) => {
+            const rows = data?.settlements ?? [];
+            setAllSettlements(rows);
+            setSettlementOffset(rows.length);
+            setHasMoreSettlements(rows.length === PAGE_SIZE);
+        },
     });
 
     const {
@@ -332,9 +348,9 @@ export default function FinancesScreen() {
         fetchPolicy: 'network-only',
     });
 
-    const summary = (summaryData as any)?.settlementSummary;
-    const settlements: any[] = (settlementsData as any)?.settlements ?? [];
-    const breakdownItems: any[] = (breakdownData as any)?.settlementBreakdown ?? [];
+    const summary = summaryData?.settlementSummary;
+    const settlements = allSettlements;
+    const breakdownItems = breakdownData?.settlementBreakdown ?? [];
 
     // Compute revenue generated & commission owed from settlement rows
     const computed = useMemo(() => {
@@ -342,9 +358,9 @@ export default function FinancesScreen() {
         let pendingOwed = 0;
         let hasPartiallyPaid = false;
 
-        settlements.forEach((s: any) => {
+        settlements.forEach((s) => {
             const businessOrder = (s.order?.businesses ?? []).find(
-                (entry: any) => entry?.business?.id === businessId,
+                (entry) => entry?.business?.id === businessId,
             );
             const items = businessOrder?.items ?? [];
             const gross = calculateBusinessSubtotal(items);
@@ -368,12 +384,23 @@ export default function FinancesScreen() {
 
     // Group settlements by order
     const settlementOrders = useMemo(() => {
-        const grouped: Record<string, any> = {};
-        filteredSettlements.forEach((s: any) => {
+        type Settlement = GetMyBusinessSettlementsQuery['settlements'][number];
+        interface OrderGroup {
+            orderId: string;
+            orderDisplayId: string;
+            order: Settlement['order'];
+            settlements: Settlement[];
+            totalGross: number;
+            totalReceivable: number;
+            totalPayable: number;
+            latestCreatedAt: string;
+        }
+        const grouped: Record<string, OrderGroup> = {};
+        filteredSettlements.forEach((s) => {
             const orderId = String(s.order?.id ?? s.id);
             if (!grouped[orderId]) {
                 const businessOrder = (s.order?.businesses ?? []).find(
-                    (entry: any) => entry?.business?.id === businessId,
+                    (entry) => entry?.business?.id === businessId,
                 );
                 const items = businessOrder?.items ?? [];
                 grouped[orderId] = {
@@ -404,16 +431,24 @@ export default function FinancesScreen() {
         );
     }, [filteredSettlements, businessId]);
 
-    const totalPages = Math.max(1, Math.ceil(settlementOrders.length / PAGE_SIZE));
-
-    const paginatedOrders = useMemo(() => {
-        const start = (currentPage - 1) * PAGE_SIZE;
-        return settlementOrders.slice(start, start + PAGE_SIZE);
-    }, [settlementOrders, currentPage]);
+    const handleLoadMoreSettlements = useCallback(async () => {
+        if (!hasMoreSettlements || settlementsLoading || loadingMore) return;
+        setLoadingMore(true);
+        try {
+            const result = await fetchMoreSettlements({
+                variables: { businessId, startDate, endDate, limit: PAGE_SIZE, offset: settlementOffset },
+            });
+            const rows = result.data?.settlements ?? [];
+            setAllSettlements(prev => [...prev, ...rows]);
+            setSettlementOffset(prev => prev + rows.length);
+            setHasMoreSettlements(rows.length === PAGE_SIZE);
+        } finally {
+            setLoadingMore(false);
+        }
+    }, [hasMoreSettlements, settlementsLoading, loadingMore, fetchMoreSettlements, settlementOffset, businessId, startDate, endDate]);
 
     const onRefresh = async () => {
         setRefreshing(true);
-        setCurrentPage(1);
         if (financeTab === 'stats') {
             await Promise.all([refetchOrders(), refetchProducts(), refetchReviews()]);
         } else {
@@ -438,7 +473,6 @@ export default function FinancesScreen() {
             return;
         }
         setPeriod(p);
-        setCurrentPage(1);
     };
 
     const handleApplyCustomRange = () => {
@@ -455,12 +489,11 @@ export default function FinancesScreen() {
         setCustomStart(customStartInput);
         setCustomEnd(customEndInput);
         setPeriod('custom');
-        setCurrentPage(1);
         setCustomModalOpen(false);
     };
 
     const handleAccept = async (requestId: string) => {
-        const req = pendingRequests.find((r: any) => r.id === requestId);
+        const req = pendingRequests.find((r) => r.id === requestId);
         const requestedAmount = Number(req?.amount ?? 0);
         Alert.alert(
             t('finances.accept_request_title', 'Accept Settlement'),
@@ -480,8 +513,8 @@ export default function FinancesScreen() {
                             });
                             await refetchRequests();
                             await Promise.all([refetchSummary(), refetchSettlements()]);
-                        } catch (err: any) {
-                            Alert.alert('Error', err?.message ?? 'Failed to accept request');
+                        } catch (err: unknown) {
+                            Alert.alert('Error', err instanceof Error ? err.message : 'Failed to accept request');
                         } finally {
                             setRespondingId(null);
                         }
@@ -509,8 +542,8 @@ export default function FinancesScreen() {
             });
             setDisputeModalRequestId(null);
             await refetchRequests();
-        } catch (err: any) {
-            Alert.alert('Error', err?.message ?? 'Failed to reject request');
+        } catch (err: unknown) {
+            Alert.alert('Error', err instanceof Error ? err.message : 'Failed to reject request');
         } finally {
             setRespondingId(null);
         }
@@ -675,7 +708,7 @@ export default function FinancesScreen() {
 
                             {/* Reviews summary card */}
                             <TouchableOpacity
-                                onPress={() => router.push('/reviews' as any)}
+                                onPress={() => router.push('/reviews')}
                                 style={{ marginHorizontal: 16, marginTop: 14, backgroundColor: '#1a2233', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#263145', flexDirection: 'row', alignItems: 'center' }}
                             >
                                 <View style={{ flex: 1 }}>
@@ -859,7 +892,7 @@ export default function FinancesScreen() {
                             {t('finances.breakdown_title', 'Cost Breakdown')}
                         </Text>
                         <View style={{ gap: 8 }}>
-                            {breakdownItems.map((item: any, idx: number) => {
+                            {breakdownItems.map((item, idx) => {
                                 const isReceivable = item.direction === 'RECEIVABLE';
                                 const color = isReceivable ? '#ef4444' : '#22c55e';
                                 return (
@@ -975,7 +1008,7 @@ export default function FinancesScreen() {
                             <ActivityIndicator color="#f59e0b" />
                         ) : (
                             <View style={{ gap: 10 }}>
-                                {pendingRequests.map((req: any) => {
+                                {pendingRequests.map((req) => {
                                     const isResponding = respondingId === req.id;
 
                                     return (
@@ -1259,7 +1292,7 @@ export default function FinancesScreen() {
                                     </View>
 
                                     {/* Table rows — grouped by order */}
-                                    {paginatedOrders.map((orderGroup: any, idx: number) => {
+                                    {settlementOrders.map((orderGroup, idx) => {
                                         const netAmount = orderGroup.totalPayable - orderGroup.totalReceivable;
                                         const hasPayable = orderGroup.totalPayable > 0;
                                         const rowBg = hasPayable
@@ -1368,49 +1401,28 @@ export default function FinancesScreen() {
                         </View>
                     )}
 
-                    {/* ── Pagination ── */}
-                    {settlementOrders.length > PAGE_SIZE && (
-                        <View
+                    {/* ── Load More ── */}
+                    {hasMoreSettlements && settlementOrders.length > 0 && (
+                        <Pressable
+                            onPress={handleLoadMoreSettlements}
+                            disabled={loadingMore}
                             style={{
-                                flexDirection: 'row',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
                                 marginTop: 12,
-                                paddingHorizontal: 4,
+                                borderRadius: 14,
+                                paddingVertical: 14,
+                                alignItems: 'center',
+                                backgroundColor: loadingMore ? '#1a2233' : '#7C3AED',
+                                opacity: loadingMore ? 0.7 : 1,
                             }}
                         >
-                            <Pressable
-                                onPress={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                                disabled={currentPage === 1}
-                                style={{
-                                    paddingHorizontal: 16,
-                                    paddingVertical: 8,
-                                    borderRadius: 10,
-                                    backgroundColor: currentPage === 1 ? '#1a2233' : '#7C3AED',
-                                    opacity: currentPage === 1 ? 0.4 : 1,
-                                }}
-                            >
-                                <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>← {t('finances.prev', 'Prev')}</Text>
-                            </Pressable>
-
-                            <Text style={{ fontSize: 12, color: '#6b7280' }}>
-                                {t('finances.page', 'Page')} {currentPage} {t('finances.of', 'of')} {totalPages}
-                            </Text>
-
-                            <Pressable
-                                onPress={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                                disabled={currentPage === totalPages}
-                                style={{
-                                    paddingHorizontal: 16,
-                                    paddingVertical: 8,
-                                    borderRadius: 10,
-                                    backgroundColor: currentPage === totalPages ? '#1a2233' : '#7C3AED',
-                                    opacity: currentPage === totalPages ? 0.4 : 1,
-                                }}
-                            >
-                                <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>{t('finances.next', 'Next')} →</Text>
-                            </Pressable>
-                        </View>
+                            {loadingMore ? (
+                                <ActivityIndicator size="small" color="#7C3AED" />
+                            ) : (
+                                <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>
+                                    {t('finances.load_more', 'Load More')}
+                                </Text>
+                            )}
+                        </Pressable>
                     )}
                 </View>
             </ScrollView>
@@ -1553,21 +1565,21 @@ export default function FinancesScreen() {
                             const og = selectedSettlementOrder;
                             if (!og) return null;
 
-                            const settlementsForOrder: any[] = og.settlements ?? [];
+                            const settlementsForOrder = og.settlements ?? [];
                             const businessOrder = (og.order?.businesses ?? []).find(
-                                (e: any) => e?.business?.id === businessId,
+                                (e) => e?.business?.id === businessId,
                             );
-                            const items: any[] = businessOrder?.items ?? [];
+                            const items = businessOrder?.items ?? [];
                             const grossFromItems = og.totalGross;
                             const netAmount = og.totalPayable - og.totalReceivable;
 
-                            const promotions: any[] = og.order?.orderPromotions ?? [];
+                            const promotions = og.order?.orderPromotions ?? [];
                             const itemDiscounts = promotions
-                                .filter((p: any) => p.appliesTo === 'PRICE')
-                                .reduce((acc: number, p: any) => acc + Number(p.discountAmount ?? 0), 0);
+                                .filter((p) => p.appliesTo === 'PRICE')
+                                .reduce((acc, p) => acc + Number(p.discountAmount ?? 0), 0);
                             const deliveryDiscounts = promotions
-                                .filter((p: any) => p.appliesTo === 'DELIVERY')
-                                .reduce((acc: number, p: any) => acc + Number(p.discountAmount ?? 0), 0);
+                                .filter((p) => p.appliesTo === 'DELIVERY')
+                                .reduce((acc, p) => acc + Number(p.discountAmount ?? 0), 0);
                             const totalDiscounts = itemDiscounts + deliveryDiscounts;
 
                             return (

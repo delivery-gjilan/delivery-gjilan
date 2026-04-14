@@ -1213,7 +1213,7 @@ type Mutation {
   registerDeviceToken(input: RegisterDeviceTokenInput!): Boolean!
   registerLiveActivityToken(activityId: String!, orderId: ID!, token: String!): Boolean!
   removeInventoryItem(businessId: ID!, productId: ID!): Boolean!
-  removeOrderItem(orderId: ID!, orderItemId: ID!, reason: String!): Order!
+  removeOrderItem(orderId: ID!, orderItemId: ID!, quantity: Int, reason: String!): Order!
   removeUserFromPromotion(promotionId: ID!, userId: ID!): Boolean!
 
   """Business user replies to admin"""
@@ -2152,8 +2152,10 @@ type StoreStatus {
   bannerEnabled: Boolean!
   bannerMessage: String
   bannerType: BannerType!
+  businessGracePeriodMinutes: Int!
   closedMessage: String
   dispatchModeEnabled: Boolean!
+  earlyDispatchLeadMinutes: Int!
   googleMapsNavEnabled: Boolean!
   inventoryModeEnabled: Boolean!
   isStoreClosed: Boolean!
@@ -2352,8 +2354,10 @@ input UpdateStoreStatusInput {
   bannerEnabled: Boolean
   bannerMessage: String
   bannerType: BannerType
+  businessGracePeriodMinutes: Int
   closedMessage: String
   dispatchModeEnabled: Boolean
+  earlyDispatchLeadMinutes: Int
   googleMapsNavEnabled: Boolean
   inventoryModeEnabled: Boolean
   isStoreClosed: Boolean!

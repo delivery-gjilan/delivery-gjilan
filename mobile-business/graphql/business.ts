@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const GET_BUSINESS_SCHEDULE = gql`
+export const GET_BUSINESS_SCHEDULE = graphql(`
     query GetBusinessSchedule($businessId: ID!) {
         business(id: $businessId) {
             id
@@ -12,9 +12,9 @@ export const GET_BUSINESS_SCHEDULE = gql`
             }
         }
     }
-`;
+`);
 
-export const SET_BUSINESS_SCHEDULE = gql`
+export const SET_BUSINESS_SCHEDULE = graphql(`
     mutation SetBusinessSchedule($businessId: ID!, $schedule: [BusinessDayHoursInput!]!) {
         setBusinessSchedule(businessId: $businessId, schedule: $schedule) {
             id
@@ -23,9 +23,9 @@ export const SET_BUSINESS_SCHEDULE = gql`
             closesAt
         }
     }
-`;
+`);
 
-export const GET_BUSINESS_OPERATIONS = gql`
+export const GET_BUSINESS_OPERATIONS = graphql(`
     query GetBusinessOperations($id: ID!) {
         business(id: $id) {
             id
@@ -35,9 +35,9 @@ export const GET_BUSINESS_OPERATIONS = gql`
             isOpen
         }
     }
-`;
+`);
 
-export const UPDATE_BUSINESS_OPERATIONS = gql`
+export const UPDATE_BUSINESS_OPERATIONS = graphql(`
     mutation UpdateBusinessOperations($id: ID!, $input: UpdateBusinessInput!) {
         updateBusiness(id: $id, input: $input) {
             id
@@ -47,4 +47,4 @@ export const UPDATE_BUSINESS_OPERATIONS = gql`
             isOpen
         }
     }
-`;
+`);

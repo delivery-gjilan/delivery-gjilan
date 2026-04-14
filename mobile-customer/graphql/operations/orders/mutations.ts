@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const CREATE_ORDER = gql`
+export const CREATE_ORDER = graphql(`
     mutation CreateOrder($input: CreateOrderInput!) {
         createOrder(input: $input) {
             id
@@ -64,9 +64,8 @@ export const CREATE_ORDER = gql`
             }
         }
     }
-`;
-
-export const UPDATE_ORDER_STATUS = gql`
+`);
+export const UPDATE_ORDER_STATUS = graphql(`
     mutation UpdateOrderStatus($id: ID!, $status: OrderStatus!) {
         updateOrderStatus(id: $id, status: $status) {
             id
@@ -134,9 +133,8 @@ export const UPDATE_ORDER_STATUS = gql`
             }
         }
     }
-`;
-
-export const CANCEL_ORDER = gql`
+`);
+export const CANCEL_ORDER = graphql(`
     mutation CancelOrder($id: ID!) {
         cancelOrder(id: $id) {
             id
@@ -204,9 +202,8 @@ export const CANCEL_ORDER = gql`
             }
         }
     }
-`;
-
-export const SUBMIT_ORDER_REVIEW = gql`
+`);
+export const SUBMIT_ORDER_REVIEW = graphql(`
     mutation SubmitOrderReview($orderId: ID!, $rating: Int!, $comment: String, $quickFeedback: [String!]) {
         submitOrderReview(orderId: $orderId, rating: $rating, comment: $comment, quickFeedback: $quickFeedback) {
             id
@@ -220,4 +217,4 @@ export const SUBMIT_ORDER_REVIEW = gql`
             updatedAt
         }
     }
-`;
+`);

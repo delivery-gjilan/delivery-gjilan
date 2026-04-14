@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const GET_ME = gql`
+export const GET_ME = graphql(`
     query GetMeBusiness {
         me {
             id
@@ -19,9 +19,9 @@ export const GET_ME = gql`
             }
         }
     }
-`;
+`);
 
-export const LOGIN_MUTATION = gql`
+export const LOGIN_MUTATION = graphql(`
     mutation BusinessLogin($input: LoginInput!) {
         login(input: $input) {
             token
@@ -45,25 +45,25 @@ export const LOGIN_MUTATION = gql`
             message
         }
     }
-`;
+`);
 
-export const CHANGE_MY_PASSWORD = gql`
+export const CHANGE_MY_PASSWORD = graphql(`
     mutation ChangeMyPassword($currentPassword: String!, $newPassword: String!) {
         changeMyPassword(currentPassword: $currentPassword, newPassword: $newPassword)
     }
-`;
+`);
 
-export const SET_MY_PREFERRED_LANGUAGE = gql`
+export const SET_MY_PREFERRED_LANGUAGE = graphql(`
     mutation SetMyPreferredLanguage($language: AppLanguage!) {
         setMyPreferredLanguage(language: $language) {
             id
             preferredLanguage
         }
     }
-`;
+`);
 
-export const DELETE_MY_ACCOUNT = gql`
+export const DELETE_MY_ACCOUNT = graphql(`
     mutation DeleteMyAccount {
         deleteMyAccount
     }
-`;
+`);

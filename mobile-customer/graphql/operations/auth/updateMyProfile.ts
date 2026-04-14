@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const UPDATE_MY_PROFILE_MUTATION = gql`
+export const UPDATE_MY_PROFILE_MUTATION = graphql(`
     mutation UpdateMyProfile($input: UpdateMyProfileInput!) {
         updateMyProfile(input: $input) {
             id
@@ -9,4 +9,4 @@ export const UPDATE_MY_PROFILE_MUTATION = gql`
             phoneNumber
         }
     }
-`;
+`);

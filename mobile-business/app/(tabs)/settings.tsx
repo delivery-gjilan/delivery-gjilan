@@ -75,7 +75,7 @@ export default function SettingsScreen() {
     });
 
     useEffect(() => {
-        const slots: any[] = (scheduleData as any)?.business?.schedule ?? [];
+        const slots = scheduleData?.business?.schedule ?? [];
         setDayStates((prev) =>
             prev.map((d) => {
                 const match = slots.find((s) => Number(s.dayOfWeek) === d.dayOfWeek);
@@ -203,8 +203,8 @@ export default function SettingsScreen() {
             setNewPassword('');
             setConfirmPassword('');
             setPasswordModalOpen(false);
-        } catch (err: any) {
-            Alert.alert(t('common.error', 'Error'), err?.message ?? 'Failed to change password');
+        } catch (err: unknown) {
+            Alert.alert(t('common.error', 'Error'), err instanceof Error ? err.message : 'Failed to change password');
         } finally {
             setSavingPassword(false);
         }
@@ -242,8 +242,8 @@ export default function SettingsScreen() {
             await refetchSchedule();
             Alert.alert(t('common.success', 'Success'), 'Business hours updated.');
             setScheduleModalOpen(false);
-        } catch (err: any) {
-            Alert.alert(t('common.error', 'Error'), err?.message ?? 'Failed to update schedule');
+        } catch (err: unknown) {
+            Alert.alert(t('common.error', 'Error'), err instanceof Error ? err.message : 'Failed to update schedule');
         } finally {
             setSavingSchedule(false);
         }
@@ -342,7 +342,7 @@ export default function SettingsScreen() {
                         icon="document-text"
                         label={t('finances.settlement_request_history', 'Settlement Request History')}
                         value={t('settings.settlement_history_hint', 'Business ↔ platform settlement records')}
-                        onPress={() => router.push('/(tabs)/settlement-history' as any)}
+                        onPress={() => router.push('/(tabs)/settlement-history')}
                     />
                 </SettingSection>
 
@@ -351,13 +351,13 @@ export default function SettingsScreen() {
                         icon="star"
                         label={t('reviews.title', 'Customer Reviews')}
                         value={t('settings.reviews_hint', 'See what customers say about you')}
-                        onPress={() => router.push('/reviews' as any)}
+                        onPress={() => router.push('/reviews')}
                     />
                     <SettingRow
                         icon="chatbubbles"
                         label={t('tabs.messages', 'Messages')}
                         value={t('settings.messages_hint', 'Chat with customers')}
-                        onPress={() => router.push('/(tabs)/messages' as any)}
+                        onPress={() => router.push('/(tabs)/messages')}
                     />
                 </SettingSection>
 

@@ -6,6 +6,7 @@ import { NotificationService } from '@/services/NotificationService';
 import { NotificationRepository } from '@/repositories/NotificationRepository';
 import { OrderDispatchService } from '@/services/OrderDispatchService';
 import { startEarlyDispatchWorker } from '@/queues/earlyDispatchQueue';
+import { startBusinessNotifyWorker } from '@/queues/businessNotifyQueue';
 import { getDB } from '@/database';
 import logger from '@/lib/logger';
 
@@ -72,6 +73,12 @@ export async function initializeDriverServices() {
         // Mark as fired in Redis so the READY path skips a duplicate dispatch.
         const { cache } = await import('@/lib/cache');
         await cache.set(`dispatch:early:${orderId}`, 'fired', 3600);
+    });
+
+    // Start the BullMQ worker that sends delayed business "new order" notifications.
+    const { notifyBusinessNewOrder: notifyBiz } = await import('@/services/orderNotifications');
+    startBusinessNotifyWorker(async (orderId, businessUserIds) => {
+        notifyBiz(notificationService, businessUserIds, orderId);
     });
 
     log.info('driverServices:ready');

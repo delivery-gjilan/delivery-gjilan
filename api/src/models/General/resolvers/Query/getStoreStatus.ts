@@ -13,6 +13,8 @@ const DEFAULT_STORE_STATUS = {
   dispatchModeEnabled: false,
   googleMapsNavEnabled: false,
   inventoryModeEnabled: false,
+  earlyDispatchLeadMinutes: 5,
+  businessGracePeriodMinutes: 0,
 };
 
 export const getStoreStatus: NonNullable<QueryResolvers['getStoreStatus']> = async (
@@ -42,6 +44,8 @@ export const getStoreStatus: NonNullable<QueryResolvers['getStoreStatus']> = asy
       dispatchModeEnabled: settings[0].dispatchModeEnabled,
       googleMapsNavEnabled: settings[0].googleMapsNavEnabled,
       inventoryModeEnabled: settings[0].inventoryModeEnabled,
+      earlyDispatchLeadMinutes: settings[0].earlyDispatchLeadMinutes,
+      businessGracePeriodMinutes: settings[0].businessGracePeriodMinutes,
     };
   });
 

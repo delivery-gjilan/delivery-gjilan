@@ -51,6 +51,12 @@ export const updateStoreStatus: NonNullable<MutationResolvers['updateStoreStatus
   if (input.inventoryModeEnabled !== undefined && input.inventoryModeEnabled !== null) {
     updateData.inventoryModeEnabled = input.inventoryModeEnabled;
   }
+  if (input.earlyDispatchLeadMinutes !== undefined && input.earlyDispatchLeadMinutes !== null) {
+    updateData.earlyDispatchLeadMinutes = input.earlyDispatchLeadMinutes;
+  }
+  if (input.businessGracePeriodMinutes !== undefined && input.businessGracePeriodMinutes !== null) {
+    updateData.businessGracePeriodMinutes = input.businessGracePeriodMinutes;
+  }
 
   if (existing.length === 0) {
     // Insert new settings row
@@ -83,6 +89,8 @@ export const updateStoreStatus: NonNullable<MutationResolvers['updateStoreStatus
     dispatchModeEnabled: row.dispatchModeEnabled,
     googleMapsNavEnabled: row.googleMapsNavEnabled,
     inventoryModeEnabled: row.inventoryModeEnabled,
+    earlyDispatchLeadMinutes: row.earlyDispatchLeadMinutes,
+    businessGracePeriodMinutes: row.businessGracePeriodMinutes,
   };
 
   // Broadcast to all subscribed clients
@@ -95,6 +103,8 @@ export const updateStoreStatus: NonNullable<MutationResolvers['updateStoreStatus
     dispatchModeEnabled: result.dispatchModeEnabled,
     googleMapsNavEnabled: result.googleMapsNavEnabled,
     inventoryModeEnabled: result.inventoryModeEnabled,
+    earlyDispatchLeadMinutes: result.earlyDispatchLeadMinutes,
+    businessGracePeriodMinutes: result.businessGracePeriodMinutes,
   } as any);
 
   await cache.invalidateStoreStatus();

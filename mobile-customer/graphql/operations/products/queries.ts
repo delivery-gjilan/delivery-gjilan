@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const GET_PRODUCTS = gql`
+export const GET_PRODUCTS = graphql(`
     query GetProducts($businessId: ID!) {
         products(businessId: $businessId) {
             id
@@ -44,9 +44,8 @@ export const GET_PRODUCTS = gql`
             }
         }
     }
-`;
-
-export const GET_PRODUCT = gql`
+`);
+export const GET_PRODUCT = graphql(`
     query GetProduct($id: ID!) {
         product(id: $id) {
             id
@@ -122,18 +121,16 @@ export const GET_PRODUCT = gql`
             updatedAt
         }
     }
-`;
-
-export const GET_PRODUCT_CATEGORIES = gql`
+`);
+export const GET_PRODUCT_CATEGORIES = graphql(`
     query ProductCategories($businessId: ID!) {
         productCategories(businessId: $businessId) {
             id
             name
         }
     }
-`;
-
-export const GET_PRODUCT_SUBCATEGORIES_BY_BUSINESS = gql`
+`);
+export const GET_PRODUCT_SUBCATEGORIES_BY_BUSINESS = graphql(`
     query ProductSubcategoriesByBusiness($businessId: ID!) {
         productSubcategoriesByBusiness(businessId: $businessId) {
             id
@@ -141,4 +138,4 @@ export const GET_PRODUCT_SUBCATEGORIES_BY_BUSINESS = gql`
             name
         }
     }
-`;
+`);

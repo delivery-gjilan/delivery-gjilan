@@ -150,8 +150,8 @@ export default function ProductsScreen() {
         try {
             await updateProduct({ variables: { id: product.id, input: { isAvailable: !product.isAvailable } } });
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        } catch (error: any) {
-            Alert.alert(t('common.error', 'Error'), error.message);
+        } catch (error: unknown) {
+            Alert.alert(t('common.error', 'Error'), error instanceof Error ? error.message : 'Failed');
         }
     };
 
@@ -165,8 +165,8 @@ export default function ProductsScreen() {
                     try {
                         await deleteProduct({ variables: { id: productId } });
                         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                    } catch (error: any) {
-                        Alert.alert(t('common.error', 'Error'), error.message);
+                    } catch (error: unknown) {
+                        Alert.alert(t('common.error', 'Error'), error instanceof Error ? error.message : 'Failed');
                     }
                 },
             },
@@ -239,8 +239,8 @@ export default function ProductsScreen() {
             setShowFormModal(false);
             setEditingProduct(null);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        } catch (error: any) {
-            Alert.alert(t('common.error', 'Error'), error?.message ?? 'Failed to save product');
+        } catch (error: unknown) {
+            Alert.alert(t('common.error', 'Error'), error instanceof Error ? error.message : 'Failed to save product');
         } finally {
             setSubmitting(false);
         }

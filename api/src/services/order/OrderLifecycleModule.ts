@@ -35,6 +35,8 @@ import { deductOrderStockCore } from '@/models/Inventory/lib/deductOrderStockCor
 import type { OrderPublishingModule } from './OrderPublishingModule';
 import type { OrderQueryModule } from './OrderQueryModule';
 import type { OrderUserBehaviorModule } from './OrderUserBehaviorModule';
+import { scheduleBusinessNotification } from '@/services/scheduleBusinessNotification';
+import { cancelPendingBusinessNotification } from '@/queues/businessNotifyQueue';
 
 const log = logger.child({ module: 'OrderLifecycleModule' });
 
@@ -269,6 +271,13 @@ export class OrderLifecycleModule {
         await this.publishing.publishAllOrders();
         notifyCustomerOrderStatus(notificationService, dbOrder.userId, id, status);
 
+        // If the order is being cancelled, remove any pending delayed business notification.
+        if (status === 'CANCELLED') {
+            cancelPendingBusinessNotification(id).catch((err) =>
+                log.warn({ err, orderId: id }, 'updateStatus:cancelBusinessNotify:error'),
+            );
+        }
+
         // If the order is being reverted away from READY (e.g. admin pushes it back to
         // PENDING or PREPARING), clear the dispatch cache key so that when it becomes
         // READY again a fresh dispatch fires and drivers are re-notified.
@@ -369,7 +378,7 @@ export class OrderLifecycleModule {
                         ),
                     );
 
-                notifyBusinessNewOrder(
+                await scheduleBusinessNotification(
                     context.notificationService,
                     businessUserRows.map((row) => row.id),
                     String(order.id),
@@ -698,6 +707,11 @@ export class OrderLifecycleModule {
 
         const order = await this.updateOrderStatus(id, 'CANCELLED');
 
+        // Cancel any pending delayed business notification.
+        cancelPendingBusinessNotification(id).catch((err) =>
+            log.warn({ err, orderId: id }, 'cancelOrder:cancelBusinessNotify:error'),
+        );
+
         const promotionEngine = new PromotionEngine(db);
         await promotionEngine.reverseUsage(id, dbOrder.userId);
 
@@ -736,6 +750,11 @@ export class OrderLifecycleModule {
         if (!updated) {
             throw AppError.notFound('Order');
         }
+
+        // Cancel any pending delayed business notification.
+        cancelPendingBusinessNotification(id).catch((err) =>
+            log.warn({ err, orderId: id }, 'adminCancelOrder:cancelBusinessNotify:error'),
+        );
 
         const promotionEngine = new PromotionEngine(db);
         await promotionEngine.reverseUsage(id, dbOrder.userId);
@@ -803,7 +822,7 @@ export class OrderLifecycleModule {
         }
     }
 
-    async removeOrderItem(orderId: string, orderItemId: string, reason: string): Promise<Order> {
+    async removeOrderItem(orderId: string, orderItemId: string, reason: string, quantity?: number): Promise<Order> {
         const db = this.deps.db;
 
         const dbOrder = await this.deps.orderRepository.findById(orderId);
@@ -830,24 +849,48 @@ export class OrderLifecycleModule {
             throw AppError.notFound('Order item not found');
         }
 
-        // Calculate price deltas
-        const itemTotal = Number(item.finalAppliedPrice) * item.quantity;
-        const inventoryTotal = Number(item.finalAppliedPrice) * (item.inventoryQuantity ?? 0);
-        const marketTotal = itemTotal - inventoryTotal;
+        // Determine how many to remove (default = all)
+        const removeQty = quantity != null ? Math.min(quantity, item.quantity) : item.quantity;
+        if (removeQty <= 0) {
+            throw AppError.businessRule('Quantity to remove must be at least 1');
+        }
 
-        // In a transaction: delete item (cascade removes children + options) and update order prices
+        const isFullRemoval = removeQty >= item.quantity;
+        const unitPrice = Number(item.finalAppliedPrice);
+
+        // Calculate price deltas for removed quantity
+        const priceReduction = unitPrice * removeQty;
+        // Proportionally split inventory vs market based on removed quantity
+        const inventoryQtyReduction = isFullRemoval
+            ? (item.inventoryQuantity ?? 0)
+            : Math.min(removeQty, item.inventoryQuantity ?? 0);
+        const inventoryPriceReduction = unitPrice * inventoryQtyReduction;
+        const marketPriceReduction = priceReduction - inventoryPriceReduction;
+
         const [updatedOrder] = await db.transaction(async (tx) => {
-            await tx
-                .delete(orderItemsTable)
-                .where(eq(orderItemsTable.id, orderItemId));
+            if (isFullRemoval) {
+                // Full removal: delete item (cascade removes children + options)
+                await tx
+                    .delete(orderItemsTable)
+                    .where(eq(orderItemsTable.id, orderItemId));
+            } else {
+                // Partial removal: reduce quantity
+                await tx
+                    .update(orderItemsTable)
+                    .set({
+                        quantity: item.quantity - removeQty,
+                        inventoryQuantity: (item.inventoryQuantity ?? 0) - inventoryQtyReduction,
+                    })
+                    .where(eq(orderItemsTable.id, orderItemId));
+            }
 
             return tx
                 .update(ordersTable)
                 .set({
-                    basePrice: sql`${ordersTable.basePrice} - ${itemTotal}`,
-                    actualPrice: sql`${ordersTable.actualPrice} - ${itemTotal}`,
-                    businessPrice: sql`${ordersTable.businessPrice} - ${marketTotal}`,
-                    inventoryPrice: sql`${ordersTable.inventoryPrice} - ${inventoryTotal}`,
+                    basePrice: sql`${ordersTable.basePrice} - ${priceReduction}`,
+                    actualPrice: sql`${ordersTable.actualPrice} - ${priceReduction}`,
+                    businessPrice: sql`${ordersTable.businessPrice} - ${marketPriceReduction}`,
+                    inventoryPrice: sql`${ordersTable.inventoryPrice} - ${inventoryPriceReduction}`,
                 })
                 .where(eq(ordersTable.id, orderId))
                 .returning();
@@ -857,7 +900,7 @@ export class OrderLifecycleModule {
             throw AppError.notFound('Order');
         }
 
-        log.info({ orderId, orderItemId, reason, itemTotal }, 'order:removeOrderItem — item removed');
+        log.info({ orderId, orderItemId, reason, removeQty, isFullRemoval, priceReduction }, 'order:removeOrderItem — item removed');
 
         return this.mapping.mapToOrder(updatedOrder);
     }

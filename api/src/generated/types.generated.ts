@@ -1661,6 +1661,7 @@ export type MutationremoveInventoryItemArgs = {
 export type MutationremoveOrderItemArgs = {
   orderId: Scalars['ID']['input'];
   orderItemId: Scalars['ID']['input'];
+  quantity?: InputMaybe<Scalars['Int']['input']>;
   reason: Scalars['String']['input'];
 };
 
@@ -3289,8 +3290,10 @@ export type StoreStatus = {
   bannerEnabled: Scalars['Boolean']['output'];
   bannerMessage?: Maybe<Scalars['String']['output']>;
   bannerType: BannerType;
+  businessGracePeriodMinutes: Scalars['Int']['output'];
   closedMessage?: Maybe<Scalars['String']['output']>;
   dispatchModeEnabled: Scalars['Boolean']['output'];
+  earlyDispatchLeadMinutes: Scalars['Int']['output'];
   googleMapsNavEnabled: Scalars['Boolean']['output'];
   inventoryModeEnabled: Scalars['Boolean']['output'];
   isStoreClosed: Scalars['Boolean']['output'];
@@ -3540,8 +3543,10 @@ export type UpdateStoreStatusInput = {
   bannerEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   bannerMessage?: InputMaybe<Scalars['String']['input']>;
   bannerType?: InputMaybe<BannerType>;
+  businessGracePeriodMinutes?: InputMaybe<Scalars['Int']['input']>;
   closedMessage?: InputMaybe<Scalars['String']['input']>;
   dispatchModeEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  earlyDispatchLeadMinutes?: InputMaybe<Scalars['Int']['input']>;
   googleMapsNavEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   inventoryModeEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   isStoreClosed: Scalars['Boolean']['input'];
@@ -5599,8 +5604,10 @@ export type StoreStatusResolvers<ContextType = GraphQLContext, ParentType extend
   bannerEnabled?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   bannerMessage?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   bannerType?: Resolver<ResolversTypes['BannerType'], ParentType, ContextType>;
+  businessGracePeriodMinutes?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   closedMessage?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   dispatchModeEnabled?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  earlyDispatchLeadMinutes?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   googleMapsNavEnabled?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   inventoryModeEnabled?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   isStoreClosed?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;

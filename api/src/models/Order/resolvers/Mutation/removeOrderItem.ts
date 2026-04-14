@@ -6,7 +6,7 @@ import logger from '@/lib/logger';
 
 export const removeOrderItem: NonNullable<MutationResolvers['removeOrderItem']> = async (
     _parent,
-    { orderId, orderItemId, reason },
+    { orderId, orderItemId, reason, quantity },
     context,
 ) => {
     const { orderService, userData, db } = context;
@@ -51,7 +51,7 @@ export const removeOrderItem: NonNullable<MutationResolvers['removeOrderItem']> 
         'order:removeOrderItem',
     );
 
-    const order = await orderService.removeOrderItem(orderId, orderItemId, trimmedReason);
+    const order = await orderService.removeOrderItem(orderId, orderItemId, trimmedReason, quantity ?? undefined);
 
     await orderService.publishSingleUserOrder(dbOrder.userId, orderId);
     await orderService.publishAllOrders();
@@ -66,7 +66,7 @@ export const removeOrderItem: NonNullable<MutationResolvers['removeOrderItem']> 
         }
         return 'Item';
     })();
-    notifyCustomerItemRemoved(context.notificationService, dbOrder.userId, orderId, itemName, trimmedReason);
+    notifyCustomerItemRemoved(context.notificationService, dbOrder.userId, orderId, itemName, trimmedReason, quantity ?? undefined);
 
     const auditLogger = createAuditLogger(db, context);
     await auditLogger.log({
@@ -77,6 +77,7 @@ export const removeOrderItem: NonNullable<MutationResolvers['removeOrderItem']> 
             orderId,
             orderItemId,
             reason: trimmedReason,
+            quantity: quantity ?? 'all',
             removedByUserId: userData.userId,
         },
     });

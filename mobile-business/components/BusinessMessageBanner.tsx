@@ -30,7 +30,7 @@ const ALERT_CONFIG: Record<AlertType, {
     border: string;
     labelBg: string;
     labelText: string;
-    iconName: string;
+    iconName: keyof typeof Ionicons.glyphMap;
     iconColor: string;
     label: string;
 }> = {
@@ -165,7 +165,7 @@ export default function BusinessMessageBanner({ senderName, body, alertType, adm
                                     gap: 6,
                                 }}
                             >
-                                <Ionicons name={config.iconName as any} size={14} color={config.iconColor} />
+                                <Ionicons name={config.iconName} size={14} color={config.iconColor} />
                                 <Text style={{ color: config.labelText, fontSize: 11, fontWeight: '800', letterSpacing: 0.8 }}>
                                     {config.label}
                                 </Text>

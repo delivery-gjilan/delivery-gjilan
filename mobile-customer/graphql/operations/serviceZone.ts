@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const GET_SERVICE_ZONES = gql`
+export const GET_SERVICE_ZONES = graphql(`
     query GetServiceZones {
         deliveryZones {
             id
@@ -12,4 +12,4 @@ export const GET_SERVICE_ZONES = gql`
             isActive
         }
     }
-`;
+`);

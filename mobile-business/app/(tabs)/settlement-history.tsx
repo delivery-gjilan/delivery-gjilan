@@ -49,14 +49,14 @@ export default function SettlementHistoryScreen() {
         fetchPolicy: 'network-only',
     });
 
-    const allRequests: any[] = (data as any)?.settlementRequests ?? [];
+    const allRequests = data?.settlementRequests ?? [];
 
     const historyRequests = useMemo(() => {
-        const base = allRequests.filter((r: any) => r.status !== 'PENDING');
+        const base = allRequests.filter((r) => r.status !== 'PENDING');
         if (statusFilter === 'ALL') {
             return base;
         }
-        return base.filter((r: any) => String(r.status) === statusFilter);
+        return base.filter((r) => String(r.status) === statusFilter);
     }, [allRequests, statusFilter]);
 
     const onRefresh = async () => {

@@ -226,7 +226,7 @@ type Mutation {
     submitOrderReview(orderId: ID!, rating: Int!, comment: String, quickFeedback: [String!]): OrderReview!
     createOrder(input: CreateOrderInput!): Order!
     createTestOrder: Order!
-    removeOrderItem(orderId: ID!, orderItemId: ID!, reason: String!): Order!
+    removeOrderItem(orderId: ID!, orderItemId: ID!, reason: String!, quantity: Int): Order!
 }
 
 type Subscription {

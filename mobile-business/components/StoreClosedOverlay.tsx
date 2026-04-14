@@ -40,7 +40,7 @@ export default function StoreClosedOverlay() {
         pollInterval: 15_000,
     });
 
-    const businessOps = (data as any)?.business;
+    const businessOps = data?.business;
     const isClosed = Boolean(businessOps?.isTemporarilyClosed);
     const closureReason = businessOps?.temporaryClosureReason ?? '';
 

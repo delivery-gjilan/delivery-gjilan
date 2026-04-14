@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const CALCULATE_DELIVERY_PRICE = gql`
+export const CALCULATE_DELIVERY_PRICE = graphql(`
     query CalculateDeliveryPrice($dropoffLat: Float!, $dropoffLng: Float!, $businessId: ID!) {
         calculateDeliveryPrice(dropoffLat: $dropoffLat, dropoffLng: $dropoffLng, businessId: $businessId) {
             distanceKm
@@ -12,9 +12,8 @@ export const CALCULATE_DELIVERY_PRICE = gql`
             }
         }
     }
-`;
-
-export const DELIVERY_PRICING_CONFIG_QUERY = gql`
+`);
+export const DELIVERY_PRICING_CONFIG_QUERY = graphql(`
     query DeliveryPricingConfig {
         deliveryPricingConfig {
             zones {
@@ -36,4 +35,4 @@ export const DELIVERY_PRICING_CONFIG_QUERY = gql`
             }
         }
     }
-`;
+`);

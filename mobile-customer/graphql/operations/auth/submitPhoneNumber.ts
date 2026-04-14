@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const SUBMIT_PHONE_NUMBER_MUTATION = gql`
+export const SUBMIT_PHONE_NUMBER_MUTATION = graphql(`
     mutation SubmitPhoneNumber($input: SubmitPhoneNumberInput!) {
         submitPhoneNumber(input: $input) {
             userId
@@ -8,4 +8,4 @@ export const SUBMIT_PHONE_NUMBER_MUTATION = gql`
             message
         }
     }
-`;
+`);

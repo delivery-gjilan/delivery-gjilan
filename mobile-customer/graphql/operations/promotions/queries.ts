@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const VALIDATE_PROMOTIONS = gql`
+export const VALIDATE_PROMOTIONS = graphql(`
     query ValidatePromotions($cart: CartContextInput!, $manualCode: String) {
         validatePromotions(cart: $cart, manualCode: $manualCode) {
             totalDiscount
@@ -20,9 +20,8 @@ export const VALIDATE_PROMOTIONS = gql`
             }
         }
     }
-`;
-
-export const GET_APPLICABLE_PROMOTIONS = gql`
+`);
+export const GET_APPLICABLE_PROMOTIONS = graphql(`
     query GetApplicablePromotions($cart: CartContextInput!, $manualCode: String) {
         getApplicablePromotions(cart: $cart, manualCode: $manualCode) {
             id
@@ -35,4 +34,4 @@ export const GET_APPLICABLE_PROMOTIONS = gql`
             priority
         }
     }
-`;
+`);

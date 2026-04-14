@@ -118,18 +118,20 @@ export function notifyCustomerItemRemoved(
     orderId: string,
     itemName: string,
     reason: string,
+    quantity?: number,
 ): void {
+    const qtyLabel = quantity != null ? `${quantity}× ` : '';
     const payload: NotificationPayload = {
         title: 'Item removed from your order',
-        body: `"${itemName}" was removed: ${reason}`,
+        body: `${qtyLabel}"${itemName}" was removed: ${reason}`,
         localeContent: {
             en: {
                 title: 'Item removed from your order',
-                body: `"${itemName}" was removed: ${reason}`,
+                body: `${qtyLabel}"${itemName}" was removed: ${reason}`,
             },
             al: {
                 title: 'Artikull i hequr nga porosia',
-                body: `"${itemName}" u hoq: ${reason}`,
+                body: `${qtyLabel}"${itemName}" u hoq: ${reason}`,
             },
         },
         data: { orderId, screen: 'orders/active', type: 'ORDER_ITEM_REMOVED' },

@@ -38,6 +38,7 @@ import {
 import { cache } from '@/lib/cache';
 import { createAuditLogger } from '@/services/AuditLogger';
 import { getPrioritySurchargeAmount } from '@/config/prioritySurcharge';
+import { scheduleBusinessNotification } from '@/services/scheduleBusinessNotification';
 import { scheduleDemoOrderProgression } from '@/services/DemoProgressionService';
 import type { OrderServiceDeps } from './types';
 import type { OrderMappingModule } from './OrderMappingModule';
@@ -1183,7 +1184,7 @@ export class OrderCreationModule {
         if (!order.needsApproval) {
             try {
                 if (orderBusinessIds.length > 0) {
-                    notifyBusinessNewOrder(
+                    await scheduleBusinessNotification(
                         context.notificationService,
                         businessUserRows.map((row: any) => row.id),
                         String(order.id),

@@ -169,8 +169,8 @@ export const CREATE_TEST_ORDER = graphql(`
 `);
 
 export const REMOVE_ORDER_ITEM = graphql(`
-    mutation RemoveOrderItem($orderId: ID!, $orderItemId: ID!, $reason: String!) {
-        removeOrderItem(orderId: $orderId, orderItemId: $orderItemId, reason: $reason) {
+    mutation RemoveOrderItem($orderId: ID!, $orderItemId: ID!, $reason: String!, $quantity: Int) {
+        removeOrderItem(orderId: $orderId, orderItemId: $orderItemId, reason: $reason, quantity: $quantity) {
             id
             orderPrice
             deliveryPrice

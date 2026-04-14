@@ -78,6 +78,13 @@
       "when": 1776042000000,
       "tag": "0010_persistent_promo_audiences",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1776336000000,
+      "tag": "0011_add_dispatch_timing_settings",
+      "breakpoints": true
     }
   ]
 }

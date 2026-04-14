@@ -4,7 +4,7 @@
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import Button from "@/components/ui/Button";
-import { LogOut, Shield, Briefcase, StoreIcon, Clock, Megaphone, Truck, Map, Package } from "lucide-react";
+import { LogOut, Shield, Briefcase, StoreIcon, Clock, Megaphone, Truck, Map, Package, Timer } from "lucide-react";
 import { useQuery, useMutation } from "@apollo/client/react";
 import { GET_STORE_STATUS, UPDATE_STORE_STATUS } from "@/graphql/operations/store";
 import { useState } from "react";
@@ -20,6 +20,9 @@ export default function Topbar() {
   const [showBannerModal, setShowBannerModal] = useState(false);
   const [bannerMessage, setBannerMessage] = useState("");
   const [bannerType, setBannerType] = useState<BannerType>(BannerType.Info);
+  const [showTimingModal, setShowTimingModal] = useState(false);
+  const [earlyDispatchMin, setEarlyDispatchMin] = useState(5);
+  const [gracePeriodMin, setGracePeriodMin] = useState(0);
 
   const { data: storeStatusData, refetch } = useQuery(GET_STORE_STATUS);
   const [updateStoreStatus, { loading: updating }] = useMutation(UPDATE_STORE_STATUS, {
@@ -141,6 +144,28 @@ export default function Topbar() {
     });
   };
 
+  const handleOpenTimingModal = () => {
+    setEarlyDispatchMin(storeStatus?.earlyDispatchLeadMinutes ?? 5);
+    setGracePeriodMin(storeStatus?.businessGracePeriodMinutes ?? 0);
+    setShowTimingModal(true);
+  };
+
+  const handleSaveTiming = async () => {
+    await updateStoreStatus({
+      variables: {
+        input: {
+          isStoreClosed,
+          bannerEnabled,
+          bannerMessage: storeStatus?.bannerMessage ?? null,
+          bannerType: (storeStatus?.bannerType as BannerType | undefined) ?? BannerType.Info,
+          earlyDispatchLeadMinutes: earlyDispatchMin,
+          businessGracePeriodMinutes: gracePeriodMin,
+        },
+      },
+    });
+    setShowTimingModal(false);
+  };
+
   const handleLogout = () => {
     logout();
     router.push("/login");
@@ -245,6 +270,18 @@ export default function Topbar() {
               >
                 <Package size={12} />
                 {inventoryModeEnabled ? 'Stock ON' : 'Stock OFF'}
+              </button>
+
+              <div className="w-px h-4 bg-zinc-800" />
+
+              <button
+                onClick={handleOpenTimingModal}
+                disabled={updating}
+                className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium text-zinc-500 hover:text-zinc-300 transition-colors"
+                title="Configure dispatch timing and business notification grace period"
+              >
+                <Timer size={12} />
+                Timing
               </button>
             </>
           )}
@@ -376,6 +413,67 @@ export default function Topbar() {
               disabled={updating || !bannerMessage.trim()}
             >
               {updating ? "Saving..." : "Activate Banner"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Dispatch Timing Modal */}
+      <Modal
+        isOpen={showTimingModal}
+        onClose={() => setShowTimingModal(false)}
+        title="Dispatch Timing"
+      >
+        <div className="space-y-5">
+          <div className="bg-blue-500/5 border border-blue-500/10 rounded-lg p-3">
+            <p className="text-blue-200/80 text-xs">
+              Configure how early drivers are notified before an order is ready, and how long
+              to delay the business notification after an order is placed.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs text-zinc-400 mb-1.5">Early Driver Dispatch (minutes before ready)</label>
+            <p className="text-[11px] text-zinc-600 mb-2">
+              Drivers get notified this many minutes before the food is estimated to be ready, giving them time to travel.
+              Set to 0 to only notify drivers when the order is marked READY.
+            </p>
+            <input
+              type="number"
+              min={0}
+              max={30}
+              value={earlyDispatchMin}
+              onChange={(e) => setEarlyDispatchMin(Math.max(0, Math.min(30, Number(e.target.value))))}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-zinc-600"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs text-zinc-400 mb-1.5">Business Grace Period (minutes)</label>
+            <p className="text-[11px] text-zinc-600 mb-2">
+              Delay the business notification by this many minutes after an order is placed.
+              This gives customers a window to call and cancel before the business starts working.
+              Set to 0 for immediate notification.
+            </p>
+            <input
+              type="number"
+              min={0}
+              max={10}
+              value={gracePeriodMin}
+              onChange={(e) => setGracePeriodMin(Math.max(0, Math.min(10, Number(e.target.value))))}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-zinc-600"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800/50">
+            <Button variant="outline" onClick={() => setShowTimingModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveTiming}
+              disabled={updating}
+            >
+              {updating ? "Saving..." : "Save Timing"}
             </Button>
           </div>
         </div>

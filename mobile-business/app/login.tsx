@@ -45,7 +45,7 @@ export default function LoginScreen() {
                 },
             });
 
-            const loginPayload = (data as any)?.login;
+            const loginPayload = data?.login;
 
             if (!loginPayload) {
                 throw new Error('Login failed');
@@ -76,10 +76,10 @@ export default function LoginScreen() {
 
             // Navigate to main app
             router.replace('/(tabs)');
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('[Login] Login error:', error);
-            const statusCode = error?.networkError?.statusCode;
-            if (statusCode === 404) {
+            const networkError = error instanceof Error && 'networkError' in error ? (error as { networkError?: { statusCode?: number } }).networkError : undefined;
+            if (networkError?.statusCode === 404) {
                 Alert.alert(
                     t('login.login_failed', 'Login Failed'),
                     'API endpoint not found (404). Check EXPO_PUBLIC_API_URL / ngrok tunnel and ensure it points to the backend GraphQL server.',
@@ -87,7 +87,7 @@ export default function LoginScreen() {
                 return;
             }
 
-            Alert.alert(t('login.login_failed', 'Login Failed'), error.message || t('login.invalid_credentials', 'Invalid email or password'));
+            Alert.alert(t('login.login_failed', 'Login Failed'), error instanceof Error ? error.message : t('login.invalid_credentials', 'Invalid email or password'));
         }
     };
 

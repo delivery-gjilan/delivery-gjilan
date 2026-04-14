@@ -51,6 +51,8 @@ type StoreStatus {
     dispatchModeEnabled: Boolean!
     googleMapsNavEnabled: Boolean!
     inventoryModeEnabled: Boolean!
+    earlyDispatchLeadMinutes: Int!
+    businessGracePeriodMinutes: Int!
 }
 
 input UpdateStoreStatusInput {
@@ -62,6 +64,8 @@ input UpdateStoreStatusInput {
     dispatchModeEnabled: Boolean
     googleMapsNavEnabled: Boolean
     inventoryModeEnabled: Boolean
+    earlyDispatchLeadMinutes: Int
+    businessGracePeriodMinutes: Int
 }
 
 type Query {

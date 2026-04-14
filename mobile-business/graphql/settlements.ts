@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const GET_MY_BUSINESS_SETTLEMENTS = gql`
+export const GET_MY_BUSINESS_SETTLEMENTS = graphql(`
     query GetMyBusinessSettlements(
         $businessId: ID!
         $status: SettlementStatus
@@ -76,9 +76,9 @@ export const GET_MY_BUSINESS_SETTLEMENTS = gql`
             }
         }
     }
-`;
+`);
 
-export const GET_MY_BUSINESS_SETTLEMENT_SUMMARY = gql`
+export const GET_MY_BUSINESS_SETTLEMENT_SUMMARY = graphql(`
     query GetMyBusinessSettlementSummary($businessId: ID!, $startDate: Date, $endDate: Date) {
         settlementSummary(
             type: BUSINESS
@@ -95,9 +95,9 @@ export const GET_MY_BUSINESS_SETTLEMENT_SUMMARY = gql`
             pendingCount
         }
     }
-`;
+`);
 
-export const GET_LAST_BUSINESS_PAID_SETTLEMENT = gql`
+export const GET_LAST_BUSINESS_PAID_SETTLEMENT = graphql(`
     query GetLastBusinessPaidSettlement($businessId: ID!) {
         settlements(
             type: BUSINESS
@@ -110,9 +110,9 @@ export const GET_LAST_BUSINESS_PAID_SETTLEMENT = gql`
             createdAt
         }
     }
-`;
+`);
 
-export const GET_MY_SETTLEMENT_REQUESTS = gql`
+export const GET_MY_SETTLEMENT_REQUESTS = graphql(`
     query GetMySettlementRequests($businessId: ID, $status: SettlementRequestStatus, $limit: Int) {
         settlementRequests(businessId: $businessId, status: $status, limit: $limit) {
             id
@@ -130,9 +130,9 @@ export const GET_MY_SETTLEMENT_REQUESTS = gql`
             }
         }
     }
-`;
+`);
 
-export const RESPOND_TO_SETTLEMENT_REQUEST = gql`
+export const RESPOND_TO_SETTLEMENT_REQUEST = graphql(`
     mutation RespondToSettlementRequest(
         $requestId: ID!
         $action: SettlementRequestAction!
@@ -149,9 +149,9 @@ export const RESPOND_TO_SETTLEMENT_REQUEST = gql`
             reason
         }
     }
-`;
+`);
 
-export const GET_BUSINESS_SETTLEMENT_BREAKDOWN = gql`
+export const GET_BUSINESS_SETTLEMENT_BREAKDOWN = graphql(`
     query GetBusinessSettlementBreakdown(
         $businessId: ID
         $isSettled: Boolean
@@ -172,4 +172,4 @@ export const GET_BUSINESS_SETTLEMENT_BREAKDOWN = gql`
             direction
         }
     }
-`;
+`);

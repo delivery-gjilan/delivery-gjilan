@@ -1,6 +1,6 @@
-import { gql } from '@apollo/client';
+import { graphql } from '@/gql';
 
-export const VERIFY_EMAIL_MUTATION = gql`
+export const VERIFY_EMAIL_MUTATION = graphql(`
     mutation VerifyEmail($input: VerifyEmailInput!) {
         verifyEmail(input: $input) {
             userId
@@ -8,4 +8,4 @@ export const VERIFY_EMAIL_MUTATION = gql`
             message
         }
     }
-`;
+`);

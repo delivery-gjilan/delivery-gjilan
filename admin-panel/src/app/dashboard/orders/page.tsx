@@ -349,8 +349,9 @@ export default function OrdersPage() {
     const [prepTimeAlerts, setPrepTimeAlerts] = useState<PrepTimeAlert[]>([]);
     const { dismiss: dismissPrepAlert } = usePrepTimeAlerts(setPrepTimeAlerts);
     const [inventoryModalOrder, setInventoryModalOrder] = useState<Order | null>(null);
-    const [removeItemDialog, setRemoveItemDialog] = useState<{ orderId: string; itemId: string; itemName: string } | null>(null);
+    const [removeItemDialog, setRemoveItemDialog] = useState<{ orderId: string; itemId: string; itemName: string; itemQuantity: number } | null>(null);
     const [removeItemReason, setRemoveItemReason] = useState<string>("");
+    const [removeItemQuantity, setRemoveItemQuantity] = useState<number>(1);
 
     // Debounce search input by 300ms
     useEffect(() => {
@@ -366,11 +367,13 @@ export default function OrdersPage() {
                     orderId: removeItemDialog.orderId,
                     orderItemId: removeItemDialog.itemId,
                     reason: removeItemReason.trim(),
+                    quantity: removeItemQuantity,
                 },
             });
-            toast.success(`"${removeItemDialog.itemName}" removed from order`);
+            toast.success(`${removeItemQuantity}× "${removeItemDialog.itemName}" removed from order`);
             setRemoveItemDialog(null);
             setRemoveItemReason("");
+            setRemoveItemQuantity(1);
         } catch (err: any) {
             toast.error(err.message || 'Failed to remove item');
         }
@@ -1618,8 +1621,9 @@ export default function OrdersPage() {
                                                                         <button
                                                                             title="Remove item"
                                                                             onClick={() => {
-                                                                                setRemoveItemDialog({ orderId: selectedOrder.id, itemId: (item as any).id, itemName: item.name });
+                                                                                setRemoveItemDialog({ orderId: selectedOrder.id, itemId: (item as any).id, itemName: item.name, itemQuantity: item.quantity });
                                                                                 setRemoveItemReason("");
+                                                                                setRemoveItemQuantity(1);
                                                                             }}
                                                                             className="p-1 rounded text-zinc-600 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
                                                                         >
@@ -1946,13 +1950,44 @@ export default function OrdersPage() {
             </Modal>
 
             {/* ════════════════ REMOVE ORDER ITEM MODAL ════════════════ */}
-            <Modal isOpen={!!removeItemDialog} onClose={() => { setRemoveItemDialog(null); setRemoveItemReason(""); }} title="Remove Item">
+            <Modal isOpen={!!removeItemDialog} onClose={() => { setRemoveItemDialog(null); setRemoveItemReason(""); setRemoveItemQuantity(1); }} title="Remove Item">
                 {removeItemDialog && (
                     <div className="space-y-4">
                         <p className="text-sm text-zinc-300">
                             Remove <span className="font-semibold text-white">"{removeItemDialog.itemName}"</span> from this order?
                         </p>
                         <p className="text-xs text-zinc-500">The customer will be notified with the reason. Order total will be updated.</p>
+
+                        {/* Quantity selector — only show when item has quantity > 1 */}
+                        {removeItemDialog.itemQuantity > 1 && (
+                            <div className="space-y-2">
+                                <label className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Quantity to remove (of {removeItemDialog.itemQuantity})</label>
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        onClick={() => setRemoveItemQuantity(Math.max(1, removeItemQuantity - 1))}
+                                        disabled={removeItemQuantity <= 1}
+                                        className="w-8 h-8 rounded-full flex items-center justify-center bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        −
+                                    </button>
+                                    <span className="text-lg font-bold text-white min-w-[2ch] text-center">{removeItemQuantity}</span>
+                                    <button
+                                        onClick={() => setRemoveItemQuantity(Math.min(removeItemDialog.itemQuantity, removeItemQuantity + 1))}
+                                        disabled={removeItemQuantity >= removeItemDialog.itemQuantity}
+                                        className="w-8 h-8 rounded-full flex items-center justify-center bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        +
+                                    </button>
+                                    <button
+                                        onClick={() => setRemoveItemQuantity(removeItemDialog.itemQuantity)}
+                                        className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${removeItemQuantity === removeItemDialog.itemQuantity ? "bg-rose-500/20 border-rose-500/50 text-rose-300" : "bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-zinc-500"}`}
+                                    >
+                                        All
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="space-y-2">
                             <label className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Reason</label>
                             <div className="flex flex-wrap gap-2">
@@ -1975,7 +2010,7 @@ export default function OrdersPage() {
                         <div className="flex gap-3 pt-2">
                             <Button
                                 variant="secondary"
-                                onClick={() => { setRemoveItemDialog(null); setRemoveItemReason(""); }}
+                                onClick={() => { setRemoveItemDialog(null); setRemoveItemReason(""); setRemoveItemQuantity(1); }}
                             >
                                 Cancel
                             </Button>
@@ -1984,7 +2019,7 @@ export default function OrdersPage() {
                                 onClick={handleRemoveItemConfirm}
                                 disabled={!removeItemReason.trim() || removingOrderItem}
                             >
-                                {removingOrderItem ? "Removing…" : "Remove item"}
+                                {removingOrderItem ? "Removing…" : `Remove ${removeItemQuantity}×`}
                             </Button>
                         </div>
                     </div>
