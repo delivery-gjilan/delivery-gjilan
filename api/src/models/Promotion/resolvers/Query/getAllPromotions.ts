@@ -21,8 +21,37 @@ export const getAllPromotions: NonNullable<QueryResolvers['getAllPromotions']> =
   if (args.isActive !== undefined && args.isActive !== null) {
     conditions.push(eq(promotions.isActive, args.isActive));
   }
-  
-  const promoList = await db.select().from(promotions).where(and(...conditions));
+
+  const promoList = await db
+    .select({
+      id: promotions.id,
+      name: promotions.name,
+      description: promotions.description,
+      code: promotions.code,
+      type: promotions.type,
+      target: promotions.target,
+      discountValue: promotions.discountValue,
+      maxDiscountCap: promotions.maxDiscountCap,
+      minOrderAmount: promotions.minOrderAmount,
+      spendThreshold: promotions.spendThreshold,
+      thresholdReward: promotions.thresholdReward,
+      maxGlobalUsage: promotions.maxGlobalUsage,
+      currentGlobalUsage: promotions.currentGlobalUsage,
+      maxUsagePerUser: promotions.maxUsagePerUser,
+      isStackable: promotions.isStackable,
+      priority: promotions.priority,
+      isActive: promotions.isActive,
+      isRecovery: promotions.isRecovery,
+      startsAt: promotions.startsAt,
+      endsAt: promotions.endsAt,
+      createdAt: promotions.createdAt,
+      totalUsageCount: promotions.totalUsageCount,
+      totalRevenue: promotions.totalRevenue,
+      creatorType: promotions.creatorType,
+      creatorId: promotions.creatorId,
+    })
+    .from(promotions)
+    .where(and(...conditions));
   
   // Helper to ensure ISO string format
   const toISOString = (date: Date | string | null | undefined): string | null => {
@@ -52,12 +81,13 @@ export const getAllPromotions: NonNullable<QueryResolvers['getAllPromotions']> =
     isRecovery: promo.isRecovery,
     startsAt: toISOString(promo.startsAt),
     endsAt: toISOString(promo.endsAt),
-    scheduleType: promo.scheduleType,
-    scheduleTimezone: promo.scheduleTimezone,
-    dailyStartTime: promo.dailyStartTime,
-    dailyEndTime: promo.dailyEndTime,
-    activeWeekdays: Array.isArray(promo.activeWeekdays) ? promo.activeWeekdays : [],
-    newUserWindowDays: promo.newUserWindowDays,
+    // Backward-compatible defaults if recurring schedule columns are not present in DB yet.
+    scheduleType: 'DATE_RANGE',
+    scheduleTimezone: null,
+    dailyStartTime: null,
+    dailyEndTime: null,
+    activeWeekdays: [],
+    newUserWindowDays: null,
     createdAt: toISOString(promo.createdAt)!,
     totalUsageCount: promo.totalUsageCount,
     totalRevenue: promo.totalRevenue || 0,

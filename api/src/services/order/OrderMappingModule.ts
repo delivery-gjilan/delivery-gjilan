@@ -39,7 +39,33 @@ export class OrderMappingModule {
                                 },
                             },
                             product: {
-                                with: { business: true },
+                                with: {
+                                    business: {
+                                        columns: {
+                                            id: true,
+                                            name: true,
+                                            businessType: true,
+                                            phoneNumber: true,
+                                            imageUrl: true,
+                                            isActive: true,
+                                            locationLat: true,
+                                            locationLng: true,
+                                            locationAddress: true,
+                                            opensAt: true,
+                                            closesAt: true,
+                                            avgPrepTimeMinutes: true,
+                                            prepTimeOverrideMinutes: true,
+                                            isTemporarilyClosed: true,
+                                            temporaryClosureReason: true,
+                                            commissionPercentage: true,
+                                            minOrderAmount: true,
+                                            isFeatured: true,
+                                            featuredSortOrder: true,
+                                            createdAt: true,
+                                            updatedAt: true,
+                                        },
+                                    },
+                                },
                             },
                             childOrderItems: {
                                 with: {

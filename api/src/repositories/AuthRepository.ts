@@ -6,11 +6,43 @@ import { userAddress } from '@/database/schema/userAddress';
 import { SignupStep } from '@/generated/types.generated';
 import { eq, and, isNull, sql, inArray, gt } from 'drizzle-orm';
 
+const userSelectColumns = {
+    id: users.id,
+    email: users.email,
+    password: users.password,
+    firstName: users.firstName,
+    lastName: users.lastName,
+    address: users.address,
+    phoneNumber: users.phoneNumber,
+    emailVerified: users.emailVerified,
+    phoneVerified: users.phoneVerified,
+    signupStep: users.signupStep,
+    role: users.role,
+    preferredLanguage: users.preferredLanguage,
+    emailOptOut: users.emailOptOut,
+    businessId: users.businessId,
+    emailVerificationCode: users.emailVerificationCode,
+    phoneVerificationCode: users.phoneVerificationCode,
+    adminNote: users.adminNote,
+    flagColor: users.flagColor,
+    isDemoAccount: users.isDemoAccount,
+    imageUrl: users.imageUrl,
+    passwordResetToken: users.passwordResetToken,
+    passwordResetExpiresAt: users.passwordResetExpiresAt,
+    createdAt: users.createdAt,
+    updatedAt: users.updatedAt,
+    deletedAt: users.deletedAt,
+};
+
+function withDefaultIsBanned(row: Omit<DbUser, 'isBanned'>): DbUser {
+    return { ...row, isBanned: false } as DbUser;
+}
+
 export class AuthRepository {
     constructor(private db: DbType) {}
 
     async createUser(firstName: string, lastName: string, email: string, hashedPassword: string): Promise<DbUser> {
-        const [user] = await this.db
+        await this.db
             .insert(users)
             .values({
                 firstName,
@@ -22,61 +54,68 @@ export class AuthRepository {
                 phoneVerified: false,
                 adminNote: null,
                 flagColor: 'yellow',
-            })
-            .returning();
-        return user;
+            });
+
+        const created = await this.findByEmail(email);
+        if (!created) {
+            throw new Error('Failed to create user');
+        }
+        return created;
     }
 
     async findByEmail(email: string): Promise<DbUser | undefined> {
-        const [user] = await this.db.select().from(users).where(and(eq(users.email, email), isNull(users.deletedAt)));
-        return user;
+        const [user] = await this.db
+            .select(userSelectColumns)
+            .from(users)
+            .where(and(eq(users.email, email), isNull(users.deletedAt)));
+        return user ? withDefaultIsBanned(user as Omit<DbUser, 'isBanned'>) : undefined;
     }
 
     async findById(id: string): Promise<DbUser | undefined> {
-        const [user] = await this.db.select().from(users).where(and(eq(users.id, id), isNull(users.deletedAt)));
-        return user;
+        const [user] = await this.db
+            .select(userSelectColumns)
+            .from(users)
+            .where(and(eq(users.id, id), isNull(users.deletedAt)));
+        return user ? withDefaultIsBanned(user as Omit<DbUser, 'isBanned'>) : undefined;
     }
 
     async updateSignupStep(userId: string, step: SignupStep): Promise<DbUser | undefined> {
-        const [user] = await this.db.update(users).set({ signupStep: step }).where(eq(users.id, userId)).returning();
-        return user;
+        await this.db.update(users).set({ signupStep: step }).where(eq(users.id, userId));
+        return this.findById(userId);
     }
 
     async setEmailVerificationCode(userId: string, code: string): Promise<DbUser | undefined> {
-        const [user] = await this.db
+        await this.db
             .update(users)
             .set({
                 emailVerificationCode: code,
                 signupStep: 'EMAIL_SENT',
             })
-            .where(eq(users.id, userId))
-            .returning();
-        return user;
+            .where(eq(users.id, userId));
+        return this.findById(userId);
     }
 
     async markEmailVerified(userId: string): Promise<DbUser | undefined> {
-        const [user] = await this.db
+        await this.db
             .update(users)
             .set({
                 emailVerified: true,
                 signupStep: 'EMAIL_VERIFIED',
                 emailVerificationCode: null,
             })
-            .where(eq(users.id, userId))
-            .returning();
-        return user;
+            .where(eq(users.id, userId));
+        return this.findById(userId);
     }
 
     async setPhoneVerificationCode(userId: string, code: string): Promise<DbUser | undefined> {
-        const [user] = await this.db
+        await this.db
             .update(users)
             .set({
                 phoneVerificationCode: code,
                 signupStep: 'PHONE_SENT',
             })
-            .where(eq(users.id, userId))
-            .returning();
-        return user;
+            .where(eq(users.id, userId));
+        return this.findById(userId);
     }
 
     async verifyEmailCode(userId: string, code: string): Promise<DbUser | undefined> {
@@ -85,16 +124,15 @@ export class AuthRepository {
             return undefined;
         }
 
-        const [updatedUser] = await this.db
+        await this.db
             .update(users)
             .set({
                 emailVerified: true,
                 signupStep: 'EMAIL_VERIFIED',
                 emailVerificationCode: null,
             })
-            .where(eq(users.id, userId))
-            .returning();
-        return updatedUser;
+            .where(eq(users.id, userId));
+        return this.findById(userId);
     }
 
     async verifyPhoneCode(userId: string, code: string): Promise<DbUser | undefined> {
@@ -103,39 +141,36 @@ export class AuthRepository {
             return undefined;
         }
 
-        const [updatedUser] = await this.db
+        await this.db
             .update(users)
             .set({
                 phoneVerified: true,
                 signupStep: 'COMPLETED',
                 phoneVerificationCode: null,
             })
-            .where(eq(users.id, userId))
-            .returning();
-        return updatedUser;
+            .where(eq(users.id, userId));
+        return this.findById(userId);
     }
 
     async setPhoneNumber(userId: string, phoneNumber: string): Promise<DbUser | undefined> {
-        const [user] = await this.db.update(users).set({ phoneNumber }).where(eq(users.id, userId)).returning();
-        return user;
+        await this.db.update(users).set({ phoneNumber }).where(eq(users.id, userId));
+        return this.findById(userId);
     }
 
     async setPhoneNumberAndComplete(userId: string, phoneNumber: string): Promise<DbUser | undefined> {
-        const [user] = await this.db
+        await this.db
             .update(users)
             .set({ phoneNumber, phoneVerified: true, signupStep: 'COMPLETED' })
-            .where(eq(users.id, userId))
-            .returning();
-        return user;
+            .where(eq(users.id, userId));
+        return this.findById(userId);
     }
 
     async updatePassword(userId: string, hashedPassword: string): Promise<DbUser | undefined> {
-        const [user] = await this.db
+        await this.db
             .update(users)
             .set({ password: hashedPassword, updatedAt: sql`CURRENT_TIMESTAMP` })
-            .where(eq(users.id, userId))
-            .returning();
-        return user;
+            .where(eq(users.id, userId));
+        return this.findById(userId);
     }
 
     async setPasswordResetToken(userId: string, token: string, expiresAt: string): Promise<void> {
@@ -169,7 +204,7 @@ export class AuthRepository {
         businessId?: string,
         isDemoAccount = false,
     ): Promise<DbUser> {
-        const [user] = await this.db
+        await this.db
             .insert(users)
             .values({
                 firstName,
@@ -184,26 +219,41 @@ export class AuthRepository {
                 adminNote: null,
                 flagColor: 'yellow',
                 isDemoAccount,
-            })
-            .returning();
-        return user;
+            });
+
+        const created = await this.findByEmail(email);
+        if (!created) {
+            throw new Error('Failed to create user with role');
+        }
+        return created;
     }
 
     async findAllUsers(limit = 2000, offset = 0): Promise<DbUser[]> {
-        return this.db.select().from(users).where(isNull(users.deletedAt)).limit(limit).offset(offset);
+        const rows = await this.db
+            .select(userSelectColumns)
+            .from(users)
+            .where(isNull(users.deletedAt))
+            .limit(limit)
+            .offset(offset);
+        return rows.map((row) => withDefaultIsBanned(row as Omit<DbUser, 'isBanned'>));
     }
 
     async findDrivers(): Promise<DbUser[]> {
-        return this.db.select().from(users).where(and(eq(users.role, 'DRIVER'), isNull(users.deletedAt)));
+        const rows = await this.db
+            .select(userSelectColumns)
+            .from(users)
+            .where(and(eq(users.role, 'DRIVER'), isNull(users.deletedAt)));
+        return rows.map((row) => withDefaultIsBanned(row as Omit<DbUser, 'isBanned'>));
     }
 
     async findDriversByIds(driverIds: string[]): Promise<DbUser[]> {
         if (driverIds.length === 0) return [];
         const uniqueIds = Array.from(new Set(driverIds));
-        return this.db
-            .select()
+        const rows = await this.db
+            .select(userSelectColumns)
             .from(users)
             .where(and(inArray(users.id, uniqueIds), eq(users.role, 'DRIVER'), isNull(users.deletedAt)));
+        return rows.map((row) => withDefaultIsBanned(row as Omit<DbUser, 'isBanned'>));
     }
 
     async createRefreshTokenSession(userId: string, tokenHash: string, expiresAtIso: string): Promise<void> {
@@ -308,12 +358,11 @@ export class AuthRepository {
             preferredLanguage?: string;
         }
     ): Promise<DbUser | undefined> {
-        const [user] = await this.db
+        await this.db
             .update(users)
             .set(data)
-            .where(eq(users.id, userId))
-            .returning();
-        return user;
+            .where(eq(users.id, userId));
+        return this.findById(userId);
     }
 
     async deleteUser(userId: string): Promise<boolean> {
