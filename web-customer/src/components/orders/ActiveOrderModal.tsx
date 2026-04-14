@@ -121,7 +121,7 @@ export function ActiveOrderModal({ orderId, onClose }: ActiveOrderModalProps) {
         fetchPolicy: "cache-and-network",
     });
 
-    const order = (data as any)?.order;
+    const order = (data as { order?: GqlOrder } | undefined)?.order;
     const status: string = order?.status ?? "";
     const isActive = ACTIVE_STATUSES.includes(status);
 
@@ -387,7 +387,7 @@ export function ActiveOrderModal({ orderId, onClose }: ActiveOrderModalProps) {
                     <div>
                         <p className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider mb-2">Items</p>
                         <div className="space-y-2">
-                            {orderItems.map((item: any) => (
+                            {orderItems.map((item: GqlOrderItem) => (
                                 <div key={item.id} className="flex items-center gap-3">
                                     {item.imageUrl ? (
                                         <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-[var(--background-secondary)]">
@@ -425,7 +425,7 @@ export function ActiveOrderModal({ orderId, onClose }: ActiveOrderModalProps) {
                             <span>{t("common.delivery")}</span>
                             <span className="text-[var(--foreground)]">{order?.deliveryPrice === 0 ? "Free" : formatPrice(order?.deliveryPrice ?? 0)}</span>
                         </div>
-                        {order?.orderPromotions?.map((promo: any) => (
+                        {order?.orderPromotions?.map((promo: GqlOrderPromotion) => (
                             <div key={promo.id} className="flex justify-between text-emerald-500 font-medium">
                                 <span>{promo.promoCode ?? t("cart.promo")}</span>
                                 <span>-{formatPrice(promo.discountAmount ?? 0)}</span>

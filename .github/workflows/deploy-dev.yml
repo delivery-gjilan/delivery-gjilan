@@ -99,6 +99,9 @@ jobs:
             set -e
             cd /opt/zippgo/api
 
+            # Make .env.dev available as .env for docker compose variable interpolation
+            cp .env.dev .env
+
             # Log in to GHCR
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 

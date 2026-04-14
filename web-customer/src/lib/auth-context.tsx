@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useMutation, useQuery } from "@apollo/client/react";
 import { LOGIN_MUTATION } from "@/graphql/operations/auth/login";
 import { ME_QUERY } from "@/graphql/operations/auth/me";
+import type { LoginResult, MeResult } from "@/types/graphql";
 
 export interface User {
     id: string;
@@ -24,7 +25,7 @@ interface AuthContextType {
     loading: boolean;
     authCheckComplete: boolean;
     login: (email: string, password: string) => Promise<void>;
-    loginWithToken: (token: string, refreshToken: string | null, userData: any) => void;
+    loginWithToken: (token: string, refreshToken: string | null, userData: Partial<User>) => void;
     logout: () => void;
     isAuthenticated: boolean;
     needsSignupCompletion: boolean;
@@ -70,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     useEffect(() => {
-        const me = (meData as any)?.me;
+        const me = (meData as { me?: MeResult } | undefined)?.me;
         if (!me) return;
         const validated: User = {
             id: me.id ?? "",
@@ -107,7 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     variables: { input: { email, password } },
                 });
 
-                const loginResult = (data as any)?.login;
+                const loginResult = (data as { login?: LoginResult } | undefined)?.login;
                 if (!loginResult?.token) {
                     throw new Error(loginResult?.message || "Login failed");
                 }
@@ -147,7 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const loginWithToken = useCallback(
-        (token: string, refreshToken: string | null, userData: any) => {
+        (token: string, refreshToken: string | null, userData: Partial<User>) => {
             localStorage.setItem("authToken", token);
             if (refreshToken) localStorage.setItem("refreshToken", refreshToken);
             const u: User = {

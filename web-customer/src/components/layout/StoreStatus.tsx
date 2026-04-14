@@ -59,13 +59,16 @@ export function StoreStatusInit() {
     useEffect(() => {
         const unsubscribe = subscribeToMore({
             document: STORE_STATUS_UPDATED,
-            updateQuery: (prev: any, { subscriptionData }: any) => {
+            updateQuery: (
+                prev: { getStoreStatus?: { isStoreClosed: boolean; closedMessage: string | null } },
+                { subscriptionData }: { subscriptionData: { data?: { storeStatusUpdated?: { isStoreClosed: boolean; closedMessage: string | null } } } }
+            ) => {
                 const next = subscriptionData.data?.storeStatusUpdated;
                 if (!next) return prev;
                 update(next);
                 return { ...prev, getStoreStatus: next };
             },
-        } as any);
+        } as Parameters<typeof subscribeToMore>[0]);
         return unsubscribe;
     }, [subscribeToMore, update]);
 
