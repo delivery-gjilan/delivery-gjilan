@@ -13,7 +13,7 @@ import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import { Image, Plus, Edit, Trash2, GripVertical, ExternalLink, Calendar, Tag, Store, Package, TrendingUp, Star, ShoppingCart, DollarSign, ChevronDown } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from 'sonner'; //qr
 
 interface Banner {
   id: string;
