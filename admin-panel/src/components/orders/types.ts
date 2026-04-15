@@ -96,6 +96,9 @@ export interface Location {
 export interface Order {
     id: string;
     displayId: string;
+    channel?: string | null;
+    recipientPhone?: string | null;
+    recipientName?: string | null;
     orderPrice: number;
     deliveryPrice: number;
     originalPrice?: number | null;

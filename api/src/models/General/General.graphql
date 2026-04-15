@@ -55,6 +55,10 @@ type StoreStatus {
     businessGracePeriodMinutes: Int!
     directDispatchEnabled: Boolean!
     directDispatchDriverReserve: Int!
+    """Distance (km) beyond which gas vehicles are dispatched first. 0 = disabled."""
+    farOrderThresholdKm: Float!
+    """Seconds gas drivers get head-start before electric drivers are notified for far orders."""
+    gasPriorityWindowSeconds: Int!
 }
 
 input UpdateStoreStatusInput {
@@ -70,6 +74,8 @@ input UpdateStoreStatusInput {
     businessGracePeriodMinutes: Int
     directDispatchEnabled: Boolean
     directDispatchDriverReserve: Int
+    farOrderThresholdKm: Float
+    gasPriorityWindowSeconds: Int
 }
 
 type Query {

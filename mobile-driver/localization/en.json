@@ -193,6 +193,7 @@
     },
     "orderAccept": {
         "new_order": "New Order",
+        "direct_call": "Direct Call",
         "you_earn": "You earn",
         "food_status": "Food status",
         "dropoff": "Drop-off",

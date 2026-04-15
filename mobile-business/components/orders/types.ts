@@ -19,6 +19,9 @@ export interface Order {
     id: string;
     displayId: string;
     status: OrderStatus;
+    channel?: string | null;
+    recipientPhone?: string | null;
+    recipientName?: string | null;
     orderDate: string;
     preparingAt?: string | null;
     readyAt?: string | null;

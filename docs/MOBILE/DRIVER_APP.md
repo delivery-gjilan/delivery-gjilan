@@ -384,7 +384,13 @@ Both `handleAcceptOrder` and `handleAcceptAndNavigate` delegates to a shared `ex
 - `OrderAcceptSheet` renders a dark overlay with a flash icon, "Order taken" title, "Another driver accepted this order first" subtitle, and "Finding you the next one…" hint when `takenByOther` is true
 
 **OrderPoolSheet:**
-Full redesign — business images, left accent bar (green=`READY`, indigo=`PREPARING`), earnings badge with large green value, animated ETA chips, drop-off location chip, cyan circle-arrow CTA button. Sheet header shows teal dot + order count badge. All strings translated (EN/AL) via `useTranslations()` → `t.orderPool`.
+Full redesign — business images, left accent bar (green=`READY`, indigo=`PREPARING`, orange=`DIRECT_DISPATCH`), earnings badge with large green value, animated ETA chips, drop-off location chip, cyan circle-arrow CTA button. Sheet header shows teal dot + order count badge. Direct dispatch orders show an orange "Direct Call" badge (phone icon) next to the business name. All strings translated (EN/AL) via `useTranslations()` → `t.orderPool`.
+
+**OrderAcceptSheet — Direct Dispatch:**
+When `order.channel === 'DIRECT_DISPATCH'`, the header shows an orange "Direct Call" badge beside the "New Order" label. The business name row also shows the recipient name or phone (from `recipientName` / `recipientPhone` fields) in orange below the business name. The `orderAccept.direct_call` i18n key provides the badge label (EN: "Direct Call", AL: "Thirrje Direkte").
+
+**OrderDetailSheet — Direct Dispatch:**
+When `order.channel === 'DIRECT_DISPATCH'`, an orange "Direct Call" badge appears inline in the status pill row. The customer name field is populated from `recipientName ?? recipientPhone` instead of `user.firstName + user.lastName`.
 
 ### Localisation (i18n) Coverage
 
@@ -549,7 +555,7 @@ Driver ↔ Admin real-time chat screen.
 
 ## Earnings Screen (`app/(tabs)/earnings.tsx`)
 
-Renamed from `add.tsx`. Displays driver settlement history and summary.
+Renamed from `add.tsx`. Displays driver settlement history, summary, and interactive category drill-down.
 
 **Period selector:** This Week / This Month / Last Month / All Time
 - Dates computed client-side using `date-fns` (no timezone normalization — city-local context)
@@ -557,8 +563,23 @@ Renamed from `add.tsx`. Displays driver settlement history and summary.
 **Queries:**
 - `GET_MY_SETTLEMENT_SUMMARY(startDate, endDate)` → totals panel
 - `GET_MY_SETTLEMENTS(startDate, endDate, limit: 50)` → itemized list
+- `GET_MY_SETTLEMENT_BREAKDOWN(startDate, endDate)` → per-category breakdown cards (DEDUCTIONS / ADDITIONS)
+- `GET_MY_SETTLEMENTS($category, startDate, endDate, limit: 100)` ← lazy, fired on category card tap → category orders modal
 
-Both use `fetchPolicy: 'network-only'` (pull-to-refresh semantics). Manual `RefreshControl` triggers `Promise.all([refetchSummary(), refetchSettlements()])`.
+Both main queries use `fetchPolicy: 'network-only'` (pull-to-refresh semantics). Manual `RefreshControl` triggers `Promise.all([refetchSummary(), refetchSettlements()])`.
+
+**Category drill-down (3 layers):**
+1. **Breakdown cards** — tappable DEDUCTIONS / ADDITIONS rows. Each row shows category icon, label, record count, and total. Tap fires lazy `GET_MY_SETTLEMENTS` filtered by `$category`.
+2. **Category Orders Modal** — lists orders matching that category with net amount and colored header. Tap an order to open detail.
+3. **Order Detail Modal** — shows all settlement lines for the order. Lines matching the selected category are highlighted with a colored left border + tinted background via `highlightCategory` state.
+
+**Category tag badges on history cards:** Each order card in the main list shows colored pill badges (Markup, Stock, Delivery, Commission, Promo, Tip, Catalog) derived from `getLineCategory()` per-settlement. Color respects `direction` for DELIVERY_COMMISSION (green when PAYABLE, amber when RECEIVABLE).
+
+**Helpers:**
+- `getLineCategory(s)` — mirrors `SettlementRepository.buildCategoryCondition()` exactly
+- `getCategoryConfig(category, direction)` — icon, color, explainer text (used in breakdown cards and modals)
+- `getCategoryColor(cat, direction?)` — consistent color map (used in category tags); accepts optional direction for DELIVERY_COMMISSION
+- `getCategoryLabel(cat)` — short i18n label for tags
 
 **No subscriptions** — earnings are not realtime; they change when admin settles.
 

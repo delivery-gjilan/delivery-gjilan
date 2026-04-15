@@ -8,6 +8,9 @@ export const GET_ORDERS = graphql(`
             orders {
                 id
                 displayId
+                channel
+                recipientPhone
+                recipientName
                 orderPrice
                 deliveryPrice
                 originalPrice
@@ -114,6 +117,9 @@ export const GET_ORDER = graphql(`
         order(id: $id) {
             id
             displayId
+            channel
+            recipientPhone
+            recipientName
             orderPrice
             deliveryPrice
             originalPrice
@@ -202,6 +208,9 @@ export const GET_ORDERS_BY_STATUS = graphql(`
         ordersByStatus(status: $status) {
             id
             displayId
+            channel
+            recipientPhone
+            recipientName
             orderPrice
             deliveryPrice
             originalPrice
@@ -252,6 +261,9 @@ export const GET_CANCELLED_ORDERS = graphql(`
         cancelledOrders {
             id
             displayId
+            channel
+            recipientPhone
+            recipientName
             orderPrice
             deliveryPrice
             totalPrice

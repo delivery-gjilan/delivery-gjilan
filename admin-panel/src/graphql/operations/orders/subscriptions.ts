@@ -5,6 +5,9 @@ export const ORDERS_SUBSCRIPTION = gql(`
         userOrdersUpdated {
             id
             displayId
+            channel
+            recipientPhone
+            recipientName
             orderPrice
             deliveryPrice
             originalPrice
@@ -74,6 +77,9 @@ export const ALL_ORDERS_SUBSCRIPTION = gql(`
         allOrdersUpdated {
             id
             displayId
+            channel
+            recipientPhone
+            recipientName
             orderPrice
             deliveryPrice
             originalPrice

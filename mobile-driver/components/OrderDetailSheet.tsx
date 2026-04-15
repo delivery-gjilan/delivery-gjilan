@@ -112,9 +112,10 @@ export function OrderDetailSheet({
     const statusIcon = STATUS_ICONS[order.status] ?? 'ellipse-outline';
 
     const bizName = order.businesses?.[0]?.business?.name ?? 'Business';
-    const customerName = order.user
-        ? `${order.user.firstName} ${order.user.lastName}`.trim()
-        : '';
+    const isDirectDispatch = order.channel === 'DIRECT_DISPATCH';
+    const customerName = isDirectDispatch
+        ? (order.recipientName ?? order.recipientPhone ?? null)
+        : (order.user ? `${order.user.firstName} ${order.user.lastName}`.trim() : '');
     const dropAddress = order.dropOffLocation?.address ?? '';
     const items = order.businesses?.flatMap((b) => b.items ?? []) ?? [];
     const totalItems = items.reduce((s, i) => s + (i.quantity || 1), 0);
@@ -164,6 +165,12 @@ export function OrderDetailSheet({
                             <Ionicons name={statusIcon as any} size={11} color={statusColor} />
                             <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
                         </View>
+                        {isDirectDispatch && (
+                            <View style={styles.directCallBadge}>
+                                <Ionicons name="call" size={10} color="#fff" />
+                                <Text style={styles.directCallText}>Direct Call</Text>
+                            </View>
+                        )}
                         <Text style={styles.orderNum}>#{order.displayId ?? '\u2014'}</Text>
                         <Pressable onPress={onClose} hitSlop={12} style={styles.closeBtn}>
                             <Ionicons name="close" size={16} color="#475569" />
@@ -373,6 +380,21 @@ const styles = StyleSheet.create({
     statusText: {
         fontSize: 10,
         fontWeight: '700',
+    },
+    directCallBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: '#F97316',
+        borderRadius: 4,
+        paddingHorizontal: 5,
+        paddingVertical: 2,
+    },
+    directCallText: {
+        color: '#fff',
+        fontSize: 9,
+        fontWeight: '700',
+        letterSpacing: 0.3,
     },
     orderNum: {
         flex: 1,

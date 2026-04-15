@@ -151,8 +151,8 @@ export function OrderAcceptSheet({
     const itemCount = allItems.length;
     const dropAddress = order.dropOffLocation?.address ?? '';
     const shortAddress = dropAddress.split(',')[0] || s.see_map;
-    const deliveryFee = Number(order.deliveryPrice ?? 0).toFixed(2);
-
+    const deliveryFee = Number(order.deliveryPrice ?? 0).toFixed(2);    const isDirectDispatch = order.channel === 'DIRECT_DISPATCH';
+    const recipientLabel = order.recipientName ?? order.recipientPhone ?? null;
     // ETA: descriptive label for food readiness
     const etaLabel = (() => {
         if (order.status === 'READY') return s.ready_now;
@@ -218,8 +218,19 @@ export function OrderAcceptSheet({
                         ) : null}
 
                         <View style={styles.headerTextBlock}>
-                            <Text style={styles.headerLabel}>{s.new_order}</Text>
+                            <View style={styles.headerLabelRow}>
+                                <Text style={styles.headerLabel}>{s.new_order}</Text>
+                                {isDirectDispatch && (
+                                    <View style={styles.directCallBadge}>
+                                        <Ionicons name="call" size={10} color="#fff" />
+                                        <Text style={styles.directCallText}>{s.direct_call}</Text>
+                                    </View>
+                                )}
+                            </View>
                             <Text style={styles.bizName} numberOfLines={1}>{bizName}</Text>
+                            {isDirectDispatch && recipientLabel ? (
+                                <Text style={styles.recipientLabel} numberOfLines={1}>{recipientLabel}</Text>
+                            ) : null}
                         </View>
                     </View>
 
@@ -464,12 +475,38 @@ const styles = StyleSheet.create({
     headerTextBlock: {
         flex: 1,
     },
+    headerLabelRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 2,
+    },
     headerLabel: {
         color: '#6B7280',
         fontSize: 11,
         fontWeight: '600',
         letterSpacing: 0.4,
-        marginBottom: 2,
+    },
+    directCallBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: '#F97316',
+        borderRadius: 4,
+        paddingHorizontal: 5,
+        paddingVertical: 2,
+    },
+    directCallText: {
+        color: '#fff',
+        fontSize: 9,
+        fontWeight: '700',
+        letterSpacing: 0.3,
+    },
+    recipientLabel: {
+        color: '#F97316',
+        fontSize: 12,
+        fontWeight: '600',
+        marginTop: 2,
     },
     bizName: {
         color: '#111827',

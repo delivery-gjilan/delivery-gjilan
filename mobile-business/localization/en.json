@@ -174,5 +174,19 @@
     "back_to_orders": "Back to Orders",
     "access_restricted": "Access Restricted",
     "no_permission": "You do not have permission to manage settings."
+  },
+  "directDispatch": {
+    "title": "Request Delivery",
+    "drivers_available": "{{count}} driver(s) available",
+    "no_drivers": "No drivers available right now",
+    "phone": "Recipient Phone",
+    "phone_placeholder": "+383 44 123 456",
+    "name": "Recipient Name",
+    "name_placeholder": "Optional",
+    "address": "Delivery Address",
+    "address_placeholder": "e.g. Rr. Adem Jashari, Nr. 12",
+    "notes": "Driver Notes",
+    "notes_placeholder": "Optional instructions for the driver",
+    "request_driver": "Request Driver"
   }
 }

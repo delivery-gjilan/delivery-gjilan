@@ -147,6 +147,19 @@ function calculateBusinessSubtotal(items: SettlementOrderItem[]): number {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
+type BusinessSettlement = GetMyBusinessSettlementsQuery['settlements'][number];
+
+interface SettlementOrderGroup {
+    orderId: string;
+    orderDisplayId: string;
+    order: BusinessSettlement['order'];
+    settlements: BusinessSettlement[];
+    totalGross: number;
+    totalReceivable: number;
+    totalPayable: number;
+    latestCreatedAt: string;
+}
+
 export default function FinancesScreen() {
     const { t } = useTranslation();
     const router = useRouter();
@@ -166,7 +179,7 @@ export default function FinancesScreen() {
     const [disputeModalRequestId, setDisputeModalRequestId] = useState<string | null>(null);
     const [rejectReason, setRejectReason] = useState('');
     const [respondingId, setRespondingId] = useState<string | null>(null);
-    const [selectedSettlementOrder, setSelectedSettlementOrder] = useState<GetMyBusinessSettlementsQuery['settlements'][number] | null>(null);
+    const [selectedSettlementOrder, setSelectedSettlementOrder] = useState<SettlementOrderGroup | null>(null);
 
     // ── Category drill-down state ──
     const [selectedCategory, setSelectedCategory] = useState<{ category: string; label: string; color: string; direction: string } | null>(null);
@@ -374,9 +387,9 @@ export default function FinancesScreen() {
     // Map a settlement line to its computed category (mirrors backend logic)
     const getLineCategory = (s: Settlement): string => {
         if (!s.rule?.id) {
-            if ((s as any).reason?.startsWith?.("Stock item")) return "STOCK_REMITTANCE";
-            if ((s as any).reason?.startsWith?.("Driver tip")) return "DRIVER_TIP";
-            if ((s as any).reason?.startsWith?.("Catalog product")) return "CATALOG_REVENUE";
+            if (s.reason?.startsWith("Stock item")) return "STOCK_REMITTANCE";
+            if (s.reason?.startsWith("Driver tip")) return "DRIVER_TIP";
+            if (s.reason?.startsWith("Catalog product")) return "CATALOG_REVENUE";
             return "AUTO_REMITTANCE";
         }
         if (s.rule.promotion?.id) return "PROMOTION_COST";
@@ -485,18 +498,7 @@ export default function FinancesScreen() {
 
     // Group settlements by order
     const settlementOrders = useMemo(() => {
-        type Settlement = GetMyBusinessSettlementsQuery['settlements'][number];
-        interface OrderGroup {
-            orderId: string;
-            orderDisplayId: string;
-            order: Settlement['order'];
-            settlements: Settlement[];
-            totalGross: number;
-            totalReceivable: number;
-            totalPayable: number;
-            latestCreatedAt: string;
-        }
-        const grouped: Record<string, OrderGroup> = {};
+        const grouped: Record<string, SettlementOrderGroup> = {};
         filteredSettlements.forEach((s) => {
             const orderId = String(s.order?.id ?? s.id);
             if (!grouped[orderId]) {
@@ -1708,8 +1710,29 @@ export default function FinancesScreen() {
                                             <Pressable
                                                 key={orderGroup.orderId}
                                                 onPress={() => {
-                                                    setHighlightCategory(selectedCategory.category);
-                                                    setSelectedSettlementOrder(orderGroup.settlement);
+                                                    // Look up the full OrderGroup from settlementOrders (loaded page)
+                                                    const existing = settlementOrders.find((o) => o.orderId === orderGroup.orderId);
+                                                    if (existing) {
+                                                        setHighlightCategory(selectedCategory.category);
+                                                        setSelectedSettlementOrder(existing);
+                                                    } else {
+                                                        // Build a compatible OrderGroup from category settlements
+                                                        const grpSettlements = orderGroup.settlements;
+                                                        const firstS = grpSettlements[0];
+                                                        const businessOrder = (firstS?.order?.businesses ?? []).find((e) => e?.business?.id === businessId);
+                                                        const items = businessOrder?.items ?? [];
+                                                        setHighlightCategory(selectedCategory.category);
+                                                        setSelectedSettlementOrder({
+                                                            orderId: orderGroup.orderId,
+                                                            orderDisplayId: orderGroup.displayId ?? firstS?.order?.displayId ?? orderGroup.orderId.slice(-6),
+                                                            order: firstS?.order ?? null,
+                                                            settlements: grpSettlements,
+                                                            totalGross: calculateBusinessSubtotal(items as SettlementOrderItem[]),
+                                                            totalReceivable: grpSettlements.filter((s) => s.direction === 'RECEIVABLE').reduce((acc, s) => acc + Number(s.amount ?? 0), 0),
+                                                            totalPayable: grpSettlements.filter((s) => s.direction === 'PAYABLE').reduce((acc, s) => acc + Number(s.amount ?? 0), 0),
+                                                            latestCreatedAt: orderGroup.latestCreatedAt,
+                                                        });
+                                                    }
                                                     setSelectedCategory(null);
                                                 }}
                                                 style={{
@@ -1742,7 +1765,7 @@ export default function FinancesScreen() {
                                                         </Text>
                                                     </View>
                                                     <Text style={{ fontSize: 11, color: '#6b7280' }}>
-                                                        {formatDate(orderGroup.latestCreatedAt)}
+                                                        {formatDateTime(orderGroup.latestCreatedAt)}
                                                     </Text>
                                                 </View>
                                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>

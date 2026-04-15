@@ -174,5 +174,19 @@
     "back_to_orders": "Kthehu te porositë",
     "access_restricted": "Qasje e kufizuar",
     "no_permission": "Nuk keni leje për menaxhimin e cilësimeve."
+  },
+  "directDispatch": {
+    "title": "Kërko Dërgesë",
+    "drivers_available": "{{count}} shofer(ë) të disponueshëm",
+    "no_drivers": "Nuk ka shoferë të disponueshëm tani",
+    "phone": "Telefoni i marrësit",
+    "phone_placeholder": "+383 44 123 456",
+    "name": "Emri i marrësit",
+    "name_placeholder": "Opsionale",
+    "address": "Adresa e dërgesës",
+    "address_placeholder": "p.sh. Rr. Adem Jashari, Nr. 12",
+    "notes": "Shënime për shofer",
+    "notes_placeholder": "Udhëzime opsionale për shofer",
+    "request_driver": "Kërko Shofer"
   }
 }

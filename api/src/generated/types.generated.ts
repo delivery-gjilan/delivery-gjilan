@@ -3439,6 +3439,10 @@ export type StoreStatus = {
   directDispatchEnabled: Scalars['Boolean']['output'];
   dispatchModeEnabled: Scalars['Boolean']['output'];
   earlyDispatchLeadMinutes: Scalars['Int']['output'];
+  /** Distance (km) beyond which gas vehicles are dispatched first. 0 = disabled. */
+  farOrderThresholdKm: Scalars['Float']['output'];
+  /** Seconds gas drivers get head-start before electric drivers are notified for far orders. */
+  gasPriorityWindowSeconds: Scalars['Int']['output'];
   googleMapsNavEnabled: Scalars['Boolean']['output'];
   inventoryModeEnabled: Scalars['Boolean']['output'];
   isStoreClosed: Scalars['Boolean']['output'];
@@ -3695,6 +3699,8 @@ export type UpdateStoreStatusInput = {
   directDispatchEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   dispatchModeEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   earlyDispatchLeadMinutes?: InputMaybe<Scalars['Int']['input']>;
+  farOrderThresholdKm?: InputMaybe<Scalars['Float']['input']>;
+  gasPriorityWindowSeconds?: InputMaybe<Scalars['Int']['input']>;
   googleMapsNavEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   inventoryModeEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   isStoreClosed: Scalars['Boolean']['input'];
@@ -5865,6 +5871,8 @@ export type StoreStatusResolvers<ContextType = GraphQLContext, ParentType extend
   directDispatchEnabled?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   dispatchModeEnabled?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   earlyDispatchLeadMinutes?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  farOrderThresholdKm?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  gasPriorityWindowSeconds?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   googleMapsNavEnabled?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   inventoryModeEnabled?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   isStoreClosed?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;

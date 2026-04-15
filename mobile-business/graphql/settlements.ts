@@ -27,6 +27,7 @@ export const GET_MY_BUSINESS_SETTLEMENTS = graphql(`
             currency
             status
             direction
+            reason
             paidAt
             paymentReference
             paymentMethod

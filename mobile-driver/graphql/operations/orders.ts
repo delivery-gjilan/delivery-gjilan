@@ -6,6 +6,9 @@ export const GET_ORDERS = graphql(`
             orders {
                 id
                 displayId
+                channel
+                recipientPhone
+                recipientName
                 orderDate
                 status
                 preparationMinutes
@@ -59,6 +62,9 @@ export const GET_ORDER = graphql(`
         order(id: $id) {
             id
             displayId
+            channel
+            recipientPhone
+            recipientName
             orderDate
             status
             orderPrice
@@ -133,6 +139,9 @@ export const ALL_ORDERS_UPDATED = graphql(`
         allOrdersUpdated {
             id
             displayId
+            channel
+            recipientPhone
+            recipientName
             orderDate
             status
             preparationMinutes

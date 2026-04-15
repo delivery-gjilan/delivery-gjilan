@@ -23,6 +23,8 @@ export default function Topbar() {
   const [showTimingModal, setShowTimingModal] = useState(false);
   const [earlyDispatchMin, setEarlyDispatchMin] = useState(5);
   const [gracePeriodMin, setGracePeriodMin] = useState(0);
+  const [farOrderThreshold, setFarOrderThreshold] = useState(5);
+  const [gasPriorityWindow, setGasPriorityWindow] = useState(30);
 
   const { data: storeStatusData, refetch } = useQuery(GET_STORE_STATUS);
   const [updateStoreStatus, { loading: updating }] = useMutation(UPDATE_STORE_STATUS, {
@@ -148,6 +150,8 @@ export default function Topbar() {
   const handleOpenTimingModal = () => {
     setEarlyDispatchMin(storeStatus?.earlyDispatchLeadMinutes ?? 5);
     setGracePeriodMin(storeStatus?.businessGracePeriodMinutes ?? 0);
+    setFarOrderThreshold(storeStatus?.farOrderThresholdKm ?? 5);
+    setGasPriorityWindow(storeStatus?.gasPriorityWindowSeconds ?? 30);
     setShowTimingModal(true);
   };
 
@@ -175,6 +179,8 @@ export default function Topbar() {
           bannerType: (storeStatus?.bannerType as BannerType | undefined) ?? BannerType.Info,
           earlyDispatchLeadMinutes: earlyDispatchMin,
           businessGracePeriodMinutes: gracePeriodMin,
+          farOrderThresholdKm: farOrderThreshold,
+          gasPriorityWindowSeconds: gasPriorityWindow,
         },
       },
     });
@@ -486,6 +492,40 @@ export default function Topbar() {
               onChange={(e) => setGracePeriodMin(Math.max(0, Math.min(10, Number(e.target.value))))}
               className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-zinc-600"
             />
+          </div>
+
+          <div className="border-t border-zinc-800/50 pt-4">
+            <p className="text-xs font-medium text-zinc-300 mb-3">Gas-Priority Dispatch</p>
+            <p className="text-[11px] text-zinc-500 mb-4">
+              When the nearest driver is farther than the threshold, gas-vehicle drivers are notified first.
+              Electric drivers are notified after the priority window. Set threshold to 0 to disable.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1.5">Far Order Threshold (km)</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={50}
+                  step={0.5}
+                  value={farOrderThreshold}
+                  onChange={(e) => setFarOrderThreshold(Math.max(0, Math.min(50, Number(e.target.value))))}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-zinc-600"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1.5">Gas Priority Window (seconds)</label>
+                <input
+                  type="number"
+                  min={10}
+                  max={120}
+                  step={5}
+                  value={gasPriorityWindow}
+                  onChange={(e) => setGasPriorityWindow(Math.max(10, Math.min(120, Number(e.target.value))))}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-zinc-600"
+                />
+              </div>
+            </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800/50">

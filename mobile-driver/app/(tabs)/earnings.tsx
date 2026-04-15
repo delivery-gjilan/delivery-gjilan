@@ -376,13 +376,14 @@ export default function EarningsScreen() {
         return "PLATFORM_COMMISSION";
     };
 
-    const getCategoryColor = (cat: string): string => {
+    const getCategoryColor = (cat: string, direction?: string): string => {
+        if (cat === 'DELIVERY_COMMISSION' && direction === 'PAYABLE') return '#22c55e';
         const map: Record<string, string> = {
             AUTO_REMITTANCE: '#ef4444',
             STOCK_REMITTANCE: '#a855f7',
             DELIVERY_COMMISSION: '#f59e0b',
             PLATFORM_COMMISSION: '#f59e0b',
-            PROMOTION_COST: '#3b82f6',
+            PROMOTION_COST: '#f59e0b',
             DRIVER_TIP: '#22c55e',
             CATALOG_REVENUE: '#ef4444',
         };
@@ -409,17 +410,6 @@ export default function EarningsScreen() {
                 contentContainerStyle={{ paddingBottom: 48 }}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
             >
-                {/* ── Page header ── */}
-                <View style={es.pageHeader}>
-                    <View>
-                        <Text style={[es.pageTitle, { color: theme.colors.text }]}>{t.earnings.title}</Text>
-                        <Text style={[es.pageSub, { color: theme.colors.subtext }]}>{t.earnings.subtitle}</Text>
-                    </View>
-                    <View style={[es.headerIcon, { backgroundColor: theme.colors.income + "20" }]}>
-                        <Ionicons name="wallet-outline" size={22} color={theme.colors.income} />
-                    </View>
-                </View>
-
                 {/* ── Period pills ── */}
                 <ScrollView
                     horizontal
@@ -787,11 +777,15 @@ export default function EarningsScreen() {
 
                                         {/* Category tags */}
                                         {(() => {
-                                            const cats = [...new Set(settlementsForOrder.map(getLineCategory))];
+                                            const catMap = new Map<string, string>();
+                                            settlementsForOrder.forEach((s) => {
+                                                const cat = getLineCategory(s);
+                                                if (!catMap.has(cat)) catMap.set(cat, s.direction ?? '');
+                                            });
                                             return (
                                                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
-                                                    {cats.map((cat) => {
-                                                        const color = getCategoryColor(cat);
+                                                    {Array.from(catMap.entries()).map(([cat, dir]) => {
+                                                        const color = getCategoryColor(cat, dir);
                                                         return (
                                                             <View key={cat} style={{ backgroundColor: color + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
                                                                 <Text style={{ fontSize: 10, fontWeight: '600', color }}>{getCategoryLabel(cat)}</Text>

@@ -1,32 +1,103 @@
-# FF2 — Business-Initiated Driver Dispatch
+# FF2 — Business-Initiated Direct Dispatch
 
-> **Status: Future Feature — Not yet implemented**
-> Discussed: 2026-03-22
-
----
-
-## ⚠️ Pre-Implementation Checklist
-
-> **Before writing a single line of code, read the current MDS docs.**
-> The system changes continuously. The design below was accurate on 2026-03-22 — driver lifecycle, order flow, settlement rules, and notification patterns may have all evolved.
-
-| Doc | Why you need it |
-|-----|----------------|
-| [A1 — ARCHITECTURE](../ARCHITECTURE.md) | Understand the full system topology — dispatch runs alongside the existing order flow |
-| [B4 — WATCHDOG_HEARTBEAT](../BACKEND/WATCHDOG_HEARTBEAT.md) | **Critical** — driver availability and presence are managed here; dispatch requests must plug into the same availability lock |
-| [B2 — ORDER_CREATION](../BACKEND/ORDER_CREATION.md) | Understand what an "order" is today so dispatch is designed to be a clearly separate concept |
-| [B7 — DATABASE_SCHEMA](../BACKEND/DATABASE_SCHEMA.md) | Verify `drivers`, `orders`, `businesses` schema before adding `dispatch_requests` table |
-| [BL1 — SETTLEMENTS](../BUSINESS_LOGIC/SETTLEMENTS_AND_PROMOTIONS.md) | Dispatch earnings need a settlement path; check existing settlement rules to avoid conflicts |
-| [M2 — PUSH & LIVE ACTIVITY](../MOBILE/PUSH_AND_LIVE_ACTIVITY.md) | Driver notification for dispatch must use the same FCM/APNs pipeline |
-| [B1 — API](../BACKEND/API.md) | Verify GraphQL resolver patterns and `@skipAuth` / `@requiresAuth` conventions |
-| [O4 — PUSH AUDIT](../OPERATIONS/PUSH_NOTIFICATIONS_AUDIT.md) | Check driver device token coverage before adding a new notification category |
-| [MDS_INDEX](../MDS_INDEX.md) | Read the full index for any docs added since 2026-03-22 that are relevant |
+> **Status: Implemented**
+> Originally planned: 2026-03-22 | Implemented: 2026-05-xx
 
 ---
 
-## Problem
+## What Was Built
 
-A business (market, restaurant, pharmacy) occasionally needs a driver to handle a run that is not a customer order — for example:
+A business can request a driver on-demand for a phone/walk-in customer delivery (off-platform order). This is called **Direct Dispatch** and runs through the existing `orders` table with `channel = 'DIRECT_DISPATCH'`, rather than a separate `dispatch_requests` table.
+
+### Architecture Decision
+
+Rather than a new table and a separate driver-accept flow, Direct Dispatch reuses the existing order + dispatch pipeline:
+- A new order is created with `channel = 'DIRECT_DISPATCH'` and `recipientPhone` / `recipientName` (no platform user)
+- The same `AllOrdersUpdated` subscription dispatches the order to available drivers
+- Drivers accept via the existing `ASSIGN_DRIVER_TO_ORDER` mutation
+- Settlements, heartbeat, and watchdog remain unchanged — no new driver state required
+
+---
+
+## Database
+
+### `storeSettings` table
+- `directDispatchEnabled: boolean` — global platform-wide toggle
+
+### `businesses` table
+- `directDispatchEnabled: boolean` — per-business opt-in toggle (both must be true for FAB to show)
+
+### `orders` table (existing)
+- `channel: enum('PLATFORM', 'DIRECT_DISPATCH')` — distinguishes order origin
+- `recipientPhone: varchar` — phone number of the off-platform recipient
+- `recipientName: varchar | null` — optional name of the recipient
+
+---
+
+## API
+
+**GraphQL mutations:**
+- `createDirectDispatchOrder(input: CreateDirectDispatchOrderInput!)` — business-role only, creates a `DIRECT_DISPATCH` order with recipient details and drop-off location
+
+**GraphQL queries:**
+- `directDispatchAvailability` — returns `{ available: boolean, reason: string | null, freeDriverCount: int }` — business-role only
+
+**Service:** `api/src/services/DirectDispatchService.ts`
+- `checkAvailability(businessId)` — validates both `storeSettings.directDispatchEnabled` and `business.directDispatchEnabled`, counts free drivers
+- `createOrder(businessId, input)` — creates the order record and fires real-time dispatch to drivers
+
+---
+
+## mobile-business UI
+
+### FAB gating
+The "Request Driver" FAB (indigo, phone icon, 56×56) appears on the Orders screen only when:
+1. `storeSettings.directDispatchEnabled` = true (from `GET_STORE_STATUS`)
+2. `business.directDispatchEnabled` = true (from `GET_BUSINESS_OPERATIONS`)
+
+### `DirectDispatchSheet` component
+`mobile-business/components/orders/DirectDispatchSheet.tsx` — slide-up animated bottom sheet:
+- Refetches `DirectDispatchAvailability` on open (network-only policy)
+- Status banner: green with driver count when available, red when unavailable
+- Form: recipientPhone (required), recipientName (optional), address (required), driverNotes (optional)
+- Drop-off coordinates are hardcoded (~Gjilan area) — map picker deferred
+- On submit: calls `CreateDirectDispatchOrder` mutation, closes sheet, refetches order list
+
+### `OrderCard` — Direct Dispatch display
+- `channel === 'DIRECT_DISPATCH'` orders show an indigo "Direct Call" badge (with phone icon) below the status badge
+- Customer name/phone shows `recipientName` / `recipientPhone` instead of the platform user record
+
+---
+
+## mobile-driver UI
+
+### `OrderAcceptSheet`
+- Orange "Direct Call" badge beside the "New Order" label when `order.channel === 'DIRECT_DISPATCH'`
+- Recipient name or phone shown in orange below the business name
+
+### `OrderPoolSheet`
+- Left accent bar is orange (`#F97316`) for direct dispatch orders (green = READY, indigo = PREPARING, orange = DIRECT_DISPATCH)
+- Orange "Direct Call" badge next to the business name
+
+### `OrderDetailSheet`
+- Orange "Direct Call" badge inline in the status pill row
+- `customerName` derived from `recipientName ?? recipientPhone` for direct dispatch orders
+
+---
+
+## Localization
+
+- `mobile-business`: `directDispatch` key section (EN + AL) — title, availability strings, field labels, submit button
+- `mobile-driver`: `orderAccept.direct_call` (EN: "Direct Call", AL: "Thirrje Direkte")
+
+---
+
+## What Was NOT Built (Deferred)
+
+- Map picker for drop-off coordinates (currently hardcoded to Gjilan area)
+- Separate settlement tracking per dispatch run (uses existing delivery-fee settlement path)
+- Interpretation B (business dispatching to their own off-platform customers with payment reconciliation)
+
 
 - Pick up stock from a supplier and bring it to the business
 - Deliver goods for a phone/walk-in customer who placed an order off-platform

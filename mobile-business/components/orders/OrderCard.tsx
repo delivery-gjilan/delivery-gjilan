@@ -73,10 +73,15 @@ export function OrderCard({
         : businessOrder.items;
     const hiddenItemsCount = businessOrder.items.length - visibleItems.length;
 
-    const customerName = order.user
+    const isDirectDispatch = (order as any).channel === 'DIRECT_DISPATCH';
+    const customerName = isDirectDispatch
+        ? ((order as any).recipientName ?? t('orders.call_in_customer', 'Call-in Customer'))
+        : order.user
         ? `${order.user.firstName} ${order.user.lastName}`.trim()
         : t('orders.customer', 'Customer');
-    const customerPhone = order.user?.phoneNumber?.trim();
+    const customerPhone = isDirectDispatch
+        ? ((order as any).recipientPhone ?? null)
+        : order.user?.phoneNumber?.trim();
 
     const elapsedText =
         (order.status === 'PENDING' && getElapsedTime(order.orderDate)) ||
@@ -166,6 +171,20 @@ export function OrderCard({
                                     {statusLabels[order.status]}
                                 </Text>
                             </View>
+                            {(order as any).channel === 'DIRECT_DISPATCH' && (
+                                <View
+                                    className="flex-row items-center px-2 py-0.5 rounded-full mt-1"
+                                    style={{ backgroundColor: '#818CF820' }}
+                                >
+                                    <Ionicons name="call" size={9} color="#818CF8" />
+                                    <Text
+                                        className="font-bold ml-1"
+                                        style={{ fontSize: 9, color: '#818CF8' }}
+                                    >
+                                        Direct Call
+                                    </Text>
+                                </View>
+                            )}
                             {isPreparing && (
                                 <Text className="text-subtext text-[10px] mt-1">
                                     {t('orders.tap_twice_mark_ready', 'Tap twice to mark ready')}

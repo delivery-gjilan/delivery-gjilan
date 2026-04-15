@@ -59,6 +59,12 @@ export const updateStoreStatus: NonNullable<MutationResolvers['updateStoreStatus
   if (input.directDispatchDriverReserve !== undefined && input.directDispatchDriverReserve !== null) {
     updateData.directDispatchDriverReserve = input.directDispatchDriverReserve;
   }
+  if (input.farOrderThresholdKm !== undefined && input.farOrderThresholdKm !== null) {
+    updateData.farOrderThresholdKm = input.farOrderThresholdKm;
+  }
+  if (input.gasPriorityWindowSeconds !== undefined && input.gasPriorityWindowSeconds !== null) {
+    updateData.gasPriorityWindowSeconds = input.gasPriorityWindowSeconds;
+  }
 
   let current;
   try {
@@ -110,6 +116,8 @@ export const updateStoreStatus: NonNullable<MutationResolvers['updateStoreStatus
     businessGracePeriodMinutes: row.businessGracePeriodMinutes,
     directDispatchEnabled: row.directDispatchEnabled,
     directDispatchDriverReserve: row.directDispatchDriverReserve,
+    farOrderThresholdKm: row.farOrderThresholdKm,
+    gasPriorityWindowSeconds: row.gasPriorityWindowSeconds,
   };
 
   // Broadcast to all subscribed clients
@@ -126,6 +134,8 @@ export const updateStoreStatus: NonNullable<MutationResolvers['updateStoreStatus
     businessGracePeriodMinutes: result.businessGracePeriodMinutes,
     directDispatchEnabled: result.directDispatchEnabled,
     directDispatchDriverReserve: result.directDispatchDriverReserve,
+    farOrderThresholdKm: result.farOrderThresholdKm,
+    gasPriorityWindowSeconds: result.gasPriorityWindowSeconds,
   } as any);
 
   await cache.invalidateStoreStatus();

@@ -15,6 +15,8 @@ export const GET_STORE_STATUS = graphql(`
             businessGracePeriodMinutes
             directDispatchEnabled
             directDispatchDriverReserve
+            farOrderThresholdKm
+            gasPriorityWindowSeconds
         }
     }
 `);
@@ -34,6 +36,8 @@ export const UPDATE_STORE_STATUS = graphql(`
             businessGracePeriodMinutes
             directDispatchEnabled
             directDispatchDriverReserve
+            farOrderThresholdKm
+            gasPriorityWindowSeconds
         }
     }
 `);
