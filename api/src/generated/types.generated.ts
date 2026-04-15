@@ -3468,6 +3468,7 @@ export type Subscription = {
   auditLogCreated: AuditLog;
   /** Business user receives messages from admin in real-time */
   businessMessageReceived: BusinessMessage;
+  businessUpdated: Business;
   driverConnectionStatusChanged: DriverConnection;
   /** Driver receives messages from admin in real-time */
   driverMessageReceived: DriverMessage;
@@ -3497,6 +3498,11 @@ export type SubscriptionauditLogCreatedArgs = {
   action?: InputMaybe<ActionType>;
   actorType?: InputMaybe<ActorType>;
   entityType?: InputMaybe<EntityType>;
+};
+
+
+export type SubscriptionbusinessUpdatedArgs = {
+  id: Scalars['ID']['input'];
 };
 
 
@@ -5893,6 +5899,7 @@ export type SubscriptionResolvers<ContextType = GraphQLContext, ParentType exten
   allOrdersUpdated?: SubscriptionResolver<Array<ResolversTypes['Order']>, "allOrdersUpdated", ParentType, ContextType>;
   auditLogCreated?: SubscriptionResolver<ResolversTypes['AuditLog'], "auditLogCreated", ParentType, ContextType, Partial<SubscriptionauditLogCreatedArgs>>;
   businessMessageReceived?: SubscriptionResolver<ResolversTypes['BusinessMessage'], "businessMessageReceived", ParentType, ContextType>;
+  businessUpdated?: SubscriptionResolver<ResolversTypes['Business'], "businessUpdated", ParentType, ContextType, RequireFields<SubscriptionbusinessUpdatedArgs, 'id'>>;
   driverConnectionStatusChanged?: SubscriptionResolver<ResolversTypes['DriverConnection'], "driverConnectionStatusChanged", ParentType, ContextType, RequireFields<SubscriptiondriverConnectionStatusChangedArgs, 'driverId'>>;
   driverMessageReceived?: SubscriptionResolver<ResolversTypes['DriverMessage'], "driverMessageReceived", ParentType, ContextType>;
   driverPttSignal?: SubscriptionResolver<ResolversTypes['DriverPttSignal'], "driverPttSignal", ParentType, ContextType, RequireFields<SubscriptiondriverPttSignalArgs, 'driverId'>>;

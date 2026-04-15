@@ -206,10 +206,13 @@ The primary operational screen. Full real-time order lifecycle management.
 - PENDING cards have **blinking red border** (`tick % 2 === 0`)
 - Collapsible item list (collapses beyond 5 items)
 - Left `StatusRail` includes status filters plus compact store open/closed, average prep-time, and Direct Call actions
+- The Direct Call action is removed live when the global store setting is turned off because the screen listens to `storeStatusUpdated`
+- Per-business direct-dispatch state is refreshed by the `businessUpdated(id)` subscription, so admin-side business edits drop the action without needing a full app restart
 - **ETA modal** — preset chips 5/10/15/25/30/45 min + custom input
 - **Add-time modal** — presets 5/10/15/20/30 + custom text input, capped at 180 min
 - **Store close modal** — optional closure reason text field
 - **Avg prep time modal** — presets 10/15/20/25/30/45 min
+- **Direct Dispatch modal** — full-screen request form with sticky header, fixed bottom action bar, live availability status, recipient fields, preparation-minute presets, and driver notes; no request-side fixed amount entry
 - **Product image modal** — populated for market-type businesses (shows item product images)
 - **Remove item modal** — required reason field
 - **Completed orders section** — paginated 10/page with Load More button

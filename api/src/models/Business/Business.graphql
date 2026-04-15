@@ -141,3 +141,7 @@ type Mutation {
     setBusinessSchedule(businessId: ID!, schedule: [BusinessDayHoursInput!]!): [BusinessDayHours!]!
     setBusinessFeatured(id: ID!, isFeatured: Boolean!, sortOrder: Int): Business!
 }
+
+extend type Subscription {
+    businessUpdated(id: ID!): Business!
+}

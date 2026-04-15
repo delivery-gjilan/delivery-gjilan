@@ -39,6 +39,20 @@ export const GET_BUSINESS_OPERATIONS = graphql(`
     }
 `);
 
+export const BUSINESS_UPDATED = graphql(`
+    subscription BusinessUpdated($id: ID!) {
+        businessUpdated(id: $id) {
+            id
+            avgPrepTimeMinutes
+            isTemporarilyClosed
+            temporaryClosureReason
+            isOpen
+            directDispatchEnabled
+            directDispatchFixedAmount
+        }
+    }
+`);
+
 export const UPDATE_BUSINESS_OPERATIONS = graphql(`
     mutation UpdateBusinessOperations($id: ID!, $input: UpdateBusinessInput!) {
         updateBusiness(id: $id, input: $input) {
@@ -47,6 +61,8 @@ export const UPDATE_BUSINESS_OPERATIONS = graphql(`
             isTemporarilyClosed
             temporaryClosureReason
             isOpen
+            directDispatchEnabled
+            directDispatchFixedAmount
         }
     }
 `);

@@ -132,13 +132,15 @@ Use three layers:
 ## Current Automated Coverage Files
 
 - `api/src/services/__tests__/OrderDispatchService.test.ts`
-   - covers first-wave selection, second-wave expansion, cancellation, gas-priority split, pickup fallback, no-eligible-driver no-op, and shift restriction edge cases
+   - covers first-wave selection, second-wave expansion, cancellation, gas-priority split, pickup fallback, no-eligible-driver no-op, shift restriction edge cases, and early-dispatch reschedule timing math
 - `api/src/services/__tests__/OrderLifecycleModule.test.ts`
    - covers PREPARING scheduling side effects and READY transition re-dispatch behavior when early dispatch state already exists
 - `api/src/models/Order/resolvers/Mutation/__tests__/assignDriverToOrder.test.ts`
    - covers self-assign guards, successful cancellation of active dispatch, admin reassignment behavior, and concurrent self-assign race protection
 - `api/src/models/Order/resolvers/Mutation/__tests__/createDirectDispatchOrder.test.ts`
    - covers direct-dispatch order creation passing preparation time through to early dispatch scheduling and graceful fallback when queueing fails
+- `api/src/models/Order/resolvers/Mutation/__tests__/updatePreparationTime.test.ts`
+   - covers PREPARING prep-time updates, pending early-dispatch rescheduling, fired-state no-op behavior, and notification fanout for customer, driver, and admins
 - `mobile-driver/utils/__tests__/driver-logic.test.ts`
    - covers dispatch-mode hiding of available/pool lists plus related pure order filtering behavior
 
@@ -163,7 +165,7 @@ Run only dispatch-focused tests once created:
 
 ```bash
 cd api
-npx vitest run src/services/__tests__/OrderDispatchService.test.ts src/models/Order/resolvers/Mutation/__tests__/assignDriverToOrder.test.ts
+npx vitest run src/services/__tests__/OrderLifecycleModule.test.ts src/services/__tests__/OrderDispatchService.test.ts src/models/Order/resolvers/Mutation/__tests__/assignDriverToOrder.test.ts src/models/Order/resolvers/Mutation/__tests__/createDirectDispatchOrder.test.ts src/models/Order/resolvers/Mutation/__tests__/updatePreparationTime.test.ts
 ```
 
 ## First Build Order For Fast Wins

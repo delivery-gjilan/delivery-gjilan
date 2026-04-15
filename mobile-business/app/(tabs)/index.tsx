@@ -21,7 +21,7 @@ import {
     UPDATE_PREPARATION_TIME,
     REMOVE_ORDER_ITEM,
 } from '@/graphql/orders';
-import { GET_BUSINESS_OPERATIONS, UPDATE_BUSINESS_OPERATIONS } from '@/graphql/business';
+import { BUSINESS_UPDATED, GET_BUSINESS_OPERATIONS, UPDATE_BUSINESS_OPERATIONS } from '@/graphql/business';
 import { useAuthStore } from '@/store/authStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { OrderStatus as GqlOrderStatus } from '@/gql/graphql';
@@ -44,7 +44,30 @@ import { AddTimeModal } from '@/components/orders/AddTimeModal';
 import { ProductImagesModal } from '@/components/orders/ProductImagesModal';
 import { RemoveItemModal } from '@/components/orders/RemoveItemModal';
 import { DirectDispatchSheet } from '@/components/orders/DirectDispatchSheet';
-import { GET_STORE_STATUS } from '@/graphql/store';
+import { GET_STORE_STATUS, STORE_STATUS_UPDATED } from '@/graphql/store';
+
+type StoreStatusSubscriptionPayload = {
+    storeStatusUpdated: {
+        isStoreClosed: boolean;
+        closedMessage?: string | null;
+        bannerEnabled: boolean;
+        bannerMessage?: string | null;
+        bannerType: string;
+        directDispatchEnabled: boolean;
+    };
+};
+
+type BusinessOperationsSubscriptionPayload = {
+    businessUpdated: {
+        id: string;
+        avgPrepTimeMinutes: number;
+        isTemporarilyClosed: boolean;
+        temporaryClosureReason?: string | null;
+        isOpen: boolean;
+        directDispatchEnabled: boolean;
+        directDispatchFixedAmount: number;
+    } | null;
+};
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -254,11 +277,48 @@ export default function OrdersScreen() {
     const avgPrepTime = businessOps?.avgPrepTimeMinutes ?? 20;
 
     // ── Direct Dispatch ──
-    const { data: storeStatusData } = useQuery(GET_STORE_STATUS);
+    const { data: storeStatusData } = useQuery(GET_STORE_STATUS, { pollInterval: 30000 });
     const [showDispatchSheet, setShowDispatchSheet] = useState(false);
     const directDispatchEnabled =
         Boolean(storeStatusData?.getStoreStatus?.directDispatchEnabled) &&
         Boolean(businessOps?.directDispatchEnabled);
+
+    useSubscription<StoreStatusSubscriptionPayload>(STORE_STATUS_UPDATED, {
+        onData: ({ data: subscriptionData }) => {
+            const updated = subscriptionData.data?.storeStatusUpdated;
+            if (!updated) return;
+
+            apolloClient.cache.updateQuery(
+                { query: GET_STORE_STATUS },
+                (existing: typeof storeStatusData | null | undefined) => ({
+                    getStoreStatus: {
+                        ...(existing?.getStoreStatus ?? {}),
+                        ...updated,
+                    },
+                }),
+            );
+        },
+    });
+
+    useSubscription<BusinessOperationsSubscriptionPayload>(BUSINESS_UPDATED, {
+        skip: !businessId,
+        variables: { id: businessId },
+        onData: ({ data: subscriptionData }) => {
+            const updatedBusiness = subscriptionData.data?.businessUpdated;
+            if (!updatedBusiness) return;
+
+            apolloClient.cache.updateQuery(
+                { query: GET_BUSINESS_OPERATIONS, variables: { id: businessId } },
+                () => ({ business: updatedBusiness }),
+            );
+        },
+    });
+
+    useEffect(() => {
+        if (!directDispatchEnabled && showDispatchSheet) {
+            setShowDispatchSheet(false);
+        }
+    }, [directDispatchEnabled, showDispatchSheet]);
 
     // ── Order lists ──
     const _allOrders = (data?.orders?.orders as unknown as Order[]) || [];
@@ -549,7 +609,10 @@ export default function OrdersScreen() {
                         }
                     }}
                     onEditPrepTime={() => dispatch({ type: 'OPEN_PREP_MODAL', time: avgPrepTime })}
-                    onOpenDirectDispatch={() => setShowDispatchSheet(true)}
+                    onOpenDirectDispatch={() => {
+                        if (!directDispatchEnabled) return;
+                        setShowDispatchSheet(true);
+                    }}
                 />
 
                 {/* Order list */}

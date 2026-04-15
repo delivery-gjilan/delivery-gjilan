@@ -52,9 +52,11 @@ Background tolerance:
 - FAB visibility requires both:
   - global `storeSettings.directDispatchEnabled`
   - per-business `business.directDispatchEnabled`
-- `DirectDispatchSheet` checks availability, shows free-driver status, and submits `createDirectDispatchOrder`.
-- Sheet collects preparation minutes so early dispatch timing can be scheduled from the request.
-- Sheet no longer shows the fixed amount.
+- The orders screen keeps global direct-dispatch state fresh via `storeStatusUpdated`, so when ops turns the feature off globally the Direct Call control disappears without waiting for a manual refresh.
+- The business-level gate is refreshed by the `businessUpdated(id)` subscription, so admin changes to a specific business hide the control and close any open request modal immediately after the update lands.
+- `DirectDispatchSheet` is presented as a full-screen request modal, checks availability, shows free-driver status, and submits `createDirectDispatchOrder`.
+- The modal collects preparation minutes so early dispatch timing can be scheduled from the request.
+- The modal no longer shows the fixed amount.
 - Direct-dispatch orders are visually tagged as Direct Call in order cards.
 - `OUT_FOR_DELIVERY` stays in upcoming/active list to preserve direct-call operational visibility.
 

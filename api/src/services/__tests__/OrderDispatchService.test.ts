@@ -316,4 +316,38 @@ describe('OrderDispatchService dispatch waves', () => {
             expect.arrayContaining(['driver-a', 'driver-b']),
         );
     });
+
+    it('rescheduleEarlyDispatch recalculates remaining preparation time from preparingAt', async () => {
+        vi.setSystemTime(new Date('2026-04-15T10:10:00.000Z'));
+        const { service } = makeService([]);
+
+        vi.spyOn(service as any, 'getEarlyDispatchLeadMin').mockResolvedValue(5);
+        const scheduleSpy = vi.spyOn(service, 'scheduleEarlyDispatch').mockResolvedValue();
+
+        await service.rescheduleEarlyDispatch(
+            'order-8',
+            new Date('2026-04-15T10:00:00.000Z').getTime(),
+            20,
+            {} as any,
+        );
+
+        expect(scheduleSpy).toHaveBeenCalledWith('order-8', 10, {});
+    });
+
+    it('rescheduleEarlyDispatch dispatches immediately when the new early window is already due', async () => {
+        vi.setSystemTime(new Date('2026-04-15T10:10:00.000Z'));
+        const { service } = makeService([]);
+
+        vi.spyOn(service as any, 'getEarlyDispatchLeadMin').mockResolvedValue(5);
+        const scheduleSpy = vi.spyOn(service, 'scheduleEarlyDispatch').mockResolvedValue();
+
+        await service.rescheduleEarlyDispatch(
+            'order-9',
+            new Date('2026-04-15T10:00:00.000Z').getTime(),
+            12,
+            {} as any,
+        );
+
+        expect(scheduleSpy).toHaveBeenCalledWith('order-9', 5, {});
+    });
 });

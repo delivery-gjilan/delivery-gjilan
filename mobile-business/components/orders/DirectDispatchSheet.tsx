@@ -5,11 +5,11 @@ import {
     Pressable,
     TextInput,
     StyleSheet,
-    Animated,
     KeyboardAvoidingView,
     Platform,
     ActivityIndicator,
     ScrollView,
+    Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,9 +37,6 @@ export function DirectDispatchSheet({ visible, onClose, onCreated, t }: Props) {
     const [driverNotes, setDriverNotes] = useState('');
     const [submitError, setSubmitError] = useState<string | null>(null);
 
-    const slideAnim = React.useRef(new Animated.Value(600)).current;
-    const backdropAnim = React.useRef(new Animated.Value(0)).current;
-
     const { data: availData, loading: availLoading, refetch: refetchAvail } = useQuery(
         DIRECT_DISPATCH_AVAILABILITY,
         {
@@ -65,37 +62,11 @@ export function DirectDispatchSheet({ visible, onClose, onCreated, t }: Props) {
             setDriverNotes('');
             setSubmitError(null);
             refetchAvail();
-            Animated.parallel([
-                Animated.spring(slideAnim, {
-                    toValue: 0,
-                    useNativeDriver: true,
-                    damping: 24,
-                    stiffness: 280,
-                    mass: 0.9,
-                }),
-                Animated.timing(backdropAnim, {
-                    toValue: 1,
-                    duration: 200,
-                    useNativeDriver: true,
-                }),
-            ]).start();
         }
-    }, [visible, refetchAvail, slideAnim, backdropAnim]);
+    }, [visible, refetchAvail]);
 
     const dismiss = useCallback(() => {
-        Animated.parallel([
-            Animated.spring(slideAnim, {
-                toValue: 600,
-                useNativeDriver: true,
-                damping: 20,
-                stiffness: 300,
-            }),
-            Animated.timing(backdropAnim, {
-                toValue: 0,
-                duration: 180,
-                useNativeDriver: true,
-            }),
-        ]).start(onClose);
+        onClose();
     }, [onClose]);
 
     const parsedPreparationMinutes = Number(preparationMinutes);
@@ -141,35 +112,34 @@ export function DirectDispatchSheet({ visible, onClose, onCreated, t }: Props) {
     if (!visible) return null;
 
     return (
-        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-            <Animated.View style={[styles.backdrop, { opacity: backdropAnim }]} pointerEvents="auto">
-                <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} />
-            </Animated.View>
-
+        <Modal
+            visible={visible}
+            animationType="slide"
+            presentationStyle="fullScreen"
+            statusBarTranslucent
+            onRequestClose={dismiss}
+        >
             <KeyboardAvoidingView
-                style={styles.keyboardView}
+                style={styles.screen}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                pointerEvents="box-none"
             >
-                <Animated.View
+                <View
                     style={[
-                        styles.sheet,
-                        { paddingBottom: insets.bottom + 12, transform: [{ translateY: slideAnim }] },
+                        styles.content,
+                        { paddingTop: insets.top + 12 },
                     ]}
-                    pointerEvents="auto"
                 >
-                    {/* Handle */}
-                    <View style={styles.handleWrap}>
-                        <View style={styles.handle} />
-                    </View>
-
-                    {/* Header */}
                     <View style={styles.header}>
                         <View style={styles.headerLeft}>
                             <View style={styles.headerIcon}>
                                 <Ionicons name="call" size={16} color="#818CF8" />
                             </View>
-                            <Text style={styles.headerTitle}>{s.title ?? 'Request Delivery'}</Text>
+                            <View style={styles.headerTextWrap}>
+                                <Text style={styles.headerTitle}>{s.title ?? 'Request Delivery'}</Text>
+                                <Text style={styles.headerSubtitle}>
+                                    {s.prep_hint ?? 'Set preparation minutes so drivers can be notified before the order is ready.'}
+                                </Text>
+                            </View>
                         </View>
                         <Pressable style={styles.closeBtn} onPress={dismiss} hitSlop={8}>
                             <Ionicons name="close" size={16} color="#64748b" />
@@ -180,6 +150,10 @@ export function DirectDispatchSheet({ visible, onClose, onCreated, t }: Props) {
                         bounces={false}
                         showsVerticalScrollIndicator={false}
                         keyboardShouldPersistTaps="handled"
+                        contentContainerStyle={[
+                            styles.scrollContent,
+                            { paddingBottom: insets.bottom + 160 },
+                        ]}
                     >
                         <View style={styles.heroCard}>
                             <View style={styles.heroIconWrap}>
@@ -188,7 +162,7 @@ export function DirectDispatchSheet({ visible, onClose, onCreated, t }: Props) {
                             <View style={{ flex: 1 }}>
                                 <Text style={styles.heroTitle}>{s.prep_title ?? 'Dispatch timing'}</Text>
                                 <Text style={styles.heroText}>
-                                    {s.prep_hint ?? 'Set preparation minutes so drivers can be notified before the order is ready.'}
+                                    {s.prep_description ?? 'Use this request for call-in orders. Dispatch starts from admin assignment flow while drivers are notified around the selected prep window.'}
                                 </Text>
                             </View>
                         </View>
@@ -300,7 +274,9 @@ export function DirectDispatchSheet({ visible, onClose, onCreated, t }: Props) {
                             </View>
                         </View>
 
-                        {/* Error message */}
+                    </ScrollView>
+
+                    <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}> 
                         {submitError ? (
                             <View style={styles.errorBanner}>
                                 <Ionicons name="alert-circle" size={14} color="#F87171" />
@@ -308,7 +284,17 @@ export function DirectDispatchSheet({ visible, onClose, onCreated, t }: Props) {
                             </View>
                         ) : null}
 
-                        {/* Submit button */}
+                        <View style={styles.footerSummary}>
+                            <Text style={styles.footerSummaryLabel}>
+                                {s.footer_summary ?? 'Dispatch trigger'}
+                            </Text>
+                            <Text style={styles.footerSummaryValue}>
+                                {parsedPreparationMinutes >= 1 && parsedPreparationMinutes <= 180
+                                    ? `${parsedPreparationMinutes} min prep window`
+                                    : (s.footer_summary_fallback ?? 'Choose a valid prep time')}
+                            </Text>
+                        </View>
+
                         <Pressable
                             style={[styles.submitBtn, !canSubmit && styles.submitBtnDisabled]}
                             onPress={handleSubmit}
@@ -325,49 +311,44 @@ export function DirectDispatchSheet({ visible, onClose, onCreated, t }: Props) {
                                 </>
                             )}
                         </Pressable>
-                    </ScrollView>
-                </Animated.View>
+                    </View>
+                </View>
             </KeyboardAvoidingView>
-        </View>
+        </Modal>
     );
 }
 
 const styles = StyleSheet.create({
-    backdrop: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-    },
-    keyboardView: {
+    screen: {
         flex: 1,
-        justifyContent: 'flex-end',
+        backgroundColor: '#09090b',
     },
-    sheet: {
-        backgroundColor: '#111113',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
+    content: {
+        flex: 1,
+        backgroundColor: '#09090b',
         paddingHorizontal: 16,
-        maxHeight: '85%',
     },
-    handleWrap: {
-        alignItems: 'center',
-        paddingVertical: 10,
-    },
-    handle: {
-        width: 36,
-        height: 4,
-        borderRadius: 2,
-        backgroundColor: '#374151',
+    scrollContent: {
+        paddingBottom: 12,
     },
     header: {
         flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 12,
+        alignItems: 'flex-start',
+        gap: 12,
+        paddingBottom: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: '#18181b',
+        marginBottom: 16,
+    },
+    headerTextWrap: {
+        flex: 1,
+        gap: 4,
     },
     headerLeft: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 10,
+        flex: 1,
     },
     headerIcon: {
         width: 32,
@@ -382,10 +363,15 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#E5E7EB',
     },
+    headerSubtitle: {
+        fontSize: 12,
+        lineHeight: 18,
+        color: '#94A3B8',
+    },
     closeBtn: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         backgroundColor: '#1F2937',
         alignItems: 'center',
         justifyContent: 'center',
@@ -397,9 +383,9 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         paddingVertical: 12,
         borderRadius: 14,
-        backgroundColor: '#18181b',
+        backgroundColor: '#111827',
         borderWidth: 1,
-        borderColor: '#27272a',
+        borderColor: '#1F2937',
         marginBottom: 12,
     },
     heroIconWrap: {
@@ -502,12 +488,39 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
         borderRadius: 10,
         backgroundColor: '#F8717112',
-        marginBottom: 12,
+        marginBottom: 10,
     },
     errorText: {
         fontSize: 12,
         color: '#F87171',
         flex: 1,
+    },
+    footer: {
+        position: 'absolute',
+        left: 16,
+        right: 16,
+        bottom: 0,
+        paddingTop: 12,
+        backgroundColor: '#09090b',
+        borderTopWidth: 1,
+        borderTopColor: '#18181b',
+    },
+    footerSummary: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        marginBottom: 10,
+    },
+    footerSummaryLabel: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#94A3B8',
+    },
+    footerSummaryValue: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#E5E7EB',
     },
     submitBtn: {
         flexDirection: 'row',

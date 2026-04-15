@@ -2338,6 +2338,7 @@ type Subscription {
 
   """Business user receives messages from admin in real-time"""
   businessMessageReceived: BusinessMessage!
+  businessUpdated(id: ID!): Business!
   driverConnectionStatusChanged(driverId: ID!): DriverConnection!
 
   """Driver receives messages from admin in real-time"""
