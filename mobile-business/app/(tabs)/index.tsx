@@ -259,7 +259,6 @@ export default function OrdersScreen() {
     const directDispatchEnabled =
         Boolean(storeStatusData?.getStoreStatus?.directDispatchEnabled) &&
         Boolean(businessOps?.directDispatchEnabled);
-    const directDispatchFixedAmount = Number(businessOps?.directDispatchFixedAmount ?? 0);
 
     // ── Order lists ──
     const _allOrders = (data?.orders?.orders as unknown as Order[]) || [];
@@ -756,7 +755,6 @@ export default function OrdersScreen() {
                 onClose={() => setShowDispatchSheet(false)}
                 onCreated={() => refetch()}
                 t={t}
-                fixedAmount={directDispatchFixedAmount}
             />
 
         </SafeAreaView>

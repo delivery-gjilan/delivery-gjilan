@@ -8,6 +8,7 @@ const mockedOrderNotifications = vi.hoisted(() => ({
 
 const mockedInfra = vi.hoisted(() => {
     const cacheStore = new Map<string, unknown>();
+
     return {
         cacheStore,
         cacheGet: vi.fn(async (key: string) => cacheStore.get(key)),
@@ -250,5 +251,69 @@ describe('OrderDispatchService dispatch waves', () => {
         await service.dispatchOrder('order-5', {} as any);
         expect(mockedOrderNotifications.notifyDriversOrderReady).not.toHaveBeenCalled();
         expect(mockedOrderNotifications.notifyDriversOrderExpanded).not.toHaveBeenCalled();
+    });
+
+    it('applies valid shift restriction and only notifies matching on-shift drivers', async () => {
+        const { service } = makeService([
+            {
+                userId: 'shift-driver',
+                onlinePreference: true,
+                connectionStatus: 'CONNECTED',
+                driverLat: 42.46,
+                driverLng: 21.47,
+                vehicleType: 'GAS',
+            },
+            {
+                userId: 'non-shift-driver',
+                onlinePreference: true,
+                connectionStatus: 'CONNECTED',
+                driverLat: 42.4601,
+                driverLng: 21.4701,
+                vehicleType: 'ELECTRIC',
+            },
+        ]);
+
+        mockedInfra.cacheStore.set('admin:shift:driverIds', ['shift-driver']);
+        vi.spyOn(service as any, '_getPickupCoords').mockResolvedValue({ lat: 42.46, lng: 21.47, businessName: 'Biz' });
+        vi.spyOn(service as any, '_getOrderRouteDistanceKm').mockResolvedValue(1);
+        vi.spyOn(service as any, 'getGasPrioritySettings').mockResolvedValue({ thresholdKm: 5, windowSeconds: 30 });
+
+        await service.dispatchOrder('order-6', {} as any);
+
+        expect(mockedOrderNotifications.notifyDriversOrderReady).toHaveBeenCalledTimes(1);
+        expect(mockedOrderNotifications.notifyDriversOrderReady.mock.calls[0][1]).toEqual(['shift-driver']);
+    });
+
+    it('ignores stale shift IDs with no overlap and falls back to all eligible drivers', async () => {
+        const { service } = makeService([
+            {
+                userId: 'driver-a',
+                onlinePreference: true,
+                connectionStatus: 'CONNECTED',
+                driverLat: 42.46,
+                driverLng: 21.47,
+                vehicleType: 'GAS',
+            },
+            {
+                userId: 'driver-b',
+                onlinePreference: true,
+                connectionStatus: 'CONNECTED',
+                driverLat: 42.4601,
+                driverLng: 21.4701,
+                vehicleType: 'ELECTRIC',
+            },
+        ]);
+
+        mockedInfra.cacheStore.set('admin:shift:driverIds', ['missing-driver']);
+        vi.spyOn(service as any, '_getPickupCoords').mockResolvedValue({ lat: 42.46, lng: 21.47, businessName: 'Biz' });
+        vi.spyOn(service as any, '_getOrderRouteDistanceKm').mockResolvedValue(1);
+        vi.spyOn(service as any, 'getGasPrioritySettings').mockResolvedValue({ thresholdKm: 5, windowSeconds: 30 });
+
+        await service.dispatchOrder('order-7', {} as any);
+
+        expect(mockedOrderNotifications.notifyDriversOrderReady).toHaveBeenCalledTimes(1);
+        expect(mockedOrderNotifications.notifyDriversOrderReady.mock.calls[0][1]).toEqual(
+            expect.arrayContaining(['driver-a', 'driver-b']),
+        );
     });
 });

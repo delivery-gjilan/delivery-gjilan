@@ -11,22 +11,37 @@ import { useState } from "react";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import { BannerType } from "@/gql/graphql";
+import { GET_BUSINESSES, UPDATE_BUSINESS } from "@/graphql/operations/businesses";
+import type { BusinessesQuery } from "@/gql/graphql";
+
+type BusinessRow = BusinessesQuery["businesses"][number];
 
 export default function Topbar() {
   const router = useRouter();
   const { admin, logout } = useAuth();
+  const isSuperAdmin = admin?.role === "SUPER_ADMIN";
   const [showModal, setShowModal] = useState(false);
   const [customMessage, setCustomMessage] = useState("");
   const [showBannerModal, setShowBannerModal] = useState(false);
   const [bannerMessage, setBannerMessage] = useState("");
   const [bannerType, setBannerType] = useState<BannerType>(BannerType.Info);
   const [showTimingModal, setShowTimingModal] = useState(false);
+  const [showDirectDispatchModal, setShowDirectDispatchModal] = useState(false);
+  const [showFixedAmountModal, setShowFixedAmountModal] = useState(false);
+  const [directDispatchTargetEnabled, setDirectDispatchTargetEnabled] = useState(false);
+  const [directDispatchSearch, setDirectDispatchSearch] = useState("");
+  const [selectedBusinessIds, setSelectedBusinessIds] = useState<string[]>([]);
+  const [businessAmountDrafts, setBusinessAmountDrafts] = useState<Record<string, string>>({});
+  const [applyingDirectDispatch, setApplyingDirectDispatch] = useState(false);
   const [earlyDispatchMin, setEarlyDispatchMin] = useState(5);
   const [gracePeriodMin, setGracePeriodMin] = useState(0);
   const [farOrderThreshold, setFarOrderThreshold] = useState(5);
   const [gasPriorityWindow, setGasPriorityWindow] = useState(30);
 
   const { data: storeStatusData, refetch } = useQuery(GET_STORE_STATUS);
+  const { data: businessesData, refetch: refetchBusinesses } = useQuery<BusinessesQuery>(GET_BUSINESSES, {
+    skip: !isSuperAdmin,
+  });
   const [updateStoreStatus, { loading: updating }] = useMutation(UPDATE_STORE_STATUS, {
     onCompleted: () => {
       refetch();
@@ -34,6 +49,7 @@ export default function Topbar() {
       setShowBannerModal(false);
     },
   });
+  const [updateBusiness] = useMutation(UPDATE_BUSINESS);
 
   const storeStatus = storeStatusData?.getStoreStatus;
   const isStoreClosed = storeStatus?.isStoreClosed ?? false;
@@ -43,7 +59,24 @@ export default function Topbar() {
   const inventoryModeEnabled = storeStatus?.inventoryModeEnabled ?? false;
   const directDispatchGlobalEnabled = storeStatus?.directDispatchEnabled ?? false;
   const assignmentModeLabel = dispatchModeEnabled ? 'Dispatch mode' : 'Self-assign mode';
-  const isSuperAdmin = admin?.role === "SUPER_ADMIN";
+  const businesses = businessesData?.businesses ?? [];
+  const filteredBusinesses = businesses.filter((business) => {
+    const query = directDispatchSearch.trim().toLowerCase();
+    if (!query) return true;
+    return (
+      business.name.toLowerCase().includes(query) ||
+      business.businessType.toLowerCase().includes(query) ||
+      business.location.address.toLowerCase().includes(query)
+    );
+  });
+  const selectedBusinesses = businesses.filter((business) => selectedBusinessIds.includes(business.id));
+  const missingFixedAmountBusinesses = selectedBusinesses.filter((business) => {
+    if (!directDispatchTargetEnabled) return false;
+    const currentAmount = Number(business.directDispatchFixedAmount ?? 0);
+    const draftAmount = Number(businessAmountDrafts[business.id] ?? 0);
+    return currentAmount <= 0 && draftAmount <= 0;
+  });
+  const businessesMissingFixedAmount = businesses.filter((business) => Number(business.directDispatchFixedAmount ?? 0) <= 0);
 
   const handleToggleStore = async (close: boolean) => {
     if (close) {
@@ -155,18 +188,91 @@ export default function Topbar() {
     setShowTimingModal(true);
   };
 
-  const handleToggleDirectDispatch = async () => {
-    await updateStoreStatus({
-      variables: {
-        input: {
-          isStoreClosed,
-          bannerEnabled,
-          bannerMessage: storeStatus?.bannerMessage ?? null,
-          bannerType: (storeStatus?.bannerType as BannerType | undefined) ?? BannerType.Info,
-          directDispatchEnabled: !directDispatchGlobalEnabled,
+  const handleOpenDirectDispatchModal = () => {
+    const nextEnabled = !directDispatchGlobalEnabled;
+    const initialDrafts = Object.fromEntries(
+      businesses
+        .filter((business) => Number(business.directDispatchFixedAmount ?? 0) > 0)
+        .map((business) => [business.id, String(Number(business.directDispatchFixedAmount).toFixed(2))]),
+    );
+    setDirectDispatchTargetEnabled(nextEnabled);
+    setSelectedBusinessIds(
+      businesses
+        .filter((business) => Boolean(business.directDispatchEnabled) !== nextEnabled)
+        .map((business) => business.id),
+    );
+    setBusinessAmountDrafts(initialDrafts);
+    setDirectDispatchSearch("");
+    setShowFixedAmountModal(false);
+    setShowDirectDispatchModal(true);
+  };
+
+  const toggleBusinessSelection = (businessId: string) => {
+    setSelectedBusinessIds((current) =>
+      current.includes(businessId)
+        ? current.filter((id) => id !== businessId)
+        : [...current, businessId],
+    );
+  };
+
+  const updateBusinessAmountDraft = (businessId: string, value: string) => {
+    setBusinessAmountDrafts((current) => ({ ...current, [businessId]: value }));
+  };
+
+  const applyDirectDispatchRollout = async () => {
+    setApplyingDirectDispatch(true);
+    try {
+      await updateStoreStatus({
+        variables: {
+          input: {
+            isStoreClosed,
+            bannerEnabled,
+            bannerMessage: storeStatus?.bannerMessage ?? null,
+            bannerType: (storeStatus?.bannerType as BannerType | undefined) ?? BannerType.Info,
+            directDispatchEnabled: directDispatchTargetEnabled,
+          },
         },
-      },
-    });
+      });
+
+      for (const businessId of selectedBusinessIds) {
+        const business = businesses.find((row) => row.id === businessId);
+        if (!business) continue;
+
+        const input: Record<string, unknown> = {
+          directDispatchEnabled: directDispatchTargetEnabled,
+        };
+
+        if (directDispatchTargetEnabled) {
+          const currentAmount = Number(business.directDispatchFixedAmount ?? 0);
+          const draftAmount = Number(businessAmountDrafts[businessId] ?? 0);
+          const finalAmount = currentAmount > 0 ? currentAmount : draftAmount;
+          if (finalAmount > 0) {
+            input.directDispatchFixedAmount = finalAmount;
+          }
+        }
+
+        await updateBusiness({
+          variables: {
+            id: businessId,
+            input,
+          },
+        });
+      }
+
+      await Promise.all([refetch(), refetchBusinesses()]);
+      setShowFixedAmountModal(false);
+      setShowDirectDispatchModal(false);
+    } finally {
+      setApplyingDirectDispatch(false);
+    }
+  };
+
+  const handleConfirmDirectDispatchModal = async () => {
+    if (directDispatchTargetEnabled && missingFixedAmountBusinesses.length > 0) {
+      setShowFixedAmountModal(true);
+      return;
+    }
+    await applyDirectDispatchRollout();
   };
 
   const handleSaveTiming = async () => {
@@ -288,8 +394,8 @@ export default function Topbar() {
               <div className="w-px h-4 bg-zinc-800" />
 
               <button
-                onClick={handleToggleDirectDispatch}
-                disabled={updating}
+                onClick={handleOpenDirectDispatchModal}
+                disabled={updating || applyingDirectDispatch}
                 className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
                   directDispatchGlobalEnabled
                     ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20'
@@ -537,6 +643,177 @@ export default function Topbar() {
               disabled={updating}
             >
               {updating ? "Saving..." : "Save Timing"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={showDirectDispatchModal}
+        onClose={() => {
+          if (applyingDirectDispatch) return;
+          setShowDirectDispatchModal(false);
+          setShowFixedAmountModal(false);
+        }}
+        title={directDispatchTargetEnabled ? "Enable Direct Dispatch" : "Disable Direct Dispatch"}
+        size="lg"
+      >
+        <div className="space-y-4">
+          <div className="bg-indigo-500/5 border border-indigo-500/10 rounded-lg p-3">
+            <p className="text-indigo-200/80 text-xs">
+              {directDispatchTargetEnabled
+                ? "Choose which businesses should be enabled together with the global direct-dispatch switch. Businesses enabled here must have a fixed amount configured."
+                : "Choose which businesses should be disabled together with the global direct-dispatch switch."}
+            </p>
+            <p className="text-zinc-400 text-[11px] mt-2">
+              {directDispatchTargetEnabled
+                ? "By default, businesses that are currently disabled are preselected."
+                : "By default, businesses that are currently enabled are preselected."}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_220px] gap-3 items-end">
+            <Input
+              label="Find business"
+              value={directDispatchSearch}
+              onChange={(e) => setDirectDispatchSearch(e.target.value)}
+              placeholder="Search by name, type, or address"
+            />
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setSelectedBusinessIds(filteredBusinesses.map((business) => business.id))}
+              >
+                Select visible
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setSelectedBusinessIds([])}
+              >
+                Clear
+              </Button>
+              {directDispatchTargetEnabled && (
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setSelectedBusinessIds(businessesMissingFixedAmount.map((business) => business.id))}
+                >
+                  Missing fixed €
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-zinc-800 overflow-hidden">
+            <div className="grid grid-cols-[auto_minmax(0,1fr)_110px_110px] gap-3 px-4 py-3 bg-zinc-900/80 border-b border-zinc-800 text-[11px] uppercase tracking-wide text-zinc-500">
+              <span>Apply</span>
+              <span>Business</span>
+              <span>Current</span>
+              <span>Fixed €</span>
+            </div>
+            <div className="max-h-[340px] overflow-y-auto divide-y divide-zinc-800">
+              {filteredBusinesses.length === 0 ? (
+                <div className="px-4 py-6 text-sm text-zinc-500">No businesses match this search.</div>
+              ) : (
+                filteredBusinesses.map((business) => {
+                  const selected = selectedBusinessIds.includes(business.id);
+                  return (
+                    <label
+                      key={business.id}
+                      className="grid grid-cols-[auto_minmax(0,1fr)_110px_110px] gap-3 px-4 py-3 items-center cursor-pointer hover:bg-zinc-900/40"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => toggleBusinessSelection(business.id)}
+                        className="h-4 w-4 rounded border-zinc-700 bg-zinc-900 text-indigo-500 focus:ring-indigo-500/30"
+                      />
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-zinc-100 truncate">{business.name}</div>
+                        <div className="text-xs text-zinc-500 truncate">{business.location.address}</div>
+                      </div>
+                      <div className="text-xs">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full border ${business.directDispatchEnabled ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-zinc-900 text-zinc-500 border-zinc-800'}`}>
+                          {business.directDispatchEnabled ? 'Enabled' : 'Disabled'}
+                        </span>
+                      </div>
+                      <div className={`text-xs font-medium ${Number(business.directDispatchFixedAmount ?? 0) > 0 ? 'text-zinc-300' : 'text-amber-400'}`}>
+                        {Number(business.directDispatchFixedAmount ?? 0) > 0
+                          ? `€${Number(business.directDispatchFixedAmount).toFixed(2)}`
+                          : 'Missing'}
+                      </div>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between text-xs text-zinc-500">
+            <span>
+              Global switch will be set to {directDispatchTargetEnabled ? 'ON' : 'OFF'}.
+            </span>
+            <span>{selectedBusinessIds.length} business(es) selected</span>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800/50">
+            <Button variant="outline" onClick={() => setShowDirectDispatchModal(false)} disabled={applyingDirectDispatch}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmDirectDispatchModal} disabled={applyingDirectDispatch}>
+              {applyingDirectDispatch
+                ? 'Applying...'
+                : directDispatchTargetEnabled
+                ? 'Enable Globally + Apply'
+                : 'Disable Globally + Apply'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={showFixedAmountModal}
+        onClose={() => {
+          if (applyingDirectDispatch) return;
+          setShowFixedAmountModal(false);
+        }}
+        title="Set Missing Fixed Amounts"
+      >
+        <div className="space-y-4">
+          <div className="bg-amber-500/5 border border-amber-500/10 rounded-lg p-3">
+            <p className="text-amber-200/80 text-xs">
+              These businesses are selected for direct dispatch but do not have a fixed amount yet. Set one before enabling them.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {missingFixedAmountBusinesses.map((business) => (
+              <div key={business.id} className="rounded-lg border border-zinc-800 p-3">
+                <div className="text-sm font-medium text-zinc-100 mb-2">{business.name}</div>
+                <input
+                  type="number"
+                  min={0}
+                  step={0.5}
+                  value={businessAmountDrafts[business.id] ?? ''}
+                  onChange={(e) => updateBusinessAmountDraft(business.id, e.target.value)}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-zinc-600"
+                  placeholder="e.g. 3.50"
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800/50">
+            <Button variant="outline" onClick={() => setShowFixedAmountModal(false)} disabled={applyingDirectDispatch}>
+              Back
+            </Button>
+            <Button
+              onClick={applyDirectDispatchRollout}
+              disabled={applyingDirectDispatch || missingFixedAmountBusinesses.some((business) => Number(businessAmountDrafts[business.id] ?? 0) <= 0)}
+            >
+              {applyingDirectDispatch ? 'Applying...' : 'Save Amounts + Apply'}
             </Button>
           </div>
         </div>

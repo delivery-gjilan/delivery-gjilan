@@ -201,6 +201,100 @@ describe('isOrderWithinFiveMinWindow', () => {
     });
 });
 
+type DriverOrderLite = {
+    id: string;
+    status: 'READY' | 'PREPARING' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED';
+    driver?: { id: string } | null;
+    estimatedReadyAt?: string | null;
+    preparingAt?: string | null;
+    preparationMinutes?: number | string | null;
+};
+
+function deriveAvailableOrders(
+    orders: DriverOrderLite[],
+    currentDriverId: string,
+    now: number,
+    earlyDispatchMs: number,
+    dispatchModeEnabled: boolean,
+    skippedIds: Set<string>,
+): DriverOrderLite[] {
+    const assignedOrders = orders.filter((order) => {
+        if (order.status === 'DELIVERED' || order.status === 'CANCELLED') return false;
+        return order.driver?.id === currentDriverId;
+    });
+
+    if (dispatchModeEnabled) return [];
+
+    return orders
+        .filter((order) => {
+            if (order.driver?.id) return false;
+            if (skippedIds.has(order.id)) return false;
+            if (order.status === 'READY') return true;
+            if (order.status === 'PREPARING') {
+                const estimatedReadyMs = getEstimatedReadyMs(order);
+                return estimatedReadyMs !== null && estimatedReadyMs - now <= earlyDispatchMs;
+            }
+            return false;
+        })
+        .sort((a, b) => {
+            const rank = (status: string) => (status === 'READY' ? 0 : status === 'PREPARING' ? 1 : 2);
+            const rankDiff = rank(a.status) - rank(b.status);
+            if (rankDiff !== 0) return rankDiff;
+
+            const aEta = getEstimatedReadyMs(a) ?? Number.MAX_SAFE_INTEGER;
+            const bEta = getEstimatedReadyMs(b) ?? Number.MAX_SAFE_INTEGER;
+            return aEta - bEta;
+        });
+}
+
+function derivePoolOrders(
+    orders: DriverOrderLite[],
+    now: number,
+    earlyDispatchMs: number,
+    dispatchModeEnabled: boolean,
+): DriverOrderLite[] {
+    if (dispatchModeEnabled) return [];
+
+    return orders.filter((order) => {
+        if (order.driver?.id) return false;
+        if (order.status === 'READY') return true;
+        if (order.status === 'PREPARING') {
+            const estimatedReadyMs = getEstimatedReadyMs(order);
+            return estimatedReadyMs !== null && estimatedReadyMs - now <= earlyDispatchMs;
+        }
+        return false;
+    });
+}
+
+describe('dispatchModeEnabled order filtering', () => {
+    it('returns no available or pool orders when dispatch mode is enabled', () => {
+        const now = Date.now();
+        const orders: DriverOrderLite[] = [
+            { id: 'ready-1', status: 'READY', driver: null },
+            { id: 'prep-1', status: 'PREPARING', driver: null, estimatedReadyAt: new Date(now + 60_000).toISOString() },
+        ];
+
+        expect(deriveAvailableOrders(orders, 'driver-1', now, 5 * 60 * 1000, true, new Set())).toEqual([]);
+        expect(derivePoolOrders(orders, now, 5 * 60 * 1000, true)).toEqual([]);
+    });
+
+    it('restores normal available and pool filtering when dispatch mode is disabled', () => {
+        const now = Date.now();
+        const orders: DriverOrderLite[] = [
+            { id: 'ready-1', status: 'READY', driver: null },
+            { id: 'prep-1', status: 'PREPARING', driver: null, estimatedReadyAt: new Date(now + 60_000).toISOString() },
+            { id: 'future-prep', status: 'PREPARING', driver: null, estimatedReadyAt: new Date(now + 10 * 60 * 1000).toISOString() },
+            { id: 'assigned', status: 'READY', driver: { id: 'driver-2' } },
+        ];
+
+        const available = deriveAvailableOrders(orders, 'driver-1', now, 5 * 60 * 1000, false, new Set(['ready-1']));
+        const pool = derivePoolOrders(orders, now, 5 * 60 * 1000, false);
+
+        expect(available.map((order) => order.id)).toEqual(['prep-1']);
+        expect(pool.map((order) => order.id)).toEqual(['ready-1', 'prep-1']);
+    });
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // useAcceptOrderMutation — error classification
 // ─────────────────────────────────────────────────────────────────────────────

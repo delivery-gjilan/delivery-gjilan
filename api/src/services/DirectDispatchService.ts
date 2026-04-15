@@ -43,6 +43,7 @@ export interface DirectDispatchAvailabilityResult {
 export interface CreateDirectDispatchInput {
     businessId: string;
     dropOffLocation: { latitude: number; longitude: number; address: string };
+    preparationMinutes: number;
     recipientPhone: string;
     recipientName?: string | null;
     driverNotes?: string | null;
@@ -127,6 +128,13 @@ export class DirectDispatchService {
             throw new Error('Direct dispatch fixed amount is not configured for this business.');
         }
 
+        if (!Number.isInteger(input.preparationMinutes) || input.preparationMinutes < 1 || input.preparationMinutes > 180) {
+            throw new Error('Preparation time must be between 1 and 180 minutes.');
+        }
+
+        const now = new Date();
+        const estimatedReadyAt = new Date(now.getTime() + input.preparationMinutes * 60_000);
+
         const displayId = this.generateDisplayId();
 
         const [order] = await this.db
@@ -146,12 +154,14 @@ export class DirectDispatchService {
                 prioritySurcharge: 0,
                 driverTip: 0,
                 paymentCollection: 'CASH_TO_DRIVER',
-                status: 'READY',
+                status: 'PREPARING',
+                preparationMinutes: input.preparationMinutes,
+                preparingAt: now.toISOString(),
+                estimatedReadyAt: estimatedReadyAt.toISOString(),
                 dropoffLat: input.dropOffLocation.latitude,
                 dropoffLng: input.dropOffLocation.longitude,
                 dropoffAddress: input.dropOffLocation.address,
                 driverNotes: input.driverNotes ?? null,
-                readyAt: new Date().toISOString(),
             })
             .returning();
 
@@ -160,6 +170,7 @@ export class DirectDispatchService {
                 orderId: order.id,
                 displayId,
                 businessId: input.businessId,
+                preparationMinutes: input.preparationMinutes,
                 recipientPhone: input.recipientPhone,
                 fixedAmount,
             },

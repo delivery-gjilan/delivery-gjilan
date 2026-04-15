@@ -154,6 +154,11 @@ The per-business Direct Dispatch toggle is exposed in both flows:
 
 The businesses list query shape used by the list-page modal includes `directDispatchEnabled` and `directDispatchFixedAmount`, so both edit paths read and persist the same per-business Direct Dispatch settings.
 
+The topbar Direct Dispatch control is no longer a one-click global flip. It opens a rollout modal where SUPER_ADMIN can:
+- switch the global store setting on or off,
+- choose which businesses to apply the per-business toggle change to,
+- and, when enabling selected businesses with no configured fixed amount, complete a second fixed-amount modal before the rollout is applied.
+
 ### Auth Flow
 
 1. Login form (`/login`) calls `useAuth().login` → `Login` mutation → JWT + refresh token stored in `localStorage` as `authToken` / `refreshToken`.

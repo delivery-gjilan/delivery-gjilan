@@ -497,6 +497,9 @@ input CreateDirectDispatchOrderInput {
   """Delivery address for the recipient."""
   dropOffLocation: LocationInput!
 
+  """Estimated preparation time in minutes for early dispatch scheduling."""
+  preparationMinutes: Int!
+
   """Optional name of the recipient."""
   recipientName: String
 

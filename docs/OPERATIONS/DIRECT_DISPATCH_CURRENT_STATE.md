@@ -21,8 +21,12 @@ Service: `api/src/services/DirectDispatchService.ts`
   - `channel = DIRECT_DISPATCH`
   - `recipientPhone`, `recipientName`
   - fixed fee from business-level `directDispatchFixedAmount` stored in `deliveryPrice`
-  - `status = READY`
+  - `status = PREPARING`
+  - `preparationMinutes`, `preparingAt`, `estimatedReadyAt`
   - dropoff coordinates/address from request input
+
+- The mutation schedules early dispatch using the submitted preparation minutes.
+- When the order later becomes `READY`, the normal READY dispatch path still re-runs as needed.
 
 ### Availability Formula (current)
 
@@ -49,7 +53,8 @@ Background tolerance:
   - global `storeSettings.directDispatchEnabled`
   - per-business `business.directDispatchEnabled`
 - `DirectDispatchSheet` checks availability, shows free-driver status, and submits `createDirectDispatchOrder`.
-- Sheet shows the admin-configured fixed amount for that business (read-only in mobile-business).
+- Sheet collects preparation minutes so early dispatch timing can be scheduled from the request.
+- Sheet no longer shows the fixed amount.
 - Direct-dispatch orders are visually tagged as Direct Call in order cards.
 - `OUT_FOR_DELIVERY` stays in upcoming/active list to preserve direct-call operational visibility.
 
@@ -73,7 +78,10 @@ Background tolerance:
   - `EditBusinessModal` (list page)
   - `EditBusinessDetailModal` (detail page)
   - includes `directDispatchEnabled` and `directDispatchFixedAmount`
-- Global Direct Dispatch toggle exists in topbar store settings controls.
+- Global Direct Dispatch control in the topbar opens a rollout modal:
+  - confirms whether global direct dispatch should be switched on or off
+  - lets admin choose which businesses to apply the per-business toggle to
+  - when enabling selected businesses without a fixed amount, opens a second modal requiring fixed-amount entry before applying changes
 
 ---
 

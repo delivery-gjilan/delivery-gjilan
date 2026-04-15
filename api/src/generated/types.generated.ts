@@ -522,6 +522,8 @@ export type CreateDirectDispatchOrderInput = {
   driverNotes?: InputMaybe<Scalars['String']['input']>;
   /** Delivery address for the recipient. */
   dropOffLocation: LocationInput;
+  /** Estimated preparation time in minutes for early dispatch scheduling. */
+  preparationMinutes: Scalars['Int']['input'];
   /** Optional name of the recipient. */
   recipientName?: InputMaybe<Scalars['String']['input']>;
   /** Phone number of the recipient. */

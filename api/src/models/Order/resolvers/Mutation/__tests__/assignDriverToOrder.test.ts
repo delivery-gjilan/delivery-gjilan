@@ -179,4 +179,58 @@ describe('assignDriverToOrder resolver', () => {
         expect(mockedDeps.cancelDispatch).not.toHaveBeenCalled();
         expect(mockedDeps.notifyDriverOrderReassigned).toHaveBeenCalledWith({}, 'driver-old', 'order-1');
     });
+
+    it('concurrent driver self-assign attempts allow one success and one conflict', async () => {
+        const firstCtx = makeContext('DRIVER');
+        const secondCtx = makeContext('DRIVER');
+
+        const sharedFindById = vi.fn(async () => ({
+            id: 'order-1',
+            userId: 'customer-1',
+            driverId: null,
+            status: 'READY',
+            dropoffAddress: 'Gjilan',
+        }));
+
+        let assignCount = 0;
+        const sharedAssignDriverToOrder = vi.fn(async () => {
+            assignCount += 1;
+            if (assignCount === 1) {
+                return {
+                    id: 'order-1',
+                    status: 'READY',
+                    driver: { id: 'driver-1', firstName: 'Driver', lastName: 'One' },
+                };
+            }
+
+            return null;
+        });
+
+        const sharedFindDriver = vi.fn(async () => ({
+            id: 'driver-1',
+            role: 'DRIVER',
+            firstName: 'Driver',
+            lastName: 'One',
+        }));
+
+        for (const ctx of [firstCtx, secondCtx]) {
+            ctx.orderService.orderRepository.findById = sharedFindById;
+            ctx.orderService.assignDriverToOrder = sharedAssignDriverToOrder;
+            ctx.authService.authRepository.findById = sharedFindDriver;
+        }
+
+        const [firstResult, secondResult] = await Promise.allSettled([
+            assignDriverToOrder(null as any, { id: 'order-1', driverId: null }, firstCtx),
+            assignDriverToOrder(null as any, { id: 'order-1', driverId: null }, secondCtx),
+        ]);
+
+        expect([firstResult.status, secondResult.status].sort()).toEqual(['fulfilled', 'rejected']);
+
+        const rejected = firstResult.status === 'rejected' ? firstResult : secondResult;
+        expect(String(rejected.reason)).toMatch(/already been taken by another driver/);
+
+        expect(sharedAssignDriverToOrder).toHaveBeenCalledTimes(2);
+        expect(mockedDeps.cancelDispatch).toHaveBeenCalledTimes(1);
+        expect(mockedDeps.notifyDriverOrderAssigned).toHaveBeenCalledTimes(1);
+    });
 });

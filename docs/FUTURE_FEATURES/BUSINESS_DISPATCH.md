@@ -10,8 +10,8 @@
 Direct Dispatch creates normal `orders` rows with `channel = DIRECT_DISPATCH` instead of introducing a separate dispatch table.
 
 - Business requests a driver from mobile-business.
-- API creates a lightweight order with recipient details.
-- Existing order dispatch and assignment flow sends it to available drivers.
+- API creates a lightweight order with recipient details and preparation timing.
+- Existing early-dispatch + READY dispatch flow sends it to available drivers.
 - Driver accepts using the normal assignment flow.
 
 ---
@@ -42,6 +42,7 @@ Direct Dispatch creates normal `orders` rows with `channel = DIRECT_DISPATCH` in
 ### Mutation
 - `createDirectDispatchOrder(input)`
   - Business-role only
+  - Input includes `preparationMinutes`
   - Creates a `DIRECT_DISPATCH` order and enters normal dispatch flow
 
 ### Service
@@ -50,6 +51,7 @@ Direct Dispatch creates normal `orders` rows with `channel = DIRECT_DISPATCH` in
   - validates per-business `directDispatchFixedAmount > 0`
   - `createOrder(input, requestingUserId)` inserts the order
   - uses business-level `directDispatchFixedAmount` as order `deliveryPrice`
+  - creates the order in `PREPARING` with `preparationMinutes` and `estimatedReadyAt`
 
 ---
 
@@ -81,8 +83,8 @@ The request-driver FAB appears only when:
 
 - Checks `directDispatchAvailability` on open
 - Shows free-driver status banner
-- Collects recipient phone/name, address, driver notes
-- Displays read-only fixed amount configured by admin for the business
+- Collects recipient phone/name, preparation minutes, address, driver notes
+- Does not expose the fixed amount in the request modal
 - Submits `createDirectDispatchOrder`
 
 ### Active Order Visibility

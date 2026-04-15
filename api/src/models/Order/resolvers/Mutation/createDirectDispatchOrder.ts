@@ -41,6 +41,7 @@ export const createDirectDispatchOrder: NonNullable<MutationResolvers['createDir
         {
             businessId,
             dropOffLocation: input.dropOffLocation,
+            preparationMinutes: input.preparationMinutes,
             recipientPhone: input.recipientPhone,
             recipientName: input.recipientName ?? null,
             driverNotes: input.driverNotes ?? null,
@@ -48,13 +49,13 @@ export const createDirectDispatchOrder: NonNullable<MutationResolvers['createDir
         userId,
     );
 
-    // Fire dispatch (reuse existing dispatch pipeline)
+    // Schedule early dispatch based on preparation time for the direct-call order.
     try {
         const dispatchService = getDispatchService();
-        await dispatchService.dispatchOrder(dbOrder.id, notificationService);
+        await dispatchService.scheduleEarlyDispatch(dbOrder.id, input.preparationMinutes, notificationService);
     } catch (err) {
         log.error({ err, orderId: dbOrder.id }, 'directDispatch:dispatch:error');
-        // Order is still created — dispatch will be retried or admin can assign manually
+        // Order is still created — business can still mark READY later or admin can assign manually.
     }
 
     // Map to GraphQL Order type

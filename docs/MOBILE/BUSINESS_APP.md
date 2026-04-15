@@ -228,12 +228,13 @@ The primary operational screen. Full real-time order lifecycle management.
 - **`GetStoreStatus`** — queried to gate the Direct Call rail action visibility (both `storeSettings.directDispatchEnabled` AND `business.directDispatchEnabled` must be true)
 - **`DirectDispatchAvailability`** — checked when the Direct Call rail action opens the sheet (network-only); contains `available`, `reason`, `freeDriverCount`
 - **`CreateDirectDispatchOrder`** — mutation to create a direct dispatch order (recipientPhone, recipientName?, address, driverNotes?)
+  - Includes `preparationMinutes` so early dispatch timing can be scheduled from the request flow
 
 **Direct Dispatch rail action:**
 When both `storeSettings.directDispatchEnabled` and `business.directDispatchEnabled` are true, an indigo `Direct Call` action appears in the left status rail on the orders screen. Tapping it opens the `DirectDispatchSheet` bottom sheet.
 
 **`components/orders/DirectDispatchSheet.tsx`:**
-Slide-up animated bottom sheet for requesting a driver on-demand. Shows an availability status banner (green when drivers are free, red when none available). Form fields: recipient phone (required), recipient name (optional), address (required), driver notes (optional). Submits `CreateDirectDispatchOrder` mutation. On success, closes the sheet and triggers an order list refetch. Drop-off coordinates are hardcoded to the Gjilan area (42.46, 21.47) as a placeholder; map picker support is deferred.
+Slide-up animated bottom sheet for requesting a driver on-demand. Shows an availability status banner (green when drivers are free, red when none available) plus preparation-time controls so dispatch can start before the order is ready. Form fields: recipient phone (required), recipient name (optional), preparation minutes (required), address (required), driver notes (optional). Submits `CreateDirectDispatchOrder` mutation. On success, closes the sheet and triggers an order list refetch. Drop-off coordinates are hardcoded to the Gjilan area (42.46, 21.47) as a placeholder; map picker support is deferred.
 
 **`OrderCard` — Direct Dispatch display:**
 - Orders with `channel === 'DIRECT_DISPATCH'` show an indigo "Direct Call" badge (phone icon) below the status badge in the card header
