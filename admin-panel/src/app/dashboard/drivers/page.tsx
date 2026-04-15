@@ -762,7 +762,7 @@ export default function DriversPage() {
                         <div>
                             <label className="flex items-center gap-1.5 text-sm font-medium text-zinc-300 mb-1.5"><Percent size={13} className="text-zinc-500" />Own Vehicle Bonus (EUR)</label>
                             <p className="text-xs text-zinc-500 mb-2">Fixed per-delivery bonus paid when this driver uses their own vehicle.</p>
-                            <Input type="number" min="0" max="999" step="0.5" value={settingsForm.ownVehicleBonusAmount} onChange={(e) => setSettingsForm(f => ({ ...f, ownVehicleBonusAmount: e.target.value }))} placeholder="e.g. 1.50" />
+                            <Input type="number" min="0" max="999" step="0.01" value={settingsForm.ownVehicleBonusAmount} onChange={(e) => setSettingsForm(f => ({ ...f, ownVehicleBonusAmount: e.target.value }))} placeholder="e.g. 1.50" />
                         </div>
                         <label className="flex items-start gap-3 rounded-xl border border-sky-500/20 bg-sky-500/5 p-3.5 cursor-pointer hover:bg-sky-500/10 transition-colors">
                             <input type="checkbox" checked={settingsForm.isDemoAccount} onChange={(e) => setSettingsForm(f => ({ ...f, isDemoAccount: e.target.checked }))} className="mt-0.5 h-4 w-4 accent-sky-500 rounded" />
@@ -832,7 +832,7 @@ export default function DriversPage() {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-zinc-300 mb-1.5">Own Vehicle Bonus (EUR)</label>
-                            <Input type="number" min="0" max="999" step="0.5" value={createForm.ownVehicleBonusAmount} onChange={(e) => setCreateForm(f => ({ ...f, ownVehicleBonusAmount: e.target.value }))} placeholder="e.g. 1.50" />
+                            <Input type="number" min="0" max="999" step="0.01" value={createForm.ownVehicleBonusAmount} onChange={(e) => setCreateForm(f => ({ ...f, ownVehicleBonusAmount: e.target.value }))} placeholder="e.g. 1.50" />
                         </div>
                         <label className="flex items-start gap-3 rounded-xl border border-sky-500/20 bg-sky-500/5 p-3.5 cursor-pointer hover:bg-sky-500/10 transition-colors">
                             <input type="checkbox" checked={createForm.isDemoAccount} onChange={(e) => setCreateForm(f => ({ ...f, isDemoAccount: e.target.checked }))} className="mt-0.5 h-4 w-4 accent-sky-500 rounded" />
