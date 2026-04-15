@@ -12,7 +12,7 @@ import {
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
-import { UserRole } from "@/gql/graphql";
+import { DriverVehicleType, UserRole } from "@/gql/graphql";
 import { useAuth } from "@/lib/auth-context";
 import { useAdminPtt } from "@/lib/hooks/useAdminPtt";
 import {
@@ -65,6 +65,8 @@ interface DriverItem {
     imageUrl?: string;
     commissionPercentage?: number | null;
     maxActiveOrders?: number | null;
+    hasOwnVehicle?: boolean | null;
+    vehicleType?: DriverVehicleType | null;
     driverLocation?: {
         latitude: number;
         longitude: number;
@@ -188,7 +190,7 @@ export default function DriversPage() {
 
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [settingsTarget, setSettingsTarget] = useState<DriverItem | null>(null);
-    const [settingsForm, setSettingsForm] = useState({ commissionPercentage: "", maxActiveOrders: "", isDemoAccount: false, hasOwnVehicle: false, vehicleType: "" as "" | "GAS" | "ELECTRIC" });
+    const [settingsForm, setSettingsForm] = useState({ commissionPercentage: "", maxActiveOrders: "", isDemoAccount: false, hasOwnVehicle: false, vehicleType: "" as "" | DriverVehicleType });
     const [settingsError, setSettingsError] = useState("");
 
     /* --- search, debounce & pagination --- */
@@ -251,7 +253,7 @@ export default function DriversPage() {
             maxActiveOrders:      driver.maxActiveOrders != null      ? String(driver.maxActiveOrders)      : "2",
             isDemoAccount: Boolean(driver.isDemoAccount),
             hasOwnVehicle: Boolean(driver.hasOwnVehicle),
-            vehicleType: (driver.vehicleType as "" | "GAS" | "ELECTRIC") ?? "",
+            vehicleType: driver.vehicleType ?? "",
         });
         setSettingsError("");
         setShowSettingsModal(true);
@@ -718,10 +720,10 @@ export default function DriversPage() {
                         <div>
                             <label className="flex items-center gap-1.5 text-sm font-medium text-zinc-300 mb-1.5"><Activity size={13} className="text-zinc-500" />Vehicle Type</label>
                             <p className="text-xs text-zinc-500 mb-2">Gas vehicles are prioritized for longer-distance deliveries.</p>
-                            <select value={settingsForm.vehicleType} onChange={(e) => setSettingsForm(f => ({ ...f, vehicleType: e.target.value as "" | "GAS" | "ELECTRIC" }))} className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500">
+                            <select value={settingsForm.vehicleType} onChange={(e) => setSettingsForm(f => ({ ...f, vehicleType: e.target.value as "" | DriverVehicleType }))} className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500">
                                 <option value="">Not specified</option>
-                                <option value="GAS">Gas</option>
-                                <option value="ELECTRIC">Electric</option>
+                                <option value={DriverVehicleType.Gas}>Gas</option>
+                                <option value={DriverVehicleType.Electric}>Electric</option>
                             </select>
                         </div>
                         <label className="flex items-start gap-3 rounded-xl border border-sky-500/20 bg-sky-500/5 p-3.5 cursor-pointer hover:bg-sky-500/10 transition-colors">
