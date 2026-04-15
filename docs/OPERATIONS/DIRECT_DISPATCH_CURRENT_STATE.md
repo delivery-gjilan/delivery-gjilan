@@ -20,6 +20,7 @@ Service: `api/src/services/DirectDispatchService.ts`
 - `createOrder(input, requestingUserId)` creates an `orders` row with:
   - `channel = DIRECT_DISPATCH`
   - `recipientPhone`, `recipientName`
+  - fixed fee from `agreedAmount` stored in `deliveryPrice`
   - `status = READY`
   - dropoff coordinates/address from request input
 
@@ -34,6 +35,11 @@ Not applied in the current formula:
 - store reserve subtraction
 - pending unassigned order subtraction
 
+Background tolerance:
+- `CONNECTED` and `STALE` are treated as available when online preference is on
+- `DISCONNECTED` may still count during a short heartbeat grace window
+- `LOST` is excluded
+
 ---
 
 ## Implemented mobile-business Behavior
@@ -43,7 +49,9 @@ Not applied in the current formula:
   - global `storeSettings.directDispatchEnabled`
   - per-business `business.directDispatchEnabled`
 - `DirectDispatchSheet` checks availability, shows free-driver status, and submits `createDirectDispatchOrder`.
+- Sheet includes agreed amount input and sends it in the mutation.
 - Direct-dispatch orders are visually tagged as Direct Call in order cards.
+- `OUT_FOR_DELIVERY` stays in upcoming/active list to preserve direct-call operational visibility.
 
 ---
 
@@ -60,7 +68,7 @@ Not applied in the current formula:
 ## Implemented admin-panel Behavior
 
 - Order queries/subscriptions include `channel`, `recipientPhone`, `recipientName`.
-- Orders list + order detail show Direct Call context and recipient info.
+- Orders list + order detail show Direct Call context, recipient info, business name, and agreed amount.
 - Per-business Direct Dispatch toggle exists in business detail modal:
   - `EditBusinessDetailModal`
 - Global Direct Dispatch toggle exists in topbar store settings controls.

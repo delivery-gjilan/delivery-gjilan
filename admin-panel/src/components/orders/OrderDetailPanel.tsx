@@ -179,6 +179,12 @@ export default function OrderDetailPanel({
                             <div className="text-white text-sm font-medium">
                                 {order.recipientName ?? order.recipientPhone ?? '—'}
                             </div>
+                            <div className="text-zinc-500 text-xs mt-1">
+                                Business: {businessList.map((b) => b.business.name).join(', ') || '—'}
+                            </div>
+                            <div className="text-emerald-300 text-xs mt-1 font-semibold">
+                                Agreed Amount: €{Number(order.deliveryPrice ?? 0).toFixed(2)}
+                            </div>
                             {order.recipientName && order.recipientPhone && (
                                 <div className="flex items-center gap-1.5 mt-1.5">
                                     <Phone size={11} className="text-zinc-600" />

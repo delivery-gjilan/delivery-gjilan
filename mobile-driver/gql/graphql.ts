@@ -525,6 +525,8 @@ export type CreateDeliveryZoneInput = {
 };
 
 export type CreateDirectDispatchOrderInput = {
+  /** Fixed fee agreed for the direct-call delivery. */
+  agreedAmount: Scalars['Float']['input'];
   /** Optional notes for the driver. */
   driverNotes?: InputMaybe<Scalars['String']['input']>;
   /** Delivery address for the recipient. */
@@ -1363,6 +1365,7 @@ export type MutationAdminUpdateDriverSettingsArgs = {
   driverId: Scalars['ID']['input'];
   hasOwnVehicle?: InputMaybe<Scalars['Boolean']['input']>;
   maxActiveOrders?: InputMaybe<Scalars['Int']['input']>;
+  ownVehicleBonusAmount?: InputMaybe<Scalars['Float']['input']>;
   vehicleType?: InputMaybe<DriverVehicleType>;
 };
 
@@ -3788,6 +3791,7 @@ export type User = {
   isTrustedCustomer: Scalars['Boolean']['output'];
   lastName: Scalars['String']['output'];
   maxActiveOrders?: Maybe<Scalars['Int']['output']>;
+  ownVehicleBonusAmount?: Maybe<Scalars['Float']['output']>;
   permissions: Array<UserPermission>;
   phoneNumber?: Maybe<Scalars['String']['output']>;
   phoneVerified: Scalars['Boolean']['output'];

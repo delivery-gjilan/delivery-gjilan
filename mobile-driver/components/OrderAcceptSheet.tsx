@@ -151,7 +151,8 @@ export function OrderAcceptSheet({
     const itemCount = allItems.length;
     const dropAddress = order.dropOffLocation?.address ?? '';
     const shortAddress = dropAddress.split(',')[0] || s.see_map;
-    const deliveryFee = Number(order.deliveryPrice ?? 0).toFixed(2);    const isDirectDispatch = order.channel === 'DIRECT_DISPATCH';
+    const deliveryFee = Number(order.deliveryPrice ?? 0).toFixed(2);
+    const isDirectDispatch = order.channel === 'DIRECT_DISPATCH';
     const recipientLabel = order.recipientName ?? order.recipientPhone ?? null;
     // ETA: descriptive label for food readiness
     const etaLabel = (() => {
@@ -238,7 +239,7 @@ export function OrderAcceptSheet({
                     <View style={styles.infoRow}>
                         <View style={styles.infoItem}>
                             <Text style={styles.infoValue}>€{deliveryFee}</Text>
-                            <Text style={styles.infoLabel}>{s.you_earn}</Text>
+                            <Text style={styles.infoLabel}>{isDirectDispatch ? 'Agreed fee' : s.you_earn}</Text>
                         </View>
                         <View style={styles.infoDivider} />
                         {etaLabel ? (

@@ -209,6 +209,7 @@ export const CREATE_DIRECT_DISPATCH_ORDER = graphql(`
             displayId
             status
             channel
+            deliveryPrice
             recipientPhone
             recipientName
             dropOffLocation {

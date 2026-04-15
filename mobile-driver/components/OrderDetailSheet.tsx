@@ -188,12 +188,14 @@ export function OrderDetailSheet({
                         </View>
                         {/* Driver earnings */}
                         <View style={styles.earningsBadge}>
-                            <Text style={styles.earningsLabel}>earn</Text>
-                            <Text style={styles.earningsText}>{'\u20ac'}{deliveryPrice}</Text>                            {driverTip > 0 && (
+                            <Text style={styles.earningsLabel}>{isDirectDispatch ? 'agreed fee' : 'earn'}</Text>
+                            <Text style={styles.earningsText}>{'\u20ac'}{deliveryPrice}</Text>
+                            {driverTip > 0 && (
                                 <Text style={[styles.earningsText, { color: '#22C55E', marginLeft: 4 }]}>
                                     +€{driverTip.toFixed(2)} tip
                                 </Text>
-                            )}                        </View>
+                            )}
+                        </View>
                     </View>
 
                     {/* Prep countdown chip — only when PREPARING */}

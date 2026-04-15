@@ -31,6 +31,7 @@ export function DirectDispatchSheet({ visible, onClose, onCreated, t }: Props) {
     const [recipientPhone, setRecipientPhone] = useState('');
     const [recipientName, setRecipientName] = useState('');
     const [address, setAddress] = useState('');
+    const [agreedAmount, setAgreedAmount] = useState('');
     const [driverNotes, setDriverNotes] = useState('');
     const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -39,7 +40,12 @@ export function DirectDispatchSheet({ visible, onClose, onCreated, t }: Props) {
 
     const { data: availData, loading: availLoading, refetch: refetchAvail } = useQuery(
         DIRECT_DISPATCH_AVAILABILITY,
-        { skip: !visible, fetchPolicy: 'network-only' },
+        {
+            skip: !visible,
+            fetchPolicy: 'network-only',
+            notifyOnNetworkStatusChange: true,
+            pollInterval: visible ? 10000 : 0,
+        },
     );
 
     const [createOrder, { loading: creating }] = useMutation(CREATE_DIRECT_DISPATCH_ORDER);
@@ -53,6 +59,7 @@ export function DirectDispatchSheet({ visible, onClose, onCreated, t }: Props) {
             setRecipientPhone('');
             setRecipientName('');
             setAddress('');
+            setAgreedAmount('');
             setDriverNotes('');
             setSubmitError(null);
             refetchAvail();
@@ -71,7 +78,7 @@ export function DirectDispatchSheet({ visible, onClose, onCreated, t }: Props) {
                 }),
             ]).start();
         }
-    }, [visible]);
+    }, [visible, refetchAvail, slideAnim, backdropAnim]);
 
     const dismiss = useCallback(() => {
         Animated.parallel([
@@ -92,6 +99,7 @@ export function DirectDispatchSheet({ visible, onClose, onCreated, t }: Props) {
     const canSubmit =
         isAvailable &&
         recipientPhone.trim().length >= 3 &&
+        Number(agreedAmount) > 0 &&
         address.trim().length >= 3 &&
         !creating;
 
@@ -107,6 +115,7 @@ export function DirectDispatchSheet({ visible, onClose, onCreated, t }: Props) {
                             longitude: 21.47,
                             address: address.trim(),
                         },
+                        agreedAmount: Number(agreedAmount),
                         recipientPhone: recipientPhone.trim(),
                         recipientName: recipientName.trim() || null,
                         driverNotes: driverNotes.trim() || null,
@@ -217,6 +226,18 @@ export function DirectDispatchSheet({ visible, onClose, onCreated, t }: Props) {
                                     onChangeText={setRecipientName}
                                     placeholder={s.name_placeholder ?? 'Optional'}
                                     placeholderTextColor="#4B5563"
+                                />
+                            </View>
+
+                            <View style={styles.field}>
+                                <Text style={styles.label}>{s.agreed_amount ?? 'Agreed Amount (€)'} *</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={agreedAmount}
+                                    onChangeText={setAgreedAmount}
+                                    placeholder={s.agreed_amount_placeholder ?? 'e.g. 3.50'}
+                                    placeholderTextColor="#4B5563"
+                                    keyboardType="decimal-pad"
                                 />
                             </View>
 

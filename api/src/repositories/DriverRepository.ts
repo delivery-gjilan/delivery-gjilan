@@ -10,7 +10,7 @@ import { cache } from '@/lib/cache';
 export const CONNECTION_THRESHOLDS = {
   STALE: 45,      // No heartbeat for 45s -> STALE (warning state)
   LOST: 90,       // No heartbeat for 90s -> LOST (legacy/intermediate state)
-  DISCONNECTED: 25, // No heartbeat for 25s -> DISCONNECTED (treat force-killed app as offline quickly)
+  DISCONNECTED: 120, // No heartbeat for 120s -> DISCONNECTED (final offline state)
   LOCATION_THROTTLE: 10, // Only write location every 10s
   LOCATION_DISTANCE_METERS: 5, // Only write if moved more than 5m
 } as const;
@@ -283,8 +283,8 @@ export class DriverRepository {
   }
 
   /**
-   * Mark drivers as DISCONNECTED if heartbeat is older than disconnected threshold.
-   * This catches force-killed app cases quickly.
+  * Mark drivers as DISCONNECTED if heartbeat is older than disconnected threshold.
+  * This is the final offline state after STALE/LOST grace windows.
    */
   async markDisconnectedDrivers(): Promise<DbDriver[]> {
     const result = await this.db

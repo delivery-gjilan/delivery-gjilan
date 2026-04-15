@@ -525,6 +525,8 @@ export type CreateDeliveryZoneInput = {
 };
 
 export type CreateDirectDispatchOrderInput = {
+  /** Fixed fee agreed for the direct-call delivery. */
+  agreedAmount: Scalars['Float']['input'];
   /** Optional notes for the driver. */
   driverNotes?: InputMaybe<Scalars['String']['input']>;
   /** Delivery address for the recipient. */

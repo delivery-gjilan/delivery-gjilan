@@ -41,6 +41,7 @@ export default function EditBusinessModal({
         location: { latitude: 0, longitude: 0, address: '' },
         workingHours: { opensAt: '08:00', closesAt: '23:00' },
         minOrderAmount: 0,
+        directDispatchEnabled: false,
     });
 
     // Sync form when modal opens with a business
@@ -61,6 +62,7 @@ export default function EditBusinessModal({
                     closesAt: business.workingHours?.closesAt || '23:00',
                 },
                 minOrderAmount: business.minOrderAmount ?? 0,
+                directDispatchEnabled: business.directDispatchEnabled ?? false,
             });
             setEditImageFile(null);
             setEditImagePreview(business.imageUrl || null);
@@ -105,6 +107,7 @@ export default function EditBusinessModal({
                     location: form.location,
                     workingHours: form.workingHours,
                     minOrderAmount: form.minOrderAmount,
+                    directDispatchEnabled: form.directDispatchEnabled,
                 },
             },
         });
@@ -269,6 +272,19 @@ export default function EditBusinessModal({
                             Set to 0 to disable. Customers cannot place an order below this subtotal.
                         </p>
                     </div>
+
+                    <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={form.directDispatchEnabled}
+                            onChange={(e) => setForm({ ...form, directDispatchEnabled: e.target.checked })}
+                            className="h-4 w-4 rounded border-zinc-700 bg-zinc-900 text-indigo-500 focus:ring-indigo-500/30"
+                        />
+                        <div>
+                            <span className="text-sm font-medium text-zinc-300">Direct Dispatch</span>
+                            <p className="text-xs text-zinc-500">Allow this business to request drivers for call-in orders.</p>
+                        </div>
+                    </label>
                 </div>
 
                 {/* Per-day Schedule Editor */}

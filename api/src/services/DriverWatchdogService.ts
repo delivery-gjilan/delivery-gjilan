@@ -3,8 +3,8 @@
  * 
  * Runs every 10 seconds to check driver connection states:
  * - CONNECTED -> STALE (no heartbeat for 45s)
- * - STALE -> DISCONNECTED (no heartbeat for 25s)
  * - STALE/CONNECTED -> LOST (no heartbeat for 90s, legacy safety net)
+ * - CONNECTED/STALE/LOST -> DISCONNECTED (no heartbeat for 120s)
  * 
  * Publishes state changes via GraphQL subscriptions for admin dashboard.
  */
@@ -122,10 +122,10 @@ export class DriverWatchdogService {
       // Mark CONNECTED -> STALE (45s no heartbeat)
       const staleDrivers = await this.driverRepository.markStaleDrivers();
 
-      // Mark CONNECTED/STALE/LOST -> DISCONNECTED (25s no heartbeat)
+      // Mark CONNECTED/STALE/LOST -> DISCONNECTED (120s no heartbeat)
       const disconnectedDrivers = await this.driverRepository.markDisconnectedDrivers();
       
-      // Mark STALE/CONNECTED -> LOST (90s no heartbeat)
+      // Mark STALE/CONNECTED -> LOST (90s no heartbeat, legacy safety net)
       const lostDrivers = await this.driverRepository.markLostDrivers();
 
       staleDrivers.forEach((driver) => {

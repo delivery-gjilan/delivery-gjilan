@@ -490,6 +490,9 @@ input CreateDeliveryZoneInput {
 }
 
 input CreateDirectDispatchOrderInput {
+  """Fixed fee agreed for the direct-call delivery."""
+  agreedAmount: Float!
+
   """Optional notes for the driver."""
   driverNotes: String
 

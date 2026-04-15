@@ -638,6 +638,9 @@ export default function OrdersPage() {
                                                         {order.recipientName && order.recipientPhone && (
                                                             <span className="text-xs text-zinc-500">{order.recipientPhone}</span>
                                                         )}
+                                                        <span className="inline-flex items-center rounded-full bg-emerald-500/15 border border-emerald-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
+                                                            Agreed €{Number(order.deliveryPrice ?? 0).toFixed(2)}
+                                                        </span>
                                                     </div>
                                                 ) : order.user && (
                                                     <div className="flex items-center gap-2 flex-wrap">

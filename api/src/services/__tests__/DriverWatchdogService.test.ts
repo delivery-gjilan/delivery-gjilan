@@ -56,7 +56,7 @@ function makeAuthRepo() {
 
 describe('CONNECTION_THRESHOLDS', () => {
     it('STALE threshold is 45 seconds', () => expect(CONNECTION_THRESHOLDS.STALE).toBe(45));
-    it('DISCONNECTED threshold is 25 seconds', () => expect(CONNECTION_THRESHOLDS.DISCONNECTED).toBe(25));
+    it('DISCONNECTED threshold is 120 seconds', () => expect(CONNECTION_THRESHOLDS.DISCONNECTED).toBe(120));
     it('LOST threshold is 90 seconds', () => expect(CONNECTION_THRESHOLDS.LOST).toBe(90));
     it('LOCATION_THROTTLE is 10 seconds', () => expect(CONNECTION_THRESHOLDS.LOCATION_THROTTLE).toBe(10));
     it('LOCATION_DISTANCE_METERS is 5 metres', () => expect(CONNECTION_THRESHOLDS.LOCATION_DISTANCE_METERS).toBe(5));

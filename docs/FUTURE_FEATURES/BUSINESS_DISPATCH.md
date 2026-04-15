@@ -41,6 +41,7 @@ Direct Dispatch creates normal `orders` rows with `channel = DIRECT_DISPATCH` in
 ### Mutation
 - `createDirectDispatchOrder(input)`
   - Business-role only
+  - Input includes `agreedAmount` (fixed fee)
   - Creates a `DIRECT_DISPATCH` order and enters normal dispatch flow
 
 ### Service
@@ -78,8 +79,11 @@ The request-driver FAB appears only when:
 
 - Checks `directDispatchAvailability` on open
 - Shows free-driver status banner
-- Collects recipient phone/name, address, driver notes
+- Collects recipient phone/name, agreed amount, address, driver notes
 - Submits `createDirectDispatchOrder`
+
+### Active Order Visibility
+`OUT_FOR_DELIVERY` direct-dispatch orders remain in the upcoming/active order list so the business can continue operational follow-up without a navigation flow.
 
 ---
 
@@ -87,8 +91,9 @@ The request-driver FAB appears only when:
 
 Direct Dispatch orders are visually distinct:
 - `OrderAcceptSheet`: orange Direct Call badge + recipient label
+- `OrderAcceptSheet`: direct-call earnings label shown as “Agreed fee”
 - `OrderPoolSheet`: orange accent + Direct Call badge
-- `OrderDetailSheet`: Direct Call badge + recipient identity
+- `OrderDetailSheet`: Direct Call badge + recipient identity + “Agreed fee” earnings label
 
 ---
 

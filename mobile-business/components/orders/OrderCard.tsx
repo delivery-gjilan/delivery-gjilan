@@ -82,6 +82,7 @@ export function OrderCard({
     const customerPhone = isDirectDispatch
         ? ((order as any).recipientPhone ?? null)
         : order.user?.phoneNumber?.trim();
+    const agreedFee = Number((order as any).deliveryPrice ?? 0);
 
     const elapsedText =
         (order.status === 'PENDING' && getElapsedTime(order.orderDate)) ||
@@ -243,6 +244,14 @@ export function OrderCard({
                                 <Ionicons name="call-outline" size={12} color="#94a3b8" />
                                 <Text className={`text-subtext ml-1.5 ${isTablet ? 'text-sm' : 'text-xs'}`} numberOfLines={1}>
                                     {customerPhone}
+                                </Text>
+                            </View>
+                        ) : null}
+                        {isDirectDispatch && agreedFee > 0 ? (
+                            <View className="flex-row items-center mt-1">
+                                <Ionicons name="cash-outline" size={12} color="#94a3b8" />
+                                <Text className={`text-subtext ml-1.5 ${isTablet ? 'text-sm' : 'text-xs'}`} numberOfLines={1}>
+                                    {t('directDispatch.agreed_amount', 'Agreed Amount (€)')}: €{agreedFee.toFixed(2)}
                                 </Text>
                             </View>
                         ) : null}

@@ -15,8 +15,13 @@
  * Availability:
  *   A driver is considered available when:
  *   - onlinePreference is true
- *   - connectionStatus is CONNECTED
+ *   - connectionStatus is not LOST
  *   - active assigned order count is below maxActiveOrders
+ *
+ * Background tolerance:
+ *   Some drivers temporarily stop heartbeats in the background.
+ *   To avoid false negatives, DISCONNECTED drivers are still counted when
+ *   their last heartbeat is within a short grace window.
  *   If no such drivers exist, direct dispatch is blocked.
  */
 
@@ -38,12 +43,15 @@ export interface DirectDispatchAvailabilityResult {
 export interface CreateDirectDispatchInput {
     businessId: string;
     dropOffLocation: { latitude: number; longitude: number; address: string };
+    agreedAmount: number;
     recipientPhone: string;
     recipientName?: string | null;
     driverNotes?: string | null;
 }
 
 export class DirectDispatchService {
+    private static readonly BACKGROUND_HEARTBEAT_GRACE_MS = 5 * 60 * 1000;
+
     constructor(
         private readonly db: DbType,
         private readonly driverRepository: DriverRepository,
@@ -101,6 +109,10 @@ export class DirectDispatchService {
             throw new Error(availability.reason ?? 'Direct dispatch is not available.');
         }
 
+        if (!Number.isFinite(input.agreedAmount) || input.agreedAmount <= 0) {
+            throw new Error('Agreed amount must be greater than 0.');
+        }
+
         const displayId = this.generateDisplayId();
 
         const [order] = await this.db
@@ -115,7 +127,8 @@ export class DirectDispatchService {
                 basePrice: 0,
                 markupPrice: 0,
                 actualPrice: 0,
-                deliveryPrice: 0,
+                // For DIRECT_DISPATCH, deliveryPrice represents the fixed agreed fee.
+                deliveryPrice: input.agreedAmount,
                 prioritySurcharge: 0,
                 driverTip: 0,
                 paymentCollection: 'CASH_TO_DRIVER',
@@ -134,6 +147,7 @@ export class DirectDispatchService {
                 displayId,
                 businessId: input.businessId,
                 recipientPhone: input.recipientPhone,
+                agreedAmount: input.agreedAmount,
             },
             'directDispatch:orderCreated',
         );
@@ -162,12 +176,19 @@ export class DirectDispatchService {
      */
     private async getFreeDriverCount(): Promise<number> {
         const allDrivers = await this.driverRepository.getAllDrivers();
+        const now = Date.now();
 
-        const connectedDrivers = allDrivers.filter(
-            (d) => d.onlinePreference && d.connectionStatus === 'CONNECTED',
-        );
+        const eligibleDrivers = allDrivers.filter((d) => {
+            if (!d.onlinePreference) return false;
+            if (d.connectionStatus === 'LOST') return false;
+            if (d.connectionStatus === 'CONNECTED' || d.connectionStatus === 'STALE') return true;
 
-        // Count active orders per connected driver
+            // Background grace: keep recently-active DISCONNECTED drivers available.
+            const heartbeatMs = d.lastHeartbeatAt ? new Date(d.lastHeartbeatAt).getTime() : 0;
+            return heartbeatMs > 0 && now - heartbeatMs <= DirectDispatchService.BACKGROUND_HEARTBEAT_GRACE_MS;
+        });
+
+        // Count active orders per eligible driver
         const activeStatuses = ['PREPARING', 'READY', 'OUT_FOR_DELIVERY'] as const;
         const activeOrders = await this.db
             .select({
@@ -188,7 +209,7 @@ export class DirectDispatchService {
         );
 
         // A driver is "free" if they have capacity for at least one more order
-        const freeDrivers = connectedDrivers.filter((d) => {
+        const freeDrivers = eligibleDrivers.filter((d) => {
             const active = activeCountByDriverUserId.get(d.userId) ?? 0;
             const max = Number(d.maxActiveOrders ?? 2);
             return active < max;
