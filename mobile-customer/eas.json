@@ -16,6 +16,17 @@
         "EXPO_PUBLIC_MAPTILER_API_KEY": "J5uv4tZ8MpmOrnqpBl4J"
       }
     },
+    "development": {
+      "distribution": "store",
+      "autoIncrement": true,
+      "channel": "development",
+      "env": {
+        "APP_VARIANT": "development",
+        "EXPO_PUBLIC_API_URL": "https://dev-api.zippgo.uk/graphql",
+        "EXPO_PUBLIC_MAPBOX_TOKEN": "pk.eyJ1IjoiYXJ0c2hhYmFuaTIwMDIiLCJhIjoiY21sZjlkbTNxMDIwOTNkc2F0cTZkYmZoeiJ9.C81uu49ST5NrfHZ58N9EXg",
+        "EXPO_PUBLIC_MAPTILER_API_KEY": "J5uv4tZ8MpmOrnqpBl4J"
+      }
+    },
     "production": {
       "distribution": "store",
       "autoIncrement": true,
@@ -28,6 +39,13 @@
     }
   },
   "submit": {
+    "development": {
+      "ios": {
+        "appleId": "artshabani2002@icloud.com",
+        "ascAppId": "6762290401",
+        "appleTeamId": "87K8YXG5V8"
+      }
+    },
     "production": {
       "ios": {
         "appleId": "artshabani2002@icloud.com",

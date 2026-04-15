@@ -1,0 +1,14 @@
+# Caddyfile — dev server reverse proxy
+# Caddy automatically obtains and renews TLS certificates
+
+# API — dev environment
+dev-api.zippgo.uk {
+    reverse_proxy api:4000
+
+    # WebSocket support (for GraphQL subscriptions)
+    @websocket {
+        header Connection *Upgrade*
+        header Upgrade websocket
+    }
+    reverse_proxy @websocket api:4000
+}
