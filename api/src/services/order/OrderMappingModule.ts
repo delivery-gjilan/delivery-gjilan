@@ -1,5 +1,6 @@
 import {
     orders as ordersTable,
+    businesses as businessesTable,
 } from '@/database/schema';
 import { asc, inArray, and } from 'drizzle-orm';
 import type { Order, OrderBusiness, OrderItem, OrderStatus, OrderPaymentCollection } from '@/generated/types.generated';
@@ -22,11 +23,12 @@ export class OrderMappingModule {
         const orderIds = dbOrders.map((order) => order.id);
         const userIds = [...new Set(dbOrders.map((order) => order.userId))];
         const driverIds = [...new Set(dbOrders.map((order) => order.driverId).filter((id): id is string => Boolean(id)))];
+        const businessIds = [...new Set(dbOrders.map((order) => order.businessId).filter((id): id is string => Boolean(id)))];
 
         // Single relational query fetches items + options + option-group/option names + products + businesses + promotions
         // in one DB round-trip (Drizzle issues sub-selects, not N+1).
         // driverUsers and firstOrderRows are independent and run in parallel.
-        const [ordersWithRelations, driverUsers, firstOrderRows] = await Promise.all([
+        const [ordersWithRelations, driverUsers, firstOrderRows, orderBusinesses] = await Promise.all([
             db.query.orders.findMany({
                 where: inArray(ordersTable.id, orderIds),
                 with: {
@@ -93,11 +95,18 @@ export class OrderMappingModule {
                       .from(ordersTable)
                       .where(inArray(ordersTable.userId, userIds))
                       .orderBy(ordersTable.userId, asc(ordersTable.orderDate), asc(ordersTable.createdAt))
-                : Promise.resolve([]),
+                    : Promise.resolve([]),
+                businessIds.length > 0
+                    ? db
+                        .select()
+                        .from(businessesTable)
+                        .where(inArray(businessesTable.id, businessIds))
+                    : Promise.resolve([]),
         ]);
 
         const driverUserById = new Map(driverUsers.map((u) => [u.id, u]));
         const firstOrderIdByUserId = new Map(firstOrderRows.map((row) => [row.userId, row.id]));
+              const businessById = new Map(orderBusinesses.map((business) => [business.id, business]));
         // Index the rich relational results by orderId to preserve original order
         const richOrderById = new Map(ordersWithRelations.map((o) => [o.id, o]));
 
@@ -135,6 +144,7 @@ export class OrderMappingModule {
             const richOrder = richOrderById.get(dbOrder.id);
             const allItems = richOrder?.orderItems ?? [];
             const topLevelItems = allItems.filter((item) => !item.parentOrderItemId);
+            const fallbackBusiness = dbOrder.businessId ? businessById.get(dbOrder.businessId) : undefined;
             // Active items: quantity > 0 (not fully removed)
             const activeTopLevelItems = topLevelItems.filter((item) => item.quantity > 0);
             // Removed items: quantity === 0 and removedAt is set (fully removed) OR removedQuantity > 0 (partially removed)
@@ -261,6 +271,43 @@ export class OrderMappingModule {
                         })),
                     } as any);
                 }
+            }
+
+            if (businessOrderList.length === 0 && fallbackBusiness) {
+                businessOrderList.push({
+                    business: {
+                        id: fallbackBusiness.id,
+                        name: fallbackBusiness.name,
+                        businessType: fallbackBusiness.businessType,
+                        imageUrl: fallbackBusiness.imageUrl || undefined,
+                        isActive: fallbackBusiness.isActive ?? true,
+                        location: {
+                            latitude: fallbackBusiness.locationLat,
+                            longitude: fallbackBusiness.locationLng,
+                            address: fallbackBusiness.locationAddress,
+                        },
+                        workingHours: {
+                            opensAt: this.minutesToTimeString(fallbackBusiness.opensAt),
+                            closesAt: this.minutesToTimeString(fallbackBusiness.closesAt),
+                        },
+                        avgPrepTimeMinutes: fallbackBusiness.avgPrepTimeMinutes,
+                        commissionPercentage: Number(fallbackBusiness.commissionPercentage),
+                        minOrderAmount: Number(fallbackBusiness.minOrderAmount ?? 0),
+                        isFeatured: fallbackBusiness.isFeatured ?? false,
+                        featuredSortOrder: fallbackBusiness.featuredSortOrder ?? 0,
+                        createdAt: new Date(fallbackBusiness.createdAt),
+                        updatedAt: new Date(fallbackBusiness.updatedAt),
+                        isOpen: true,
+                        isTemporarilyClosed: fallbackBusiness.isTemporarilyClosed ?? false,
+                        schedule: [],
+                        prepTimeOverrideMinutes: (fallbackBusiness as any).prepTimeOverrideMinutes ?? null,
+                        temporaryClosureReason: (fallbackBusiness as any).temporaryClosureReason ?? null,
+                        ratingAverage: 0,
+                        ratingCount: 0,
+                    },
+                    items: [],
+                    removedItems: [],
+                } as any);
             }
 
             const isFirstOrder = firstOrderIdByUserId.get(dbOrder.userId) === dbOrder.id;

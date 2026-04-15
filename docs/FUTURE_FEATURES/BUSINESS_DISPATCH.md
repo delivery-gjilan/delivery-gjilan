@@ -3,6 +3,10 @@
 > **Status: Future Feature — Not yet implemented**
 > Discussed: 2026-03-22
 
+## Current Behavior Note
+
+The live product also contains an order-based direct-call flow that uses regular `orders` rows with a business owner, recipient phone/name, and no cart items. In admin surfaces, the business label for those orders is derived from `orders.businessId` when the order has no `orderItems`, so the orders page and map page still show the originating business name for direct-call requests.
+
 ---
 
 ## ⚠️ Pre-Implementation Checklist
