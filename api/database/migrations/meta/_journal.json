@@ -29,6 +29,13 @@
       "when": 1776281308814,
       "tag": "0003_add-gas-priority-settings",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1776284766957,
+      "tag": "0004_add-driver-own-vehicle-bonus",
+      "breakpoints": true
     }
   ]
 }

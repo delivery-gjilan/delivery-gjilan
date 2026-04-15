@@ -1162,7 +1162,7 @@ type Mutation {
   """
   Admin mutation to update per-driver settings (commission %, max active orders, vehicle ownership)
   """
-  adminUpdateDriverSettings(commissionPercentage: Float, driverId: ID!, hasOwnVehicle: Boolean, maxActiveOrders: Int, vehicleType: DriverVehicleType): User!
+  adminUpdateDriverSettings(commissionPercentage: Float, driverId: ID!, hasOwnVehicle: Boolean, maxActiveOrders: Int, ownVehicleBonusAmount: Float, vehicleType: DriverVehicleType): User!
   adoptCatalogProduct(input: AdoptCatalogProductInput!): Product!
   approveOrder(id: ID!): Order!
   assignDriverToOrder(driverId: ID, id: ID!): Order!
@@ -2565,6 +2565,7 @@ type User {
   isTrustedCustomer: Boolean!
   lastName: String!
   maxActiveOrders: Int
+  ownVehicleBonusAmount: Float
   permissions: [UserPermission!]!
   phoneNumber: String
   phoneVerified: Boolean!

@@ -45,6 +45,7 @@ export const DRIVERS_QUERY = graphql(`
       maxActiveOrders
       hasOwnVehicle
       vehicleType
+      ownVehicleBonusAmount
       driverLocation {
         latitude
         longitude

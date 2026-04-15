@@ -528,58 +528,6 @@ export default function OrdersScreen() {
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
 
-            {/* ── Operations bar ── */}
-            <View className="px-3 pt-2 pb-1">
-                <View className="flex-row items-center gap-2">
-                    <TouchableOpacity
-                        className="flex-1 rounded-xl px-3 py-2.5 border"
-                        style={{
-                            backgroundColor: isStoreClosed ? '#ef444420' : '#10b98120',
-                            borderColor: isStoreClosed ? '#ef444455' : '#10b98155',
-                        }}
-                        onPress={() => {
-                            if (isStoreClosed) {
-                                handleOpenStore();
-                            } else {
-                                dispatch({ type: 'OPEN_STORE_CLOSE_MODAL', reason: storeCloseReason });
-                            }
-                        }}
-                        disabled={updatingBusinessOps}
-                    >
-                        <View className="flex-row items-center justify-between">
-                            <View className="flex-row items-center">
-                                <Ionicons
-                                    name={isStoreClosed ? 'close-circle' : 'checkmark-circle'}
-                                    size={16}
-                                    color={isStoreClosed ? '#ef4444' : '#10b981'}
-                                />
-                                <Text className="font-bold text-sm ml-1.5" style={{ color: isStoreClosed ? '#ef4444' : '#10b981' }}>
-                                    {isStoreClosed ? t('orders.store_closed', 'Store Closed') : t('orders.store_open', 'Store Open')}
-                                </Text>
-                            </View>
-                            <Ionicons name="chevron-forward" size={15} color="#cbd5e1" />
-                        </View>
-                        {isStoreClosed && storeCloseReason ? (
-                            <Text className="text-xs text-white/85 mt-1" numberOfLines={1}>{storeCloseReason}</Text>
-                        ) : null}
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        className="rounded-xl px-3 py-2.5 border"
-                        style={{ minWidth: 132, backgroundColor: '#3b82f620', borderColor: '#3b82f655' }}
-                        onPress={() => dispatch({ type: 'OPEN_PREP_MODAL', time: avgPrepTime })}
-                        disabled={updatingBusinessOps}
-                    >
-                        <View className="flex-row items-center justify-center">
-                            <Ionicons name="timer-outline" size={15} color="#60a5fa" />
-                            <Text className="text-[#60a5fa] font-bold text-sm ml-1.5">
-                                {t('orders.avg_prep', 'Avg Prep')} {avgPrepTime}m
-                            </Text>
-                        </View>
-                    </TouchableOpacity>
-                </View>
-            </View>
-
             {/* ── Main layout: [StatusRail | List | DetailPanel] ── */}
             <View style={{ flex: 1, flexDirection: 'row' }}>
 
@@ -588,7 +536,20 @@ export default function OrdersScreen() {
                     activeFilter={statusFilter}
                     counts={statusCounts}
                     tick={tick}
+                    isStoreClosed={isStoreClosed}
+                    avgPrepTime={avgPrepTime}
+                    directDispatchEnabled={directDispatchEnabled}
+                    controlsDisabled={updatingBusinessOps}
                     onSelect={setStatusFilter}
+                    onToggleStore={() => {
+                        if (isStoreClosed) {
+                            handleOpenStore();
+                        } else {
+                            dispatch({ type: 'OPEN_STORE_CLOSE_MODAL', reason: storeCloseReason });
+                        }
+                    }}
+                    onEditPrepTime={() => dispatch({ type: 'OPEN_PREP_MODAL', time: avgPrepTime })}
+                    onOpenDirectDispatch={() => setShowDispatchSheet(true)}
                 />
 
                 {/* Order list */}
@@ -627,12 +588,6 @@ export default function OrdersScreen() {
                         refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} tintColor="#7C3AED" />}
                         ListEmptyComponent={
                             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 48 }}>
-                                <View
-                                    className="w-24 h-24 rounded-2xl items-center justify-center mb-4"
-                                    style={{ borderWidth: 2, borderStyle: 'dashed', borderColor: '#475569', backgroundColor: '#1E293B' }}
-                                >
-                                    <Ionicons name="image-outline" size={36} color="#94A3B8" />
-                                </View>
                                 <Text className="text-text text-lg font-bold mb-1">
                                     {t('orders.no_orders_now', 'No orders for now')}
                                 </Text>
@@ -794,32 +749,6 @@ export default function OrdersScreen() {
                 onChangeQuantity={(quantity) => dispatch({ type: 'SET_REMOVE_ITEM_QUANTITY', quantity })}
                 onConfirm={handleRemoveItemConfirm}
             />
-
-            {/* Direct Dispatch FAB */}
-            {directDispatchEnabled && (
-                <TouchableOpacity
-                    style={{
-                        position: 'absolute',
-                        bottom: 20,
-                        right: 20,
-                        width: 56,
-                        height: 56,
-                        borderRadius: 28,
-                        backgroundColor: '#818CF8',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        shadowColor: '#818CF8',
-                        shadowOffset: { width: 0, height: 4 },
-                        shadowOpacity: 0.35,
-                        shadowRadius: 8,
-                        elevation: 6,
-                    }}
-                    onPress={() => setShowDispatchSheet(true)}
-                    activeOpacity={0.8}
-                >
-                    <Ionicons name="call" size={24} color="#fff" />
-                </TouchableOpacity>
-            )}
 
             <DirectDispatchSheet
                 visible={showDispatchSheet}

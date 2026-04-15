@@ -497,7 +497,7 @@ export default function Topbar() {
           <div className="border-t border-zinc-800/50 pt-4">
             <p className="text-xs font-medium text-zinc-300 mb-3">Gas-Priority Dispatch</p>
             <p className="text-[11px] text-zinc-500 mb-4">
-              When the nearest driver is farther than the threshold, gas-vehicle drivers are notified first.
+              When the pickup-to-dropoff distance is above the threshold, gas-vehicle drivers are notified first.
               Electric drivers are notified after the priority window. Set threshold to 0 to disable.
             </p>
             <div className="space-y-3">

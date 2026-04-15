@@ -166,6 +166,7 @@ extend type User {
     maxActiveOrders: Int
     hasOwnVehicle: Boolean
     vehicleType: DriverVehicleType
+    ownVehicleBonusAmount: Float
 }
 
 type DriverDailyMetrics {
@@ -226,6 +227,7 @@ extend type Mutation {
         maxActiveOrders: Int
         hasOwnVehicle: Boolean
         vehicleType: DriverVehicleType
+        ownVehicleBonusAmount: Float
     ): User!
 
     """Driver battery telemetry update (recommended every 5-10 minutes)"""

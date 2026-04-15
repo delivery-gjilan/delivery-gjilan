@@ -19,6 +19,7 @@ import { eq } from 'drizzle-orm';
 import type { DbType } from '@/database';
 import {
     businesses as businessesTable,
+    orders as ordersTable,
     products as productsTable,
     orderItems as orderItemsTable,
 } from '@/database/schema';
@@ -289,13 +290,14 @@ export class OrderDispatchService {
 
             const firstWaveIds = [...connectedFirstWave.map((d) => d.userId), ...pushOnlyIds];
 
-            // 4b. Gas-priority check: if the nearest driver is beyond the far-order
-            //     threshold, give gas/unset-vehicle drivers a head-start before notifying
+            // 4b. Gas-priority check: if the pickup->dropoff route distance is beyond
+            //     the far-order threshold, give gas/unset-vehicle drivers a head-start before notifying
             //     electric drivers. Push-only drivers (offline) are always included
             //     in wave 1 regardless of vehicle type since they need to open the app.
             const { thresholdKm: farThreshold, windowSeconds: gasPriorityWindowS } =
                 await this.getGasPrioritySettings();
-            const isFarOrder = farThreshold > 0 && sorted.length > 0 && sorted[0].distanceKm > farThreshold;
+            const routeDistanceKm = await this._getOrderRouteDistanceKm(orderId, pickup.lat, pickup.lng);
+            const isFarOrder = farThreshold > 0 && routeDistanceKm != null && routeDistanceKm > farThreshold;
 
             if (isFarOrder) {
                 // Split first-wave connected drivers: gas/null first, electric delayed.
@@ -317,7 +319,7 @@ export class OrderDispatchService {
                         electricDelayedCount: electricDelayedIds.length,
                         pushOnly: pushOnlyIds.length,
                         totalConnected: connected.length,
-                        nearestKm: sorted[0]?.distanceKm?.toFixed(2),
+                        routeDistanceKm: routeDistanceKm?.toFixed(2),
                         gasPriorityWindowS,
                     },
                     'dispatch:firstWave:gasPriority',
@@ -371,7 +373,7 @@ export class OrderDispatchService {
                     pushOnly: pushOnlyIds.length,
                     totalFirstWave: firstWaveIds.length,
                     totalConnected: connected.length,
-                    nearestKm: sorted[0]?.distanceKm?.toFixed(2),
+                    routeDistanceKm: routeDistanceKm?.toFixed(2),
                 },
                 'dispatch:firstWave',
             );
@@ -600,6 +602,34 @@ export class OrderDispatchService {
             return { lat: row.locationLat, lng: row.locationLng, businessName: row.name };
         } catch (err) {
             log.error({ err, orderId }, 'dispatch:getPickupCoords:error');
+            return null;
+        }
+    }
+
+    /**
+     * Compute straight-line pickup->dropoff distance in km for far-order checks.
+     */
+    private async _getOrderRouteDistanceKm(
+        orderId: string,
+        pickupLat: number,
+        pickupLng: number,
+    ): Promise<number | null> {
+        try {
+            const rows = await this.db
+                .select({
+                    dropoffLat: ordersTable.dropoffLat,
+                    dropoffLng: ordersTable.dropoffLng,
+                })
+                .from(ordersTable)
+                .where(eq(ordersTable.id, orderId))
+                .limit(1);
+
+            const row = rows[0];
+            if (!row) return null;
+
+            return haversineKm(pickupLat, pickupLng, row.dropoffLat, row.dropoffLng);
+        } catch (err) {
+            log.error({ err, orderId }, 'dispatch:getRouteDistance:error');
             return null;
         }
     }

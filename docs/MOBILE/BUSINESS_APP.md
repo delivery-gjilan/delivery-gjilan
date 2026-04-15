@@ -3,7 +3,7 @@
 > **MDS ID:** M13  
 > **App:** `mobile-business/`  
 > **Target users:** Business owners and employees (restaurant/shop operators)  
-> **Updated:** 2026-04-13
+> **Updated:** 2026-04-15
 
 ---
 
@@ -205,6 +205,7 @@ The primary operational screen. Full real-time order lifecycle management.
 - `FlatList` of order cards with status-color-coded left border
 - PENDING cards have **blinking red border** (`tick % 2 === 0`)
 - Collapsible item list (collapses beyond 5 items)
+- Left `StatusRail` includes status filters plus compact store open/closed, average prep-time, and Direct Call actions
 - **ETA modal** — preset chips 5/10/15/25/30/45 min + custom input
 - **Add-time modal** — presets 5/10/15/20/30 + custom text input, capped at 180 min
 - **Store close modal** — optional closure reason text field
@@ -213,7 +214,7 @@ The primary operational screen. Full real-time order lifecycle management.
 - **Remove item modal** — required reason field
 - **Completed orders section** — paginated 10/page with Load More button
 - **Reviews section** — star rating + text display
-- **Store status bar** — at top of screen, open/closed indicator + toggle button
+- Empty order state is text-only (`No orders for now`) with no decorative icon
 - **Tablet layout** (`width >= 768`) — order cards rendered side-by-side
 
 **Behaviors:**
@@ -224,12 +225,12 @@ The primary operational screen. Full real-time order lifecycle management.
 - **Market business variant:** skips PREPARING state entirely; labels as "Packing"
 - **`scheduleRefetch()`:** custom throttler — 1200 ms cooldown + 350 ms debounce to avoid burst refetch storms
 
-- **`GetStoreStatus`** — queried to gate the Direct Dispatch FAB visibility (both `storeSettings.directDispatchEnabled` AND `business.directDispatchEnabled` must be true)
-- **`DirectDispatchAvailability`** — checked on FAB tap (network-only); contains `available`, `reason`, `freeDriverCount`
+- **`GetStoreStatus`** — queried to gate the Direct Call rail action visibility (both `storeSettings.directDispatchEnabled` AND `business.directDispatchEnabled` must be true)
+- **`DirectDispatchAvailability`** — checked when the Direct Call rail action opens the sheet (network-only); contains `available`, `reason`, `freeDriverCount`
 - **`CreateDirectDispatchOrder`** — mutation to create a direct dispatch order (recipientPhone, recipientName?, address, driverNotes?)
 
-**Direct Dispatch FAB:**
-When both `storeSettings.directDispatchEnabled` and `business.directDispatchEnabled` are true, an indigo Floating Action Button (56×56, phone icon) appears in the bottom-right corner of the orders screen. Tapping it opens the `DirectDispatchSheet` bottom sheet.
+**Direct Dispatch rail action:**
+When both `storeSettings.directDispatchEnabled` and `business.directDispatchEnabled` are true, an indigo `Direct Call` action appears in the left status rail on the orders screen. Tapping it opens the `DirectDispatchSheet` bottom sheet.
 
 **`components/orders/DirectDispatchSheet.tsx`:**
 Slide-up animated bottom sheet for requesting a driver on-demand. Shows an availability status banner (green when drivers are free, red when none available). Form fields: recipient phone (required), recipient name (optional), address (required), driver notes (optional). Submits `CreateDirectDispatchOrder` mutation. On success, closes the sheet and triggers an order list refetch. Drop-off coordinates are hardcoded to the Gjilan area (42.46, 21.47) as a placeholder; map picker support is deferred.

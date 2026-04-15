@@ -12,9 +12,12 @@
  *  4. Existing dispatch pipeline fires (Wave 1 → Wave 2) to find the closest driver.
  *  5. On delivery completion, settlements are created per the normal rules.
  *
- * Platform priority:
- *   Free capacity = connectedDrivers - (pendingPlatformOrders + directDispatchDriverReserve).
- *   If free capacity ≤ 0, direct dispatch is blocked.
+ * Availability:
+ *   A driver is considered available when:
+ *   - onlinePreference is true
+ *   - connectionStatus is CONNECTED
+ *   - active assigned order count is below maxActiveOrders
+ *   If no such drivers exist, direct dispatch is blocked.
  */
 
 import { eq, and, inArray, sql } from 'drizzle-orm';
@@ -78,7 +81,7 @@ export class DirectDispatchService {
         }
 
         // 3. Driver capacity check
-        const freeDriverCount = await this.getFreeDriverCount(settings.directDispatchDriverReserve);
+        const freeDriverCount = await this.getFreeDriverCount();
 
         if (freeDriverCount <= 0) {
             return unavailable('No drivers are available at the moment. Please try again later.');
@@ -144,7 +147,6 @@ export class DirectDispatchService {
         const [row] = await this.db
             .select({
                 directDispatchEnabled: storeSettings.directDispatchEnabled,
-                directDispatchDriverReserve: storeSettings.directDispatchDriverReserve,
             })
             .from(storeSettings)
             .where(eq(storeSettings.id, 'default'))
@@ -152,32 +154,18 @@ export class DirectDispatchService {
 
         return {
             directDispatchEnabled: row?.directDispatchEnabled ?? false,
-            directDispatchDriverReserve: row?.directDispatchDriverReserve ?? 2,
         };
     }
 
     /**
-     * Count drivers with free capacity, minus the platform reserve.
+     * Count drivers who are currently online and still have capacity.
      */
-    private async getFreeDriverCount(reserve: number): Promise<number> {
+    private async getFreeDriverCount(): Promise<number> {
         const allDrivers = await this.driverRepository.getAllDrivers();
 
         const connectedDrivers = allDrivers.filter(
             (d) => d.onlinePreference && d.connectionStatus === 'CONNECTED',
         );
-
-        // Count unclaimed platform orders (READY or PREPARING, no driver assigned)
-        const pendingStatuses = ['READY', 'PREPARING'] as const;
-        const [pendingResult] = await this.db
-            .select({ count: sql<number>`count(*)::int` })
-            .from(ordersTable)
-            .where(
-                and(
-                    inArray(ordersTable.status, [...pendingStatuses]),
-                    sql`${ordersTable.driverId} IS NULL`,
-                ),
-            );
-        const pendingPlatformOrders = pendingResult?.count ?? 0;
 
         // Count active orders per connected driver
         const activeStatuses = ['PREPARING', 'READY', 'OUT_FOR_DELIVERY'] as const;
@@ -206,8 +194,7 @@ export class DirectDispatchService {
             return active < max;
         });
 
-        // Subtract the reserve and pending unclaimed orders
-        return Math.max(0, freeDrivers.length - pendingPlatformOrders - reserve);
+        return freeDrivers.length;
     }
 
     private generateDisplayId(): string {

@@ -1346,6 +1346,7 @@ export type MutationadminUpdateDriverSettingsArgs = {
   driverId: Scalars['ID']['input'];
   hasOwnVehicle?: InputMaybe<Scalars['Boolean']['input']>;
   maxActiveOrders?: InputMaybe<Scalars['Int']['input']>;
+  ownVehicleBonusAmount?: InputMaybe<Scalars['Float']['input']>;
   vehicleType?: InputMaybe<DriverVehicleType>;
 };
 
@@ -3749,6 +3750,7 @@ export type User = {
   isTrustedCustomer: Scalars['Boolean']['output'];
   lastName: Scalars['String']['output'];
   maxActiveOrders?: Maybe<Scalars['Int']['output']>;
+  ownVehicleBonusAmount?: Maybe<Scalars['Float']['output']>;
   permissions: Array<UserPermission>;
   phoneNumber?: Maybe<Scalars['String']['output']>;
   phoneVerified: Scalars['Boolean']['output'];
@@ -5934,6 +5936,7 @@ export type UserResolvers<ContextType = GraphQLContext, ParentType extends Resol
   isTrustedCustomer?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   lastName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   maxActiveOrders?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
+  ownVehicleBonusAmount?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   permissions?: Resolver<Array<ResolversTypes['UserPermission']>, ParentType, ContextType>;
   phoneNumber?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   phoneVerified?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;

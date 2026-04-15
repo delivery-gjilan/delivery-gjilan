@@ -123,6 +123,12 @@ export const drivers = pgTable('drivers', {
   vehicleType: driverVehicleType('vehicle_type'),
 
   /**
+   * Optional per-order bonus paid to drivers who use their own vehicle.
+   * Applied by settlement engine when hasOwnVehicle=true.
+   */
+  ownVehicleBonusAmount: numeric('own_vehicle_bonus_amount', { precision: 10, scale: 2 }).default('0').notNull(),
+
+  /**
    * Maximum number of active orders this driver can handle simultaneously
    * Configurable per driver (default: 2)
    * Used to prevent driver overload

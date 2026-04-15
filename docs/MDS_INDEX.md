@@ -74,6 +74,7 @@
 | O20 | [OPERATIONS/DEPLOYMENT_GUIDE.md](OPERATIONS/DEPLOYMENT_GUIDE.md) | Operations | Hetzner production deployment runbook: server bootstrap, Docker stack, Caddy TLS on api.zippgo.uk, health verification, and GHCR deploy flow |
 | O16 | [DEMO_MODE_PLAN.md](DEMO_MODE_PLAN.md) | Operations | Apple review demo-account flow, auto-progression behavior, reviewer credentials strategy, and admin-panel demo-account operations |
 | O21 | [OPERATIONS/OPTIMIZATION_TRACKER.md](OPERATIONS/OPTIMIZATION_TRACKER.md) | Operations | Per-project optimization recommendations tracker — performance, code quality, reliability, and future considerations with priority and status. Covers: mobile-customer (16 items), mobile-driver (15 items), mobile-business (18 items), mobile-admin (19 items), admin-panel/web (21 items), web-customer (21 items) |
+| O22 | [OPERATIONS/DIRECT_DISPATCH_CURRENT_STATE.md](OPERATIONS/DIRECT_DISPATCH_CURRENT_STATE.md) | Operations | Direct Dispatch current-state reference: backend availability formula, API contract, mobile-business request flow, mobile-driver direct-call UX, admin-panel visibility and toggle paths |
 | W1 | [WEB/ADMIN_PANEL_APP.md](WEB/ADMIN_PANEL_APP.md) | Web | Admin panel deep-dive: Next.js 16 App Router, 21 dashboard routes + 6 admin-only routes, 138 GraphQL ops (51q/82m/5s), role system (SUPER_ADMIN/ADMIN/BUSINESS_OWNER/BUSINESS_EMPLOYEE), Mapbox live map + Agora PTT, Apollo 3 + graphql-ws, 9 custom hooks, drag-and-drop (dnd-kit), push campaign query builder, ops-wall REST monitor, audit logs, settlements, inventory, all known issues and tech debt. Optimizations applied: `getAuthToken()` util (#1/#2), BannerType enum casts in topbar (#5), businesses/[id] businessType pre-fill bug (#7), ScheduleEditor UTF-8 arrow (#8), debug logs removed (#15), categories GET_BUSINESSES skip (#17), duplicate constants extracted to `lib/constants/orderHelpers.ts` (#9), `@ts-nocheck` removed from 7 files — businesses, promotions, notifications, business-settlements, orders/cancelled, admin/banners, SubcategoriesBlock — tsc clean (#4) |
 | W2 | [WEB/WEB_CUSTOMER_APP.md](WEB/WEB_CUSTOMER_APP.md) | Web | Web customer deep-dive: Next.js 16 / React 19, 11 routes (home/business/market/product/orders/profile/addresses/checkout), 6 Zustand stores, ~43 GraphQL ops (20q/20m/3s), Mapbox address picker + live order tracking, 5-step signup, animated driver map with cinematic approach, i18n (en/al), Apollo 4 + graphql-ws. Fixed: market qty stepper (#1), cancelled-order delivered modal (#2), N+1 GET_BUSINESSES (#6), ME_QUERY token validation on mount (#10), Orders tab added to mobile bottom nav (#13) |
 | UI1 | [ADMIN_MOBILEBUSINESS_UI_CONTEXT.md](ADMIN_MOBILEBUSINESS_UI_CONTEXT.md) | UI | Product types, variant groups, admin/mobile-business UX |
@@ -185,7 +186,7 @@ ARCHITECTURE (A1)
 | Order status state machine | B2 |
 | Market order flow (PENDING→READY skip) | B2 |
 | Personal inventory & order coverage | FF1 (future) |
-| Business-initiated driver dispatch | FF2 (future) |
+| Business-initiated driver dispatch | FF2 (implemented), O22 |
 | Custom navigation (replace SDK) | FF3 (future) |
 
 ### Marketing/Promotions Domain

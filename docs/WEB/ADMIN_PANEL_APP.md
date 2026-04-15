@@ -103,6 +103,8 @@ admin-panel/
 │   │   │   └── PermissionSelector.tsx # Permission checkbox grid
 │   │   ├── businesses/
 │   │   │   ├── CategoriesBlock.tsx  # Category CRUD + drag reorder
+│   │   │   ├── EditBusinessModal.tsx # List-page edit modal (businesses/page.tsx flow)
+│   │   │   ├── EditBusinessDetailModal.tsx # Detail-page edit modal ([id]/page.tsx flow; includes Direct Dispatch toggle)
 │   │   │   ├── ProductsBlock.tsx    # Product CRUD + options + catalog adoption
 │   │   │   ├── ScheduleEditor.tsx   # Weekly hours editor
 │   │   │   └── SubcategoriesBlock.tsx
@@ -138,6 +140,15 @@ admin-panel/
 ---
 
 ## 4. Authentication & Role System
+
+### Business Edit Flows (Current)
+
+Business management currently has two separate edit modal flows:
+
+- Dashboard list page (`/dashboard/businesses`) uses `EditBusinessModal.tsx`
+- Business detail page (`/dashboard/businesses/[id]`) uses `EditBusinessDetailModal.tsx`
+
+The per-business Direct Dispatch toggle is currently exposed in the detail-page flow (`EditBusinessDetailModal.tsx`).
 
 ### Auth Flow
 
