@@ -9,10 +9,14 @@
       "bundleIdentifier": "y",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "runtimeVersion": "1.0.0"
     },
     "android": {
       "package": "com.y"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/3b29a9b0-8685-409b-933c-daf14adca9b8"
     }
   }
 }

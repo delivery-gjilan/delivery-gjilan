@@ -662,6 +662,7 @@ export default function NavigationScreen() {
                         businessName={order?.businessName ?? ''}
                         etaMins={null}
                         prepMinsLeft={pickupPrepMins}
+                        disabled={liveOrder?.status === 'PREPARING'}
                         insetBottom={insets.bottom}
                         onConfirm={async () => {
                             try {

@@ -37,6 +37,7 @@ export enum ActionType {
   OrderCancelled = 'ORDER_CANCELLED',
   OrderCreated = 'ORDER_CREATED',
   OrderDelivered = 'ORDER_DELIVERED',
+  OrderItemRemoved = 'ORDER_ITEM_REMOVED',
   OrderStatusChanged = 'ORDER_STATUS_CHANGED',
   OrderUpdated = 'ORDER_UPDATED',
   PasswordChanged = 'PASSWORD_CHANGED',
@@ -613,9 +614,12 @@ export type CreatePromotionAudienceGroupInput = {
 };
 
 export type CreatePromotionInput = {
+  activeWeekdays?: InputMaybe<Array<Scalars['Int']['input']>>;
   code?: InputMaybe<Scalars['String']['input']>;
   creatorId?: InputMaybe<Scalars['ID']['input']>;
   creatorType: PromotionCreatorType;
+  dailyEndTime?: InputMaybe<Scalars['String']['input']>;
+  dailyStartTime?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   discountValue?: InputMaybe<Scalars['Float']['input']>;
   driverPayoutAmount?: InputMaybe<Scalars['Float']['input']>;
@@ -629,7 +633,10 @@ export type CreatePromotionInput = {
   maxUsagePerUser?: InputMaybe<Scalars['Int']['input']>;
   minOrderAmount?: InputMaybe<Scalars['Float']['input']>;
   name: Scalars['String']['input'];
+  newUserWindowDays?: InputMaybe<Scalars['Int']['input']>;
   priority: Scalars['Int']['input'];
+  scheduleTimezone?: InputMaybe<Scalars['String']['input']>;
+  scheduleType?: InputMaybe<PromotionScheduleType>;
   spendThreshold?: InputMaybe<Scalars['Float']['input']>;
   startsAt?: InputMaybe<Scalars['String']['input']>;
   target: PromotionTarget;
@@ -2137,6 +2144,7 @@ export type OrderBusiness = {
   __typename?: 'OrderBusiness';
   business: Business;
   items: Array<OrderItem>;
+  removedItems: Array<RemovedOrderItem>;
 };
 
 export type OrderConnection = {
@@ -2372,12 +2380,15 @@ export type ProductVariantGroup = {
 
 export type Promotion = {
   __typename?: 'Promotion';
+  activeWeekdays?: Maybe<Array<Scalars['Int']['output']>>;
   assignedUsers?: Maybe<Array<UserPromotion>>;
   code?: Maybe<Scalars['String']['output']>;
   createdAt: Scalars['String']['output'];
   creatorId?: Maybe<Scalars['ID']['output']>;
   creatorType: PromotionCreatorType;
   currentGlobalUsage: Scalars['Int']['output'];
+  dailyEndTime?: Maybe<Scalars['String']['output']>;
+  dailyStartTime?: Maybe<Scalars['String']['output']>;
   description?: Maybe<Scalars['String']['output']>;
   discountValue?: Maybe<Scalars['Float']['output']>;
   eligibleBusinesses?: Maybe<Array<Business>>;
@@ -2391,8 +2402,11 @@ export type Promotion = {
   maxUsagePerUser?: Maybe<Scalars['Int']['output']>;
   minOrderAmount?: Maybe<Scalars['Float']['output']>;
   name: Scalars['String']['output'];
+  newUserWindowDays?: Maybe<Scalars['Int']['output']>;
   orderId?: Maybe<Scalars['ID']['output']>;
   priority: Scalars['Int']['output'];
+  scheduleTimezone?: Maybe<Scalars['String']['output']>;
+  scheduleType: PromotionScheduleType;
   spendThreshold?: Maybe<Scalars['Float']['output']>;
   startsAt?: Maybe<Scalars['String']['output']>;
   target: PromotionTarget;
@@ -2400,6 +2414,33 @@ export type Promotion = {
   totalRevenue: Scalars['Float']['output'];
   totalUsageCount: Scalars['Int']['output'];
   type: PromotionType;
+};
+
+export type PromotionAnalyticsDailyPoint = {
+  __typename?: 'PromotionAnalyticsDailyPoint';
+  businessPaid: Scalars['Float']['output'];
+  date: Scalars['String']['output'];
+  platformPaid: Scalars['Float']['output'];
+  totalDeducted: Scalars['Float']['output'];
+  totalDeliveryDeducted: Scalars['Float']['output'];
+  totalDiscountDeducted: Scalars['Float']['output'];
+  uniqueUsers: Scalars['Int']['output'];
+  usageCount: Scalars['Int']['output'];
+};
+
+export type PromotionAnalyticsListItem = {
+  __typename?: 'PromotionAnalyticsListItem';
+  averageOrderValue: Scalars['Float']['output'];
+  businessPaid: Scalars['Float']['output'];
+  creatorName?: Maybe<Scalars['String']['output']>;
+  freeDeliveryUsageCount: Scalars['Int']['output'];
+  platformPaid: Scalars['Float']['output'];
+  promotion: Promotion;
+  totalDeducted: Scalars['Float']['output'];
+  totalDeliveryDeducted: Scalars['Float']['output'];
+  totalDiscountDeducted: Scalars['Float']['output'];
+  totalUsageCount: Scalars['Int']['output'];
+  uniqueUsers: Scalars['Int']['output'];
 };
 
 export type PromotionAnalyticsResult = {
@@ -2450,10 +2491,17 @@ export type PromotionResult = {
   totalDiscount: Scalars['Float']['output'];
 };
 
+export enum PromotionScheduleType {
+  Always = 'ALWAYS',
+  DateRange = 'DATE_RANGE',
+  Recurring = 'RECURRING'
+}
+
 export enum PromotionTarget {
   AllUsers = 'ALL_USERS',
   Conditional = 'CONDITIONAL',
   FirstOrder = 'FIRST_ORDER',
+  NewUsers = 'NEW_USERS',
   SpecificUsers = 'SPECIFIC_USERS'
 }
 
@@ -2491,6 +2539,25 @@ export type PromotionUsage = {
   usedAt: Scalars['String']['output'];
   user?: Maybe<User>;
   userId: Scalars['ID']['output'];
+};
+
+export type PromotionsAnalyticsResult = {
+  __typename?: 'PromotionsAnalyticsResult';
+  dailyPoints: Array<PromotionAnalyticsDailyPoint>;
+  items: Array<PromotionAnalyticsListItem>;
+  summary: PromotionsAnalyticsSummary;
+};
+
+export type PromotionsAnalyticsSummary = {
+  __typename?: 'PromotionsAnalyticsSummary';
+  averageOrderValue: Scalars['Float']['output'];
+  businessPaid: Scalars['Float']['output'];
+  platformPaid: Scalars['Float']['output'];
+  totalDeducted: Scalars['Float']['output'];
+  totalDeliveryDeducted: Scalars['Float']['output'];
+  totalDiscountDeducted: Scalars['Float']['output'];
+  totalUsageCount: Scalars['Int']['output'];
+  uniqueUsers: Scalars['Int']['output'];
 };
 
 export type PushTelemetryEvent = {
@@ -2578,6 +2645,7 @@ export type Query = {
   getPromotionAudienceGroups: Array<PromotionAudienceGroup>;
   getPromotionThresholds: Array<PromotionThreshold>;
   getPromotionUsage: Array<PromotionUsage>;
+  getPromotionsAnalytics: PromotionsAnalyticsResult;
   getRecoveryPromotions: Array<Promotion>;
   getStoreStatus: StoreStatus;
   getUserPromoMetadata?: Maybe<UserPromoMetadata>;
@@ -2819,6 +2887,14 @@ export type QueryGetPromotionUsageArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
   promotionId: Scalars['ID']['input'];
+};
+
+
+export type QueryGetPromotionsAnalyticsArgs = {
+  from?: InputMaybe<Scalars['String']['input']>;
+  includeRecovery?: InputMaybe<Scalars['Boolean']['input']>;
+  isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  to?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -3074,6 +3150,19 @@ export type RegisterDeviceTokenInput = {
   deviceId: Scalars['String']['input'];
   platform: DevicePlatform;
   token: Scalars['String']['input'];
+};
+
+export type RemovedOrderItem = {
+  __typename?: 'RemovedOrderItem';
+  id: Scalars['ID']['output'];
+  imageUrl?: Maybe<Scalars['String']['output']>;
+  name: Scalars['String']['output'];
+  productId: Scalars['ID']['output'];
+  reason: Scalars['String']['output'];
+  removedAt?: Maybe<Scalars['Date']['output']>;
+  /** Original quantity before removal */
+  removedQuantity: Scalars['Int']['output'];
+  unitPrice: Scalars['Float']['output'];
 };
 
 export type SendNotificationResult = {
@@ -3620,6 +3709,7 @@ export type User = {
   business?: Maybe<Business>;
   businessId?: Maybe<Scalars['ID']['output']>;
   commissionPercentage?: Maybe<Scalars['Float']['output']>;
+  createdAt: Scalars['DateTime']['output'];
   driverConnection?: Maybe<DriverConnection>;
   driverLocation?: Maybe<Location>;
   driverLocationUpdatedAt?: Maybe<Scalars['Date']['output']>;
@@ -3957,12 +4047,12 @@ export type OrderStatusUpdatedSubscription = { __typename?: 'Subscription', orde
 export type GetStoreStatusQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetStoreStatusQuery = { __typename?: 'Query', getStoreStatus: { __typename?: 'StoreStatus', isStoreClosed: boolean, closedMessage?: string | null, bannerEnabled: boolean, bannerMessage?: string | null, bannerType: BannerType, dispatchModeEnabled: boolean, googleMapsNavEnabled: boolean, inventoryModeEnabled: boolean } };
+export type GetStoreStatusQuery = { __typename?: 'Query', getStoreStatus: { __typename?: 'StoreStatus', isStoreClosed: boolean, closedMessage?: string | null, bannerEnabled: boolean, bannerMessage?: string | null, bannerType: BannerType, dispatchModeEnabled: boolean, googleMapsNavEnabled: boolean, inventoryModeEnabled: boolean, earlyDispatchLeadMinutes: number } };
 
 export type StoreStatusUpdatedSubscriptionVariables = Exact<{ [key: string]: never; }>;
 
 
-export type StoreStatusUpdatedSubscription = { __typename?: 'Subscription', storeStatusUpdated: { __typename?: 'StoreStatus', isStoreClosed: boolean, closedMessage?: string | null, bannerEnabled: boolean, bannerMessage?: string | null, bannerType: BannerType, dispatchModeEnabled: boolean, googleMapsNavEnabled: boolean, inventoryModeEnabled: boolean } };
+export type StoreStatusUpdatedSubscription = { __typename?: 'Subscription', storeStatusUpdated: { __typename?: 'StoreStatus', isStoreClosed: boolean, closedMessage?: string | null, bannerEnabled: boolean, bannerMessage?: string | null, bannerType: BannerType, dispatchModeEnabled: boolean, googleMapsNavEnabled: boolean, inventoryModeEnabled: boolean, earlyDispatchLeadMinutes: number } };
 
 
 export const DeleteMyAccountDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteMyAccount"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteMyAccount"}}]}}]} as unknown as DocumentNode<DeleteMyAccountMutation, DeleteMyAccountMutationVariables>;
@@ -3995,5 +4085,5 @@ export const UpdateOrderStatusDocument = {"kind":"Document","definitions":[{"kin
 export const DriverNotifyCustomerDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DriverNotifyCustomer"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"orderId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"kind"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DriverCustomerNotificationKind"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"driverNotifyCustomer"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"orderId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"orderId"}}},{"kind":"Argument","name":{"kind":"Name","value":"kind"},"value":{"kind":"Variable","name":{"kind":"Name","value":"kind"}}}]}]}}]} as unknown as DocumentNode<DriverNotifyCustomerMutation, DriverNotifyCustomerMutationVariables>;
 export const AllOrdersUpdatedDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"subscription","name":{"kind":"Name","value":"AllOrdersUpdated"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"allOrdersUpdated"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"displayId"}},{"kind":"Field","name":{"kind":"Name","value":"orderDate"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"preparationMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"estimatedReadyAt"}},{"kind":"Field","name":{"kind":"Name","value":"preparingAt"}},{"kind":"Field","name":{"kind":"Name","value":"orderPrice"}},{"kind":"Field","name":{"kind":"Name","value":"deliveryPrice"}},{"kind":"Field","name":{"kind":"Name","value":"totalPrice"}},{"kind":"Field","name":{"kind":"Name","value":"driverTip"}},{"kind":"Field","name":{"kind":"Name","value":"dropOffLocation"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}},{"kind":"Field","name":{"kind":"Name","value":"driverNotes"}},{"kind":"Field","name":{"kind":"Name","value":"businesses"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"business"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"location"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"latitude"}},{"kind":"Field","name":{"kind":"Name","value":"longitude"}},{"kind":"Field","name":{"kind":"Name","value":"address"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"quantity"}},{"kind":"Field","name":{"kind":"Name","value":"notes"}},{"kind":"Field","name":{"kind":"Name","value":"inventoryQuantity"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"phoneNumber"}}]}},{"kind":"Field","name":{"kind":"Name","value":"driver"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}}]}}]}}]}}]} as unknown as DocumentNode<AllOrdersUpdatedSubscription, AllOrdersUpdatedSubscriptionVariables>;
 export const OrderStatusUpdatedDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"subscription","name":{"kind":"Name","value":"OrderStatusUpdated"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"orderId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"orderStatusUpdated"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"orderId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"orderId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"driver"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}}]}}]}}]}}]} as unknown as DocumentNode<OrderStatusUpdatedSubscription, OrderStatusUpdatedSubscriptionVariables>;
-export const GetStoreStatusDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetStoreStatus"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getStoreStatus"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"isStoreClosed"}},{"kind":"Field","name":{"kind":"Name","value":"closedMessage"}},{"kind":"Field","name":{"kind":"Name","value":"bannerEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"bannerMessage"}},{"kind":"Field","name":{"kind":"Name","value":"bannerType"}},{"kind":"Field","name":{"kind":"Name","value":"dispatchModeEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"googleMapsNavEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"inventoryModeEnabled"}}]}}]}}]} as unknown as DocumentNode<GetStoreStatusQuery, GetStoreStatusQueryVariables>;
-export const StoreStatusUpdatedDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"subscription","name":{"kind":"Name","value":"StoreStatusUpdated"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"storeStatusUpdated"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"isStoreClosed"}},{"kind":"Field","name":{"kind":"Name","value":"closedMessage"}},{"kind":"Field","name":{"kind":"Name","value":"bannerEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"bannerMessage"}},{"kind":"Field","name":{"kind":"Name","value":"bannerType"}},{"kind":"Field","name":{"kind":"Name","value":"dispatchModeEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"googleMapsNavEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"inventoryModeEnabled"}}]}}]}}]} as unknown as DocumentNode<StoreStatusUpdatedSubscription, StoreStatusUpdatedSubscriptionVariables>;
+export const GetStoreStatusDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetStoreStatus"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getStoreStatus"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"isStoreClosed"}},{"kind":"Field","name":{"kind":"Name","value":"closedMessage"}},{"kind":"Field","name":{"kind":"Name","value":"bannerEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"bannerMessage"}},{"kind":"Field","name":{"kind":"Name","value":"bannerType"}},{"kind":"Field","name":{"kind":"Name","value":"dispatchModeEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"googleMapsNavEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"inventoryModeEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"earlyDispatchLeadMinutes"}}]}}]}}]} as unknown as DocumentNode<GetStoreStatusQuery, GetStoreStatusQueryVariables>;
+export const StoreStatusUpdatedDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"subscription","name":{"kind":"Name","value":"StoreStatusUpdated"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"storeStatusUpdated"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"isStoreClosed"}},{"kind":"Field","name":{"kind":"Name","value":"closedMessage"}},{"kind":"Field","name":{"kind":"Name","value":"bannerEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"bannerMessage"}},{"kind":"Field","name":{"kind":"Name","value":"bannerType"}},{"kind":"Field","name":{"kind":"Name","value":"dispatchModeEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"googleMapsNavEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"inventoryModeEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"earlyDispatchLeadMinutes"}}]}}]}}]} as unknown as DocumentNode<StoreStatusUpdatedSubscription, StoreStatusUpdatedSubscriptionVariables>;

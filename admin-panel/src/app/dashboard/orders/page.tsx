@@ -173,7 +173,7 @@ export default function OrdersPage() {
     const [removeOrderItemMut, { loading: removingOrderItem }] = useMutation(REMOVE_ORDER_ITEM);
 
     /* ─── UI state ─── */
-    const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+    const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
     const [activeTab, setActiveTab] = useState<"active" | "completed">("active");
@@ -236,6 +236,11 @@ export default function OrdersPage() {
         const source = Array.isArray(orders) ? orders : [];
         return source.map(normalizeFetchedOrder);
     }, [orders]);
+
+    const selectedOrder = useMemo(
+        () => selectedOrderId ? (normalizedOrders.find((o) => o.id === selectedOrderId) ?? null) : null,
+        [selectedOrderId, normalizedOrders]
+    );
 
     const matchesSearch = useCallback((order: Order, q: string) => {
         if (!q) return true;
@@ -438,7 +443,7 @@ export default function OrdersPage() {
         if (isAdmin && order.needsApproval && dismissedApprovalOrderIds.has(order.id) && approvalModalOrder?.id !== order.id) {
             setApprovalModalOrder(order);
         }
-        setSelectedOrder(order);
+        setSelectedOrderId(order.id);
         if (isAdmin) fetchOrderCoverage({ variables: { orderId: order.id } });
     };
 
@@ -468,7 +473,7 @@ export default function OrdersPage() {
         suppressionUpdatingUserId,
         approvingOrder,
         now,
-        onClose: () => setSelectedOrder(null),
+        onClose: () => setSelectedOrderId(null),
         onRemoveItem: (dialog: { orderId: string; itemId: string; itemName: string; itemQuantity: number }) => {
             setRemoveItemDialog(dialog); setRemoveItemReason(""); setRemoveItemQuantity(1);
         },

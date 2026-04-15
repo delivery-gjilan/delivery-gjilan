@@ -37,6 +37,7 @@ export enum ActionType {
   OrderCancelled = 'ORDER_CANCELLED',
   OrderCreated = 'ORDER_CREATED',
   OrderDelivered = 'ORDER_DELIVERED',
+  OrderItemRemoved = 'ORDER_ITEM_REMOVED',
   OrderStatusChanged = 'ORDER_STATUS_CHANGED',
   OrderUpdated = 'ORDER_UPDATED',
   PasswordChanged = 'PASSWORD_CHANGED',
@@ -613,9 +614,12 @@ export type CreatePromotionAudienceGroupInput = {
 };
 
 export type CreatePromotionInput = {
+  activeWeekdays?: InputMaybe<Array<Scalars['Int']['input']>>;
   code?: InputMaybe<Scalars['String']['input']>;
   creatorId?: InputMaybe<Scalars['ID']['input']>;
   creatorType: PromotionCreatorType;
+  dailyEndTime?: InputMaybe<Scalars['String']['input']>;
+  dailyStartTime?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   discountValue?: InputMaybe<Scalars['Float']['input']>;
   driverPayoutAmount?: InputMaybe<Scalars['Float']['input']>;
@@ -629,7 +633,10 @@ export type CreatePromotionInput = {
   maxUsagePerUser?: InputMaybe<Scalars['Int']['input']>;
   minOrderAmount?: InputMaybe<Scalars['Float']['input']>;
   name: Scalars['String']['input'];
+  newUserWindowDays?: InputMaybe<Scalars['Int']['input']>;
   priority: Scalars['Int']['input'];
+  scheduleTimezone?: InputMaybe<Scalars['String']['input']>;
+  scheduleType?: InputMaybe<PromotionScheduleType>;
   spendThreshold?: InputMaybe<Scalars['Float']['input']>;
   startsAt?: InputMaybe<Scalars['String']['input']>;
   target: PromotionTarget;
@@ -1124,6 +1131,7 @@ export type Mutation = {
   assignDriverToOrder: Order;
   assignPromotionToUsers: Array<UserPromotion>;
   backfillSettlementsForDeliveredOrders: Scalars['Int']['output'];
+  banUser: User;
   bulkSetInventory: Array<InventoryItem>;
   businessDeviceHeartbeat: Scalars['Boolean']['output'];
   businessDeviceOrderSignal: Scalars['Boolean']['output'];
@@ -1343,6 +1351,12 @@ export type MutationAssignDriverToOrderArgs = {
 
 export type MutationAssignPromotionToUsersArgs = {
   input: AssignPromotionToUserInput;
+};
+
+
+export type MutationBanUserArgs = {
+  banned: Scalars['Boolean']['input'];
+  userId: Scalars['ID']['input'];
 };
 
 
@@ -2130,6 +2144,7 @@ export type OrderBusiness = {
   __typename?: 'OrderBusiness';
   business: Business;
   items: Array<OrderItem>;
+  removedItems: Array<RemovedOrderItem>;
 };
 
 export type OrderConnection = {
@@ -2365,12 +2380,15 @@ export type ProductVariantGroup = {
 
 export type Promotion = {
   __typename?: 'Promotion';
+  activeWeekdays?: Maybe<Array<Scalars['Int']['output']>>;
   assignedUsers?: Maybe<Array<UserPromotion>>;
   code?: Maybe<Scalars['String']['output']>;
   createdAt: Scalars['String']['output'];
   creatorId?: Maybe<Scalars['ID']['output']>;
   creatorType: PromotionCreatorType;
   currentGlobalUsage: Scalars['Int']['output'];
+  dailyEndTime?: Maybe<Scalars['String']['output']>;
+  dailyStartTime?: Maybe<Scalars['String']['output']>;
   description?: Maybe<Scalars['String']['output']>;
   discountValue?: Maybe<Scalars['Float']['output']>;
   eligibleBusinesses?: Maybe<Array<Business>>;
@@ -2384,8 +2402,11 @@ export type Promotion = {
   maxUsagePerUser?: Maybe<Scalars['Int']['output']>;
   minOrderAmount?: Maybe<Scalars['Float']['output']>;
   name: Scalars['String']['output'];
+  newUserWindowDays?: Maybe<Scalars['Int']['output']>;
   orderId?: Maybe<Scalars['ID']['output']>;
   priority: Scalars['Int']['output'];
+  scheduleTimezone?: Maybe<Scalars['String']['output']>;
+  scheduleType: PromotionScheduleType;
   spendThreshold?: Maybe<Scalars['Float']['output']>;
   startsAt?: Maybe<Scalars['String']['output']>;
   target: PromotionTarget;
@@ -2393,6 +2414,33 @@ export type Promotion = {
   totalRevenue: Scalars['Float']['output'];
   totalUsageCount: Scalars['Int']['output'];
   type: PromotionType;
+};
+
+export type PromotionAnalyticsDailyPoint = {
+  __typename?: 'PromotionAnalyticsDailyPoint';
+  businessPaid: Scalars['Float']['output'];
+  date: Scalars['String']['output'];
+  platformPaid: Scalars['Float']['output'];
+  totalDeducted: Scalars['Float']['output'];
+  totalDeliveryDeducted: Scalars['Float']['output'];
+  totalDiscountDeducted: Scalars['Float']['output'];
+  uniqueUsers: Scalars['Int']['output'];
+  usageCount: Scalars['Int']['output'];
+};
+
+export type PromotionAnalyticsListItem = {
+  __typename?: 'PromotionAnalyticsListItem';
+  averageOrderValue: Scalars['Float']['output'];
+  businessPaid: Scalars['Float']['output'];
+  creatorName?: Maybe<Scalars['String']['output']>;
+  freeDeliveryUsageCount: Scalars['Int']['output'];
+  platformPaid: Scalars['Float']['output'];
+  promotion: Promotion;
+  totalDeducted: Scalars['Float']['output'];
+  totalDeliveryDeducted: Scalars['Float']['output'];
+  totalDiscountDeducted: Scalars['Float']['output'];
+  totalUsageCount: Scalars['Int']['output'];
+  uniqueUsers: Scalars['Int']['output'];
 };
 
 export type PromotionAnalyticsResult = {
@@ -2443,10 +2491,17 @@ export type PromotionResult = {
   totalDiscount: Scalars['Float']['output'];
 };
 
+export enum PromotionScheduleType {
+  Always = 'ALWAYS',
+  DateRange = 'DATE_RANGE',
+  Recurring = 'RECURRING'
+}
+
 export enum PromotionTarget {
   AllUsers = 'ALL_USERS',
   Conditional = 'CONDITIONAL',
   FirstOrder = 'FIRST_ORDER',
+  NewUsers = 'NEW_USERS',
   SpecificUsers = 'SPECIFIC_USERS'
 }
 
@@ -2484,6 +2539,25 @@ export type PromotionUsage = {
   usedAt: Scalars['String']['output'];
   user?: Maybe<User>;
   userId: Scalars['ID']['output'];
+};
+
+export type PromotionsAnalyticsResult = {
+  __typename?: 'PromotionsAnalyticsResult';
+  dailyPoints: Array<PromotionAnalyticsDailyPoint>;
+  items: Array<PromotionAnalyticsListItem>;
+  summary: PromotionsAnalyticsSummary;
+};
+
+export type PromotionsAnalyticsSummary = {
+  __typename?: 'PromotionsAnalyticsSummary';
+  averageOrderValue: Scalars['Float']['output'];
+  businessPaid: Scalars['Float']['output'];
+  platformPaid: Scalars['Float']['output'];
+  totalDeducted: Scalars['Float']['output'];
+  totalDeliveryDeducted: Scalars['Float']['output'];
+  totalDiscountDeducted: Scalars['Float']['output'];
+  totalUsageCount: Scalars['Int']['output'];
+  uniqueUsers: Scalars['Int']['output'];
 };
 
 export type PushTelemetryEvent = {
@@ -2571,6 +2645,7 @@ export type Query = {
   getPromotionAudienceGroups: Array<PromotionAudienceGroup>;
   getPromotionThresholds: Array<PromotionThreshold>;
   getPromotionUsage: Array<PromotionUsage>;
+  getPromotionsAnalytics: PromotionsAnalyticsResult;
   getRecoveryPromotions: Array<Promotion>;
   getStoreStatus: StoreStatus;
   getUserPromoMetadata?: Maybe<UserPromoMetadata>;
@@ -2812,6 +2887,14 @@ export type QueryGetPromotionUsageArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
   promotionId: Scalars['ID']['input'];
+};
+
+
+export type QueryGetPromotionsAnalyticsArgs = {
+  from?: InputMaybe<Scalars['String']['input']>;
+  includeRecovery?: InputMaybe<Scalars['Boolean']['input']>;
+  isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  to?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -3067,6 +3150,19 @@ export type RegisterDeviceTokenInput = {
   deviceId: Scalars['String']['input'];
   platform: DevicePlatform;
   token: Scalars['String']['input'];
+};
+
+export type RemovedOrderItem = {
+  __typename?: 'RemovedOrderItem';
+  id: Scalars['ID']['output'];
+  imageUrl?: Maybe<Scalars['String']['output']>;
+  name: Scalars['String']['output'];
+  productId: Scalars['ID']['output'];
+  reason: Scalars['String']['output'];
+  removedAt?: Maybe<Scalars['Date']['output']>;
+  /** Original quantity before removal */
+  removedQuantity: Scalars['Int']['output'];
+  unitPrice: Scalars['Float']['output'];
 };
 
 export type SendNotificationResult = {
@@ -3613,6 +3709,7 @@ export type User = {
   business?: Maybe<Business>;
   businessId?: Maybe<Scalars['ID']['output']>;
   commissionPercentage?: Maybe<Scalars['Float']['output']>;
+  createdAt: Scalars['DateTime']['output'];
   driverConnection?: Maybe<DriverConnection>;
   driverLocation?: Maybe<Location>;
   driverLocationUpdatedAt?: Maybe<Scalars['Date']['output']>;
@@ -3624,6 +3721,7 @@ export type User = {
   hasOwnVehicle?: Maybe<Scalars['Boolean']['output']>;
   id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
+  isBanned: Scalars['Boolean']['output'];
   isDemoAccount: Scalars['Boolean']['output'];
   isOnline: Scalars['Boolean']['output'];
   isTrustedCustomer: Scalars['Boolean']['output'];

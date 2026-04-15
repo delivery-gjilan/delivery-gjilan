@@ -12,6 +12,7 @@ interface Props {
     etaMins: number | null;
     prepMinsLeft: number | null;
     insetBottom: number;
+    disabled?: boolean;
     onConfirm: () => Promise<void>;
     onCancel: () => void;
 }
@@ -21,6 +22,7 @@ export function PickupSlider({
     etaMins,
     prepMinsLeft,
     insetBottom,
+    disabled = false,
     onConfirm,
     onCancel,
 }: Props) {
@@ -92,7 +94,7 @@ export function PickupSlider({
 
     const pan = useRef(
         PanResponder.create({
-            onStartShouldSetPanResponder: () => !confirmed.current,
+            onStartShouldSetPanResponder: () => !confirmed.current && !disabled,
             onPanResponderMove: (_, gs) => {
                 const max = trackWidth.current - PICKUP_THUMB - 6;
                 translateX.setValue(Math.max(0, Math.min(gs.dx, max)));
@@ -154,18 +156,18 @@ export function PickupSlider({
             )}
 
             <View
-                style={styles.track}
+                style={[styles.track, disabled && styles.trackDisabled]}
                 onLayout={e => { trackWidth.current = e.nativeEvent.layout.width; }}
             >
                 <Animated.View style={[styles.fill, { opacity: fillOpacity }]} />
                 <Animated.Text style={[styles.trackLabel, { opacity: labelOpacity }]}>
-                    {s.slide_confirm}
+                    {disabled ? s.food_almost_ready : s.slide_confirm}
                 </Animated.Text>
                 <Animated.View
-                    style={[styles.thumb, done && styles.thumbDone, { transform: [{ translateX }] }]}
+                    style={[styles.thumb, done && styles.thumbDone, disabled && styles.thumbDisabled, { transform: [{ translateX }] }]}
                     {...pan.panHandlers}
                 >
-                    <Ionicons name={done ? 'checkmark' : 'bag-check'} size={26} color="#fff" />
+                    <Ionicons name={done ? 'checkmark' : disabled ? 'time-outline' : 'bag-check'} size={26} color="#fff" />
                 </Animated.View>
             </View>
 
@@ -360,6 +362,14 @@ const styles = StyleSheet.create({
     thumbDone: {
         backgroundColor: '#22c55e',
         shadowColor: '#22c55e',
+    },
+    trackDisabled: {
+        backgroundColor: 'rgba(100,116,139,0.10)',
+        borderColor: 'rgba(100,116,139,0.20)',
+    },
+    thumbDisabled: {
+        backgroundColor: '#475569',
+        shadowColor: '#475569',
     },
     secondary: {
         alignItems: 'center',
