@@ -52,21 +52,29 @@ export const orderCoverage: NonNullable<QueryResolvers['orderCoverage']> = async
         .from(orderCoverageLogs)
         .where(eq(orderCoverageLogs.orderId, orderId));
 
+    // Always fetch order items to get removedQuantity info
+    const allItemRows = await db
+        .select({
+            productId: orderItems.productId,
+            productName: products.name,
+            productImageUrl: products.imageUrl,
+            removedQuantity: orderItems.removedQuantity,
+        })
+        .from(orderItems)
+        .innerJoin(products, eq(orderItems.productId, products.id))
+        .where(eq(orderItems.orderId, orderId));
+
+    // Aggregate removedQuantity by productId
+    const removedQtyMap = new Map<string, number>();
+    for (const row of allItemRows) {
+        const prev = removedQtyMap.get(row.productId) ?? 0;
+        removedQtyMap.set(row.productId, prev + (row.removedQuantity ?? 0));
+    }
+
     // If we already have logs, use them as the source of truth (don't re-derive from current inventory)
     if (existingLogs.length > 0) {
-        // Get product info for items in this order
-        const itemRows = await db
-            .select({
-                productId: orderItems.productId,
-                productName: products.name,
-                productImageUrl: products.imageUrl,
-            })
-            .from(orderItems)
-            .innerJoin(products, eq(orderItems.productId, products.id))
-            .where(eq(orderItems.orderId, orderId));
-
         const productInfoMap = new Map<string, { productName: string; productImageUrl: string | null }>();
-        for (const row of itemRows) {
+        for (const row of allItemRows) {
             if (!productInfoMap.has(row.productId)) {
                 productInfoMap.set(row.productId, { productName: row.productName, productImageUrl: row.productImageUrl });
             }
@@ -108,6 +116,7 @@ export const orderCoverage: NonNullable<QueryResolvers['orderCoverage']> = async
                 fromMarket,
                 status,
                 deducted,
+                removedQty: removedQtyMap.get(productId) ?? 0,
             });
         }
 
@@ -128,30 +137,34 @@ export const orderCoverage: NonNullable<QueryResolvers['orderCoverage']> = async
 
     // No logs yet — fall back to computing from current inventory
 
-    // Get order items with product info
-    const items = await db
-        .select({
-            productId: orderItems.productId,
-            quantity: orderItems.quantity,
-            productName: products.name,
-            productImageUrl: products.imageUrl,
-        })
-        .from(orderItems)
-        .innerJoin(products, eq(orderItems.productId, products.id))
-        .where(eq(orderItems.orderId, orderId));
-
-    // Aggregate quantities for same product (e.g. same product with different options)
+    // Aggregate current quantities for same product (e.g. same product with different options)
     const aggregated = new Map<string, { productName: string; productImageUrl: string | null; totalQty: number }>();
-    for (const item of items) {
+    for (const item of allItemRows) {
         const existing = aggregated.get(item.productId);
         if (existing) {
-            existing.totalQty += item.quantity;
+            existing.totalQty += 0; // quantity not selected; handled below
         } else {
             aggregated.set(item.productId, {
                 productName: item.productName,
                 productImageUrl: item.productImageUrl,
-                totalQty: item.quantity,
+                totalQty: 0,
             });
+        }
+    }
+
+    // Re-fetch with quantity (allItemRows doesn't have quantity)
+    const activeItems = await db
+        .select({
+            productId: orderItems.productId,
+            quantity: orderItems.quantity,
+        })
+        .from(orderItems)
+        .where(eq(orderItems.orderId, orderId));
+
+    for (const item of activeItems) {
+        const existing = aggregated.get(item.productId);
+        if (existing) {
+            existing.totalQty += item.quantity;
         }
     }
 
@@ -216,6 +229,7 @@ export const orderCoverage: NonNullable<QueryResolvers['orderCoverage']> = async
             fromMarket,
             status,
             deducted: logEntry?.deducted ?? false,
+            removedQty: removedQtyMap.get(productId) ?? 0,
         });
     }
 

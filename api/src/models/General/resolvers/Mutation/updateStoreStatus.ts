@@ -53,6 +53,12 @@ export const updateStoreStatus: NonNullable<MutationResolvers['updateStoreStatus
   if (input.businessGracePeriodMinutes !== undefined && input.businessGracePeriodMinutes !== null) {
     updateData.businessGracePeriodMinutes = input.businessGracePeriodMinutes;
   }
+  if (input.directDispatchEnabled !== undefined && input.directDispatchEnabled !== null) {
+    updateData.directDispatchEnabled = input.directDispatchEnabled;
+  }
+  if (input.directDispatchDriverReserve !== undefined && input.directDispatchDriverReserve !== null) {
+    updateData.directDispatchDriverReserve = input.directDispatchDriverReserve;
+  }
 
   let current;
   try {
@@ -102,6 +108,8 @@ export const updateStoreStatus: NonNullable<MutationResolvers['updateStoreStatus
     inventoryModeEnabled: row.inventoryModeEnabled,
     earlyDispatchLeadMinutes: row.earlyDispatchLeadMinutes,
     businessGracePeriodMinutes: row.businessGracePeriodMinutes,
+    directDispatchEnabled: row.directDispatchEnabled,
+    directDispatchDriverReserve: row.directDispatchDriverReserve,
   };
 
   // Broadcast to all subscribed clients
@@ -116,6 +124,8 @@ export const updateStoreStatus: NonNullable<MutationResolvers['updateStoreStatus
     inventoryModeEnabled: result.inventoryModeEnabled,
     earlyDispatchLeadMinutes: result.earlyDispatchLeadMinutes,
     businessGracePeriodMinutes: result.businessGracePeriodMinutes,
+    directDispatchEnabled: result.directDispatchEnabled,
+    directDispatchDriverReserve: result.directDispatchDriverReserve,
   } as any);
 
   await cache.invalidateStoreStatus();

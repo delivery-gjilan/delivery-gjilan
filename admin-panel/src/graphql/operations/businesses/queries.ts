@@ -29,6 +29,7 @@ export const GET_BUSINESS = graphql(`
             createdAt
             minOrderAmount
             category
+            directDispatchEnabled
         }
     }
 `);

@@ -244,6 +244,7 @@ export type Business = {
   commissionPercentage: Scalars['Float']['output'];
   createdAt: Scalars['Date']['output'];
   description?: Maybe<Scalars['String']['output']>;
+  directDispatchEnabled: Scalars['Boolean']['output'];
   featuredSortOrder: Scalars['Int']['output'];
   id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
@@ -523,6 +524,17 @@ export type CreateDeliveryZoneInput = {
   sortOrder?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type CreateDirectDispatchOrderInput = {
+  /** Optional notes for the driver. */
+  driverNotes?: InputMaybe<Scalars['String']['input']>;
+  /** Delivery address for the recipient. */
+  dropOffLocation: LocationInput;
+  /** Optional name of the recipient. */
+  recipientName?: InputMaybe<Scalars['String']['input']>;
+  /** Phone number of the recipient. */
+  recipientPhone: Scalars['String']['input'];
+};
+
 export type CreateOptionGroupInput = {
   displayOrder?: InputMaybe<Scalars['Int']['input']>;
   maxSelections: Scalars['Int']['input'];
@@ -759,6 +771,16 @@ export type DeviceToken = {
   userId: Scalars['ID']['output'];
 };
 
+export type DirectDispatchAvailability = {
+  __typename?: 'DirectDispatchAvailability';
+  /** Whether the business can create a direct dispatch order right now. */
+  available: Scalars['Boolean']['output'];
+  /** Number of free drivers available for dispatch. */
+  freeDriverCount: Scalars['Int']['output'];
+  /** Human-readable reason if not available. */
+  reason?: Maybe<Scalars['String']['output']>;
+};
+
 /** Result of driverLogin / driverRegister mutations */
 export type DriverAuthResult = {
   __typename?: 'DriverAuthResult';
@@ -965,6 +987,16 @@ export type DriverRegisterInput = {
   phoneNumber?: InputMaybe<Scalars['String']['input']>;
 };
 
+/**
+ * Vehicle type for drivers:
+ * - GAS: Internal combustion engine vehicle
+ * - ELECTRIC: Electric vehicle (e-bike, e-scooter, EV)
+ */
+export enum DriverVehicleType {
+  Electric = 'ELECTRIC',
+  Gas = 'GAS'
+}
+
 /** Single data point in the platform earnings trend. */
 export type EarningsTrendPoint = {
   __typename?: 'EarningsTrendPoint';
@@ -1143,6 +1175,7 @@ export type Mutation = {
   createCampaign: NotificationCampaign;
   createDeliveryPricingTier: DeliveryPricingTier;
   createDeliveryZone: DeliveryZone;
+  createDirectDispatchOrder: Order;
   createOption: Option;
   createOptionGroup: OptionGroup;
   createOrder: Order;
@@ -1330,6 +1363,7 @@ export type MutationAdminUpdateDriverSettingsArgs = {
   driverId: Scalars['ID']['input'];
   hasOwnVehicle?: InputMaybe<Scalars['Boolean']['input']>;
   maxActiveOrders?: InputMaybe<Scalars['Int']['input']>;
+  vehicleType?: InputMaybe<DriverVehicleType>;
 };
 
 
@@ -1414,6 +1448,11 @@ export type MutationCreateDeliveryPricingTierArgs = {
 
 export type MutationCreateDeliveryZoneArgs = {
   input: CreateDeliveryZoneInput;
+};
+
+
+export type MutationCreateDirectDispatchOrderArgs = {
+  input: CreateDirectDispatchOrderInput;
 };
 
 
@@ -2105,6 +2144,7 @@ export type Order = {
   businesses: Array<OrderBusiness>;
   cancellationReason?: Maybe<Scalars['String']['output']>;
   cancelledAt?: Maybe<Scalars['Date']['output']>;
+  channel: OrderChannel;
   deliveredAt?: Maybe<Scalars['Date']['output']>;
   deliveryPrice: Scalars['Float']['output'];
   displayId: Scalars['String']['output'];
@@ -2131,6 +2171,8 @@ export type Order = {
   preparingAt?: Maybe<Scalars['Date']['output']>;
   prioritySurcharge: Scalars['Float']['output'];
   readyAt?: Maybe<Scalars['Date']['output']>;
+  recipientName?: Maybe<Scalars['String']['output']>;
+  recipientPhone?: Maybe<Scalars['String']['output']>;
   review?: Maybe<OrderReview>;
   settlementPreview?: Maybe<OrderSettlementPreview>;
   status: OrderStatus;
@@ -2146,6 +2188,11 @@ export type OrderBusiness = {
   items: Array<OrderItem>;
   removedItems: Array<RemovedOrderItem>;
 };
+
+export enum OrderChannel {
+  DirectDispatch = 'DIRECT_DISPATCH',
+  Platform = 'PLATFORM'
+}
 
 export type OrderConnection = {
   __typename?: 'OrderConnection';
@@ -2176,6 +2223,7 @@ export type OrderCoverageItem = {
   productId: Scalars['ID']['output'];
   productImageUrl?: Maybe<Scalars['String']['output']>;
   productName: Scalars['String']['output'];
+  removedQty: Scalars['Int']['output'];
   status: InventoryCoverageStatus;
 };
 
@@ -2619,6 +2667,7 @@ export type Query = {
   deliveryPricingTiers: Array<DeliveryPricingTier>;
   deliveryZones: Array<DeliveryZone>;
   deviceTokens: Array<DeviceToken>;
+  directDispatchAvailability: DirectDispatchAvailability;
   driverBalance: SettlementSummary;
   /** Driver cash summary with settlement breakdown. Auto-scoped to current driver. */
   driverCashSummary: DriverCashSummary;
@@ -3109,6 +3158,7 @@ export type QuerySettlementSummaryArgs = {
 
 export type QuerySettlementsArgs = {
   businessId?: InputMaybe<Scalars['ID']['input']>;
+  category?: InputMaybe<Scalars['String']['input']>;
   direction?: InputMaybe<SettlementDirection>;
   driverId?: InputMaybe<Scalars['ID']['input']>;
   endDate?: InputMaybe<Scalars['Date']['input']>;
@@ -3424,6 +3474,8 @@ export type StoreStatus = {
   bannerType: BannerType;
   businessGracePeriodMinutes: Scalars['Int']['output'];
   closedMessage?: Maybe<Scalars['String']['output']>;
+  directDispatchDriverReserve: Scalars['Int']['output'];
+  directDispatchEnabled: Scalars['Boolean']['output'];
   dispatchModeEnabled: Scalars['Boolean']['output'];
   earlyDispatchLeadMinutes: Scalars['Int']['output'];
   googleMapsNavEnabled: Scalars['Boolean']['output'];
@@ -3567,6 +3619,7 @@ export type UpdateBusinessInput = {
   category?: InputMaybe<Scalars['String']['input']>;
   commissionPercentage?: InputMaybe<Scalars['Float']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
+  directDispatchEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
   isTemporarilyClosed?: InputMaybe<Scalars['Boolean']['input']>;
@@ -3677,6 +3730,8 @@ export type UpdateStoreStatusInput = {
   bannerType?: InputMaybe<BannerType>;
   businessGracePeriodMinutes?: InputMaybe<Scalars['Int']['input']>;
   closedMessage?: InputMaybe<Scalars['String']['input']>;
+  directDispatchDriverReserve?: InputMaybe<Scalars['Int']['input']>;
+  directDispatchEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   dispatchModeEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   earlyDispatchLeadMinutes?: InputMaybe<Scalars['Int']['input']>;
   googleMapsNavEnabled?: InputMaybe<Scalars['Boolean']['input']>;
@@ -3734,6 +3789,7 @@ export type User = {
   role: UserRole;
   signupStep: SignupStep;
   totalOrders: Scalars['Int']['output'];
+  vehicleType?: Maybe<DriverVehicleType>;
 };
 
 export type UserAddress = {
@@ -4042,6 +4098,7 @@ export type GetMyBusinessSettlementsQueryVariables = Exact<{
   businessId: Scalars['ID']['input'];
   status?: InputMaybe<SettlementStatus>;
   direction?: InputMaybe<SettlementDirection>;
+  category?: InputMaybe<Scalars['String']['input']>;
   startDate?: InputMaybe<Scalars['Date']['input']>;
   endDate?: InputMaybe<Scalars['Date']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -4049,7 +4106,7 @@ export type GetMyBusinessSettlementsQueryVariables = Exact<{
 }>;
 
 
-export type GetMyBusinessSettlementsQuery = { __typename?: 'Query', settlements: Array<{ __typename?: 'Settlement', id: string, amount: number, currency: string, status: SettlementStatus, direction: SettlementDirection, paidAt?: any | null, paymentReference?: string | null, paymentMethod?: string | null, createdAt: any, rule?: { __typename?: 'SettlementRule', id: string, name: string, type: SettlementRuleType, direction: SettlementDirection } | null, order?: { __typename?: 'Order', id: string, displayId: string, orderPrice: number, deliveryPrice: number, originalPrice?: number | null, totalPrice: number, orderDate: any, status: OrderStatus, orderPromotions?: Array<{ __typename?: 'OrderPromotion', id: string, appliesTo: PromotionAppliesTo, discountAmount: number }> | null, businesses: Array<{ __typename?: 'OrderBusiness', business: { __typename?: 'Business', id: string, name: string }, items: Array<{ __typename?: 'OrderItem', id: string, name: string, quantity: number, unitPrice: number, notes?: string | null, selectedOptions: Array<{ __typename?: 'OrderItemOption', optionGroupName: string, optionName: string, priceAtOrder: number }>, childItems: Array<{ __typename?: 'OrderItem', id: string, name: string, quantity: number, unitPrice: number }> }> }> } | null }> };
+export type GetMyBusinessSettlementsQuery = { __typename?: 'Query', settlements: Array<{ __typename?: 'Settlement', id: string, amount: number, currency: string, status: SettlementStatus, direction: SettlementDirection, paidAt?: any | null, paymentReference?: string | null, paymentMethod?: string | null, createdAt: any, rule?: { __typename?: 'SettlementRule', id: string, name: string, type: SettlementRuleType, direction: SettlementDirection, promotion?: { __typename?: 'Promotion', id: string } | null } | null, order?: { __typename?: 'Order', id: string, displayId: string, orderPrice: number, deliveryPrice: number, originalPrice?: number | null, totalPrice: number, orderDate: any, status: OrderStatus, orderPromotions?: Array<{ __typename?: 'OrderPromotion', id: string, appliesTo: PromotionAppliesTo, discountAmount: number }> | null, businesses: Array<{ __typename?: 'OrderBusiness', business: { __typename?: 'Business', id: string, name: string }, items: Array<{ __typename?: 'OrderItem', id: string, name: string, quantity: number, unitPrice: number, notes?: string | null, selectedOptions: Array<{ __typename?: 'OrderItemOption', optionGroupName: string, optionName: string, priceAtOrder: number }>, childItems: Array<{ __typename?: 'OrderItem', id: string, name: string, quantity: number, unitPrice: number }> }> }> } | null }> };
 
 export type GetMyBusinessSettlementSummaryQueryVariables = Exact<{
   businessId: Scalars['ID']['input'];
@@ -4131,7 +4188,7 @@ export const CreateProductDocument = {"kind":"Document","definitions":[{"kind":"
 export const UpdateProductDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateProduct"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateProductInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateProduct"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}},{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"imageUrl"}},{"kind":"Field","name":{"kind":"Name","value":"price"}},{"kind":"Field","name":{"kind":"Name","value":"isOnSale"}},{"kind":"Field","name":{"kind":"Name","value":"saleDiscountPercentage"}},{"kind":"Field","name":{"kind":"Name","value":"isAvailable"}}]}}]}}]} as unknown as DocumentNode<UpdateProductMutation, UpdateProductMutationVariables>;
 export const DeleteProductDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteProduct"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteProduct"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}]}}]} as unknown as DocumentNode<DeleteProductMutation, DeleteProductMutationVariables>;
 export const CreateCategoryDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateCategory"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateProductCategoryInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createProductCategory"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"businessId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}}]}}]}}]} as unknown as DocumentNode<CreateCategoryMutation, CreateCategoryMutationVariables>;
-export const GetMyBusinessSettlementsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetMyBusinessSettlements"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"businessId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"status"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"SettlementStatus"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"direction"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"SettlementDirection"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"startDate"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Date"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"endDate"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Date"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"settlements"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"type"},"value":{"kind":"EnumValue","value":"BUSINESS"}},{"kind":"Argument","name":{"kind":"Name","value":"businessId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"businessId"}}},{"kind":"Argument","name":{"kind":"Name","value":"status"},"value":{"kind":"Variable","name":{"kind":"Name","value":"status"}}},{"kind":"Argument","name":{"kind":"Name","value":"direction"},"value":{"kind":"Variable","name":{"kind":"Name","value":"direction"}}},{"kind":"Argument","name":{"kind":"Name","value":"startDate"},"value":{"kind":"Variable","name":{"kind":"Name","value":"startDate"}}},{"kind":"Argument","name":{"kind":"Name","value":"endDate"},"value":{"kind":"Variable","name":{"kind":"Name","value":"endDate"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"amount"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"direction"}},{"kind":"Field","name":{"kind":"Name","value":"paidAt"}},{"kind":"Field","name":{"kind":"Name","value":"paymentReference"}},{"kind":"Field","name":{"kind":"Name","value":"paymentMethod"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"rule"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"direction"}}]}},{"kind":"Field","name":{"kind":"Name","value":"order"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"displayId"}},{"kind":"Field","name":{"kind":"Name","value":"orderPrice"}},{"kind":"Field","name":{"kind":"Name","value":"deliveryPrice"}},{"kind":"Field","name":{"kind":"Name","value":"originalPrice"}},{"kind":"Field","name":{"kind":"Name","value":"totalPrice"}},{"kind":"Field","name":{"kind":"Name","value":"orderDate"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"orderPromotions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"appliesTo"}},{"kind":"Field","name":{"kind":"Name","value":"discountAmount"}}]}},{"kind":"Field","name":{"kind":"Name","value":"businesses"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"business"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"quantity"}},{"kind":"Field","name":{"kind":"Name","value":"unitPrice"}},{"kind":"Field","name":{"kind":"Name","value":"notes"}},{"kind":"Field","name":{"kind":"Name","value":"selectedOptions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"optionGroupName"}},{"kind":"Field","name":{"kind":"Name","value":"optionName"}},{"kind":"Field","name":{"kind":"Name","value":"priceAtOrder"}}]}},{"kind":"Field","name":{"kind":"Name","value":"childItems"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"quantity"}},{"kind":"Field","name":{"kind":"Name","value":"unitPrice"}}]}}]}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetMyBusinessSettlementsQuery, GetMyBusinessSettlementsQueryVariables>;
+export const GetMyBusinessSettlementsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetMyBusinessSettlements"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"businessId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"status"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"SettlementStatus"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"direction"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"SettlementDirection"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"category"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"startDate"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Date"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"endDate"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Date"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"settlements"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"type"},"value":{"kind":"EnumValue","value":"BUSINESS"}},{"kind":"Argument","name":{"kind":"Name","value":"businessId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"businessId"}}},{"kind":"Argument","name":{"kind":"Name","value":"status"},"value":{"kind":"Variable","name":{"kind":"Name","value":"status"}}},{"kind":"Argument","name":{"kind":"Name","value":"direction"},"value":{"kind":"Variable","name":{"kind":"Name","value":"direction"}}},{"kind":"Argument","name":{"kind":"Name","value":"category"},"value":{"kind":"Variable","name":{"kind":"Name","value":"category"}}},{"kind":"Argument","name":{"kind":"Name","value":"startDate"},"value":{"kind":"Variable","name":{"kind":"Name","value":"startDate"}}},{"kind":"Argument","name":{"kind":"Name","value":"endDate"},"value":{"kind":"Variable","name":{"kind":"Name","value":"endDate"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"amount"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"direction"}},{"kind":"Field","name":{"kind":"Name","value":"paidAt"}},{"kind":"Field","name":{"kind":"Name","value":"paymentReference"}},{"kind":"Field","name":{"kind":"Name","value":"paymentMethod"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"rule"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"direction"}},{"kind":"Field","name":{"kind":"Name","value":"promotion"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"order"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"displayId"}},{"kind":"Field","name":{"kind":"Name","value":"orderPrice"}},{"kind":"Field","name":{"kind":"Name","value":"deliveryPrice"}},{"kind":"Field","name":{"kind":"Name","value":"originalPrice"}},{"kind":"Field","name":{"kind":"Name","value":"totalPrice"}},{"kind":"Field","name":{"kind":"Name","value":"orderDate"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"orderPromotions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"appliesTo"}},{"kind":"Field","name":{"kind":"Name","value":"discountAmount"}}]}},{"kind":"Field","name":{"kind":"Name","value":"businesses"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"business"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"quantity"}},{"kind":"Field","name":{"kind":"Name","value":"unitPrice"}},{"kind":"Field","name":{"kind":"Name","value":"notes"}},{"kind":"Field","name":{"kind":"Name","value":"selectedOptions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"optionGroupName"}},{"kind":"Field","name":{"kind":"Name","value":"optionName"}},{"kind":"Field","name":{"kind":"Name","value":"priceAtOrder"}}]}},{"kind":"Field","name":{"kind":"Name","value":"childItems"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"quantity"}},{"kind":"Field","name":{"kind":"Name","value":"unitPrice"}}]}}]}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetMyBusinessSettlementsQuery, GetMyBusinessSettlementsQueryVariables>;
 export const GetMyBusinessSettlementSummaryDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetMyBusinessSettlementSummary"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"businessId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"startDate"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Date"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"endDate"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Date"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"settlementSummary"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"type"},"value":{"kind":"EnumValue","value":"BUSINESS"}},{"kind":"Argument","name":{"kind":"Name","value":"businessId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"businessId"}}},{"kind":"Argument","name":{"kind":"Name","value":"startDate"},"value":{"kind":"Variable","name":{"kind":"Name","value":"startDate"}}},{"kind":"Argument","name":{"kind":"Name","value":"endDate"},"value":{"kind":"Variable","name":{"kind":"Name","value":"endDate"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"totalAmount"}},{"kind":"Field","name":{"kind":"Name","value":"totalPending"}},{"kind":"Field","name":{"kind":"Name","value":"totalPaid"}},{"kind":"Field","name":{"kind":"Name","value":"totalReceivable"}},{"kind":"Field","name":{"kind":"Name","value":"totalPayable"}},{"kind":"Field","name":{"kind":"Name","value":"count"}},{"kind":"Field","name":{"kind":"Name","value":"pendingCount"}}]}}]}}]} as unknown as DocumentNode<GetMyBusinessSettlementSummaryQuery, GetMyBusinessSettlementSummaryQueryVariables>;
 export const GetLastBusinessPaidSettlementDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetLastBusinessPaidSettlement"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"businessId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"settlements"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"type"},"value":{"kind":"EnumValue","value":"BUSINESS"}},{"kind":"Argument","name":{"kind":"Name","value":"businessId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"businessId"}}},{"kind":"Argument","name":{"kind":"Name","value":"status"},"value":{"kind":"EnumValue","value":"PAID"}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"IntValue","value":"1"}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"paidAt"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]}}]} as unknown as DocumentNode<GetLastBusinessPaidSettlementQuery, GetLastBusinessPaidSettlementQueryVariables>;
 export const GetMySettlementRequestsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetMySettlementRequests"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"businessId"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"status"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"SettlementRequestStatus"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"settlementRequests"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"businessId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"businessId"}}},{"kind":"Argument","name":{"kind":"Name","value":"status"},"value":{"kind":"Variable","name":{"kind":"Name","value":"status"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"amount"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"respondedAt"}},{"kind":"Field","name":{"kind":"Name","value":"settlementPayment"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"amount"}},{"kind":"Field","name":{"kind":"Name","value":"direction"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]}}]}}]} as unknown as DocumentNode<GetMySettlementRequestsQuery, GetMySettlementRequestsQueryVariables>;

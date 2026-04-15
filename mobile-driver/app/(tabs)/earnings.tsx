@@ -78,6 +78,11 @@ export default function EarningsScreen() {
     const [hasMoreSettlements, setHasMoreSettlements] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
 
+    // ── Category drill-down state ──
+    const [selectedCategory, setSelectedCategory] = useState<{ category: string; label: string; color: string; direction: string } | null>(null);
+    const [categorySettlements, setCategorySettlements] = useState<Settlement[]>([]);
+    const [highlightCategory, setHighlightCategory] = useState<string | null>(null);
+
     const PERIODS: { key: Period; label: string }[] = [
         { key: 'today', label: t.earnings.period_today },
         { key: 'week', label: t.earnings.period_week },
@@ -125,6 +130,16 @@ export default function EarningsScreen() {
         { fetchPolicy: 'network-only' },
     );
 
+    const [fetchCategorySettlements, { loading: categoryLoading }] = useLazyQuery(
+        GET_MY_SETTLEMENTS,
+        {
+            fetchPolicy: 'network-only',
+            onCompleted: (data) => {
+                setCategorySettlements(data?.settlements ?? []);
+            },
+        },
+    );
+
     const cash = cashData?.driverCashSummary;
     const breakdownItems = breakdownData?.settlementBreakdown ?? [];
     const settlements = allSettlements;
@@ -168,6 +183,39 @@ export default function EarningsScreen() {
             (a, b) => new Date(b.latestCreatedAt).getTime() - new Date(a.latestCreatedAt).getTime(),
         );
     }, [settlements]);
+
+    // Group category-filtered settlements by order
+    const categoryOrders = useMemo(() => {
+        const byOrder = new Map<string, { orderId: string; orderDisplayId: string | null; order: Settlement['order']; settlements: Settlement[]; totalReceivable: number; totalPayable: number; latestCreatedAt: string }>();
+        categorySettlements.forEach((settlement) => {
+            const orderId = String(settlement.order?.id ?? settlement.id);
+            const existing = byOrder.get(orderId);
+            if (existing) {
+                existing.settlements.push(settlement);
+                existing.totalReceivable += settlement.direction === 'RECEIVABLE' ? Number(settlement.amount ?? 0) : 0;
+                existing.totalPayable += settlement.direction === 'PAYABLE' ? Number(settlement.amount ?? 0) : 0;
+                if (new Date(settlement.createdAt).getTime() > new Date(existing.latestCreatedAt).getTime()) existing.latestCreatedAt = settlement.createdAt;
+                return;
+            }
+            byOrder.set(orderId, {
+                orderId,
+                orderDisplayId: settlement.order?.displayId ?? null,
+                order: settlement.order ?? null,
+                settlements: [settlement],
+                totalReceivable: settlement.direction === 'RECEIVABLE' ? Number(settlement.amount ?? 0) : 0,
+                totalPayable: settlement.direction === 'PAYABLE' ? Number(settlement.amount ?? 0) : 0,
+                latestCreatedAt: settlement.createdAt,
+            });
+        });
+        return Array.from(byOrder.values()).sort((a, b) => new Date(b.latestCreatedAt).getTime() - new Date(a.latestCreatedAt).getTime());
+    }, [categorySettlements]);
+
+    const handleCategoryPress = useCallback((item: BreakdownItem) => {
+        const cfg = getCategoryConfig(item.category, item.direction);
+        setSelectedCategory({ category: item.category, label: item.label, color: cfg.color, direction: item.direction });
+        setCategorySettlements([]);
+        fetchCategorySettlements({ variables: { category: item.category, startDate, endDate, limit: 100 } });
+    }, [fetchCategorySettlements, startDate, endDate]);
 
     const handleLoadMoreSettlements = useCallback(async () => {
         if (!hasMoreSettlements || settlementsLoading || loadingMore) return;
@@ -315,6 +363,45 @@ export default function EarningsScreen() {
         return { label: t.earnings.commission, color: "#f59e0b" };
     };
 
+    // Map a settlement line to its computed category (mirrors backend logic)
+    const getLineCategory = (s: Settlement): string => {
+        if (!s.rule?.id) {
+            if (s.reason?.startsWith("Stock item")) return "STOCK_REMITTANCE";
+            if (s.reason?.startsWith("Driver tip")) return "DRIVER_TIP";
+            if (s.reason?.startsWith("Catalog product")) return "CATALOG_REVENUE";
+            return "AUTO_REMITTANCE";
+        }
+        if (s.rule.promotion?.id) return "PROMOTION_COST";
+        if (s.rule.type === "DELIVERY_PRICE") return "DELIVERY_COMMISSION";
+        return "PLATFORM_COMMISSION";
+    };
+
+    const getCategoryColor = (cat: string): string => {
+        const map: Record<string, string> = {
+            AUTO_REMITTANCE: '#ef4444',
+            STOCK_REMITTANCE: '#a855f7',
+            DELIVERY_COMMISSION: '#f59e0b',
+            PLATFORM_COMMISSION: '#f59e0b',
+            PROMOTION_COST: '#3b82f6',
+            DRIVER_TIP: '#22c55e',
+            CATALOG_REVENUE: '#ef4444',
+        };
+        return map[cat] ?? '#6b7280';
+    };
+
+    const getCategoryLabel = (cat: string): string => {
+        const map: Record<string, string> = {
+            AUTO_REMITTANCE: t.earnings.cat_markup ?? 'Markup',
+            STOCK_REMITTANCE: t.earnings.cat_stock ?? 'Stock',
+            DELIVERY_COMMISSION: t.earnings.cat_delivery ?? 'Delivery',
+            PLATFORM_COMMISSION: t.earnings.cat_commission ?? 'Commission',
+            PROMOTION_COST: t.earnings.cat_promo ?? 'Promo',
+            DRIVER_TIP: t.earnings.cat_tip ?? 'Tip',
+            CATALOG_REVENUE: t.earnings.cat_catalog ?? 'Catalog',
+        };
+        return map[cat] ?? cat;
+    };
+
     return (
         <SafeAreaView style={[es.safe, { backgroundColor: theme.colors.background }]}>
             <ScrollView
@@ -424,7 +511,7 @@ export default function EarningsScreen() {
                                             {flowData.youOweItems.map((item, idx: number) => {
                                                 const cfg = getCategoryConfig(item.category, item.direction);
                                                 return (
-                                                    <View key={`${item.category}-${idx}`}>
+                                                    <Pressable key={`${item.category}-${idx}`} onPress={() => handleCategoryPress(item)}>
                                                         <View style={es.deductionRow}>
                                                             <View style={[es.deductionIcon, { backgroundColor: cfg.color + "15" }]}>
                                                                 <Ionicons name={cfg.icon as any} size={14} color={cfg.color} />
@@ -439,7 +526,7 @@ export default function EarningsScreen() {
                                                                     </Text>
                                                                 ) : null}
                                                                 <Text style={[es.deductionMeta, { color: theme.colors.subtext }]}>
-                                                                    {item.count} {item.count === 1 ? t.earnings.delivery : t.earnings.deliveries}
+                                                                    {item.count} {item.count === 1 ? t.earnings.delivery : t.earnings.deliveries} · {t.earnings.view_orders ?? "View Orders"} ›
                                                                 </Text>
                                                             </View>
                                                             <Text style={[es.deductionAmount, { color: cfg.color }]}>
@@ -449,7 +536,7 @@ export default function EarningsScreen() {
                                                         {idx < flowData.youOweItems.length - 1 && (
                                                             <View style={[es.deductionSep, { backgroundColor: theme.colors.border }]} />
                                                         )}
-                                                    </View>
+                                                    </Pressable>
                                                 );
                                             })}
                                         </View>
@@ -489,7 +576,7 @@ export default function EarningsScreen() {
                                             {flowData.youReceiveItems.map((item, idx: number) => {
                                                 const cfg = getCategoryConfig(item.category, item.direction);
                                                 return (
-                                                    <View key={`${item.category}-${idx}`}>
+                                                    <Pressable key={`${item.category}-${idx}`} onPress={() => handleCategoryPress(item)}>
                                                         <View style={es.deductionRow}>
                                                             <View style={[es.deductionIcon, { backgroundColor: theme.colors.income + "15" }]}>
                                                                 <Ionicons name={cfg.icon as any} size={14} color={theme.colors.income} />
@@ -499,7 +586,7 @@ export default function EarningsScreen() {
                                                                     {item.label}
                                                                 </Text>
                                                                 <Text style={[es.deductionMeta, { color: theme.colors.subtext }]}>
-                                                                    {item.count} {item.count === 1 ? t.earnings.delivery : t.earnings.deliveries}
+                                                                    {item.count} {item.count === 1 ? t.earnings.delivery : t.earnings.deliveries} · {t.earnings.view_orders ?? "View Orders"} ›
                                                                 </Text>
                                                             </View>
                                                             <Text style={[es.deductionAmount, { color: theme.colors.income }]}>
@@ -509,7 +596,7 @@ export default function EarningsScreen() {
                                                         {idx < flowData.youReceiveItems.length - 1 && (
                                                             <View style={[es.deductionSep, { backgroundColor: theme.colors.border }]} />
                                                         )}
-                                                    </View>
+                                                    </Pressable>
                                                 );
                                             })}
                                         </View>
@@ -674,6 +761,7 @@ export default function EarningsScreen() {
                                     <Pressable
                                         key={orderGroup.orderId}
                                         onPress={() => {
+                                            setHighlightCategory(null);
                                             setSelectedSettlementOrder(orderGroup);
                                             if (orderGroup.order?.id) fetchFinancials({ variables: { orderId: orderGroup.order.id } });
                                         }}
@@ -696,6 +784,23 @@ export default function EarningsScreen() {
                                         <Text style={[es.historyReason, { color: theme.colors.text }]} numberOfLines={2}>
                                             {lineCount} settlement line{lineCount === 1 ? '' : 's'}
                                         </Text>
+
+                                        {/* Category tags */}
+                                        {(() => {
+                                            const cats = [...new Set(settlementsForOrder.map(getLineCategory))];
+                                            return (
+                                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                                                    {cats.map((cat) => {
+                                                        const color = getCategoryColor(cat);
+                                                        return (
+                                                            <View key={cat} style={{ backgroundColor: color + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                                                                <Text style={{ fontSize: 10, fontWeight: '600', color }}>{getCategoryLabel(cat)}</Text>
+                                                            </View>
+                                                        );
+                                                    })}
+                                                </View>
+                                            );
+                                        })()}
 
                                         {/* Business & address */}
                                         <View style={es.historyMeta}>
@@ -760,14 +865,111 @@ export default function EarningsScreen() {
                 </View>
             </ScrollView>
 
+            {/* ── Category Orders Modal ── */}
+            <Modal
+                visible={selectedCategory !== null}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setSelectedCategory(null)}
+            >
+                <Pressable style={es.modalBackdrop} onPress={() => setSelectedCategory(null)} />
+                <View style={[es.detailModalSheet, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+                    {selectedCategory && (
+                        <>
+                            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingBottom: 4 }}>
+                                <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1 }}>
+                                    <View style={[es.flowIconWrap, { backgroundColor: selectedCategory.color + "18", width: 32, height: 32, borderRadius: 8 }]}>
+                                        <Ionicons name={getCategoryConfig(selectedCategory.category, selectedCategory.direction).icon as any} size={16} color={selectedCategory.color} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={[es.modalTitle, { color: theme.colors.text }]}>
+                                            {selectedCategory.label}
+                                        </Text>
+                                        <Text style={{ fontSize: 11, color: theme.colors.subtext, marginTop: 1 }}>
+                                            {t.earnings.orders_for_category ?? "Orders"} · {categoryOrders.length} {categoryOrders.length === 1 ? t.earnings.delivery : t.earnings.deliveries}
+                                        </Text>
+                                    </View>
+                                </View>
+                                <Pressable onPress={() => setSelectedCategory(null)}>
+                                    <Ionicons name="close-circle" size={28} color={theme.colors.subtext} />
+                                </Pressable>
+                            </View>
+
+                            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }} contentContainerStyle={{ gap: 8 }}>
+                                {categoryLoading ? (
+                                    <ActivityIndicator color={selectedCategory.color} style={{ marginVertical: 24 }} />
+                                ) : categoryOrders.length === 0 ? (
+                                    <View style={es.emptyState}>
+                                        <Text style={[es.emptyTitle, { color: theme.colors.text }]}>{t.earnings.no_orders_for_category ?? "No orders found"}</Text>
+                                    </View>
+                                ) : (
+                                    categoryOrders.map((orderGroup) => {
+                                        const catSettlements = orderGroup.settlements;
+                                        const catAmount = catSettlements.reduce((s, line) => s + Number(line.amount ?? 0), 0);
+                                        const isPayable = orderGroup.settlements[0]?.direction === 'PAYABLE';
+                                        const businessNames = orderGroup.order?.businesses?.map((b) => b.business?.name).filter(Boolean).join(", ") ?? "—";
+                                        const orderLabel = orderGroup.orderDisplayId ? `#${orderGroup.orderDisplayId}` : t.earnings.delivery;
+
+                                        return (
+                                            <Pressable
+                                                key={orderGroup.orderId}
+                                                onPress={() => {
+                                                    setHighlightCategory(selectedCategory.category);
+                                                    setSelectedSettlementOrder(orderGroup);
+                                                    setSelectedCategory(null);
+                                                    if (orderGroup.order?.id) fetchFinancials({ variables: { orderId: orderGroup.order.id } });
+                                                }}
+                                                style={[es.historyCard, {
+                                                    backgroundColor: theme.colors.background,
+                                                    borderColor: selectedCategory.color + "30",
+                                                }]}
+                                            >
+                                                <View style={es.historyTopRow}>
+                                                    <View style={[es.historyTag, { backgroundColor: theme.colors.primary + "18" }]}>
+                                                        <View style={[es.historyTagDot, { backgroundColor: theme.colors.primary }]} />
+                                                        <Text style={[es.historyTagText, { color: theme.colors.primary }]}>{orderLabel}</Text>
+                                                    </View>
+                                                    <Text style={[es.historyAmount, { color: selectedCategory.color }]}>
+                                                        {isPayable ? '+' : '-'}{formatCurrency(catAmount)}
+                                                    </Text>
+                                                </View>
+                                                <View style={es.historyMeta}>
+                                                    <View style={es.historyMetaRow}>
+                                                        <Ionicons name="storefront-outline" size={12} color={theme.colors.subtext} />
+                                                        <Text style={[es.historyMetaText, { color: theme.colors.subtext }]} numberOfLines={1}>
+                                                            {businessNames}
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                                <View style={es.historyFooter}>
+                                                    <Text style={[es.historyDate, { color: theme.colors.subtext }]}>
+                                                        {formatDateTime(orderGroup.latestCreatedAt)}
+                                                    </Text>
+                                                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                                                        <Text style={{ fontSize: 11, color: selectedCategory.color, fontWeight: "600" }}>
+                                                            {catSettlements.length} line{catSettlements.length === 1 ? '' : 's'}
+                                                        </Text>
+                                                        <Ionicons name="chevron-forward" size={14} color={theme.colors.subtext} />
+                                                    </View>
+                                                </View>
+                                            </Pressable>
+                                        );
+                                    })
+                                )}
+                            </ScrollView>
+                        </>
+                    )}
+                </View>
+            </Modal>
+
             {/* ── Delivery Detail Modal ── */}
             <Modal
                 visible={selectedSettlementOrder !== null}
                 transparent
                 animationType="slide"
-                onRequestClose={() => setSelectedSettlementOrder(null)}
+                onRequestClose={() => { setSelectedSettlementOrder(null); setHighlightCategory(null); }}
             >
-                <Pressable style={es.modalBackdrop} onPress={() => setSelectedSettlementOrder(null)} />
+                <Pressable style={es.modalBackdrop} onPress={() => { setSelectedSettlementOrder(null); setHighlightCategory(null); }} />
                 <View style={[es.detailModalSheet, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
                     {selectedSettlementOrder && (() => {
                         const settlementsForOrder = selectedSettlementOrder.settlements ?? [];
@@ -797,7 +999,7 @@ export default function EarningsScreen() {
                                             </Text>
                                         )}
                                     </View>
-                                    <Pressable onPress={() => setSelectedSettlementOrder(null)}>
+                                    <Pressable onPress={() => { setSelectedSettlementOrder(null); setHighlightCategory(null); }}>
                                         <Ionicons name="close-circle" size={28} color={theme.colors.subtext} />
                                     </Pressable>
                                 </View>
@@ -844,11 +1046,22 @@ export default function EarningsScreen() {
                                                 {settlementsForOrder.map((line) => {
                                                     const lineIsPayable = line.direction === 'PAYABLE';
                                                     const lineTag = getSettlementTag(line);
+                                                    const lineCategory = getLineCategory(line);
+                                                    const isHighlighted = highlightCategory != null && lineCategory === highlightCategory;
+                                                    const highlightColor = isHighlighted ? (getCategoryConfig(highlightCategory, line.direction).color) : null;
                                                     return (
-                                                        <View key={line.id} style={es.detailRow}>
+                                                        <View key={line.id} style={[es.detailRow, isHighlighted && {
+                                                            backgroundColor: highlightColor + "12",
+                                                            marginHorizontal: -8,
+                                                            paddingHorizontal: 8,
+                                                            paddingVertical: 6,
+                                                            borderRadius: 8,
+                                                            borderLeftWidth: 3,
+                                                            borderLeftColor: highlightColor,
+                                                        }]}>
                                                             <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1 }}>
                                                                 <View style={[es.historyTagDot, { backgroundColor: lineTag.color }]} />
-                                                                <Text style={[es.detailLabel, { color: theme.colors.subtext, flex: 1 }]} numberOfLines={1}>
+                                                                <Text style={[es.detailLabel, { color: isHighlighted ? theme.colors.text : theme.colors.subtext, flex: 1, fontWeight: isHighlighted ? "600" : "400" }]} numberOfLines={1}>
                                                                     {getSettlementLabel(line)}
                                                                 </Text>
                                                             </View>

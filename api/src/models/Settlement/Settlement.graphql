@@ -92,6 +92,8 @@ type Query {
         businessId: ID
         orderId: ID
         promotionId: ID
+        """Filter by computed category (e.g. AUTO_REMITTANCE, STOCK_REMITTANCE, DELIVERY_COMMISSION, PLATFORM_COMMISSION, PROMOTION_COST, DRIVER_TIP, CATALOG_REVENUE)."""
+        category: String
         startDate: Date
         endDate: Date
         limit: Int

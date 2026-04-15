@@ -14,7 +14,7 @@ import {
     TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQuery, useMutation } from '@apollo/client/react';
+import { useQuery, useMutation, useLazyQuery } from '@apollo/client/react';
 import { useRouter } from 'expo-router';
 import { format, startOfDay, startOfMonth, startOfWeek, subDays } from 'date-fns';
 import { Image } from 'expo-image';
@@ -31,7 +31,10 @@ import { GET_BUSINESS_ORDERS, GET_BUSINESS_ORDER_REVIEWS } from '@/graphql/order
 import { GET_BUSINESS_PRODUCTS } from '@/graphql/products';
 import { useAuthStore } from '@/store/authStore';
 import { useTranslation } from '@/hooks/useTranslation';
-import type { GetMyBusinessSettlementsQuery } from '@/gql/graphql';
+import type { GetMyBusinessSettlementsQuery, GetBusinessSettlementBreakdownQuery } from '@/gql/graphql';
+
+type Settlement = GetMyBusinessSettlementsQuery['settlements'][number];
+type BreakdownItem = GetBusinessSettlementBreakdownQuery['settlementBreakdown'][number];
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -164,6 +167,11 @@ export default function FinancesScreen() {
     const [rejectReason, setRejectReason] = useState('');
     const [respondingId, setRespondingId] = useState<string | null>(null);
     const [selectedSettlementOrder, setSelectedSettlementOrder] = useState<GetMyBusinessSettlementsQuery['settlements'][number] | null>(null);
+
+    // ── Category drill-down state ──
+    const [selectedCategory, setSelectedCategory] = useState<{ category: string; label: string; color: string; direction: string } | null>(null);
+    const [categorySettlements, setCategorySettlements] = useState<Settlement[]>([]);
+    const [highlightCategory, setHighlightCategory] = useState<string | null>(null);
 
     const businessId = user?.businessId ?? '';
 
@@ -352,6 +360,99 @@ export default function FinancesScreen() {
     const settlements = allSettlements;
     const breakdownItems = breakdownData?.settlementBreakdown ?? [];
 
+    // ── Category drill-down query ──
+    const [fetchCategorySettlements, { loading: categoryLoading }] = useLazyQuery(
+        GET_MY_BUSINESS_SETTLEMENTS,
+        {
+            fetchPolicy: 'network-only',
+            onCompleted: (data) => {
+                setCategorySettlements(data?.settlements ?? []);
+            },
+        },
+    );
+
+    // Map a settlement line to its computed category (mirrors backend logic)
+    const getLineCategory = (s: Settlement): string => {
+        if (!s.rule?.id) {
+            if ((s as any).reason?.startsWith?.("Stock item")) return "STOCK_REMITTANCE";
+            if ((s as any).reason?.startsWith?.("Driver tip")) return "DRIVER_TIP";
+            if ((s as any).reason?.startsWith?.("Catalog product")) return "CATALOG_REVENUE";
+            return "AUTO_REMITTANCE";
+        }
+        if (s.rule.promotion?.id) return "PROMOTION_COST";
+        if (s.rule.type === "DELIVERY_PRICE") return "DELIVERY_COMMISSION";
+        return "PLATFORM_COMMISSION";
+    };
+
+    const getCategoryColor = (category: string, direction: string) => {
+        const colors: Record<string, string> = {
+            AUTO_REMITTANCE: '#ef4444',
+            STOCK_REMITTANCE: '#a855f7',
+            DELIVERY_COMMISSION: direction === 'PAYABLE' ? '#22c55e' : '#f59e0b',
+            PLATFORM_COMMISSION: '#f59e0b',
+            PROMOTION_COST: '#f59e0b',
+            DRIVER_TIP: '#22c55e',
+            CATALOG_REVENUE: '#ef4444',
+        };
+        return colors[category] ?? '#6b7280';
+    };
+
+    const getCategoryIcon = (category: string): string => {
+        const icons: Record<string, string> = {
+            AUTO_REMITTANCE: 'swap-horizontal-outline',
+            STOCK_REMITTANCE: 'cube-outline',
+            DELIVERY_COMMISSION: 'bicycle-outline',
+            PLATFORM_COMMISSION: 'business-outline',
+            PROMOTION_COST: 'pricetag-outline',
+            DRIVER_TIP: 'heart-outline',
+            CATALOG_REVENUE: 'storefront-outline',
+        };
+        return icons[category] ?? 'help-circle-outline';
+    };
+
+    const getCategoryDescription = (category: string): string => {
+        const map: Record<string, string> = {
+            AUTO_REMITTANCE: t('finances.desc_auto_remittance', 'Markup & surcharge adjustments'),
+            STOCK_REMITTANCE: t('finances.desc_stock_remittance', 'Stock item cost remittance'),
+            DELIVERY_COMMISSION: t('finances.desc_delivery_commission', 'Commission on delivery fees'),
+            PLATFORM_COMMISSION: t('finances.desc_platform_commission', 'Platform fee on order subtotal'),
+            PROMOTION_COST: t('finances.desc_promotion_cost', 'Promotional discount cost share'),
+            DRIVER_TIP: t('finances.desc_driver_tip', 'Tips forwarded to drivers'),
+            CATALOG_REVENUE: t('finances.desc_catalog_revenue', 'Catalog product revenue'),
+        };
+        return map[category] ?? '';
+    };
+
+    // Group category-filtered settlements by order
+    const categoryOrders = useMemo(() => {
+        const byOrder = new Map<string, { orderId: string; displayId: string | null; settlement: Settlement; settlements: Settlement[]; totalAmount: number; latestCreatedAt: string }>();
+        categorySettlements.forEach((s) => {
+            const orderId = String(s.order?.id ?? s.id);
+            const existing = byOrder.get(orderId);
+            if (existing) {
+                existing.settlements.push(s);
+                existing.totalAmount += Number(s.amount ?? 0);
+                if (new Date(s.createdAt).getTime() > new Date(existing.latestCreatedAt).getTime()) existing.latestCreatedAt = s.createdAt;
+                return;
+            }
+            byOrder.set(orderId, {
+                orderId,
+                displayId: s.order?.displayId ?? null,
+                settlement: s,
+                settlements: [s],
+                totalAmount: Number(s.amount ?? 0),
+                latestCreatedAt: s.createdAt,
+            });
+        });
+        return Array.from(byOrder.values()).sort((a, b) => new Date(b.latestCreatedAt).getTime() - new Date(a.latestCreatedAt).getTime());
+    }, [categorySettlements]);
+
+    const handleCategoryPress = useCallback((item: BreakdownItem) => {
+        const color = getCategoryColor(item.category, item.direction);
+        setSelectedCategory({ category: item.category, label: item.label, color, direction: item.direction });
+        setCategorySettlements([]);
+        fetchCategorySettlements({ variables: { businessId, category: item.category, startDate, endDate, limit: 100, offset: 0 } });
+    }, [fetchCategorySettlements, businessId, startDate, endDate]);
     // Compute revenue generated & commission owed from settlement rows
     const computed = useMemo(() => {
         let totalGross = 0;
@@ -894,10 +995,11 @@ export default function FinancesScreen() {
                         <View style={{ gap: 8 }}>
                             {breakdownItems.map((item, idx) => {
                                 const isReceivable = item.direction === 'RECEIVABLE';
-                                const color = isReceivable ? '#ef4444' : '#22c55e';
+                                const color = getCategoryColor(item.category, item.direction);
                                 return (
-                                    <View
+                                    <Pressable
                                         key={`${item.category}-${idx}`}
+                                        onPress={() => handleCategoryPress(item)}
                                         style={{
                                             flexDirection: 'row',
                                             alignItems: 'center',
@@ -912,12 +1014,16 @@ export default function FinancesScreen() {
                                         <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 10 }}>
                                             <View
                                                 style={{
-                                                    width: 8,
-                                                    height: 8,
-                                                    borderRadius: 4,
-                                                    backgroundColor: color,
+                                                    width: 28,
+                                                    height: 28,
+                                                    borderRadius: 8,
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    backgroundColor: color + '18',
                                                 }}
-                                            />
+                                            >
+                                                <Ionicons name={getCategoryIcon(item.category) as any} size={14} color={color} />
+                                            </View>
                                             <View style={{ flex: 1 }}>
                                                 <Text
                                                     style={{
@@ -929,8 +1035,11 @@ export default function FinancesScreen() {
                                                 >
                                                     {item.label}
                                                 </Text>
+                                                <Text style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }} numberOfLines={1}>
+                                                    {getCategoryDescription(item.category)}
+                                                </Text>
                                                 <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
-                                                    {item.count} {item.count === 1 ? t('finances.record', 'record') : t('finances.records', 'records')}
+                                                    {item.count} {item.count === 1 ? t('finances.record', 'record') : t('finances.records', 'records')} · {t('finances.view_orders', 'View Orders')} ›
                                                 </Text>
                                             </View>
                                         </View>
@@ -943,7 +1052,7 @@ export default function FinancesScreen() {
                                         >
                                             {isReceivable ? '-' : '+'}{formatCurrency(item.totalAmount)}
                                         </Text>
-                                    </View>
+                                    </Pressable>
                                 );
                             })}
                         </View>
@@ -1302,7 +1411,7 @@ export default function FinancesScreen() {
                                         return (
                                             <Pressable
                                                 key={orderGroup.orderId}
-                                                onPress={() => setSelectedSettlementOrder(orderGroup)}
+                                                onPress={() => { setHighlightCategory(null); setSelectedSettlementOrder(orderGroup); }}
                                                 style={{
                                                     flexDirection: 'row',
                                                     borderBottomWidth: 1,
@@ -1539,16 +1648,129 @@ export default function FinancesScreen() {
                 </KeyboardAvoidingView>
             </Modal>
 
+            {/* ── Category Orders Modal ── */}
+            <Modal
+                visible={selectedCategory !== null}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setSelectedCategory(null)}
+            >
+                <Pressable
+                    style={{ flex: 1, backgroundColor: '#00000090', justifyContent: 'flex-end' }}
+                    onPress={() => setSelectedCategory(null)}
+                />
+                <View style={{
+                    position: 'absolute', bottom: 0, left: 0, right: 0,
+                    backgroundColor: '#0f1724', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+                    padding: 24, paddingBottom: 40, maxHeight: '85%',
+                    borderTopWidth: 1, borderColor: '#263145',
+                }}>
+                    {selectedCategory && (
+                        <>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                                    <View style={{
+                                        width: 32, height: 32, borderRadius: 8,
+                                        alignItems: 'center', justifyContent: 'center',
+                                        backgroundColor: selectedCategory.color + '18',
+                                    }}>
+                                        <Ionicons name={getCategoryIcon(selectedCategory.category) as any} size={16} color={selectedCategory.color} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ fontSize: 16, fontWeight: '800', color: '#fff' }}>
+                                            {selectedCategory.label}
+                                        </Text>
+                                        <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>
+                                            {categoryOrders.length} {categoryOrders.length === 1 ? t('finances.order', 'order') : t('finances.orders', 'orders')}
+                                        </Text>
+                                    </View>
+                                </View>
+                                <Pressable onPress={() => setSelectedCategory(null)}>
+                                    <Ionicons name="close-circle" size={28} color="#6b7280" />
+                                </Pressable>
+                            </View>
+
+                            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }} contentContainerStyle={{ gap: 8 }}>
+                                {categoryLoading ? (
+                                    <ActivityIndicator color={selectedCategory.color} style={{ marginVertical: 24 }} />
+                                ) : categoryOrders.length === 0 ? (
+                                    <View style={{ alignItems: 'center', paddingVertical: 32 }}>
+                                        <Text style={{ fontSize: 14, fontWeight: '600', color: '#6b7280' }}>
+                                            {t('finances.no_orders_for_category', 'No orders found for this category')}
+                                        </Text>
+                                    </View>
+                                ) : (
+                                    categoryOrders.map((orderGroup) => {
+                                        const isPayable = orderGroup.settlements[0]?.direction === 'PAYABLE';
+                                        const orderLabel = orderGroup.displayId ? `#${orderGroup.displayId}` : t('finances.order', 'Order');
+
+                                        return (
+                                            <Pressable
+                                                key={orderGroup.orderId}
+                                                onPress={() => {
+                                                    setHighlightCategory(selectedCategory.category);
+                                                    setSelectedSettlementOrder(orderGroup.settlement);
+                                                    setSelectedCategory(null);
+                                                }}
+                                                style={{
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    borderRadius: 14,
+                                                    padding: 14,
+                                                    backgroundColor: '#1a2233',
+                                                    borderWidth: 1,
+                                                    borderColor: selectedCategory.color + '30',
+                                                }}
+                                            >
+                                                <View style={{ flex: 1, gap: 4 }}>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                        <View style={{
+                                                            backgroundColor: '#7C3AED18',
+                                                            borderRadius: 6,
+                                                            paddingHorizontal: 7,
+                                                            paddingVertical: 2,
+                                                            flexDirection: 'row',
+                                                            alignItems: 'center',
+                                                            gap: 4,
+                                                        }}>
+                                                            <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#7C3AED' }} />
+                                                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#7C3AED', textTransform: 'uppercase' }}>{orderLabel}</Text>
+                                                        </View>
+                                                        <Text style={{ fontSize: 11, color: '#6b7280' }}>
+                                                            {orderGroup.settlements.length} line{orderGroup.settlements.length === 1 ? '' : 's'}
+                                                        </Text>
+                                                    </View>
+                                                    <Text style={{ fontSize: 11, color: '#6b7280' }}>
+                                                        {formatDate(orderGroup.latestCreatedAt)}
+                                                    </Text>
+                                                </View>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                    <Text style={{ fontSize: 15, fontWeight: '700', color: selectedCategory.color }}>
+                                                        {isPayable ? '+' : '-'}{formatCurrency(orderGroup.totalAmount)}
+                                                    </Text>
+                                                    <Ionicons name="chevron-forward" size={14} color="#6b7280" />
+                                                </View>
+                                            </Pressable>
+                                        );
+                                    })
+                                )}
+                            </ScrollView>
+                        </>
+                    )}
+                </View>
+            </Modal>
+
             {/* ── Order Detail Modal ── */}
             <Modal
                 visible={selectedSettlementOrder !== null}
                 transparent
                 animationType="slide"
-                onRequestClose={() => setSelectedSettlementOrder(null)}
+                onRequestClose={() => { setSelectedSettlementOrder(null); setHighlightCategory(null); }}
             >
                 <Pressable
                     style={{ flex: 1, backgroundColor: '#00000090', justifyContent: 'flex-end' }}
-                    onPress={() => setSelectedSettlementOrder(null)}
+                    onPress={() => { setSelectedSettlementOrder(null); setHighlightCategory(null); }}
                 >
                     <Pressable
                         onPress={(e) => e.stopPropagation()}
@@ -1651,17 +1873,22 @@ export default function FinancesScreen() {
                                             const lineLabel = line.rule?.category
                                                 ? `${line.rule.category}${line.rule.subcategory ? ` · ${line.rule.subcategory}` : ''}`
                                                 : (isPayable ? 'Payout' : 'Commission');
+                                            const lineCategory = getLineCategory(line);
+                                            const isHighlighted = highlightCategory != null && lineCategory === highlightCategory;
+                                            const hlColor = isHighlighted ? getCategoryColor(highlightCategory, line.direction) : null;
                                             return (
                                                 <View key={line.id} style={{
                                                     flexDirection: 'row',
                                                     justifyContent: 'space-between',
                                                     paddingHorizontal: 14,
                                                     paddingVertical: 11,
-                                                    backgroundColor: i % 2 === 0 ? '#0d1421' : '#0a0f1a',
+                                                    backgroundColor: isHighlighted ? (hlColor + '18') : (i % 2 === 0 ? '#0d1421' : '#0a0f1a'),
+                                                    borderLeftWidth: isHighlighted ? 3 : 0,
+                                                    borderLeftColor: isHighlighted ? hlColor : 'transparent',
                                                 }}>
                                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
                                                         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isPayable ? '#22c55e' : '#ef4444' }} />
-                                                        <Text style={{ fontSize: 13, color: '#6b7280', flex: 1 }} numberOfLines={1}>{lineLabel}</Text>
+                                                        <Text style={{ fontSize: 13, color: isHighlighted ? '#e2e8f0' : '#6b7280', fontWeight: isHighlighted ? '600' : '400', flex: 1 }} numberOfLines={1}>{lineLabel}</Text>
                                                     </View>
                                                     <Text style={{ fontSize: 13, fontWeight: '700', color: isPayable ? '#22c55e' : '#ef4444' }}>
                                                         {isPayable ? '+' : '-'}{formatCurrency(Number(line.amount ?? 0))}
@@ -1798,7 +2025,7 @@ export default function FinancesScreen() {
 
                                     {/* Close button */}
                                     <Pressable
-                                        onPress={() => setSelectedSettlementOrder(null)}
+                                        onPress={() => { setSelectedSettlementOrder(null); setHighlightCategory(null); }}
                                         style={{
                                             borderRadius: 14,
                                             paddingVertical: 14,

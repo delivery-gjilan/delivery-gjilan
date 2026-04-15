@@ -1,0 +1,2 @@
+ALTER TABLE "store_settings" ADD COLUMN "far_order_threshold_km" double precision DEFAULT 5 NOT NULL;--> statement-breakpoint
+ALTER TABLE "store_settings" ADD COLUMN "gas_priority_window_seconds" integer DEFAULT 30 NOT NULL;

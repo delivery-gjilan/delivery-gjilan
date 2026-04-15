@@ -105,6 +105,12 @@ export default function BusinessDetailsPage() {
                                     Inactive
                                 </span>
                             )}
+                            {b.directDispatchEnabled && (
+                                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-400">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
+                                    Direct Dispatch
+                                </span>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-1.5 mt-3">

@@ -579,7 +579,7 @@ export function useDriverHeartbeat() {
     return () => {
       stopHeartbeat();
     };
-  }, [isAuthenticated, startHeartbeat, stopHeartbeat]);
+  }, [isAuthenticated, appSessionActive, startHeartbeat, stopHeartbeat]);
 
   return { connectionStatus };
 }

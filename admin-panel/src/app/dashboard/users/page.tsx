@@ -615,6 +615,7 @@ export default function UsersPage() {
                                                     )}
                                                 </div>
                                                 <div className="text-xs text-zinc-500 truncate">{u.email}</div>
+                                                {u.phoneNumber && <div className="text-xs text-zinc-500 truncate">{u.phoneNumber}</div>}
                                             </div>
 
                                             {/* Flag dot */}
@@ -855,11 +856,11 @@ export default function UsersPage() {
                                             </div>
                                             <div>
                                                 <span className="text-zinc-500">Phone</span>
-                                                <div className="text-zinc-200 mt-0.5">{selectedUser.phoneNumber || "ï¿½"}</div>
+                                                <div className="text-zinc-200 mt-0.5">{selectedUser.phoneNumber || <span className="text-zinc-600">—</span>}</div>
                                             </div>
                                             <div>
                                                 <span className="text-zinc-500">Address</span>
-                                                <div className="text-zinc-200 mt-0.5">{selectedUser.address || "ï¿½"}</div>
+                                                <div className="text-zinc-200 mt-0.5">{selectedUser.address || <span className="text-zinc-600">—</span>}</div>
                                             </div>
                                             <div>
                                                 <span className="text-zinc-500">User ID</span>

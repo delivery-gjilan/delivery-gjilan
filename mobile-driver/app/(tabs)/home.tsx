@@ -1,23 +1,211 @@
-﻿import React, { useState } from "react";
+﻿import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
     View,
     Text,
+    FlatList,
     TouchableOpacity,
     Alert,
-    ScrollView,
-    RefreshControl,
     ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useMutation } from "@apollo/client/react";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { useTheme } from "@/hooks/useTheme";
 import { useTranslations } from "@/hooks/useTranslations";
 import { useAuthStore } from "@/store/authStore";
 import { UPDATE_DRIVER_ONLINE_STATUS } from "@/graphql/operations/driverLocation";
-import { GET_MY_DRIVER_METRICS } from "@/graphql/operations/driver";
 import { useStoreStatus } from "@/hooks/useStoreStatus";
+import { useSharedOrderAccept } from "@/hooks/GlobalOrderAcceptContext";
 import { useRouter } from "expo-router";
+import type { DriverOrder } from "@/utils/types";
+
+// ─── Order Card ──────────────────────────────────────────────────────────────
+
+type CardVariant = "available" | "assigned";
+
+function OrderCard({
+    order,
+    variant,
+    onAccept,
+    onNavigate,
+    currentDriverId,
+}: {
+    order: DriverOrder;
+    variant: CardVariant;
+    onAccept?: (id: string) => void;
+    onNavigate?: (order: DriverOrder) => void;
+    currentDriverId: string | undefined;
+}) {
+    const theme = useTheme();
+
+    const firstBusiness = order.businesses?.[0];
+    const bizName = firstBusiness?.business?.name ?? "Business";
+    const dropAddress = order.dropOffLocation?.address ?? "—";
+    const driverEarning = (order.deliveryPrice ?? 0) + (order.driverTip ?? 0);
+
+    const items = order.businesses?.flatMap((b) => b.items ?? []) ?? [];
+    const itemSummary = items
+        .map((i) => `${i.quantity}× ${i.name}`)
+        .slice(0, 3)
+        .join(", ");
+    const moreCount = items.length > 3 ? items.length - 3 : 0;
+
+    // ETA badge for PREPARING orders
+    const etaBadge = useMemo(() => {
+        if (order.status !== "PREPARING") return null;
+        const readyAt = order.estimatedReadyAt
+            ? new Date(order.estimatedReadyAt).getTime()
+            : order.preparingAt && order.preparationMinutes
+            ? new Date(order.preparingAt).getTime() + order.preparationMinutes * 60000
+            : null;
+        if (!readyAt) return null;
+        const diff = Math.round((readyAt - Date.now()) / 60000);
+        if (diff <= 0) return "Ready soon";
+        return `Ready in ${diff}m`;
+    }, [order]);
+
+    const statusColor =
+        order.status === "READY" ? "#22c55e"
+        : order.status === "PREPARING" ? "#f59e0b"
+        : order.status === "OUT_FOR_DELIVERY" ? "#3b82f6"
+        : "#6b7280";
+
+    const statusLabel =
+        order.status === "READY" ? "Ready"
+        : order.status === "PREPARING" ? "Preparing"
+        : order.status === "OUT_FOR_DELIVERY" ? "Out for delivery"
+        : order.status === "PICKED_UP" ? "Picked up"
+        : order.status;
+
+    return (
+        <View style={{
+            marginHorizontal: 16,
+            marginBottom: 12,
+            borderRadius: 20,
+            backgroundColor: theme.colors.card,
+            borderWidth: 1,
+            borderColor: variant === "available" ? "#16a34a30" : theme.colors.border,
+            overflow: "hidden",
+        }}>
+            {/* Top bar */}
+            <View style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                paddingHorizontal: 16,
+                paddingTop: 14,
+                paddingBottom: 10,
+            }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
+                    <Text style={{ fontSize: 16, fontWeight: "800", color: theme.colors.text, flexShrink: 1 }}>
+                        {bizName}
+                    </Text>
+                    <View style={{
+                        backgroundColor: "#f1f5f9",
+                        borderRadius: 8,
+                        paddingHorizontal: 7,
+                        paddingVertical: 2,
+                    }}>
+                        <Text style={{ fontSize: 11, fontWeight: "700", color: "#64748b" }}>
+                            #{order.displayId}
+                        </Text>
+                    </View>
+                </View>
+                {/* Status / ETA badge */}
+                <View style={{ backgroundColor: statusColor + "20", borderRadius: 10, paddingHorizontal: 9, paddingVertical: 4 }}>
+                    <Text style={{ fontSize: 11, fontWeight: "700", color: statusColor }}>
+                        {etaBadge ?? statusLabel}
+                    </Text>
+                </View>
+            </View>
+
+            {/* Items */}
+            {itemSummary.length > 0 && (
+                <View style={{ paddingHorizontal: 16, paddingBottom: 10 }}>
+                    <Text style={{ fontSize: 13, color: theme.colors.subtext }} numberOfLines={1}>
+                        {itemSummary}{moreCount > 0 ? ` +${moreCount} more` : ""}
+                    </Text>
+                </View>
+            )}
+
+            {/* Drop-off address */}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, paddingBottom: 14 }}>
+                <Ionicons name="location-outline" size={13} color={theme.colors.subtext} />
+                <Text style={{ fontSize: 13, color: theme.colors.subtext, flex: 1 }} numberOfLines={1}>
+                    {dropAddress}
+                </Text>
+            </View>
+
+            {/* Divider */}
+            <View style={{ height: 1, backgroundColor: theme.colors.border }} />
+
+            {/* Footer */}
+            <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, gap: 10 }}>
+                {/* Earnings */}
+                <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 22, fontWeight: "900", color: "#22c55e", letterSpacing: -0.5 }}>
+                        €{driverEarning.toFixed(2)}
+                    </Text>
+                    {order.driverTip > 0 && (
+                        <Text style={{ fontSize: 11, color: theme.colors.subtext }}>
+                            incl. €{order.driverTip.toFixed(2)} tip
+                        </Text>
+                    )}
+                </View>
+
+                {/* Action button */}
+                {variant === "available" && onAccept && (
+                    <TouchableOpacity
+                        onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            onAccept(order.id);
+                        }}
+                        activeOpacity={0.8}
+                        style={{
+                            backgroundColor: "#16a34a",
+                            borderRadius: 14,
+                            paddingVertical: 12,
+                            paddingHorizontal: 22,
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 6,
+                        }}
+                    >
+                        <Ionicons name="checkmark-circle" size={17} color="#fff" />
+                        <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>Accept</Text>
+                    </TouchableOpacity>
+                )}
+
+                {variant === "assigned" && onNavigate && (
+                    <TouchableOpacity
+                        onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            onNavigate(order);
+                        }}
+                        activeOpacity={0.8}
+                        style={{
+                            backgroundColor: "#3b82f6",
+                            borderRadius: 14,
+                            paddingVertical: 12,
+                            paddingHorizontal: 22,
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 6,
+                        }}
+                    >
+                        <Ionicons name="navigate" size={15} color="#fff" />
+                        <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>Navigate</Text>
+                    </TouchableOpacity>
+                )}
+            </View>
+        </View>
+    );
+}
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
+
+type TabFilter = "available" | "assigned";
 
 export default function Home() {
     const theme = useTheme();
@@ -30,221 +218,222 @@ export default function Home() {
     const connectionStatus = useAuthStore((s) => s.connectionStatus);
     const { dispatchModeEnabled } = useStoreStatus();
 
-    const firstName = user?.firstName || "Driver";
-    const [refreshing, setRefreshing] = useState(false);
+    const currentDriverId = user?.id;
+    const [tab, setTab] = useState<TabFilter>("available");
+    const [updatingStatus, setUpdatingStatus] = useState(false);
+    const [updateOnlineStatus] = useMutation(UPDATE_DRIVER_ONLINE_STATUS);
 
-    const [updateOnlineStatus, { loading: updatingStatus }] = useMutation(UPDATE_DRIVER_ONLINE_STATUS);
-    const { data: metricsData, loading: metricsLoading, refetch } = useQuery(GET_MY_DRIVER_METRICS, {
-        fetchPolicy: "cache-and-network",
-        pollInterval: 30_000,
-    });
+    const {
+        assignedOrders,
+        poolOrders,
+        isOrdersBootstrapping,
+        handleAcceptAndNavigate,
+        accepting,
+    } = useSharedOrderAccept();
 
-    const m = metricsData?.myDriverMetrics;
-    const grossToday = m?.grossEarningsToday ?? 0;
-    const netToday = m?.netEarningsToday ?? 0;
-    const deliveredToday = m?.deliveredTodayCount ?? 0;
-    const commissionPct = m?.commissionPercentage ?? 0;
-    const activeOrders = m?.activeOrdersCount ?? 0;
-    const maxOrders = m?.maxActiveOrders ?? 5;
-    const avgPerDelivery = deliveredToday > 0 ? grossToday / deliveredToday : 0;
-    const capacityPct = maxOrders > 0 ? activeOrders / maxOrders : 0;
-    const commissionTaken = grossToday - netToday;
-
-    const onRefresh = async () => {
-        setRefreshing(true);
-        await refetch();
-        setRefreshing(false);
-    };
-
-    const handleOnlineStatusChange = async () => {
+    const handleOnlineStatusChange = useCallback(async () => {
         const newStatus = !isOnline;
+        setUpdatingStatus(true);
         try {
             setOnline(newStatus);
             const result = await updateOnlineStatus({ variables: { isOnline: newStatus } });
             const updatedUser = result.data?.updateDriverOnlineStatus;
             if (updatedUser) setUser(updatedUser);
+            if (newStatus) setTab("available");
         } catch {
             setOnline(!newStatus);
             Alert.alert(t.common.error, t.home.error_update_status);
+        } finally {
+            setUpdatingStatus(false);
         }
-    };
+    }, [isOnline, setOnline, setUser, updateOnlineStatus, t]);
 
-    const hour = new Date().getHours();
-    const greeting =
-        hour < 12 ? t.home.greeting_morning
-        : hour < 17 ? t.home.greeting_afternoon
-        : t.home.greeting_evening;
+    const handleNavigate = useCallback((order: DriverOrder) => {
+        router.push("/(tabs)/drive" as any);
+    }, [router]);
 
     const connColor =
         connectionStatus === "CONNECTED" ? "#22c55e"
         : connectionStatus === "STALE" ? "#f59e0b"
+        : connectionStatus === "DISCONNECTED" ? "#6b7280"
         : "#ef4444";
 
-    const capacityColor = capacityPct >= 1 ? "#ef4444" : capacityPct >= 0.75 ? "#f59e0b" : "#22c55e";
+    const connLabel =
+        connectionStatus === "CONNECTED" ? (isOnline ? t.home.signal_good : t.home.offline)
+        : connectionStatus === "STALE" ? `${t.home.signal_weak} — ${t.home.check_signal}`
+        : connectionStatus === "DISCONNECTED" ? t.home.signal_connecting
+        : t.home.signal_lost;
 
-    const isDark = theme.colors.background === "#111827" || theme.colors.background === "#0f172a";
+    const displayedOrders: DriverOrder[] = tab === "available" ? poolOrders : assignedOrders;
+
+    const ListHeader = (
+        <View>
+            {/* ── Page header ── */}
+            <View style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                paddingHorizontal: 16,
+                paddingTop: 16,
+                paddingBottom: 12,
+            }}>
+                <View>
+                    <Text style={{ fontSize: 26, fontWeight: "900", color: theme.colors.text, letterSpacing: -0.5 }}>
+                        {t.tabs.orders}
+                    </Text>
+                    {/* Connection pill */}
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 3 }}>
+                        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: connColor }} />
+                        <Text style={{ fontSize: 11, fontWeight: "600", color: theme.colors.subtext }}>
+                            {connLabel}
+                        </Text>
+                    </View>
+                </View>
+
+                {/* Online / Offline pill toggle */}
+                <TouchableOpacity
+                    onPress={handleOnlineStatusChange}
+                    disabled={updatingStatus}
+                    activeOpacity={0.8}
+                    style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 7,
+                        paddingVertical: 10,
+                        paddingHorizontal: 16,
+                        borderRadius: 20,
+                        backgroundColor: isOnline ? "#0f2318" : theme.colors.card,
+                        borderWidth: 1.5,
+                        borderColor: isOnline ? "#16a34a50" : theme.colors.border,
+                    }}
+                >
+                    {updatingStatus
+                        ? <ActivityIndicator size="small" color={isOnline ? "#4ade80" : theme.colors.subtext} />
+                        : <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isOnline ? "#22c55e" : "#6b7280" }} />
+                    }
+                    <Text style={{ fontSize: 13, fontWeight: "800", color: isOnline ? "#4ade80" : theme.colors.subtext }}>
+                        {isOnline ? t.home.online : t.home.offline}
+                    </Text>
+                </TouchableOpacity>
+            </View>
+
+            {/* Dispatch mode banner */}
+            {dispatchModeEnabled && isOnline && (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 16, marginBottom: 10, backgroundColor: "#fef3c710", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: "#fef3c730" }}>
+                    <Ionicons name="car-outline" size={15} color="#fbbf24" />
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: "#fbbf24", flex: 1 }}>
+                        {t.home.dispatch_mode_title} — {t.home.dispatch_mode_sub}
+                    </Text>
+                </View>
+            )}
+
+            {/* ── Status rail ── */}
+            <View style={{ flexDirection: "row", marginHorizontal: 16, marginBottom: 12, gap: 8 }}>
+                {(["available", "assigned"] as TabFilter[]).map((f) => {
+                    const count = f === "available" ? poolOrders.length : assignedOrders.length;
+                    const active = tab === f;
+                    const activeColor = f === "available" ? "#22c55e" : "#3b82f6";
+                    return (
+                        <TouchableOpacity
+                            key={f}
+                            onPress={() => setTab(f)}
+                            activeOpacity={0.8}
+                            style={{
+                                flex: 1,
+                                flexDirection: "row",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: 6,
+                                paddingVertical: 10,
+                                borderRadius: 14,
+                                backgroundColor: active ? activeColor + "20" : theme.colors.card,
+                                borderWidth: 1.5,
+                                borderColor: active ? activeColor + "60" : theme.colors.border,
+                            }}
+                        >
+                            <Text style={{ fontSize: 13, fontWeight: "800", color: active ? activeColor : theme.colors.subtext }}>
+                                {f === "available" ? t.home.tab_available : t.home.tab_my_orders}
+                            </Text>
+                            {count > 0 && (
+                                <View style={{ backgroundColor: active ? activeColor : theme.colors.border, borderRadius: 8, minWidth: 18, paddingHorizontal: 5, paddingVertical: 1, alignItems: "center" }}>
+                                    <Text style={{ fontSize: 11, fontWeight: "800", color: active ? "#fff" : theme.colors.subtext }}>
+                                        {count}
+                                    </Text>
+                                </View>
+                            )}
+                        </TouchableOpacity>
+                    );
+                })}
+            </View>
+        </View>
+    );
+
+    // ── Empty / loading states ──
+    if (isOrdersBootstrapping) {
+        return (
+            <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
+                {ListHeader}
+                <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
+                    <Text style={{ marginTop: 12, fontSize: 14, color: theme.colors.subtext }}>{t.common.loading}</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
-            <ScrollView
-                contentContainerStyle={{ paddingBottom: 48 }}
+            <FlatList
+                data={displayedOrders}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                    <OrderCard
+                        order={item}
+                        variant={tab}
+                        onAccept={tab === "available" ? (id) => { void handleAcceptAndNavigate(id); } : undefined}
+                        onNavigate={tab === "assigned" ? handleNavigate : undefined}
+                        currentDriverId={currentDriverId}
+                    />
+                )}
+                ListHeaderComponent={ListHeader}
+                contentContainerStyle={{ paddingBottom: 32 }}
                 showsVerticalScrollIndicator={false}
-                refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
-                }
-            >
-                {/* ── Hero Status Card ── */}
-                <View style={{
-                    margin: 16,
-                    borderRadius: 28,
-                    overflow: "hidden",
-                    backgroundColor: isOnline ? "#0f2318" : (isDark ? "#1c1c1e" : "#f1f5f9"),
-                    borderWidth: 1,
-                    borderColor: isOnline ? "#16a34a40" : theme.colors.border,
-                    padding: 24,
-                }}>
-                    {/* Greeting */}
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28 }}>
-                        <View>
-                            <Text style={{ fontSize: 13, color: isOnline ? "#4ade80" : theme.colors.subtext, marginBottom: 4, fontWeight: "600" }}>
-                                {greeting}
-                            </Text>
-                            <Text style={{ fontSize: 22, fontWeight: "800", color: isOnline ? "#f0fdf4" : theme.colors.text, letterSpacing: -0.4 }}>
-                                {firstName} 👋
-                            </Text>
-                        </View>
-                        {metricsLoading && !m && <ActivityIndicator size="small" color={isOnline ? "#4ade80" : theme.colors.subtext} />}
-                    </View>
-
-                    {/* Status label */}
-                    <Text style={{ fontSize: 13, fontWeight: "600", color: isOnline ? "#86efac" : theme.colors.subtext, marginBottom: 16 }}>
-                        {isOnline ? "● You are live — receiving orders" : "○ Go online to start earning"}
-                    </Text>
-
-                    {/* Big toggle button */}
-                    <TouchableOpacity
-                        onPress={handleOnlineStatusChange}
-                        disabled={updatingStatus}
-                        activeOpacity={0.85}
-                        style={{
-                            borderRadius: 18,
-                            paddingVertical: 16,
-                            alignItems: "center",
-                            backgroundColor: isOnline ? "#ef444415" : "#16a34a",
-                            borderWidth: 1.5,
-                            borderColor: isOnline ? "#ef444450" : "#15803d",
-                            flexDirection: "row",
-                            justifyContent: "center",
-                            gap: 8,
-                        }}
-                    >
-                        {updatingStatus
-                            ? <ActivityIndicator size="small" color={isOnline ? "#ef4444" : "#fff"} />
-                            : <Ionicons name={isOnline ? "pause-circle-outline" : "play-circle-outline"} size={20} color={isOnline ? "#ef4444" : "#fff"} />
-                        }
-                        <Text style={{ fontSize: 16, fontWeight: "800", color: isOnline ? "#ef4444" : "#fff", letterSpacing: -0.2 }}>
-                            {isOnline ? "Go Offline" : "Go Online"}
-                        </Text>
-                    </TouchableOpacity>
-
-                    {/* Dispatch mode notice */}
-                    {dispatchModeEnabled && isOnline && (
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 14, backgroundColor: "#fef3c710", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 }}>
-                            <Ionicons name="car-outline" size={15} color="#fbbf24" />
-                            <Text style={{ fontSize: 12, fontWeight: "600", color: "#fbbf24", flex: 1 }}>
-                                {t.home.dispatch_mode_title} — {t.home.dispatch_mode_sub}
-                            </Text>
-                        </View>
-                    )}
-                </View>
-
-                {/* ── Earnings ── */}
-                <View style={{ marginHorizontal: 16, marginBottom: 12, borderRadius: 24, padding: 22, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                        <Text style={{ fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 1.2, color: theme.colors.subtext }}>
-                            {t.home.earnings_today}
-                        </Text>
-                        <TouchableOpacity onPress={() => router.push("/(tabs)/earnings" as any)} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                            <Text style={{ fontSize: 12, color: theme.colors.primary, fontWeight: "600" }}>Details</Text>
-                            <Ionicons name="chevron-forward" size={13} color={theme.colors.primary} />
-                        </TouchableOpacity>
-                    </View>
-                    <Text style={{ fontSize: 46, fontWeight: "900", letterSpacing: -2, color: theme.colors.text, marginBottom: 4 }}>
-                        €{netToday.toFixed(2)}
-                    </Text>
-                    <Text style={{ fontSize: 13, color: theme.colors.subtext }}>
-                        {t.home.your_take} · €{grossToday.toFixed(2)} {t.home.gross}
-                    </Text>
-                    {grossToday > 0 && (
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-                            <View style={{ backgroundColor: "#fef3c7", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 }}>
-                                <Text style={{ color: "#92400e", fontSize: 11, fontWeight: "700" }}>
-                                    {commissionPct > 0 ? `${commissionPct.toFixed(0)}% ${t.home.commission}` : `€${commissionTaken.toFixed(2)} ${t.home.commission}`}
+                ListEmptyComponent={
+                    <View style={{ alignItems: "center", justifyContent: "center", paddingTop: 60, paddingHorizontal: 32 }}>
+                        {!isOnline ? (
+                            <>
+                                <Ionicons name="power-outline" size={48} color={theme.colors.subtext} style={{ marginBottom: 16 }} />
+                                <Text style={{ fontSize: 17, fontWeight: "700", color: theme.colors.text, textAlign: "center", marginBottom: 6 }}>
+                                    {t.home.offline_title}
                                 </Text>
-                            </View>
-                            <Text style={{ fontSize: 11, color: theme.colors.subtext }}>−€{commissionTaken.toFixed(2)} {t.home.deducted}</Text>
-                        </View>
-                    )}
-                </View>
-
-                {/* ── Stat row ── */}
-                <View style={{ flexDirection: "row", gap: 10, marginHorizontal: 16, marginBottom: 12 }}>
-                    {/* Deliveries */}
-                    <View style={{ flex: 1, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
-                        <View style={{ width: 36, height: 36, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "#eff6ff", marginBottom: 10 }}>
-                            <Ionicons name="bicycle-outline" size={18} color="#3b82f6" />
-                        </View>
-                        <Text style={{ fontSize: 28, fontWeight: "900", letterSpacing: -0.5, color: theme.colors.text }}>{deliveredToday}</Text>
-                        <Text style={{ fontSize: 11, color: theme.colors.subtext, marginTop: 2 }}>{t.home.delivered_today}</Text>
+                                <Text style={{ fontSize: 14, color: theme.colors.subtext, textAlign: "center" }}>
+                                    {t.home.offline_sub}
+                                </Text>
+                            </>
+                        ) : tab === "available" ? (
+                            <>
+                                <Ionicons name="time-outline" size={48} color={theme.colors.subtext} style={{ marginBottom: 16 }} />
+                                <Text style={{ fontSize: 17, fontWeight: "700", color: theme.colors.text, textAlign: "center", marginBottom: 6 }}>
+                                    {t.home.waiting_title}
+                                </Text>
+                                <Text style={{ fontSize: 14, color: theme.colors.subtext, textAlign: "center" }}>
+                                    {t.home.waiting_sub}
+                                </Text>
+                            </>
+                        ) : (
+                            <>
+                                <Ionicons name="checkmark-done-outline" size={48} color={theme.colors.subtext} style={{ marginBottom: 16 }} />
+                                <Text style={{ fontSize: 17, fontWeight: "700", color: theme.colors.text, textAlign: "center", marginBottom: 6 }}>
+                                    {t.home.no_assigned_title}
+                                </Text>
+                                <Text style={{ fontSize: 14, color: theme.colors.subtext, textAlign: "center" }}>
+                                    {t.home.no_assigned_sub}
+                                </Text>
+                            </>
+                        )}
                     </View>
-
-                    {/* Avg */}
-                    <View style={{ flex: 1, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
-                        <View style={{ width: 36, height: 36, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "#f0fdf4", marginBottom: 10 }}>
-                            <Ionicons name="trending-up-outline" size={18} color="#22c55e" />
-                        </View>
-                        <Text style={{ fontSize: 28, fontWeight: "900", letterSpacing: -0.5, color: theme.colors.text }}>
-                            {deliveredToday > 0 ? `€${avgPerDelivery.toFixed(2)}` : "—"}
-                        </Text>
-                        <Text style={{ fontSize: 11, color: theme.colors.subtext, marginTop: 2 }}>{t.home.avg_per_delivery}</Text>
-                    </View>
-
-                    {/* Active */}
-                    <View style={{ flex: 1, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: capacityColor + "50", backgroundColor: theme.colors.card }}>
-                        <View style={{ width: 36, height: 36, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: capacityColor + "15", marginBottom: 10 }}>
-                            <Ionicons name="layers-outline" size={18} color={capacityColor} />
-                        </View>
-                        <Text style={{ fontSize: 28, fontWeight: "900", letterSpacing: -0.5, color: capacityColor }}>{activeOrders}</Text>
-                        <Text style={{ fontSize: 11, color: theme.colors.subtext, marginTop: 2 }}>{t.home.active_orders}</Text>
-                    </View>
-                </View>
-
-                {/* ── Capacity bar ── */}
-                <View style={{ marginHorizontal: 16, marginBottom: 12, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
-                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                        <Text style={{ fontSize: 12, fontWeight: "700", color: theme.colors.text }}>Order Capacity</Text>
-                        <Text style={{ fontSize: 12, fontWeight: "800", color: capacityColor }}>{activeOrders} / {maxOrders}</Text>
-                    </View>
-                    <View style={{ height: 5, borderRadius: 3, backgroundColor: theme.colors.border, overflow: "hidden" }}>
-                        <View style={{ height: "100%", borderRadius: 3, width: `${Math.min(100, Math.round(capacityPct * 100))}%` as any, backgroundColor: capacityColor }} />
-                    </View>
-                    <Text style={{ fontSize: 11, color: theme.colors.subtext, marginTop: 8 }}>
-                        {activeOrders === 0 ? t.home.no_active_orders
-                            : capacityPct >= 1 ? t.home.at_max_capacity
-                            : `${maxOrders - activeOrders} ${maxOrders - activeOrders !== 1 ? t.home.slots_available : t.home.slot_available}`}
-                    </Text>
-                </View>
-
-                {/* ── Connection pill ── */}
-                <View style={{ marginHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start" }}>
-                    <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: connColor }} />
-                    <Text style={{ fontSize: 11, fontWeight: "600", color: theme.colors.subtext }}>
-                        {connectionStatus === "CONNECTED" ? (isOnline ? t.home.signal_good : "Offline")
-                            : connectionStatus === "STALE" ? `${t.home.signal_weak} — ${t.home.check_signal}`
-                            : t.home.signal_lost}
-                    </Text>
-                </View>
-            </ScrollView>
+                }
+            />
         </SafeAreaView>
     );
 }

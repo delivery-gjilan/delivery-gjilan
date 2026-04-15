@@ -70,7 +70,16 @@
     "accept_request_title": "Accept Settlement",
     "accept_request_text": "Accepting will settle up to {{amount}} for this request period. Continue?",
     "accept_request_fallback": "Accept this settlement request?",
-    "breakdown_title": "Cost Breakdown"
+    "breakdown_title": "Cost Breakdown",
+    "view_orders": "View Orders",
+    "no_orders_for_category": "No orders found for this category",
+    "desc_auto_remittance": "Markup & surcharge adjustments",
+    "desc_stock_remittance": "Stock item cost remittance",
+    "desc_delivery_commission": "Commission on delivery fees",
+    "desc_platform_commission": "Platform fee on order subtotal",
+    "desc_promotion_cost": "Promotional discount cost share",
+    "desc_driver_tip": "Tips forwarded to drivers",
+    "desc_catalog_revenue": "Catalog product revenue"
   },
   "dashboard": {
     "title": "Dashboard",

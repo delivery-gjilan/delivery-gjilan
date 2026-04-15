@@ -183,28 +183,41 @@ export class SettlementCalculationEngine {
     }
 
     /**
-     * Automatic markup remittance: driver owes the platform the markup amount
-     * they collected in cash from the customer.
-     * Only applies to CASH_TO_DRIVER orders — for PREPAID_TO_PLATFORM the
-     * platform already collected the full amount directly from the customer.
+     * Automatic markup earning: records the platform's markup income.
+     * - CASH_TO_DRIVER: the driver collected the markup in cash and must remit it.
+     * - PREPAID_TO_PLATFORM: the platform already received the markup in the
+     *   customer's payment; record it as a direct RECEIVABLE so the settlement
+     *   preview reflects the full platform earnings.
      */
     private addMarkupSettlement(order: DbOrder, driverId: string | null, results: SettlementCalculation[]): void {
-        if (!driverId) return;
-        if (order.paymentCollection !== 'CASH_TO_DRIVER') return;
-
         const markupPrice = Number(order.markupPrice ?? 0);
         if (markupPrice <= 0) return;
 
-        results.push({
-            type: 'DRIVER',
-            direction: 'RECEIVABLE',
-            driverId,
-            businessId: null,
-            orderId: order.id,
-            amount: Number(markupPrice.toFixed(2)),
-            ruleId: null,
-            reason: `Markup remittance (€${markupPrice.toFixed(2)} cash collected)`,
-        });
+        if (order.paymentCollection === 'CASH_TO_DRIVER') {
+            if (!driverId) return;
+            results.push({
+                type: 'DRIVER',
+                direction: 'RECEIVABLE',
+                driverId,
+                businessId: null,
+                orderId: order.id,
+                amount: Number(markupPrice.toFixed(2)),
+                ruleId: null,
+                reason: `Markup remittance (€${markupPrice.toFixed(2)} cash collected)`,
+            });
+        } else {
+            // PREPAID_TO_PLATFORM: platform collected markup directly from customer
+            results.push({
+                type: 'DRIVER',
+                direction: 'RECEIVABLE',
+                driverId: driverId ?? null,
+                businessId: null,
+                orderId: order.id,
+                amount: Number(markupPrice.toFixed(2)),
+                ruleId: null,
+                reason: `Markup earning (€${markupPrice.toFixed(2)} collected in prepayment)`,
+            });
+        }
     }
 
     /**

@@ -13,6 +13,8 @@ export const GET_STORE_STATUS = graphql(`
             inventoryModeEnabled
             earlyDispatchLeadMinutes
             businessGracePeriodMinutes
+            directDispatchEnabled
+            directDispatchDriverReserve
         }
     }
 `);
@@ -30,6 +32,8 @@ export const UPDATE_STORE_STATUS = graphql(`
             inventoryModeEnabled
             earlyDispatchLeadMinutes
             businessGracePeriodMinutes
+            directDispatchEnabled
+            directDispatchDriverReserve
         }
     }
 `);

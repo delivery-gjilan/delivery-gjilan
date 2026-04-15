@@ -49,6 +49,8 @@ export type StoreStatusPayload = {
     bannerEnabled: boolean;
     bannerMessage?: string | null;
     bannerType: string;
+    directDispatchEnabled?: boolean;
+    directDispatchDriverReserve?: number;
 };
 
 export type DriverMessagePayload = {

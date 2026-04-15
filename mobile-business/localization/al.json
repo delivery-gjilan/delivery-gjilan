@@ -70,7 +70,16 @@
     "accept_request_title": "Prano shlyerjen",
     "accept_request_text": "Pranimi do të shlyejë deri në {{amount}} për këtë periudhë. Vazhdon?",
     "accept_request_fallback": "Ta pranosh këtë kërkesë për shlyerje?",
-    "breakdown_title": "Ndarja e Kostove"
+    "breakdown_title": "Ndarja e Kostove",
+    "view_orders": "Shiko porositë",
+    "no_orders_for_category": "Nuk u gjetën porosi për këtë kategori",
+    "desc_auto_remittance": "Rregullimet e marzhit dhe shtesave",
+    "desc_stock_remittance": "Kthimi i kostos së stoqeve",
+    "desc_delivery_commission": "Komisioni mbi tarifat e dërgesës",
+    "desc_platform_commission": "Tarifa e platformës mbi nëntotalin",
+    "desc_promotion_cost": "Ndarja e kostove të zbritjeve",
+    "desc_driver_tip": "Bakshishi i përcjellë te shoferët",
+    "desc_catalog_revenue": "Të ardhurat nga produktet e katalogut"
   },
   "dashboard": {
     "title": "Paneli",

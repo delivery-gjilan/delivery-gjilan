@@ -25,6 +25,9 @@ export const orderStatus = pgEnum('order_status', orderStatusValues);
 const orderPaymentCollectionValues = ['CASH_TO_DRIVER', 'PREPAID_TO_PLATFORM'] as const;
 export const orderPaymentCollection = pgEnum('order_payment_collection', orderPaymentCollectionValues);
 
+const orderChannelValues = ['PLATFORM', 'DIRECT_DISPATCH'] as const;
+export const orderChannel = pgEnum('order_channel', orderChannelValues);
+
 export const orders = pgTable(
     'orders',
     {
@@ -63,6 +66,12 @@ export const orders = pgTable(
         driverTip: numeric('driver_tip', { mode: 'number', precision: 10, scale: 2 }).notNull().default(0),
 
         paymentCollection: orderPaymentCollection('payment_collection').default('CASH_TO_DRIVER').notNull(),
+        /** Order channel: PLATFORM (normal customer order) or DIRECT_DISPATCH (business call-in). */
+        channel: orderChannel('channel').default('PLATFORM').notNull(),
+        /** Phone number of the recipient (used for DIRECT_DISPATCH orders). */
+        recipientPhone: varchar('recipient_phone', { length: 32 }),
+        /** Name of the recipient (used for DIRECT_DISPATCH orders). */
+        recipientName: varchar('recipient_name', { length: 255 }),
         status: orderStatus('status').notNull(),
         dropoffLat: doublePrecision('dropoff_lat').notNull(),
         dropoffLng: doublePrecision('dropoff_lng').notNull(),

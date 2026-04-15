@@ -64,11 +64,30 @@ const DISPATCH_CACHE_TTL_S = 300; // 5 minutes
  */
 const DEFAULT_EARLY_DISPATCH_LEAD_MIN = 5;
 
+/**
+ * Distance threshold (km) beyond which gas vehicles are dispatched first.
+ * When the nearest eligible driver is farther than this, gas-vehicle drivers
+ * get a head-start before electric drivers are also notified.
+ * 0 = disabled. Configurable via store_settings.far_order_threshold_km.
+ */
+const DEFAULT_FAR_ORDER_THRESHOLD_KM = 5;
+
+/**
+ * How many seconds gas drivers get exclusive notification before electric
+ * drivers are also notified for far-away orders.
+ * Configurable via store_settings.gas_priority_window_seconds.
+ */
+const DEFAULT_GAS_PRIORITY_WINDOW_S = 30;
+
 // ── Internals ─────────────────────────────────────────────────────────────────
 
 type DispatchState = {
     firstWaveIds: string[];
     expanded: boolean;
+    /** IDs notified in gas-priority wave (subset of firstWaveIds). */
+    gasPriorityIds?: string[];
+    /** Whether the mixed (electric + remaining) follow-up has fired. */
+    gasMixedExpanded?: boolean;
 };
 
 type EarlyDispatchState = 'pending' | 'fired';
@@ -112,6 +131,27 @@ export class OrderDispatchService {
             return rows[0]?.lead ?? DEFAULT_EARLY_DISPATCH_LEAD_MIN;
         } catch {
             return DEFAULT_EARLY_DISPATCH_LEAD_MIN;
+        }
+    }
+
+    /** Read gas-priority dispatch settings from store_settings. */
+    private async getGasPrioritySettings(): Promise<{ thresholdKm: number; windowSeconds: number }> {
+        try {
+            const db = await getDB();
+            const rows = await db
+                .select({
+                    thresholdKm: storeSettings.farOrderThresholdKm,
+                    windowSeconds: storeSettings.gasPriorityWindowSeconds,
+                })
+                .from(storeSettings)
+                .where(eq(storeSettings.id, 'default'))
+                .limit(1);
+            return {
+                thresholdKm: rows[0]?.thresholdKm ?? DEFAULT_FAR_ORDER_THRESHOLD_KM,
+                windowSeconds: rows[0]?.windowSeconds ?? DEFAULT_GAS_PRIORITY_WINDOW_S,
+            };
+        } catch {
+            return { thresholdKm: DEFAULT_FAR_ORDER_THRESHOLD_KM, windowSeconds: DEFAULT_GAS_PRIORITY_WINDOW_S };
         }
     }
 
@@ -235,6 +275,7 @@ export class OrderDispatchService {
             const sorted = connected
                 .map((d) => ({
                     userId: d.userId,
+                    vehicleType: d.vehicleType,
                     distanceKm: haversineKm(d.driverLat!, d.driverLng!, pickup.lat, pickup.lng),
                 }))
                 .sort((a, b) => a.distanceKm - b.distanceKm);
@@ -248,9 +289,82 @@ export class OrderDispatchService {
 
             const firstWaveIds = [...connectedFirstWave.map((d) => d.userId), ...pushOnlyIds];
 
+            // 4b. Gas-priority check: if the nearest driver is beyond the far-order
+            //     threshold, give gas/unset-vehicle drivers a head-start before notifying
+            //     electric drivers. Push-only drivers (offline) are always included
+            //     in wave 1 regardless of vehicle type since they need to open the app.
+            const { thresholdKm: farThreshold, windowSeconds: gasPriorityWindowS } =
+                await this.getGasPrioritySettings();
+            const isFarOrder = farThreshold > 0 && sorted.length > 0 && sorted[0].distanceKm > farThreshold;
+
+            if (isFarOrder) {
+                // Split first-wave connected drivers: gas/null first, electric delayed.
+                // vehicleType=null is treated as gas (legacy drivers without the field set).
+                const gasWave = connectedFirstWave.filter((d) => d.vehicleType !== 'ELECTRIC');
+                const electricWave = connectedFirstWave.filter((d) => d.vehicleType === 'ELECTRIC');
+
+                // Gas priority wave = gas connected drivers + all push-only drivers.
+                const gasPriorityIds = [...gasWave.map((d) => d.userId), ...pushOnlyIds];
+                const electricDelayedIds = electricWave.map((d) => d.userId);
+
+                log.info(
+                    {
+                        orderId,
+                        dispatchMode: 'gas-priority',
+                        pickupLat: pickup.lat,
+                        pickupLng: pickup.lng,
+                        gasWaveCount: gasWave.length,
+                        electricDelayedCount: electricDelayedIds.length,
+                        pushOnly: pushOnlyIds.length,
+                        totalConnected: connected.length,
+                        nearestKm: sorted[0]?.distanceKm?.toFixed(2),
+                        gasPriorityWindowS,
+                    },
+                    'dispatch:firstWave:gasPriority',
+                );
+
+                // Notify gas drivers immediately.
+                if (gasPriorityIds.length > 0) {
+                    notifyDriversOrderReady(notificationService, gasPriorityIds, orderId, pickup.businessName);
+                }
+
+                // Persist state so the gas-mixed expansion and wave-2 can check it.
+                await cache.set(
+                    `dispatch:order:${orderId}`,
+                    {
+                        firstWaveIds,
+                        expanded: false,
+                        gasPriorityIds,
+                        gasMixedExpanded: false,
+                    } as DispatchState,
+                    DISPATCH_CACHE_TTL_S,
+                );
+
+                // Schedule the mixed follow-up (electric + any remaining) after the gas window.
+                const gasTimer = setTimeout(() => {
+                    this._expandGasMixed(orderId, notificationService, pickup.businessName).catch((err) =>
+                        log.error({ err, orderId }, 'dispatch:gasMixed:error'),
+                    );
+                }, gasPriorityWindowS * 1000);
+                this.expandTimers.set(`gas:${orderId}`, gasTimer);
+
+                // Schedule wave-2 expansion (all remaining after accept window).
+                if (connectedFirstWave.length < connected.length) {
+                    const timer = setTimeout(() => {
+                        this._expandDispatch(orderId, notificationService).catch((err) =>
+                            log.error({ err, orderId }, 'dispatch:expand:error'),
+                        );
+                    }, ACCEPT_WINDOW_MS);
+                    this.expandTimers.set(orderId, timer);
+                }
+
+                return;
+            }
+
             log.info(
                 {
                     orderId,
+                    dispatchMode: 'standard',
                     pickupLat: pickup.lat,
                     pickupLng: pickup.lng,
                     connectedFirstWave: connectedFirstWave.length,
@@ -301,6 +415,12 @@ export class OrderDispatchService {
             clearTimeout(timer);
             this.expandTimers.delete(orderId);
             log.debug({ orderId }, 'dispatch:cancelled — timer cleared');
+        }
+        // Also clear gas-priority mixed-wave timer if pending.
+        const gasTimer = this.expandTimers.get(`gas:${orderId}`);
+        if (gasTimer) {
+            clearTimeout(gasTimer);
+            this.expandTimers.delete(`gas:${orderId}`);
         }
         // Remove the pending BullMQ early-dispatch job (fire-and-forget).
         getEarlyDispatchQueue()
@@ -353,6 +473,42 @@ export class OrderDispatchService {
         await cache.set(
             `dispatch:order:${orderId}`,
             { ...state, expanded: true } as DispatchState,
+            DISPATCH_CACHE_TTL_S,
+        );
+    }
+
+    /**
+     * Gas-priority mixed-wave follow-up: notify electric (and any remaining gas)
+     * drivers that were delayed during gas-priority dispatch.
+     */
+    private async _expandGasMixed(
+        orderId: string,
+        notificationService: NotificationService,
+        businessName?: string,
+    ): Promise<void> {
+        this.expandTimers.delete(`gas:${orderId}`);
+
+        const state = await cache.get<DispatchState>(`dispatch:order:${orderId}`);
+        if (!state || state.gasMixedExpanded) {
+            log.debug({ orderId }, 'dispatch:gasMixed:skip — order taken or already expanded');
+            return;
+        }
+
+        // Notify the first-wave drivers that weren't in the gas-priority batch.
+        const alreadyNotified = new Set(state.gasPriorityIds ?? []);
+        const mixedIds = state.firstWaveIds.filter((id) => !alreadyNotified.has(id));
+
+        if (mixedIds.length > 0) {
+            log.info({ orderId, count: mixedIds.length }, 'dispatch:gasMixed:notifying');
+            notifyDriversOrderReady(notificationService, mixedIds, orderId, businessName);
+        } else {
+            log.info({ orderId }, 'dispatch:gasMixed:noElectricDrivers');
+        }
+
+        // Mark mixed expansion as done.
+        await cache.set(
+            `dispatch:order:${orderId}`,
+            { ...state, gasMixedExpanded: true } as DispatchState,
             DISPATCH_CACHE_TTL_S,
         );
     }

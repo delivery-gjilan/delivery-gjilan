@@ -15,6 +15,16 @@ export const driverConnectionStatus = pgEnum('driver_connection_status', driverC
 export type DriverConnectionStatusType = (typeof driverConnectionStatusValues)[number];
 
 /**
+ * Vehicle type enum for drivers
+ * - GAS: Internal combustion engine vehicle
+ * - ELECTRIC: Electric vehicle (e-bike, e-scooter, EV)
+ */
+const driverVehicleTypeValues = ['GAS', 'ELECTRIC'] as const;
+export const driverVehicleType = pgEnum('driver_vehicle_type', driverVehicleTypeValues);
+
+export type DriverVehicleTypeType = (typeof driverVehicleTypeValues)[number];
+
+/**
  * Drivers table - stores driver-specific information
  * Relationship to Users table via userId (FK)
  */
@@ -104,6 +114,13 @@ export const drivers = pgTable('drivers', {
    * Used by settlement engine to evaluate DRIVER_VEHICLE_BONUS rules.
    */
   hasOwnVehicle: boolean('has_own_vehicle').default(false).notNull(),
+
+  /**
+   * Type of vehicle the driver uses (GAS or ELECTRIC).
+   * Used for dispatch prioritization (gas vehicles for far orders)
+   * and future bonus calculations.
+   */
+  vehicleType: driverVehicleType('vehicle_type'),
 
   /**
    * Maximum number of active orders this driver can handle simultaneously

@@ -4,7 +4,7 @@
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import Button from "@/components/ui/Button";
-import { LogOut, Shield, Briefcase, StoreIcon, Clock, Megaphone, Truck, Map, Package, Timer } from "lucide-react";
+import { LogOut, Shield, Briefcase, StoreIcon, Clock, Megaphone, Truck, Map, Package, Timer, PhoneCall } from "lucide-react";
 import { useQuery, useMutation } from "@apollo/client/react";
 import { GET_STORE_STATUS, UPDATE_STORE_STATUS } from "@/graphql/operations/store";
 import { useState } from "react";
@@ -39,6 +39,7 @@ export default function Topbar() {
   const dispatchModeEnabled = storeStatus?.dispatchModeEnabled ?? false;
   const googleMapsNavEnabled = storeStatus?.googleMapsNavEnabled ?? false;
   const inventoryModeEnabled = storeStatus?.inventoryModeEnabled ?? false;
+  const directDispatchGlobalEnabled = storeStatus?.directDispatchEnabled ?? false;
   const assignmentModeLabel = dispatchModeEnabled ? 'Dispatch mode' : 'Self-assign mode';
   const isSuperAdmin = admin?.role === "SUPER_ADMIN";
 
@@ -148,6 +149,20 @@ export default function Topbar() {
     setEarlyDispatchMin(storeStatus?.earlyDispatchLeadMinutes ?? 5);
     setGracePeriodMin(storeStatus?.businessGracePeriodMinutes ?? 0);
     setShowTimingModal(true);
+  };
+
+  const handleToggleDirectDispatch = async () => {
+    await updateStoreStatus({
+      variables: {
+        input: {
+          isStoreClosed,
+          bannerEnabled,
+          bannerMessage: storeStatus?.bannerMessage ?? null,
+          bannerType: (storeStatus?.bannerType as BannerType | undefined) ?? BannerType.Info,
+          directDispatchEnabled: !directDispatchGlobalEnabled,
+        },
+      },
+    });
   };
 
   const handleSaveTiming = async () => {
@@ -262,6 +277,22 @@ export default function Topbar() {
               >
                 <Package size={12} />
                 {inventoryModeEnabled ? 'Stock ON' : 'Stock OFF'}
+              </button>
+
+              <div className="w-px h-4 bg-zinc-800" />
+
+              <button
+                onClick={handleToggleDirectDispatch}
+                disabled={updating}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+                  directDispatchGlobalEnabled
+                    ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+                title={directDispatchGlobalEnabled ? 'Direct dispatch ON — businesses can request drivers for call-in orders' : 'Direct dispatch OFF — businesses cannot request drivers'}
+              >
+                <PhoneCall size={12} />
+                {directDispatchGlobalEnabled ? 'Direct ON' : 'Direct OFF'}
               </button>
 
               <div className="w-px h-4 bg-zinc-800" />

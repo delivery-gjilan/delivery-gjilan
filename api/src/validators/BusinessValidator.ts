@@ -39,6 +39,7 @@ const updateBusinessSchema = z.object({
     prepTimeOverrideMinutes: z.number().int().min(1).max(240).optional().nullable(),
     isTemporarilyClosed: z.boolean().optional(),
     temporaryClosureReason: z.string().min(2).max(500).optional().nullable(),
+    directDispatchEnabled: z.boolean().optional(),
 });
 
 export class BusinessValidator {

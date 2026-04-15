@@ -17,6 +17,7 @@ interface Business {
     category?: string | null;
     isActive: boolean;
     minOrderAmount?: number | null;
+    directDispatchEnabled?: boolean;
 }
 
 interface EditBusinessDetailModalProps {
@@ -30,6 +31,7 @@ interface EditBusinessDetailModalProps {
         category: string | null;
         imageUrl: string | null;
         minOrderAmount: number;
+        directDispatchEnabled: boolean;
     }) => Promise<void>;
 }
 
@@ -46,6 +48,7 @@ export default function EditBusinessDetailModal({
         category: '',
         imageUrl: '',
         minOrderAmount: 0,
+        directDispatchEnabled: false,
     });
 
     useEffect(() => {
@@ -57,6 +60,7 @@ export default function EditBusinessDetailModal({
                 category: business.category || '',
                 imageUrl: business.imageUrl || '',
                 minOrderAmount: business.minOrderAmount ?? 0,
+                directDispatchEnabled: business.directDispatchEnabled ?? false,
             });
         }
     }, [isOpen, business]);
@@ -70,6 +74,7 @@ export default function EditBusinessDetailModal({
                 category: form.category.trim() || null,
                 imageUrl: form.imageUrl || null,
                 minOrderAmount: form.minOrderAmount,
+                directDispatchEnabled: form.directDispatchEnabled,
             });
             onClose();
             toast.success('Business updated');
@@ -140,6 +145,21 @@ export default function EditBusinessDetailModal({
                         onChange={(e) => setForm({ ...form, minOrderAmount: parseFloat(e.target.value) || 0 })}
                     />
                     <p className="text-xs text-zinc-600 mt-1">Set to 0 to disable</p>
+                </div>
+
+                <div>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={form.directDispatchEnabled}
+                            onChange={(e) => setForm({ ...form, directDispatchEnabled: e.target.checked })}
+                            className="h-4 w-4 rounded border-zinc-700 bg-zinc-900 text-indigo-500 focus:ring-indigo-500/30"
+                        />
+                        <div>
+                            <span className="text-sm font-medium text-zinc-300">Direct Dispatch</span>
+                            <p className="text-xs text-zinc-600">Allow this business to request drivers for call-in orders</p>
+                        </div>
+                    </label>
                 </div>
 
                 <Button variant="primary" className="w-full mt-2" onClick={handleSave}>

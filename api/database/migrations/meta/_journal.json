@@ -8,6 +8,27 @@
       "when": 1776193893993,
       "tag": "0000_medical_skreet",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1776278603139,
+      "tag": "0001_direct-dispatch",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1776278979131,
+      "tag": "0002_add-driver-vehicle-type",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1776281308814,
+      "tag": "0003_add-gas-priority-settings",
+      "breakpoints": true
     }
   ]
 }

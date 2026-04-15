@@ -12,6 +12,16 @@ enum DriverConnectionStatus {
     DISCONNECTED
 }
 
+"""
+Vehicle type for drivers:
+- GAS: Internal combustion engine vehicle
+- ELECTRIC: Electric vehicle (e-bike, e-scooter, EV)
+"""
+enum DriverVehicleType {
+    GAS
+    ELECTRIC
+}
+
 """Basic driver profile returned by driverLogin / driverRegister"""
 type DriverBasicInfo {
     id: ID!
@@ -155,6 +165,7 @@ extend type User {
     commissionPercentage: Float
     maxActiveOrders: Int
     hasOwnVehicle: Boolean
+    vehicleType: DriverVehicleType
 }
 
 type DriverDailyMetrics {
@@ -214,6 +225,7 @@ extend type Mutation {
         commissionPercentage: Float
         maxActiveOrders: Int
         hasOwnVehicle: Boolean
+        vehicleType: DriverVehicleType
     ): User!
 
     """Driver battery telemetry update (recommended every 5-10 minutes)"""

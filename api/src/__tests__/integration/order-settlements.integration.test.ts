@@ -97,11 +97,11 @@ describe('markup product (base=10, markup=13), CASH', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 3. Markup product, PREPAID — no markup remittance
+// 3. Markup product, PREPAID — markup shows as direct RECEIVABLE for platform
 // ---------------------------------------------------------------------------
 
 describe('markup product, PREPAID_TO_PLATFORM', () => {
-    it('does NOT create a DRIVER RECEIVABLE (markup remittance skipped for prepaid)', async () => {
+    it('creates a DRIVER RECEIVABLE for markup earning (platform collected it in prepayment)', async () => {
         const { order, items } = await h.insertDeliveredOrder({
             items: [{ productId: IDS.markupProduct, quantity: 2, basePrice: 10, finalAppliedPrice: 13 }],
             subtotal: 26,
@@ -115,7 +115,8 @@ describe('markup product, PREPAID_TO_PLATFORM', () => {
         h.assertSettlements(settlements, [
             { type: 'BUSINESS', direction: 'RECEIVABLE', amount: 2.60, ruleId: IDS.ruleGlobalBiz10 },
             { type: 'DRIVER',   direction: 'PAYABLE',    amount: 2.00, ruleId: IDS.ruleGlobalDrv80 },
-            // No DRIVER RECEIVABLE — platform already collected the markup via the prepaid flow
+            // Markup earning: platform collected €6 markup directly in the prepaid flow
+            { type: 'DRIVER',   direction: 'RECEIVABLE', amount: 6.00, ruleId: null },
         ]);
     });
 });
@@ -226,7 +227,7 @@ describe('priority surcharge, CASH', () => {
         ]);
     });
 
-    it('does NOT create priority surcharge remittance when PREPAID', async () => {
+    it('does NOT create priority surcharge remittance when PREPAID, but does include markup earning', async () => {
         const { order, items } = await h.insertDeliveredOrder({
             items: [{ productId: IDS.markupProduct, quantity: 1, basePrice: 10, finalAppliedPrice: 13 }],
             subtotal: 13,
@@ -237,9 +238,11 @@ describe('priority surcharge, CASH', () => {
         });
 
         const settlements = await h.settle(order, items);
-        // No DRIVER RECEIVABLE rows at all (platform collected everything)
+        // Priority surcharge remittance is skipped (no cash collected by driver)
+        // but markup earning is recorded as platform already collected it
         const driverRecv = settlements.filter((s) => s.type === 'DRIVER' && s.direction === 'RECEIVABLE');
-        expect(driverRecv).toHaveLength(0);
+        expect(driverRecv).toHaveLength(1);
+        expect(driverRecv[0].amount).toBe(3.00); // markup only, no priority surcharge row
     });
 });
 

@@ -13,6 +13,11 @@ enum OrderPaymentCollection {
     PREPAID_TO_PLATFORM
 }
 
+enum OrderChannel {
+    PLATFORM
+    DIRECT_DISPATCH
+}
+
 enum PromotionAppliesTo {
     PRICE
     DELIVERY
@@ -180,6 +185,9 @@ type Order {
     updatedAt: Date!
     status: OrderStatus!
     paymentCollection: OrderPaymentCollection!
+    channel: OrderChannel!
+    recipientPhone: String
+    recipientName: String
     preparationMinutes: Int
     estimatedReadyAt: Date
     preparingAt: Date
@@ -224,6 +232,7 @@ type Query {
     businessOrderFinancials(orderId: ID!, businessId: ID!): BusinessOrderFinancials
     businessOrderReviews(limit: Int, offset: Int): [OrderReview!]!
     adminOrderReviews(businessId: ID!, rating: Int, limit: Int, offset: Int): [OrderReview!]!
+    directDispatchAvailability: DirectDispatchAvailability!
 }
 
 type Mutation {
@@ -239,6 +248,7 @@ type Mutation {
     submitOrderReview(orderId: ID!, rating: Int!, comment: String, quickFeedback: [String!]): OrderReview!
     createOrder(input: CreateOrderInput!): Order!
     createTestOrder: Order!
+    createDirectDispatchOrder(input: CreateDirectDispatchOrderInput!): Order!
     removeOrderItem(orderId: ID!, orderItemId: ID!, reason: String!, quantity: Int): Order!
 }
 
@@ -287,5 +297,25 @@ input CreateOrderInput {
     driverNotes: String
     # Optional tip for the driver (added on top of the totalPrice)
     driverTip: Float
+}
+
+input CreateDirectDispatchOrderInput {
+    """Delivery address for the recipient."""
+    dropOffLocation: LocationInput!
+    """Phone number of the recipient."""
+    recipientPhone: String!
+    """Optional name of the recipient."""
+    recipientName: String
+    """Optional notes for the driver."""
+    driverNotes: String
+}
+
+type DirectDispatchAvailability {
+    """Whether the business can create a direct dispatch order right now."""
+    available: Boolean!
+    """Human-readable reason if not available."""
+    reason: String
+    """Number of free drivers available for dispatch."""
+    freeDriverCount: Int!
 }
 

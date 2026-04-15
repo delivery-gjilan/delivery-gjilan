@@ -188,7 +188,7 @@ export default function DriversPage() {
 
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [settingsTarget, setSettingsTarget] = useState<DriverItem | null>(null);
-    const [settingsForm, setSettingsForm] = useState({ commissionPercentage: "", maxActiveOrders: "", isDemoAccount: false });
+    const [settingsForm, setSettingsForm] = useState({ commissionPercentage: "", maxActiveOrders: "", isDemoAccount: false, hasOwnVehicle: false, vehicleType: "" as "" | "GAS" | "ELECTRIC" });
     const [settingsError, setSettingsError] = useState("");
 
     /* --- search, debounce & pagination --- */
@@ -250,6 +250,8 @@ export default function DriversPage() {
             commissionPercentage: driver.commissionPercentage != null ? String(driver.commissionPercentage) : "0",
             maxActiveOrders:      driver.maxActiveOrders != null      ? String(driver.maxActiveOrders)      : "2",
             isDemoAccount: Boolean(driver.isDemoAccount),
+            hasOwnVehicle: Boolean(driver.hasOwnVehicle),
+            vehicleType: (driver.vehicleType as "" | "GAS" | "ELECTRIC") ?? "",
         });
         setSettingsError("");
         setShowSettingsModal(true);
@@ -264,7 +266,7 @@ export default function DriversPage() {
         if (isNaN(commission) || commission < 0 || commission > 100) { setSettingsError("Commission must be 0–100"); return; }
         if (isNaN(maxOrders)  || maxOrders  < 1 || maxOrders  > 99)  { setSettingsError("Max orders must be 1–99");  return; }
         try {
-            await updateDriverSettings({ variables: { driverId: settingsTarget.id, commissionPercentage: commission, maxActiveOrders: maxOrders } });
+            await updateDriverSettings({ variables: { driverId: settingsTarget.id, commissionPercentage: commission, maxActiveOrders: maxOrders, hasOwnVehicle: settingsForm.hasOwnVehicle, vehicleType: settingsForm.vehicleType || null } });
             await updateUser({ variables: { id: settingsTarget.id, firstName: settingsTarget.firstName, lastName: settingsTarget.lastName, role: UserRole.Driver, businessId: null, isDemoAccount: settingsForm.isDemoAccount } });
             toast.success("Settings updated");
         } catch (err) {
@@ -705,6 +707,22 @@ export default function DriversPage() {
                                 <p className="text-xs text-zinc-500 mb-2">Maximum simultaneous orders this driver can accept.</p>
                                 <Input type="number" min="1" max="99" step="1" value={settingsForm.maxActiveOrders} onChange={(e) => setSettingsForm(f => ({ ...f, maxActiveOrders: e.target.value }))} placeholder="e.g. 2" />
                             </div>
+                        </div>
+                        <label className="flex items-start gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3.5 cursor-pointer hover:bg-emerald-500/10 transition-colors">
+                            <input type="checkbox" checked={settingsForm.hasOwnVehicle} onChange={(e) => setSettingsForm(f => ({ ...f, hasOwnVehicle: e.target.checked }))} className="mt-0.5 h-4 w-4 accent-emerald-500 rounded" />
+                            <div>
+                                <div className="text-sm font-medium text-emerald-200">Has Personal Vehicle</div>
+                                <p className="text-xs text-emerald-300/60 mt-0.5">Driver uses their own vehicle for deliveries. Eligible for vehicle bonus.</p>
+                            </div>
+                        </label>
+                        <div>
+                            <label className="flex items-center gap-1.5 text-sm font-medium text-zinc-300 mb-1.5"><Activity size={13} className="text-zinc-500" />Vehicle Type</label>
+                            <p className="text-xs text-zinc-500 mb-2">Gas vehicles are prioritized for longer-distance deliveries.</p>
+                            <select value={settingsForm.vehicleType} onChange={(e) => setSettingsForm(f => ({ ...f, vehicleType: e.target.value as "" | "GAS" | "ELECTRIC" }))} className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500">
+                                <option value="">Not specified</option>
+                                <option value="GAS">Gas</option>
+                                <option value="ELECTRIC">Electric</option>
+                            </select>
                         </div>
                         <label className="flex items-start gap-3 rounded-xl border border-sky-500/20 bg-sky-500/5 p-3.5 cursor-pointer hover:bg-sky-500/10 transition-colors">
                             <input type="checkbox" checked={settingsForm.isDemoAccount} onChange={(e) => setSettingsForm(f => ({ ...f, isDemoAccount: e.target.checked }))} className="mt-0.5 h-4 w-4 accent-sky-500 rounded" />

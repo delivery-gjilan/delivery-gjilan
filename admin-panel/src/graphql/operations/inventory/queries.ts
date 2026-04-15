@@ -44,6 +44,7 @@ export const GET_ORDER_COVERAGE = graphql(`
                 fromMarket
                 status
                 deducted
+                removedQty
             }
             totalItems
             fullyOwnedCount

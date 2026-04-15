@@ -36,6 +36,7 @@ type OrderCoverageItem {
     fromMarket: Int!
     status: InventoryCoverageStatus!
     deducted: Boolean!
+    removedQty: Int!
 }
 
 type OrderCoverage {

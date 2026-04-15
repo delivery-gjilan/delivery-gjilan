@@ -43,6 +43,8 @@ import { PrepTimeModal } from '@/components/orders/PrepTimeModal';
 import { AddTimeModal } from '@/components/orders/AddTimeModal';
 import { ProductImagesModal } from '@/components/orders/ProductImagesModal';
 import { RemoveItemModal } from '@/components/orders/RemoveItemModal';
+import { DirectDispatchSheet } from '@/components/orders/DirectDispatchSheet';
+import { GET_STORE_STATUS } from '@/graphql/store';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -250,6 +252,13 @@ export default function OrdersScreen() {
     const isStoreClosed = Boolean(businessOps?.isTemporarilyClosed);
     const storeCloseReason = businessOps?.temporaryClosureReason ?? '';
     const avgPrepTime = businessOps?.avgPrepTimeMinutes ?? 20;
+
+    // ── Direct Dispatch ──
+    const { data: storeStatusData } = useQuery(GET_STORE_STATUS);
+    const [showDispatchSheet, setShowDispatchSheet] = useState(false);
+    const directDispatchEnabled =
+        Boolean(storeStatusData?.getStoreStatus?.directDispatchEnabled) &&
+        Boolean(businessOps?.directDispatchEnabled);
 
     // ── Order lists ──
     const _allOrders = (data?.orders?.orders as unknown as Order[]) || [];
@@ -784,6 +793,39 @@ export default function OrdersScreen() {
                 onChangeReason={(reason) => dispatch({ type: 'SET_REMOVE_ITEM_REASON', reason })}
                 onChangeQuantity={(quantity) => dispatch({ type: 'SET_REMOVE_ITEM_QUANTITY', quantity })}
                 onConfirm={handleRemoveItemConfirm}
+            />
+
+            {/* Direct Dispatch FAB */}
+            {directDispatchEnabled && (
+                <TouchableOpacity
+                    style={{
+                        position: 'absolute',
+                        bottom: 20,
+                        right: 20,
+                        width: 56,
+                        height: 56,
+                        borderRadius: 28,
+                        backgroundColor: '#818CF8',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        shadowColor: '#818CF8',
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.35,
+                        shadowRadius: 8,
+                        elevation: 6,
+                    }}
+                    onPress={() => setShowDispatchSheet(true)}
+                    activeOpacity={0.8}
+                >
+                    <Ionicons name="call" size={24} color="#fff" />
+                </TouchableOpacity>
+            )}
+
+            <DirectDispatchSheet
+                visible={showDispatchSheet}
+                onClose={() => setShowDispatchSheet(false)}
+                onCreated={() => refetch()}
+                t={t}
             />
 
         </SafeAreaView>
