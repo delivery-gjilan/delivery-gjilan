@@ -173,7 +173,7 @@ export default function OrdersPage() {
     const [removeOrderItemMut, { loading: removingOrderItem }] = useMutation(REMOVE_ORDER_ITEM);
 
     /* ─── UI state ─── */
-    const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+    const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
     const [activeTab, setActiveTab] = useState<"active" | "completed">("active");
@@ -237,6 +237,11 @@ export default function OrdersPage() {
         return source.map(normalizeFetchedOrder);
     }, [orders]);
 
+    const selectedOrder = useMemo(
+        () => selectedOrderId ? (normalizedOrders.find((o) => o.id === selectedOrderId) ?? null) : null,
+        [selectedOrderId, normalizedOrders]
+    );
+
     const matchesSearch = useCallback((order: Order, q: string) => {
         if (!q) return true;
         const lower = q.toLowerCase();
@@ -247,6 +252,10 @@ export default function OrdersPage() {
             const fullName = `${order.user.firstName} ${order.user.lastName}`.toLowerCase();
             if (fullName.includes(lower) || order.user.email.toLowerCase().includes(lower)) return true;
             if (order.user.phoneNumber && order.user.phoneNumber.includes(q)) return true;
+                if (order.channel === 'DIRECT_DISPATCH') {
+                    if (order.recipientPhone && order.recipientPhone.includes(q)) return true;
+                    if (order.recipientName && order.recipientName.toLowerCase().includes(lower)) return true;
+                }
         }
         return false;
     }, []);
@@ -438,7 +447,7 @@ export default function OrdersPage() {
         if (isAdmin && order.needsApproval && dismissedApprovalOrderIds.has(order.id) && approvalModalOrder?.id !== order.id) {
             setApprovalModalOrder(order);
         }
-        setSelectedOrder(order);
+        setSelectedOrderId(order.id);
         if (isAdmin) fetchOrderCoverage({ variables: { orderId: order.id } });
     };
 
@@ -468,7 +477,7 @@ export default function OrdersPage() {
         suppressionUpdatingUserId,
         approvingOrder,
         now,
-        onClose: () => setSelectedOrder(null),
+        onClose: () => setSelectedOrderId(null),
         onRemoveItem: (dialog: { orderId: string; itemId: string; itemName: string; itemQuantity: number }) => {
             setRemoveItemDialog(dialog); setRemoveItemReason(""); setRemoveItemQuantity(1);
         },
@@ -619,7 +628,21 @@ export default function OrdersPage() {
 
                                             {/* Customer + Business */}
                                             <div className="mb-3 pb-3 border-b border-zinc-800/60 space-y-1.5">
-                                                {order.user && (
+                                                {order.channel === 'DIRECT_DISPATCH' ? (
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <Phone size={14} className="text-orange-500 shrink-0" />
+                                                        <span className="text-[10px] font-semibold text-orange-400 uppercase tracking-wide">Direct Call</span>
+                                                        <span className="text-sm text-white font-medium">
+                                                            {order.recipientName ?? order.recipientPhone ?? '—'}
+                                                        </span>
+                                                        {order.recipientName && order.recipientPhone && (
+                                                            <span className="text-xs text-zinc-500">{order.recipientPhone}</span>
+                                                        )}
+                                                        <span className="inline-flex items-center rounded-full bg-emerald-500/15 border border-emerald-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
+                                                            Agreed €{Number(order.deliveryPrice ?? 0).toFixed(2)}
+                                                        </span>
+                                                    </div>
+                                                ) : order.user && (
                                                     <div className="flex items-center gap-2 flex-wrap">
                                                         <User size={14} className="text-zinc-500 shrink-0" />
                                                         <span className="text-sm text-white font-medium">{order.user.firstName} {order.user.lastName}</span>

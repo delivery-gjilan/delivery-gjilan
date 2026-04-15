@@ -3,6 +3,7 @@ import { createAuditLogger } from '@/services/AuditLogger';
 import { hasPermission, isPlatformAdmin } from '@/lib/utils/permissions';
 import { GraphQLError } from 'graphql';
 import { cache } from '@/lib/cache';
+import { pubsub, publish, topics } from '@/lib/pubsub';
 
 export const updateBusiness: NonNullable<MutationResolvers['updateBusiness']> = async (
     _parent,
@@ -80,6 +81,8 @@ export const updateBusiness: NonNullable<MutationResolvers['updateBusiness']> = 
             changedFields,
         },
     });
+
+    publish(pubsub, topics.businessUpdated(id), { businessId: id });
     
     return result;
 };

@@ -47,6 +47,7 @@ export const DEDUCT_ORDER_STOCK = graphql(`
                 fromMarket
                 status
                 deducted
+                removedQty
             }
             deducted
         }

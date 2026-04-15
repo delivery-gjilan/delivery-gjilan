@@ -18,6 +18,10 @@ export const storeStatusUpdated: NonNullable<SubscriptionResolvers['storeStatusU
       inventoryModeEnabled: (payload as any).inventoryModeEnabled ?? false,
       earlyDispatchLeadMinutes: (payload as any).earlyDispatchLeadMinutes ?? 5,
       businessGracePeriodMinutes: (payload as any).businessGracePeriodMinutes ?? 0,
+      directDispatchEnabled: (payload as any).directDispatchEnabled ?? false,
+      directDispatchDriverReserve: (payload as any).directDispatchDriverReserve ?? 2,
+      farOrderThresholdKm: (payload as any).farOrderThresholdKm ?? 5,
+      gasPriorityWindowSeconds: (payload as any).gasPriorityWindowSeconds ?? 30,
     };
   },
 };

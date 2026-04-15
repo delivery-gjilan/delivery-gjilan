@@ -70,7 +70,16 @@
     "accept_request_title": "Accept Settlement",
     "accept_request_text": "Accepting will settle up to {{amount}} for this request period. Continue?",
     "accept_request_fallback": "Accept this settlement request?",
-    "breakdown_title": "Cost Breakdown"
+    "breakdown_title": "Cost Breakdown",
+    "view_orders": "View Orders",
+    "no_orders_for_category": "No orders found for this category",
+    "desc_auto_remittance": "Markup & surcharge adjustments",
+    "desc_stock_remittance": "Stock item cost remittance",
+    "desc_delivery_commission": "Commission on delivery fees",
+    "desc_platform_commission": "Platform fee on order subtotal",
+    "desc_promotion_cost": "Promotional discount cost share",
+    "desc_driver_tip": "Tips forwarded to drivers",
+    "desc_catalog_revenue": "Catalog product revenue"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -165,5 +174,23 @@
     "back_to_orders": "Back to Orders",
     "access_restricted": "Access Restricted",
     "no_permission": "You do not have permission to manage settings."
+  },
+  "directDispatch": {
+    "title": "Request Delivery",
+    "drivers_available": "{{count}} driver(s) available",
+    "no_drivers": "No drivers available right now",
+    "prep_title": "Dispatch timing",
+    "prep_hint": "Set preparation minutes so drivers can be notified before the order is ready.",
+    "phone": "Recipient Phone",
+    "phone_placeholder": "+383 44 123 456",
+    "name": "Recipient Name",
+    "name_placeholder": "Optional",
+    "preparation_minutes": "Preparation Time (min)",
+    "preparation_minutes_placeholder": "e.g. 15",
+    "address": "Delivery Address",
+    "address_placeholder": "e.g. Rr. Adem Jashari, Nr. 12",
+    "notes": "Driver Notes",
+    "notes_placeholder": "Optional instructions for the driver",
+    "request_driver": "Request Driver"
   }
 }

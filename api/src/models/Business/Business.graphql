@@ -23,6 +23,8 @@ type Business {
     minOrderAmount: Float!
     isFeatured: Boolean!
     featuredSortOrder: Int!
+    directDispatchEnabled: Boolean!
+    directDispatchFixedAmount: Float!
     category: String
     isOpen: Boolean!
     ratingAverage: Float!
@@ -127,6 +129,8 @@ input UpdateBusinessInput {
     temporaryClosureReason: String
     commissionPercentage: Float
     minOrderAmount: Float
+    directDispatchEnabled: Boolean
+    directDispatchFixedAmount: Float
 }
 
 type Mutation {
@@ -136,4 +140,8 @@ type Mutation {
     deleteBusiness(id: ID!): Boolean!
     setBusinessSchedule(businessId: ID!, schedule: [BusinessDayHoursInput!]!): [BusinessDayHours!]!
     setBusinessFeatured(id: ID!, isFeatured: Boolean!, sortOrder: Int): Business!
+}
+
+extend type Subscription {
+    businessUpdated(id: ID!): Business!
 }

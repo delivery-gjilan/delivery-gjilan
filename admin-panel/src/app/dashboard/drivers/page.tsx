@@ -12,7 +12,7 @@ import {
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
-import { UserRole } from "@/gql/graphql";
+import { DriverVehicleType, UserRole } from "@/gql/graphql";
 import { useAuth } from "@/lib/auth-context";
 import { useAdminPtt } from "@/lib/hooks/useAdminPtt";
 import {
@@ -65,6 +65,9 @@ interface DriverItem {
     imageUrl?: string;
     commissionPercentage?: number | null;
     maxActiveOrders?: number | null;
+    hasOwnVehicle?: boolean | null;
+    vehicleType?: DriverVehicleType | null;
+    ownVehicleBonusAmount?: number | null;
     driverLocation?: {
         latitude: number;
         longitude: number;
@@ -179,7 +182,17 @@ export default function DriversPage() {
 
     /* --- modals --- */
     const [showCreateModal, setShowCreateModal] = useState(false);
-    const [createForm, setCreateForm] = useState({ email: "", password: "", firstName: "", lastName: "", phoneNumber: "", isDemoAccount: false });
+    const [createForm, setCreateForm] = useState({
+        email: "",
+        password: "",
+        firstName: "",
+        lastName: "",
+        phoneNumber: "",
+        isDemoAccount: false,
+        hasOwnVehicle: false,
+        vehicleType: "" as "" | DriverVehicleType,
+        ownVehicleBonusAmount: "0",
+    });
     const [formError, setFormError] = useState("");
     const [formSuccess, setFormSuccess] = useState("");
 
@@ -188,7 +201,14 @@ export default function DriversPage() {
 
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [settingsTarget, setSettingsTarget] = useState<DriverItem | null>(null);
-    const [settingsForm, setSettingsForm] = useState({ commissionPercentage: "", maxActiveOrders: "", isDemoAccount: false });
+    const [settingsForm, setSettingsForm] = useState({
+        commissionPercentage: "",
+        maxActiveOrders: "",
+        isDemoAccount: false,
+        hasOwnVehicle: false,
+        vehicleType: "" as "" | DriverVehicleType,
+        ownVehicleBonusAmount: "0",
+    });
     const [settingsError, setSettingsError] = useState("");
 
     /* --- search, debounce & pagination --- */
@@ -250,6 +270,9 @@ export default function DriversPage() {
             commissionPercentage: driver.commissionPercentage != null ? String(driver.commissionPercentage) : "0",
             maxActiveOrders:      driver.maxActiveOrders != null      ? String(driver.maxActiveOrders)      : "2",
             isDemoAccount: Boolean(driver.isDemoAccount),
+            hasOwnVehicle: Boolean(driver.hasOwnVehicle),
+            vehicleType: driver.vehicleType ?? "",
+            ownVehicleBonusAmount: driver.ownVehicleBonusAmount != null ? String(driver.ownVehicleBonusAmount) : "0",
         });
         setSettingsError("");
         setShowSettingsModal(true);
@@ -261,10 +284,12 @@ export default function DriversPage() {
         setSettingsError("");
         const commission = parseFloat(settingsForm.commissionPercentage);
         const maxOrders  = parseInt(settingsForm.maxActiveOrders, 10);
+        const ownVehicleBonusAmount = parseFloat(settingsForm.ownVehicleBonusAmount);
         if (isNaN(commission) || commission < 0 || commission > 100) { setSettingsError("Commission must be 0–100"); return; }
         if (isNaN(maxOrders)  || maxOrders  < 1 || maxOrders  > 99)  { setSettingsError("Max orders must be 1–99");  return; }
+        if (isNaN(ownVehicleBonusAmount) || ownVehicleBonusAmount < 0 || ownVehicleBonusAmount > 999) { setSettingsError("Own vehicle bonus must be 0–999");  return; }
         try {
-            await updateDriverSettings({ variables: { driverId: settingsTarget.id, commissionPercentage: commission, maxActiveOrders: maxOrders } });
+            await updateDriverSettings({ variables: { driverId: settingsTarget.id, commissionPercentage: commission, maxActiveOrders: maxOrders, hasOwnVehicle: settingsForm.hasOwnVehicle, vehicleType: settingsForm.vehicleType || null, ownVehicleBonusAmount } });
             await updateUser({ variables: { id: settingsTarget.id, firstName: settingsTarget.firstName, lastName: settingsTarget.lastName, role: UserRole.Driver, businessId: null, isDemoAccount: settingsForm.isDemoAccount } });
             toast.success("Settings updated");
         } catch (err) {
@@ -284,13 +309,25 @@ export default function DriversPage() {
             }) as any;
             const createdId = created?.driverRegister?.driver?.id as string | undefined;
             if (!createdId) throw new Error("Driver creation failed");
+            const ownVehicleBonusAmount = parseFloat(createForm.ownVehicleBonusAmount);
+            if (isNaN(ownVehicleBonusAmount) || ownVehicleBonusAmount < 0 || ownVehicleBonusAmount > 999) {
+                throw new Error("Own vehicle bonus must be 0–999");
+            }
+            await updateDriverSettings({
+                variables: {
+                    driverId: createdId,
+                    hasOwnVehicle: createForm.hasOwnVehicle,
+                    vehicleType: createForm.vehicleType || null,
+                    ownVehicleBonusAmount,
+                },
+            });
             if (createForm.isDemoAccount) {
                 await updateUser({ variables: { id: createdId, firstName: createForm.firstName, lastName: createForm.lastName, role: UserRole.Driver, businessId: null, isDemoAccount: true } });
             }
             await refetch();
             toast.success(created?.driverRegister?.message || "Driver created");
             setShowCreateModal(false);
-            setCreateForm({ email: "", password: "", firstName: "", lastName: "", phoneNumber: "", isDemoAccount: false });
+            setCreateForm({ email: "", password: "", firstName: "", lastName: "", phoneNumber: "", isDemoAccount: false, hasOwnVehicle: false, vehicleType: "", ownVehicleBonusAmount: "0" });
         } catch (err) {
             setFormError(err instanceof Error ? err.message : "Failed to create driver");
         }
@@ -706,6 +743,27 @@ export default function DriversPage() {
                                 <Input type="number" min="1" max="99" step="1" value={settingsForm.maxActiveOrders} onChange={(e) => setSettingsForm(f => ({ ...f, maxActiveOrders: e.target.value }))} placeholder="e.g. 2" />
                             </div>
                         </div>
+                        <label className="flex items-start gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3.5 cursor-pointer hover:bg-emerald-500/10 transition-colors">
+                            <input type="checkbox" checked={settingsForm.hasOwnVehicle} onChange={(e) => setSettingsForm(f => ({ ...f, hasOwnVehicle: e.target.checked }))} className="mt-0.5 h-4 w-4 accent-emerald-500 rounded" />
+                            <div>
+                                <div className="text-sm font-medium text-emerald-200">Has Personal Vehicle</div>
+                                <p className="text-xs text-emerald-300/60 mt-0.5">Driver uses their own vehicle for deliveries. Eligible for vehicle bonus.</p>
+                            </div>
+                        </label>
+                        <div>
+                            <label className="flex items-center gap-1.5 text-sm font-medium text-zinc-300 mb-1.5"><Activity size={13} className="text-zinc-500" />Vehicle Type</label>
+                            <p className="text-xs text-zinc-500 mb-2">Gas vehicles are prioritized for longer-distance deliveries.</p>
+                            <select value={settingsForm.vehicleType} onChange={(e) => setSettingsForm(f => ({ ...f, vehicleType: e.target.value as "" | DriverVehicleType }))} className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500">
+                                <option value="">Not specified</option>
+                                <option value={DriverVehicleType.Gas}>Gas</option>
+                                <option value={DriverVehicleType.Electric}>Electric</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="flex items-center gap-1.5 text-sm font-medium text-zinc-300 mb-1.5"><Percent size={13} className="text-zinc-500" />Own Vehicle Bonus (EUR)</label>
+                            <p className="text-xs text-zinc-500 mb-2">Fixed per-delivery bonus paid when this driver uses their own vehicle.</p>
+                            <Input type="number" min="0" max="999" step="0.01" value={settingsForm.ownVehicleBonusAmount} onChange={(e) => setSettingsForm(f => ({ ...f, ownVehicleBonusAmount: e.target.value }))} placeholder="e.g. 1.50" />
+                        </div>
                         <label className="flex items-start gap-3 rounded-xl border border-sky-500/20 bg-sky-500/5 p-3.5 cursor-pointer hover:bg-sky-500/10 transition-colors">
                             <input type="checkbox" checked={settingsForm.isDemoAccount} onChange={(e) => setSettingsForm(f => ({ ...f, isDemoAccount: e.target.checked }))} className="mt-0.5 h-4 w-4 accent-sky-500 rounded" />
                             <div>
@@ -723,7 +781,7 @@ export default function DriversPage() {
 
             {/* Create Modal */}
             {showCreateModal && isSuperAdmin && (
-                <Modal isOpen={showCreateModal} onClose={() => { setShowCreateModal(false); setCreateForm({ email: "", password: "", firstName: "", lastName: "", phoneNumber: "", isDemoAccount: false }); setFormError(""); }} title="Add New Driver">
+                <Modal isOpen={showCreateModal} onClose={() => { setShowCreateModal(false); setCreateForm({ email: "", password: "", firstName: "", lastName: "", phoneNumber: "", isDemoAccount: false, hasOwnVehicle: false, vehicleType: "", ownVehicleBonusAmount: "0" }); setFormError(""); }} title="Add New Driver">
                     <form onSubmit={handleCreateSubmit} className="space-y-5">
                         {formError && (
                             <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
@@ -756,6 +814,25 @@ export default function DriversPage() {
                         <div>
                             <label className="block text-sm font-medium text-zinc-300 mb-1.5">Phone Number</label>
                             <Input type="tel" value={createForm.phoneNumber} onChange={(e) => setCreateForm(f => ({ ...f, phoneNumber: e.target.value }))} placeholder="+383 44 123 456" />
+                        </div>
+                        <label className="flex items-start gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3.5 cursor-pointer hover:bg-emerald-500/10 transition-colors">
+                            <input type="checkbox" checked={createForm.hasOwnVehicle} onChange={(e) => setCreateForm(f => ({ ...f, hasOwnVehicle: e.target.checked }))} className="mt-0.5 h-4 w-4 accent-emerald-500 rounded" />
+                            <div>
+                                <div className="text-sm font-medium text-emerald-200">Has Personal Vehicle</div>
+                                <p className="text-xs text-emerald-300/60 mt-0.5">Eligible for own-vehicle bonus settlements.</p>
+                            </div>
+                        </label>
+                        <div>
+                            <label className="block text-sm font-medium text-zinc-300 mb-1.5">Vehicle Type</label>
+                            <select value={createForm.vehicleType} onChange={(e) => setCreateForm(f => ({ ...f, vehicleType: e.target.value as "" | DriverVehicleType }))} className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500">
+                                <option value="">Not specified</option>
+                                <option value={DriverVehicleType.Gas}>Gas</option>
+                                <option value={DriverVehicleType.Electric}>Electric</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-zinc-300 mb-1.5">Own Vehicle Bonus (EUR)</label>
+                            <Input type="number" min="0" max="999" step="0.01" value={createForm.ownVehicleBonusAmount} onChange={(e) => setCreateForm(f => ({ ...f, ownVehicleBonusAmount: e.target.value }))} placeholder="e.g. 1.50" />
                         </div>
                         <label className="flex items-start gap-3 rounded-xl border border-sky-500/20 bg-sky-500/5 p-3.5 cursor-pointer hover:bg-sky-500/10 transition-colors">
                             <input type="checkbox" checked={createForm.isDemoAccount} onChange={(e) => setCreateForm(f => ({ ...f, isDemoAccount: e.target.checked }))} className="mt-0.5 h-4 w-4 accent-sky-500 rounded" />

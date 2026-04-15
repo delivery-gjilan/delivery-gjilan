@@ -1,6 +1,6 @@
 import { type DbType } from '@/database';
 import { settlements, settlementRules } from '@/database/schema';
-import { eq, and, gte, lte, sql, inArray, isNotNull } from 'drizzle-orm';
+import { eq, and, or, gte, lte, sql, inArray, isNotNull, isNull, like, not } from 'drizzle-orm';
 import { DbSettlement } from '@/database/schema/settlements';
 
 export interface SettlementFilters {
@@ -11,6 +11,7 @@ export interface SettlementFilters {
     businessId?: string;
     orderId?: string;
     promotionId?: string;
+    category?: string;
     startDate?: string;
     endDate?: string;
     limit?: number;
@@ -84,6 +85,11 @@ export class SettlementRepository {
             const ids = ruleIds.map(r => r.id);
             if (ids.length === 0) return [];
             conditions.push(inArray(settlements.ruleId, ids));
+        }
+
+        if (filters.category) {
+            const categoryCondition = this.buildCategoryCondition(filters.category);
+            if (categoryCondition) conditions.push(categoryCondition);
         }
 
         if (filters.startDate) {
@@ -428,5 +434,40 @@ export class SettlementRepository {
             .then((rows: any[]) => rows[0]);
 
         return result?.net ?? 0;
+    }
+
+    /**
+     * Translates a computed category name back into SQL conditions on settlement rows.
+     * Categories are a logical grouping derived from ruleId, reason, and rule properties.
+     */
+    private buildCategoryCondition(category: string) {
+        const nullRuleId = isNull(settlements.ruleId);
+        const hasRuleId = isNotNull(settlements.ruleId);
+
+        switch (category) {
+            case 'STOCK_REMITTANCE':
+                return and(nullRuleId, like(settlements.reason, 'Stock item%'));
+            case 'DRIVER_TIP':
+                return and(nullRuleId, like(settlements.reason, 'Driver tip%'));
+            case 'CATALOG_REVENUE':
+                return and(nullRuleId, like(settlements.reason, 'Catalog product%'));
+            case 'AUTO_REMITTANCE':
+                // Null ruleId and NOT any of the special reason patterns (handle null reason)
+                return and(
+                    nullRuleId,
+                    or(isNull(settlements.reason), not(like(settlements.reason, 'Stock item%'))),
+                    or(isNull(settlements.reason), not(like(settlements.reason, 'Driver tip%'))),
+                    or(isNull(settlements.reason), not(like(settlements.reason, 'Catalog product%'))),
+                );
+            case 'PROMOTION_COST':
+                // Has a rule that has a promotionId
+                return sql`${settlements.ruleId} IN (SELECT ${settlementRules.id} FROM ${settlementRules} WHERE ${settlementRules.promotionId} IS NOT NULL)`;
+            case 'DELIVERY_COMMISSION':
+                return sql`${settlements.ruleId} IN (SELECT ${settlementRules.id} FROM ${settlementRules} WHERE ${settlementRules.type} = 'DELIVERY_PRICE' AND ${settlementRules.promotionId} IS NULL)`;
+            case 'PLATFORM_COMMISSION':
+                return sql`${settlements.ruleId} IN (SELECT ${settlementRules.id} FROM ${settlementRules} WHERE ${settlementRules.type} = 'ORDER_PRICE' AND ${settlementRules.promotionId} IS NULL)`;
+            default:
+                return undefined;
+        }
     }
 }

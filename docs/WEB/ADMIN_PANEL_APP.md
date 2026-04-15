@@ -1,7 +1,7 @@
 # Admin Panel — Deep Dive (W1)
 
 **MDS ID:** W1  
-**Last updated:** 2026-04-14  
+**Last updated:** 2026-04-15  
 **Path:** `admin-panel/`  
 **Relates to:** M9 (mobile-admin deep dive), M6 (admin panel ↔ mobile-admin parity tracker), UI1, UI2, BL1–BL5, A1
 
@@ -103,6 +103,8 @@ admin-panel/
 │   │   │   └── PermissionSelector.tsx # Permission checkbox grid
 │   │   ├── businesses/
 │   │   │   ├── CategoriesBlock.tsx  # Category CRUD + drag reorder
+│   │   │   ├── EditBusinessModal.tsx # List-page edit modal (businesses/page.tsx flow)
+│   │   │   ├── EditBusinessDetailModal.tsx # Detail-page edit modal ([id]/page.tsx flow; includes Direct Dispatch toggle)
 │   │   │   ├── ProductsBlock.tsx    # Product CRUD + options + catalog adoption
 │   │   │   ├── ScheduleEditor.tsx   # Weekly hours editor
 │   │   │   └── SubcategoriesBlock.tsx
@@ -138,6 +140,24 @@ admin-panel/
 ---
 
 ## 4. Authentication & Role System
+
+### Business Edit Flows (Current)
+
+Business management currently has two separate edit modal flows:
+
+- Dashboard list page (`/dashboard/businesses`) uses `EditBusinessModal.tsx`
+- Business detail page (`/dashboard/businesses/[id]`) uses `EditBusinessDetailModal.tsx`
+
+The per-business Direct Dispatch toggle is exposed in both flows:
+- list-page `EditBusinessModal.tsx`
+- detail-page `EditBusinessDetailModal.tsx`
+
+The businesses list query shape used by the list-page modal includes `directDispatchEnabled` and `directDispatchFixedAmount`, so both edit paths read and persist the same per-business Direct Dispatch settings.
+
+The topbar Direct Dispatch control is no longer a one-click global flip. It opens a rollout modal where SUPER_ADMIN can:
+- switch the global store setting on or off,
+- choose which businesses to apply the per-business toggle change to,
+- and, when enabling selected businesses with no configured fixed amount, complete a second fixed-amount modal before the rollout is applied.
 
 ### Auth Flow
 

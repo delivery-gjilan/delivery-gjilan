@@ -91,6 +91,7 @@ export function OrderPoolSheet({ orders, accepting = false, onAccept, onAcceptAn
                             const deliveryFee = Number(order.deliveryPrice ?? 0).toFixed(2);
                             const orderTip = Number(order.driverTip ?? 0);
                             const isReady = order.status === 'READY';
+                            const isDirectDispatch = order.channel === 'DIRECT_DISPATCH';
                             const etaLabel = (() => {
                                 if (isReady) return s.ready_now;
                                 if (order.estimatedReadyAt) {
@@ -104,7 +105,7 @@ export function OrderPoolSheet({ orders, accepting = false, onAccept, onAcceptAn
                             return (
                                 <View key={order.id} style={styles.card}>
                                     {/* Left accent */}
-                                    <View style={[styles.cardAccent, isReady && styles.cardAccentReady]} />
+                                    <View style={[styles.cardAccent, isReady && styles.cardAccentReady, isDirectDispatch && styles.cardAccentDirect]} />
 
                                     <View style={styles.cardBody}>
                                         {/* Row 1: Business + Fee */}
@@ -121,7 +122,15 @@ export function OrderPoolSheet({ orders, accepting = false, onAccept, onAcceptAn
                                             </View>
 
                                             <View style={styles.bizInfo}>
-                                                <Text style={styles.bizName} numberOfLines={1}>{bizName}</Text>
+                                                <View style={styles.bizNameRow}>
+                                                    <Text style={styles.bizName} numberOfLines={1}>{bizName}</Text>
+                                                    {isDirectDispatch && (
+                                                        <View style={styles.directCallBadge}>
+                                                            <Ionicons name="call" size={9} color="#fff" />
+                                                            <Text style={styles.directCallText}>Direct Call</Text>
+                                                        </View>
+                                                    )}
+                                                </View>
                                                 <Text style={styles.orderId}>#{order.displayId ?? '—'}</Text>
                                             </View>
 
@@ -333,6 +342,9 @@ const styles = StyleSheet.create({
     cardAccentReady: {
         backgroundColor: '#22c55e',
     },
+    cardAccentDirect: {
+        backgroundColor: '#F97316',
+    },
     cardBody: {
         flex: 1,
         padding: 12,
@@ -368,6 +380,26 @@ const styles = StyleSheet.create({
     },
     bizInfo: {
         flex: 1,
+    },
+    bizNameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+    },
+    directCallBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: '#F97316',
+        borderRadius: 4,
+        paddingHorizontal: 4,
+        paddingVertical: 2,
+    },
+    directCallText: {
+        color: '#fff',
+        fontSize: 8,
+        fontWeight: '700',
+        letterSpacing: 0.2,
     },
     bizName: {
         color: '#f1f5f9',

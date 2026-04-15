@@ -85,7 +85,7 @@ jobs:
           host: ${{ secrets.DEV_SSH_HOST }}
           username: ${{ secrets.DEV_SSH_USER }}
           key: ${{ secrets.DEV_SSH_KEY }}
-          source: "api/docker-compose.dev-server.yml"
+          source: "api/docker-compose.dev-server.yml,api/Caddyfile.dev"
           target: "/opt/zippgo/api/"
           strip_components: 1
 

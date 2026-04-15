@@ -26,6 +26,7 @@
 | B9 | [BACKEND/UPLOADS_AND_S3.md](BACKEND/UPLOADS_AND_S3.md) | Backend | S3Service, upload/delete REST routes, key generation, auth gaps |
 | B10 | [BACKEND/AUDIT_LOGGING.md](BACKEND/AUDIT_LOGGING.md) | Backend | audit_logs table, actor/action/entity enums, AuditLogRepository |
 | B11 | [BACKEND/OUT_OF_ZONE_AND_APPROVAL.md](BACKEND/OUT_OF_ZONE_AND_APPROVAL.md) | Backend | Out-of-coverage handling, locationFlagged, approval-required orders, admin alerts |
+| B12 | [BACKEND/ORDER_DISPATCH_WAVES_AND_SELF_ASSIGN_TESTING.md](BACKEND/ORDER_DISPATCH_WAVES_AND_SELF_ASSIGN_TESTING.md) | Backend | Wave-1/wave-2 dispatch behavior, gas-priority branch, self-assign guards, and test strategy |
 | BL1 | [BUSINESS_LOGIC/SETTLEMENTS_AND_PROMOTIONS.md](BUSINESS_LOGIC/SETTLEMENTS_AND_PROMOTIONS.md) | Business Logic | Settlements, rules, promotions (including recurring windows and new-user targeting), FinancialService, PromotionEngine, mobile-customer progression bar |
 | BL2 | [BUSINESS_LOGIC/PRODUCT_BUSINESS_CATEGORY_REFACTOR_FLOW.md](BUSINESS_LOGIC/PRODUCT_BUSINESS_CATEGORY_REFACTOR_FLOW.md) | Business Logic | CRUD flows, delete semantics, hook consolidation |
 | BL3 | [BUSINESS_LOGIC/CART_ACTIVE_ORDER_FLOW_RECOMMENDATIONS.md](BUSINESS_LOGIC/CART_ACTIVE_ORDER_FLOW_RECOMMENDATIONS.md) | Business Logic | Cart store, subscription lifecycle, race conditions |
@@ -33,7 +34,7 @@
 | BL5 | [BANNER_MANAGEMENT.md](BANNER_MANAGEMENT.md) | Business Logic | Banner system: multi-media support, business/product/promotion targeting, scheduling, display contexts, admin panel UI |
 | BL6 | [SETTLEMENT_KINDS.md](SETTLEMENT_KINDS.md) | Business Logic | All 8 settlement categories, rule scoping/priority, payment method impact, when settlements are created |
 | FF1 | [FUTURE_FEATURES/PERSONAL_INVENTORY_COVERAGE.md](FUTURE_FEATURES/PERSONAL_INVENTORY_COVERAGE.md) | Future Feature | Personal stock tracking, order coverage split, margin optimisation |
-| FF2 | [FUTURE_FEATURES/BUSINESS_DISPATCH.md](FUTURE_FEATURES/BUSINESS_DISPATCH.md) | Future Feature | Business-initiated driver dispatch, internal delivery runs |
+| FF2 | [FUTURE_FEATURES/BUSINESS_DISPATCH.md](FUTURE_FEATURES/BUSINESS_DISPATCH.md) | **Implemented** | Business-initiated direct dispatch: `channel=DIRECT_DISPATCH` orders, `directDispatchAvailability` query, `createDirectDispatchOrder` mutation, `DirectDispatchService`, `DirectDispatchSheet` in mobile-business, orange badges in mobile-driver |
 | FF3 | [FUTURE_FEATURES/CUSTOM_NAVIGATION.md](FUTURE_FEATURES/CUSTOM_NAVIGATION.md) | Future Feature | Migrating from `@badatgil/expo-mapbox-navigation` SDK to custom `@rnmapbox/maps` navigation — cost driver, unused hook inventory, step-by-step migration plan |
 | FF4 | [FUTURE_FEATURES/EMAIL_SERVICE.md](FUTURE_FEATURES/EMAIL_SERVICE.md) | Future Feature | Transactional email via Resend — order receipt on delivery, email verification migration, react-email templates, EmailService architecture |
 | FF5 | [FUTURE_FEATURES/MINIMUM_ORDER_AMOUNT.md](FUTURE_FEATURES/MINIMUM_ORDER_AMOUNT.md) | Future Feature | Per-business minimum order subtotal — DB column, API enforcement in createOrder, admin panel edit form, mobile-customer cart bar + disabled checkout |
@@ -45,12 +46,12 @@
 | M5 | [MOBILE/ORDER_INPUT_VARIANT_OFFER_FLOW_SNAPSHOT.md](MOBILE/ORDER_INPUT_VARIANT_OFFER_FLOW_SNAPSHOT.md) | Mobile | CreateOrderInput, variants, offers, options |
 | M6 | [MOBILE/ADMIN_PANEL_MOBILE_REFACTOR_TRACKER.md](MOBILE/ADMIN_PANEL_MOBILE_REFACTOR_TRACKER.md) | Mobile | Admin-panel to mobile parity tracker (business/admin flows) |
 | M7 | [MOBILE/ORDER_SUBSCRIPTION_SYNC_MB.md](MOBILE/ORDER_SUBSCRIPTION_SYNC_MB.md) | Mobile | Subscription-first order sync, cache/store update contract, fallback refetch rules |
-| M8 | [MOBILE/DRIVER_APP.md](MOBILE/DRIVER_APP.md) | Mobile | Driver app deep-dive: heartbeat (exp. backoff), navigation (PickupSlider, DeliverySlider, minimized-nav flow, per-order status exit, 60-particle confetti success), OrderPoolSheet, OrderDetailSheet, DriverMessageBanner, PTT, battery, auth, stores (orderAcceptStore with persisted skip/seen TTLs), GlobalOrderAcceptContext provider, home metrics (capacity bar + dispatch pill), profile (language/delete/links), earnings (settlements + dispute + cash summary), messages (AsyncStorage persistence), tab auto-navigation restore, 15 mutations, 11 queries, 5 subscriptions, full i18n (EN/AL) |
+| M8 | [MOBILE/DRIVER_APP.md](MOBILE/DRIVER_APP.md) | Mobile | Driver app deep-dive: heartbeat (exp. backoff), navigation (PickupSlider, DeliverySlider, minimized-nav flow, per-order status exit, 60-particle confetti success), OrderPoolSheet (orange accent for DIRECT_DISPATCH), OrderDetailSheet, OrderAcceptSheet (orange Direct Call badge for DD orders), DriverMessageBanner, PTT, battery, auth, stores (orderAcceptStore with persisted skip/seen TTLs), GlobalOrderAcceptContext provider, home metrics (capacity bar + dispatch pill), profile (language/delete/links), earnings (settlements + dispute + cash summary + category drill-down 3-layer modal + per-card category tag badges with direction-aware color), messages (AsyncStorage persistence), tab auto-navigation restore, 15 mutations, 12 queries, 5 subscriptions, full i18n (EN/AL) |
 | M9 | [MOBILE/MOBILE_ADMIN_DEEP_DIVE.md](MOBILE/MOBILE_ADMIN_DEEP_DIVE.md) | Mobile | Mobile-admin deep-dive: all screens, GraphQL ops, real-time arch, theme, i18n, refactor candidates |
 | M10 | [MOBILE/REALTIME_SUBSCRIPTIONS_CUSTOMER.md](MOBILE/REALTIME_SUBSCRIPTIONS_CUSTOMER.md) | Mobile | Subscription topology audit, connection count, payload sizing, duplicate subscriptions, optimization roadmap |
 | M11 | [MOBILE/PUSH_AND_LIVE_ACTIVITY_REFACTOR_PLAN.md](MOBILE/PUSH_AND_LIVE_ACTIVITY_REFACTOR_PLAN.md) | Mobile | Full audit of all push notifications and Live Activity; copy refinements; Android notification icon wiring; brand logo in Lock Screen widget; Albanian copy corrections |
 | M12 | [MOBILE/CUSTOMER_APP.md](MOBILE/CUSTOMER_APP.md) | Mobile | Customer app deep-dive: all 20+ screens, 78+ GraphQL ops, 18 hooks, 11+4 stores, 35 shared components, 5 domain modules (auth/business/cart/orders/product), 3-step checkout, live tracking pipeline, embedded admin panel, localization, config, optimization candidates |
-| M13 | [MOBILE/BUSINESS_APP.md](MOBILE/BUSINESS_APP.md) | Mobile | Business app deep-dive: 7 tabs (orders/products/dashboard/finances/messages/settlement-history/settings), 36 GraphQL ops (12q/22m/2s), 3 Zustand stores (auth/locale/notifSettings), 4 hooks (authInit/deviceMonitoring/notifications/translation), 3 global components (BusinessMessageBanner/InfoBanner/StoreClosedOverlay), RBAC (3 permissions), device health telemetry, order subscription sync, audio beep alerts, EN/AL i18n, full finances+settlements UI, 18 optimization candidates |
+| M13 | [MOBILE/BUSINESS_APP.md](MOBILE/BUSINESS_APP.md) | Mobile | Business app deep-dive: 7 tabs (orders/products/dashboard/finances/messages/settlement-history/settings), Direct Dispatch FAB + DirectDispatchSheet (channel=DIRECT_DISPATCH orders, availability check, recipient form), OrderCard Direct Call badge, 38 GraphQL ops (14q/22m/2s), 3 Zustand stores (auth/locale/notifSettings), 4 hooks (authInit/deviceMonitoring/notifications/translation), 3 global components (BusinessMessageBanner/InfoBanner/StoreClosedOverlay), RBAC (3 permissions), device health telemetry, order subscription sync, audio beep alerts, EN/AL i18n, full finances+settlements UI with category drill-down (3-layer: breakdown row → category orders modal → highlighted order detail), `SettlementOrderGroup` module-level type, `reason` in settlements query, 18 optimization candidates |
 | M14 | [MOBILE/ADMIN_APP.md](MOBILE/ADMIN_APP.md) | Mobile | Admin app deep-dive: 3 tabs (map/orders/ops) + order detail modal + notification campaigns, 38+ GraphQL ops (11q/28m/3s), 4 Zustand stores (auth/locale/map/theme), 10 hooks (useAdminPtt/useAppSetup/useAuth/useAuthInit/useNotifications/useOperationalOrderAlerts/useSyncTheme/useTheme/useTranslations/useInitializeTranslation), PTT bidirectional Agora RTC, live Mapbox map (driver tracking + route polylines + order pins), operational alerts (new order + late-pending), apollo3-cache-persist configured, typed i18n schema, EN/AL, React Compiler enabled, 19 optimization candidates; optimizations applied: persistCache blank-screen fix (#11/#12), useTranslations English fallback (#10), LoginResult+OrdersQueryResult types removing as-any (#7/#14), route-calc 1.5 s debounce (#3), ADMIN_ROLES extracted to utils/constants.ts (#6), Mapbox token dev warning (#15) |
 | O1 | [OPERATIONS/MONITORING.md](OPERATIONS/MONITORING.md) | Operations | Health endpoints, Prometheus, Grafana phases |
 | O2 | [OPERATIONS/OBSERVABILITY.md](OPERATIONS/OBSERVABILITY.md) | Operations | Loki, Promtail, structured logging, runbooks |
@@ -74,6 +75,7 @@
 | O20 | [OPERATIONS/DEPLOYMENT_GUIDE.md](OPERATIONS/DEPLOYMENT_GUIDE.md) | Operations | Hetzner production deployment runbook: server bootstrap, Docker stack, Caddy TLS on api.zippgo.uk, health verification, and GHCR deploy flow |
 | O16 | [DEMO_MODE_PLAN.md](DEMO_MODE_PLAN.md) | Operations | Apple review demo-account flow, auto-progression behavior, reviewer credentials strategy, and admin-panel demo-account operations |
 | O21 | [OPERATIONS/OPTIMIZATION_TRACKER.md](OPERATIONS/OPTIMIZATION_TRACKER.md) | Operations | Per-project optimization recommendations tracker — performance, code quality, reliability, and future considerations with priority and status. Covers: mobile-customer (16 items), mobile-driver (15 items), mobile-business (18 items), mobile-admin (19 items), admin-panel/web (21 items), web-customer (21 items) |
+| O22 | [OPERATIONS/DIRECT_DISPATCH_CURRENT_STATE.md](OPERATIONS/DIRECT_DISPATCH_CURRENT_STATE.md) | Operations | Direct Dispatch current-state reference: backend availability formula, API contract, mobile-business request flow, mobile-driver direct-call UX, admin-panel visibility and toggle paths |
 | W1 | [WEB/ADMIN_PANEL_APP.md](WEB/ADMIN_PANEL_APP.md) | Web | Admin panel deep-dive: Next.js 16 App Router, 21 dashboard routes + 6 admin-only routes, 138 GraphQL ops (51q/82m/5s), role system (SUPER_ADMIN/ADMIN/BUSINESS_OWNER/BUSINESS_EMPLOYEE), Mapbox live map + Agora PTT, Apollo 3 + graphql-ws, 9 custom hooks, drag-and-drop (dnd-kit), push campaign query builder, ops-wall REST monitor, audit logs, settlements, inventory, all known issues and tech debt. Optimizations applied: `getAuthToken()` util (#1/#2), BannerType enum casts in topbar (#5), businesses/[id] businessType pre-fill bug (#7), ScheduleEditor UTF-8 arrow (#8), debug logs removed (#15), categories GET_BUSINESSES skip (#17), duplicate constants extracted to `lib/constants/orderHelpers.ts` (#9), `@ts-nocheck` removed from 7 files — businesses, promotions, notifications, business-settlements, orders/cancelled, admin/banners, SubcategoriesBlock — tsc clean (#4) |
 | W2 | [WEB/WEB_CUSTOMER_APP.md](WEB/WEB_CUSTOMER_APP.md) | Web | Web customer deep-dive: Next.js 16 / React 19, 11 routes (home/business/market/product/orders/profile/addresses/checkout), 6 Zustand stores, ~43 GraphQL ops (20q/20m/3s), Mapbox address picker + live order tracking, 5-step signup, animated driver map with cinematic approach, i18n (en/al), Apollo 4 + graphql-ws. Fixed: market qty stepper (#1), cancelled-order delivered modal (#2), N+1 GET_BUSINESSES (#6), ME_QUERY token validation on mount (#10), Orders tab added to mobile bottom nav (#13) |
 | UI1 | [ADMIN_MOBILEBUSINESS_UI_CONTEXT.md](ADMIN_MOBILEBUSINESS_UI_CONTEXT.md) | UI | Product types, variant groups, admin/mobile-business UX |
@@ -113,6 +115,7 @@ ARCHITECTURE (A1)
 │   │   │   └── BUSINESS_LOGIC/SETTLEMENTS_AND_PROMOTIONS (BL1)
 │   │   │       └── OPERATIONS/NOTIFICATIONS (O3)
 │   │   └── BUSINESS_LOGIC/SETTLEMENTS_AND_PROMOTIONS (BL1)
+│   ├── BACKEND/ORDER_DISPATCH_WAVES_AND_SELF_ASSIGN_TESTING (B12)
 │   ├── BACKEND/UPLOADS_AND_S3 (B9)
 │   ├── BACKEND/AUDIT_LOGGING (B10)
 │   └── BACKEND/WATCHDOG_HEARTBEAT (B4)
@@ -160,6 +163,7 @@ ARCHITECTURE (A1)
 | Concern | MDS Files |
 |---------|-----------|
 | Order creation flow | B2, B3, BL1 |
+| Dispatch waves and self-assign | B12, M8 |
 | Cart → checkout → order | BL3, M4, M5 |
 | Payment collection modes | B2, M4, BL1 |
 | Order tracking (realtime) | A1, B4, M3, M7, O12 |
@@ -169,6 +173,7 @@ ARCHITECTURE (A1)
 | Concern | MDS Files |
 |---------|-----------|
 | Heartbeat/presence | B4, A1 |
+| Dispatch expansion and claim race guards | B12, B4, M8 |
 | Watchdog state machine | B4, O1 |
 | Live ETA / tracking | B4, M3, O12 |
 | Driver settlements | BL1 |
@@ -185,7 +190,7 @@ ARCHITECTURE (A1)
 | Order status state machine | B2 |
 | Market order flow (PENDING→READY skip) | B2 |
 | Personal inventory & order coverage | FF1 (future) |
-| Business-initiated driver dispatch | FF2 (future) |
+| Business-initiated driver dispatch | FF2 (implemented), O22 |
 | Custom navigation (replace SDK) | FF3 (future) |
 
 ### Marketing/Promotions Domain

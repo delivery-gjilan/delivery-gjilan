@@ -152,7 +152,8 @@ export function OrderAcceptSheet({
     const dropAddress = order.dropOffLocation?.address ?? '';
     const shortAddress = dropAddress.split(',')[0] || s.see_map;
     const deliveryFee = Number(order.deliveryPrice ?? 0).toFixed(2);
-
+    const isDirectDispatch = order.channel === 'DIRECT_DISPATCH';
+    const recipientLabel = order.recipientName ?? order.recipientPhone ?? null;
     // ETA: descriptive label for food readiness
     const etaLabel = (() => {
         if (order.status === 'READY') return s.ready_now;
@@ -168,6 +169,19 @@ export function OrderAcceptSheet({
 
     const ringOffset = (RING_C * (COUNTDOWN_DURATION - countdown)) / COUNTDOWN_DURATION;
     const isUrgent = countdown <= 5;
+
+    // Inventory breakdown
+    const stockItems = allItems.filter((it) => (it.inventoryQuantity ?? 0) > 0);
+    const totalStockUnits = allItems.reduce((sum, it) => sum + (it.inventoryQuantity ?? 0), 0);
+    const totalMarketUnits = allItems.reduce((sum, it) => sum + Math.max(0, it.quantity - (it.inventoryQuantity ?? 0)), 0);
+    const hasInventory = totalStockUnits > 0;
+
+    // Cash breakdown — derive market cost from available fields
+    // businessPrice (market items) = orderPrice - inventoryPrice
+    const orderPrice = Number((order as any).orderPrice ?? 0);
+    const inventoryPrice = Number((order as any).inventoryPrice ?? 0);
+    const businessPrice = Math.max(0, orderPrice - inventoryPrice);
+    const totalPrice = Number(order.totalPrice ?? 0);
 
     return (
         <Animated.View style={[styles.root, { transform: [{ translateY: slideY }] }]}>
@@ -205,8 +219,19 @@ export function OrderAcceptSheet({
                         ) : null}
 
                         <View style={styles.headerTextBlock}>
-                            <Text style={styles.headerLabel}>{s.new_order}</Text>
+                            <View style={styles.headerLabelRow}>
+                                <Text style={styles.headerLabel}>{s.new_order}</Text>
+                                {isDirectDispatch && (
+                                    <View style={styles.directCallBadge}>
+                                        <Ionicons name="call" size={10} color="#fff" />
+                                        <Text style={styles.directCallText}>{s.direct_call}</Text>
+                                    </View>
+                                )}
+                            </View>
                             <Text style={styles.bizName} numberOfLines={1}>{bizName}</Text>
+                            {isDirectDispatch && recipientLabel ? (
+                                <Text style={styles.recipientLabel} numberOfLines={1}>{recipientLabel}</Text>
+                            ) : null}
                         </View>
                     </View>
 
@@ -214,7 +239,7 @@ export function OrderAcceptSheet({
                     <View style={styles.infoRow}>
                         <View style={styles.infoItem}>
                             <Text style={styles.infoValue}>€{deliveryFee}</Text>
-                            <Text style={styles.infoLabel}>{s.you_earn}</Text>
+                            <Text style={styles.infoLabel}>{isDirectDispatch ? 'Agreed fee' : s.you_earn}</Text>
                         </View>
                         <View style={styles.infoDivider} />
                         {etaLabel ? (
@@ -275,6 +300,78 @@ export function OrderAcceptSheet({
                             )}
                         </View>
                     )}
+
+                    {/* Inventory banner — shown when any items come from operator stock */}
+                    {hasInventory && (
+                        <View style={styles.inventoryBanner}>
+                            <View style={styles.inventoryBannerHeader}>
+                                <Ionicons name="cube-outline" size={13} color="#7c3aed" />
+                                <Text style={styles.inventoryBannerTitle}>{s.stock_banner_title}</Text>
+                            </View>
+                            <View style={styles.inventoryItemsList}>
+                                {stockItems.map((it, i) => (
+                                    <View key={i} style={styles.inventoryItemRow}>
+                                        <Text style={styles.inventoryItemName} numberOfLines={1}>{it.name}</Text>
+                                        <View style={styles.inventoryItemQty}>
+                                            <Ionicons name="cube" size={10} color="#7c3aed" />
+                                            <Text style={styles.inventoryItemQtyText}>×{it.inventoryQuantity}</Text>
+                                        </View>
+                                    </View>
+                                ))}
+                            </View>
+                            <View style={styles.inventoryTotalsRow}>
+                                {totalStockUnits > 0 && (
+                                    <View style={styles.inventoryTotalBadge}>
+                                        <Text style={styles.inventoryTotalBadgeText}>📦 {totalStockUnits} from stock</Text>
+                                    </View>
+                                )}
+                                {totalMarketUnits > 0 && (
+                                    <View style={[styles.inventoryTotalBadge, styles.inventoryMarketBadge]}>
+                                        <Text style={[styles.inventoryTotalBadgeText, { color: '#6B7280' }]}>🛒 {totalMarketUnits} from market</Text>
+                                    </View>
+                                )}
+                            </View>
+                        </View>
+                    )}
+
+                    {/* Cash breakdown */}
+                    <View style={styles.cashBreakdown}>
+                        <Text style={styles.cashBreakdownTitle}>{s.cash_breakdown_title}</Text>
+                        <View style={styles.cashBreakdownRows}>
+                            {businessPrice > 0 && (
+                                <View style={styles.cashRow}>
+                                    <View style={styles.cashRowLeft}>
+                                        <View style={[styles.cashDot, { backgroundColor: '#EF4444' }]} />
+                                        <View>
+                                            <Text style={styles.cashRowLabel}>{s.pay_business}</Text>
+                                            <Text style={styles.cashRowHint}>{s.pay_business_hint}</Text>
+                                        </View>
+                                    </View>
+                                    <Text style={[styles.cashRowAmount, { color: '#EF4444' }]}>−€{businessPrice.toFixed(2)}</Text>
+                                </View>
+                            )}
+                            <View style={styles.cashRow}>
+                                <View style={styles.cashRowLeft}>
+                                    <View style={[styles.cashDot, { backgroundColor: '#10B981' }]} />
+                                    <View>
+                                        <Text style={styles.cashRowLabel}>{s.collect_customer}</Text>
+                                        <Text style={styles.cashRowHint}>{s.collect_customer_hint}</Text>
+                                    </View>
+                                </View>
+                                <Text style={[styles.cashRowAmount, { color: '#10B981' }]}>+€{totalPrice.toFixed(2)}</Text>
+                            </View>
+                            <View style={[styles.cashRow, styles.cashRowLast]}>
+                                <View style={styles.cashRowLeft}>
+                                    <View style={[styles.cashDot, { backgroundColor: '#6366F1' }]} />
+                                    <View>
+                                        <Text style={[styles.cashRowLabel, { color: '#6366F1', fontWeight: '700' }]}>{s.your_cut}</Text>
+                                        <Text style={styles.cashRowHint}>{s.your_cut_hint}</Text>
+                                    </View>
+                                </View>
+                                <Text style={[styles.cashRowAmount, { color: '#6366F1', fontWeight: '800', fontSize: 16 }]}>€{deliveryFee}</Text>
+                            </View>
+                        </View>
+                    </View>
 
                     {/* Driver notes */}
                     {!!order.driverNotes && (
@@ -379,12 +476,38 @@ const styles = StyleSheet.create({
     headerTextBlock: {
         flex: 1,
     },
+    headerLabelRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 2,
+    },
     headerLabel: {
         color: '#6B7280',
         fontSize: 11,
         fontWeight: '600',
         letterSpacing: 0.4,
-        marginBottom: 2,
+    },
+    directCallBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: '#F97316',
+        borderRadius: 4,
+        paddingHorizontal: 5,
+        paddingVertical: 2,
+    },
+    directCallText: {
+        color: '#fff',
+        fontSize: 9,
+        fontWeight: '700',
+        letterSpacing: 0.3,
+    },
+    recipientLabel: {
+        color: '#F97316',
+        fontSize: 12,
+        fontWeight: '600',
+        marginTop: 2,
     },
     bizName: {
         color: '#111827',
@@ -504,6 +627,138 @@ const styles = StyleSheet.create({
         paddingVertical: 6,
         textAlign: 'center',
     },
+
+    /* -- Inventory banner -- */
+    inventoryBanner: {
+        backgroundColor: '#f5f3ff',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#ddd6fe',
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        marginBottom: 8,
+    },
+    inventoryBannerHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        marginBottom: 8,
+    },
+    inventoryBannerTitle: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#7c3aed',
+        textTransform: 'uppercase',
+        letterSpacing: 0.4,
+    },
+    inventoryItemsList: {
+        gap: 4,
+        marginBottom: 8,
+    },
+    inventoryItemRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    inventoryItemName: {
+        fontSize: 13,
+        color: '#374151',
+        flex: 1,
+    },
+    inventoryItemQty: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: 'rgba(124,58,237,0.12)',
+        borderRadius: 6,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+    },
+    inventoryItemQtyText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#7c3aed',
+    },
+    inventoryTotalsRow: {
+        flexDirection: 'row',
+        gap: 6,
+    },
+    inventoryTotalBadge: {
+        backgroundColor: 'rgba(124,58,237,0.1)',
+        borderRadius: 6,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+    },
+    inventoryMarketBadge: {
+        backgroundColor: '#F3F4F6',
+    },
+    inventoryTotalBadgeText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#7c3aed',
+    },
+
+    /* -- Cash breakdown -- */
+    cashBreakdown: {
+        backgroundColor: '#F9FAFB',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        marginBottom: 8,
+    },
+    cashBreakdownTitle: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#6B7280',
+        textTransform: 'uppercase',
+        letterSpacing: 0.4,
+        marginBottom: 8,
+    },
+    cashBreakdownRows: {
+        gap: 6,
+    },
+    cashRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingBottom: 6,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F3F4F6',
+    },
+    cashRowLast: {
+        borderBottomWidth: 0,
+        paddingBottom: 0,
+        paddingTop: 4,
+    },
+    cashRowLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        flex: 1,
+    },
+    cashDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+    cashRowLabel: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#374151',
+    },
+    cashRowHint: {
+        fontSize: 10,
+        color: '#9CA3AF',
+        marginTop: 1,
+    },
+    cashRowAmount: {
+        fontSize: 14,
+        fontWeight: '700',
+        marginLeft: 8,
+    },
+
     notesRow: {
         backgroundColor: '#FFFBEB',
         borderWidth: 1,

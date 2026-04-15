@@ -152,6 +152,21 @@ export function useNotifications() {
                 apolloClient
                     .query({ query: GET_ORDERS, fetchPolicy: 'network-only' })
                     .catch(() => null);
+
+                // Firebase foreground messages are NOT shown as banners automatically —
+                // we must present a local notification to make it visible.
+                const title = remoteMessage.notification?.title ?? 'New Order Available! 📦';
+                const body = remoteMessage.notification?.body ?? 'A new order is ready for pickup.';
+                Notifications.scheduleNotificationAsync({
+                    content: {
+                        title,
+                        body,
+                        data: msgData as Record<string, unknown>,
+                        sound: 'default',
+                        priority: Notifications.AndroidNotificationPriority.MAX,
+                    },
+                    trigger: null,
+                }).catch(() => null);
             }
         });
 

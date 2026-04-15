@@ -22,6 +22,7 @@
     },
     "tabs": {
         "home": "Kreu",
+        "orders": "Porositë",
         "map": "Harta",
         "earnings": "Fitimet",
         "messages": "Mesazhet",
@@ -36,6 +37,7 @@
         "signal_good": "Sinjal i mirë",
         "signal_weak": "Sinjal i dobët",
         "signal_lost": "Sinjal humbur",
+        "signal_connecting": "Duke u lidhur...",
         "dispatch_mode_title": "Adminitistrata po cakton porositë",
         "dispatch_mode_sub": "Prisni caktimin — porositë do t'ju dërgohen drejtpërdrejt",
         "earnings_today": "Fitimet e Sotme",
@@ -52,7 +54,15 @@
         "slot_available": "vend i lirë",
         "heartbeat": "Gjendja e lidhjes",
         "check_signal": "kontrolloni sinjalin",
-        "error_update_status": "Ndryshimi i statusit dështoi. Provoni përsëri."
+        "error_update_status": "Ndryshimi i statusit dështoi. Provoni përsëri.",
+        "tab_available": "Të disponueshme",
+        "tab_my_orders": "Porositë e mia",
+        "offline_title": "Jeni offline",
+        "offline_sub": "Shkoni online për të filluar të merrni porosi",
+        "waiting_title": "Duke pritur porosi",
+        "waiting_sub": "Porositë e reja do të shfaqen këtu sapo të jenë të disponueshme",
+        "no_assigned_title": "Asnjë porosi aktive",
+        "no_assigned_sub": "Porositë e pranuara do të shfaqen këtu"
     },
     "map": {
         "status_pending": "Në pritje",
@@ -154,7 +164,18 @@
         "pricing": "Çmimet",
         "items_total": "Artikujt",
         "total": "Totali",
-        "status": "Statusi"
+        "status": "Statusi",
+        "view_orders": "Shiko porositë",
+        "orders_for_category": "Porositë",
+        "no_orders_for_category": "Nuk u gjetën porosi për këtë kategori",
+        "back_to_orders": "Kthehu",
+        "cat_markup": "Marzhi",
+        "cat_stock": "Stoku",
+        "cat_delivery": "Dërgesa",
+        "cat_commission": "Komisioni",
+        "cat_promo": "Promo",
+        "cat_tip": "Bakshishi",
+        "cat_catalog": "Katalog"
     },
     "messages": {
         "type_message": "Mesazh",
@@ -172,6 +193,7 @@
     },
     "orderAccept": {
         "new_order": "Porosi e Re",
+        "direct_call": "Thirrje Direkte",
         "you_earn": "Fitoni",
         "food_status": "Statusi i ushqimit",
         "dropoff": "Dorëzimi",
@@ -191,7 +213,17 @@
         "order_taken": "Porosia u mor",
         "taken_sub": "Një shofer tjetër e pranoi këtë porosi i pari",
         "taken_hint": "Duke gjetur porosinë tjetër…",
-        "see_map": "Shiko hartën"
+        "see_map": "Shiko hartën",
+        "from_stock_label": "Merr nga stoku i operatorit",
+        "from_market_label": "Bli nga tregu",
+        "stock_banner_title": "Artikuj nga inventari",
+        "cash_breakdown_title": "Ndarja e Parave",
+        "pay_business": "Pagoje biznesin",
+        "pay_business_hint": "Artikujt e tregut që blini",
+        "collect_customer": "Mbledh nga klienti",
+        "collect_customer_hint": "Parà totale (me tarifën e dorëzimit)",
+        "your_cut": "Pjesa jote",
+        "your_cut_hint": "Tarifa e dorëzimit që mbani"
     },
     "orderPool": {
         "available_orders": "Porositë e Disponueshme",
@@ -287,7 +319,10 @@
         "nav_choice_inapp": "Navigim i Integruar",
         "nav_choice_gmaps": "Google Maps",
         "nav_choice_cancel": "Anulo",
-        "from_stock_label": "Merr nga stoku",
-        "from_market_label": "Bli nga tregu"
+        "from_stock_label": "Merr nga stoku i operatorit",
+        "from_market_label": "Bli nga tregu",
+        "fulfillment_guide": "Udhëzues Plotësimi",
+        "units_from_stock": "{{count}} nga stoku — nuk nevojitet blerje",
+        "units_from_market": "{{count}} për të blerë në treg"
     }
 }

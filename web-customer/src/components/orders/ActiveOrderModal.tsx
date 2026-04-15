@@ -21,6 +21,7 @@ import {
     CheckCheck,
 } from "lucide-react";
 import { GET_ORDER, CANCEL_ORDER } from "@/graphql/operations/orders";
+import type { GqlOrder, GqlOrderItem, GqlOrderPromotion } from "@/types/graphql";
 import { ORDER_STATUS_UPDATED, ORDER_DRIVER_LIVE_TRACKING } from "@/graphql/operations/orders";
 import dynamic from "next/dynamic";
 import type { GqlOrder, GqlOrderItem, GqlDriverLiveTracking, GqlOrderPromotion } from "@/types/graphql";

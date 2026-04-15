@@ -216,6 +216,8 @@ type Business {
   commissionPercentage: Float!
   createdAt: Date!
   description: String
+  directDispatchEnabled: Boolean!
+  directDispatchFixedAmount: Float!
   featuredSortOrder: Int!
   id: ID!
   imageUrl: String
@@ -488,6 +490,23 @@ input CreateDeliveryZoneInput {
   sortOrder: Int
 }
 
+input CreateDirectDispatchOrderInput {
+  """Optional notes for the driver."""
+  driverNotes: String
+
+  """Delivery address for the recipient."""
+  dropOffLocation: LocationInput!
+
+  """Estimated preparation time in minutes for early dispatch scheduling."""
+  preparationMinutes: Int!
+
+  """Optional name of the recipient."""
+  recipientName: String
+
+  """Phone number of the recipient."""
+  recipientPhone: String!
+}
+
 input CreateOptionGroupInput {
   displayOrder: Int
   maxSelections: Int!
@@ -720,6 +739,17 @@ type DeviceToken {
   userId: ID!
 }
 
+type DirectDispatchAvailability {
+  """Whether the business can create a direct dispatch order right now."""
+  available: Boolean!
+
+  """Number of free drivers available for dispatch."""
+  freeDriverCount: Int!
+
+  """Human-readable reason if not available."""
+  reason: String
+}
+
 """Result of driverLogin / driverRegister mutations"""
 type DriverAuthResult {
   driver: DriverBasicInfo!
@@ -949,6 +979,16 @@ input DriverRegisterInput {
   phoneNumber: String
 }
 
+"""
+Vehicle type for drivers:
+- GAS: Internal combustion engine vehicle
+- ELECTRIC: Electric vehicle (e-bike, e-scooter, EV)
+"""
+enum DriverVehicleType {
+  ELECTRIC
+  GAS
+}
+
 """Single data point in the platform earnings trend."""
 type EarningsTrendPoint {
   """Number of settlements on this date."""
@@ -1126,7 +1166,7 @@ type Mutation {
   """
   Admin mutation to update per-driver settings (commission %, max active orders, vehicle ownership)
   """
-  adminUpdateDriverSettings(commissionPercentage: Float, driverId: ID!, hasOwnVehicle: Boolean, maxActiveOrders: Int): User!
+  adminUpdateDriverSettings(commissionPercentage: Float, driverId: ID!, hasOwnVehicle: Boolean, maxActiveOrders: Int, ownVehicleBonusAmount: Float, vehicleType: DriverVehicleType): User!
   adoptCatalogProduct(input: AdoptCatalogProductInput!): Product!
   approveOrder(id: ID!): Order!
   assignDriverToOrder(driverId: ID, id: ID!): Order!
@@ -1144,6 +1184,7 @@ type Mutation {
   createCampaign(input: CreateCampaignInput!): NotificationCampaign!
   createDeliveryPricingTier(input: CreateDeliveryPricingTierInput!): DeliveryPricingTier!
   createDeliveryZone(input: CreateDeliveryZoneInput!): DeliveryZone!
+  createDirectDispatchOrder(input: CreateDirectDispatchOrderInput!): Order!
   createOption(input: CreateOptionInput!, optionGroupId: ID!): Option!
   createOptionGroup(input: CreateOptionGroupInput!): OptionGroup!
   createOrder(input: CreateOrderInput!): Order!
@@ -1379,6 +1420,7 @@ type Order {
   businesses: [OrderBusiness!]!
   cancellationReason: String
   cancelledAt: Date
+  channel: OrderChannel!
   deliveredAt: Date
   deliveryPrice: Float!
   displayId: String!
@@ -1408,6 +1450,8 @@ type Order {
   preparingAt: Date
   prioritySurcharge: Float!
   readyAt: Date
+  recipientName: String
+  recipientPhone: String
   review: OrderReview
   settlementPreview: OrderSettlementPreview
   status: OrderStatus!
@@ -1421,6 +1465,11 @@ type OrderBusiness {
   business: Business!
   items: [OrderItem!]!
   removedItems: [RemovedOrderItem!]!
+}
+
+enum OrderChannel {
+  DIRECT_DISPATCH
+  PLATFORM
 }
 
 type OrderConnection {
@@ -1449,6 +1498,7 @@ type OrderCoverageItem {
   productId: ID!
   productImageUrl: String
   productName: String!
+  removedQty: Int!
   status: InventoryCoverageStatus!
 }
 
@@ -1869,6 +1919,7 @@ type Query {
   deliveryPricingTiers: [DeliveryPricingTier!]!
   deliveryZones: [DeliveryZone!]!
   deviceTokens(userId: ID): [DeviceToken!]!
+  directDispatchAvailability: DirectDispatchAvailability!
   driverBalance(driverId: ID!): SettlementSummary!
 
   """
@@ -1952,7 +2003,25 @@ type Query {
   settlementRulesCount(filter: SettlementRuleFilterInput): Int!
   settlementScenarioDefinitions: [SettlementScenarioDefinition!]!
   settlementSummary(businessId: ID, direction: SettlementDirection, driverId: ID, endDate: Date, isSettled: Boolean, orderId: ID, promotionId: ID, startDate: Date, type: SettlementType): SettlementSummary!
-  settlements(businessId: ID, direction: SettlementDirection, driverId: ID, endDate: Date, isSettled: Boolean, limit: Int, offset: Int, orderId: ID, promotionId: ID, startDate: Date, status: SettlementStatus, type: SettlementType): [Settlement!]!
+  settlements(
+    businessId: ID
+
+    """
+    Filter by computed category (e.g. AUTO_REMITTANCE, STOCK_REMITTANCE, DELIVERY_COMMISSION, PLATFORM_COMMISSION, PROMOTION_COST, DRIVER_TIP, CATALOG_REVENUE).
+    """
+    category: String
+    direction: SettlementDirection
+    driverId: ID
+    endDate: Date
+    isSettled: Boolean
+    limit: Int
+    offset: Int
+    orderId: ID
+    promotionId: ID
+    startDate: Date
+    status: SettlementStatus
+    type: SettlementType
+  ): [Settlement!]!
   uncompletedOrders: [Order!]!
   unsettledBalance(entityId: ID!, entityType: SettlementType!): Float!
   userBehavior(userId: ID!): UserBehavior
@@ -2232,8 +2301,20 @@ type StoreStatus {
   bannerType: BannerType!
   businessGracePeriodMinutes: Int!
   closedMessage: String
+  directDispatchDriverReserve: Int!
+  directDispatchEnabled: Boolean!
   dispatchModeEnabled: Boolean!
   earlyDispatchLeadMinutes: Int!
+
+  """
+  Distance (km) beyond which gas vehicles are dispatched first. 0 = disabled.
+  """
+  farOrderThresholdKm: Float!
+
+  """
+  Seconds gas drivers get head-start before electric drivers are notified for far orders.
+  """
+  gasPriorityWindowSeconds: Int!
   googleMapsNavEnabled: Boolean!
   inventoryModeEnabled: Boolean!
   isStoreClosed: Boolean!
@@ -2257,6 +2338,7 @@ type Subscription {
 
   """Business user receives messages from admin in real-time"""
   businessMessageReceived: BusinessMessage!
+  businessUpdated(id: ID!): Business!
   driverConnectionStatusChanged(driverId: ID!): DriverConnection!
 
   """Driver receives messages from admin in real-time"""
@@ -2324,6 +2406,8 @@ input UpdateBusinessInput {
   category: String
   commissionPercentage: Float
   description: String
+  directDispatchEnabled: Boolean
+  directDispatchFixedAmount: Float
   imageUrl: String
   isActive: Boolean
   isTemporarilyClosed: Boolean
@@ -2434,8 +2518,12 @@ input UpdateStoreStatusInput {
   bannerType: BannerType
   businessGracePeriodMinutes: Int
   closedMessage: String
+  directDispatchDriverReserve: Int
+  directDispatchEnabled: Boolean
   dispatchModeEnabled: Boolean
   earlyDispatchLeadMinutes: Int
+  farOrderThresholdKm: Float
+  gasPriorityWindowSeconds: Int
   googleMapsNavEnabled: Boolean
   inventoryModeEnabled: Boolean
   isStoreClosed: Boolean!
@@ -2483,6 +2571,7 @@ type User {
   isTrustedCustomer: Boolean!
   lastName: String!
   maxActiveOrders: Int
+  ownVehicleBonusAmount: Float
   permissions: [UserPermission!]!
   phoneNumber: String
   phoneVerified: Boolean!
@@ -2490,6 +2579,7 @@ type User {
   role: UserRole!
   signupStep: SignupStep!
   totalOrders: Int!
+  vehicleType: DriverVehicleType
 }
 
 type UserAddress {

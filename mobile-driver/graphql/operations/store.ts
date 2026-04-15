@@ -11,6 +11,7 @@ export const GET_STORE_STATUS = graphql(`
             dispatchModeEnabled
             googleMapsNavEnabled
             inventoryModeEnabled
+            earlyDispatchLeadMinutes
         }
     }
 `);
@@ -25,6 +26,7 @@ export const STORE_STATUS_UPDATED = graphql(`
             dispatchModeEnabled
             googleMapsNavEnabled
             inventoryModeEnabled
+            earlyDispatchLeadMinutes
         }
     }
 `);

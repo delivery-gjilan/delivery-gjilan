@@ -5,6 +5,7 @@ export const GET_MY_BUSINESS_SETTLEMENTS = graphql(`
         $businessId: ID!
         $status: SettlementStatus
         $direction: SettlementDirection
+        $category: String
         $startDate: Date
         $endDate: Date
         $limit: Int
@@ -15,6 +16,7 @@ export const GET_MY_BUSINESS_SETTLEMENTS = graphql(`
             businessId: $businessId
             status: $status
             direction: $direction
+            category: $category
             startDate: $startDate
             endDate: $endDate
             limit: $limit
@@ -25,6 +27,7 @@ export const GET_MY_BUSINESS_SETTLEMENTS = graphql(`
             currency
             status
             direction
+            reason
             paidAt
             paymentReference
             paymentMethod
@@ -34,6 +37,9 @@ export const GET_MY_BUSINESS_SETTLEMENTS = graphql(`
                 name
                 type
                 direction
+                promotion {
+                    id
+                }
             }
             order {
                 id

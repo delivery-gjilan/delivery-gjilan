@@ -22,6 +22,7 @@
     },
     "tabs": {
         "home": "Home",
+        "orders": "Orders",
         "map": "Map",
         "earnings": "Earnings",
         "messages": "Messages",
@@ -36,6 +37,7 @@
         "signal_good": "Signal good",
         "signal_weak": "Weak signal",
         "signal_lost": "Signal lost",
+        "signal_connecting": "Connecting...",
         "dispatch_mode_title": "Admin is dispatching orders",
         "dispatch_mode_sub": "Wait for assignment — orders will be sent to you directly",
         "earnings_today": "Today's Earnings",
@@ -52,7 +54,15 @@
         "slot_available": "slot available",
         "heartbeat": "Heartbeat",
         "check_signal": "check signal",
-        "error_update_status": "Failed to update status. Try again."
+        "error_update_status": "Failed to update status. Try again.",
+        "tab_available": "Available",
+        "tab_my_orders": "My Orders",
+        "offline_title": "You're offline",
+        "offline_sub": "Go online to start receiving orders",
+        "waiting_title": "Waiting for orders",
+        "waiting_sub": "New orders will appear here as they become available",
+        "no_assigned_title": "No active orders",
+        "no_assigned_sub": "Accepted orders will show up here"
     },
     "map": {
         "status_pending": "Pending",
@@ -154,7 +164,18 @@
         "pricing": "Pricing",
         "items_total": "Items",
         "total": "Total",
-        "status": "Status"
+        "status": "Status",
+        "view_orders": "View Orders",
+        "orders_for_category": "Orders",
+        "no_orders_for_category": "No orders found for this category",
+        "back_to_orders": "Back",
+        "cat_markup": "Markup",
+        "cat_stock": "Stock",
+        "cat_delivery": "Delivery",
+        "cat_commission": "Commission",
+        "cat_promo": "Promo",
+        "cat_tip": "Tip",
+        "cat_catalog": "Catalog"
     },
     "messages": {
         "type_message": "Message",
@@ -172,6 +193,7 @@
     },
     "orderAccept": {
         "new_order": "New Order",
+        "direct_call": "Direct Call",
         "you_earn": "You earn",
         "food_status": "Food status",
         "dropoff": "Drop-off",
@@ -191,7 +213,17 @@
         "order_taken": "Order taken",
         "taken_sub": "Another driver accepted this order first",
         "taken_hint": "Finding you the next one…",
-        "see_map": "See map"
+        "see_map": "See map",
+        "from_stock_label": "Collect from operator stock",
+        "from_market_label": "Buy from market",
+        "stock_banner_title": "Inventory items in this order",
+        "cash_breakdown_title": "Cash Breakdown",
+        "pay_business": "Pay business",
+        "pay_business_hint": "Market items you buy on-site",
+        "collect_customer": "Collect from customer",
+        "collect_customer_hint": "Total cash to collect (incl. delivery)",
+        "your_cut": "Your cut",
+        "your_cut_hint": "Delivery fee you keep"
     },
     "orderPool": {
         "available_orders": "Available Orders",
@@ -288,6 +320,9 @@
         "nav_choice_gmaps": "Google Maps",
         "nav_choice_cancel": "Cancel",
         "from_stock_label": "Collect from operator stock",
-        "from_market_label": "Buy from market"
+        "from_market_label": "Buy from market",
+        "fulfillment_guide": "Fulfillment Guide",
+        "units_from_stock": "{{count}} from stock — no purchase needed",
+        "units_from_market": "{{count}} to buy at market"
     }
 }

@@ -86,6 +86,8 @@ export const UPDATE_BUSINESS = graphql(`
             prepTimeOverrideMinutes
             minOrderAmount
             category
+            directDispatchEnabled
+            directDispatchFixedAmount
             location {
                 latitude
                 longitude

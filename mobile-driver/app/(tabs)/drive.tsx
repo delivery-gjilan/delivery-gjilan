@@ -718,11 +718,13 @@ export default function MapScreen() {
             {(() => {
                 const connColor =
                     connectionStatus === 'CONNECTED' ? '#22c55e' :
-                    connectionStatus === 'STALE' ? '#f59e0b' : '#ef4444';
+                    connectionStatus === 'STALE' ? '#f59e0b' :
+                    connectionStatus === 'DISCONNECTED' ? '#6b7280' : '#ef4444';
                 const connLabel =
                     connectionStatus === 'CONNECTED' ? (isOnline ? t.home.online : t.home.offline) :
                     connectionStatus === 'STALE' ? t.home.signal_weak :
-                    connectionStatus === 'LOST' ? t.home.signal_lost : t.home.offline;
+                    connectionStatus === 'LOST' ? t.home.signal_lost :
+                    connectionStatus === 'DISCONNECTED' ? t.home.signal_connecting : t.home.offline;
                 return (
                     <View style={[styles.connPill, { top: insets.top + 12 }]}>
                         <View style={[styles.connDot, { backgroundColor: connColor }]} />
@@ -822,34 +824,52 @@ export default function MapScreen() {
                             )}
                         </View>
 
-                        {/* Fulfillment guide — visible when order has stock items (i.e. was created during inventory mode) */}
+                        {/* Fulfillment guide — visible when order has stock items */}
                         {(() => {
                             const allItems = order.businesses?.flatMap((b) => b.items ?? []) ?? [];
                             const stockItems = allItems.filter((it) => (it.inventoryQuantity ?? 0) > 0);
-                            const marketItems = allItems.filter((it) => (it.quantity ?? 0) - (it.inventoryQuantity ?? 0) > 0);
                             if (stockItems.length === 0) return null;
+
+                            const totalStockUnits = allItems.reduce((sum, it) => sum + (it.inventoryQuantity ?? 0), 0);
+                            const totalMarketUnits = allItems.reduce((sum, it) => sum + Math.max(0, it.quantity - (it.inventoryQuantity ?? 0)), 0);
+
                             return (
                                 <View style={styles.fulfillmentGuide}>
-                                    {stockItems.length > 0 && (
-                                        <View style={styles.fulfillmentSection}>
-                                            <Text style={styles.fulfillmentHeader}>{t.drive.from_stock_label}</Text>
-                                            {stockItems.map((it, i: number) => (
-                                                <Text key={i} style={styles.fulfillmentItem}>
-                                                    {'📦 '}{it.inventoryQuantity}× {it.name}
-                                                </Text>
-                                            ))}
-                                        </View>
-                                    )}
-                                    {marketItems.length > 0 && (
-                                        <View style={[styles.fulfillmentSection, { marginTop: 6 }]}>
-                                            <Text style={[styles.fulfillmentHeader, { color: '#6B7280' }]}>{t.drive.from_market_label}</Text>
-                                            {marketItems.map((it, i: number) => (
-                                                <Text key={i} style={[styles.fulfillmentItem, { color: '#6B7280' }]}>
-                                                    {'🛒 '}{it.quantity - (it.inventoryQuantity ?? 0)}× {it.name}
-                                                </Text>
-                                            ))}
-                                        </View>
-                                    )}
+                                    <View style={styles.fulfillmentTitleRow}>
+                                        <Ionicons name="cube-outline" size={12} color="#7c3aed" />
+                                        <Text style={styles.fulfillmentTitle}>{t.drive.fulfillment_guide}</Text>
+                                    </View>
+
+                                    {/* Per-item rows */}
+                                    {stockItems.map((it, i: number) => {
+                                        const fromStock = it.inventoryQuantity ?? 0;
+                                        const fromMarket = Math.max(0, it.quantity - fromStock);
+                                        return (
+                                            <View key={i} style={styles.fulfillmentItemRow}>
+                                                <Text style={styles.fulfillmentItemName} numberOfLines={1}>{it.name}</Text>
+                                                <View style={styles.fulfillmentItemBadges}>
+                                                    {fromStock > 0 && (
+                                                        <View style={styles.fulfillmentStockBadge}>
+                                                            <Text style={styles.fulfillmentStockBadgeText}>📦 ×{fromStock}</Text>
+                                                        </View>
+                                                    )}
+                                                    {fromMarket > 0 && (
+                                                        <View style={styles.fulfillmentMarketBadge}>
+                                                            <Text style={styles.fulfillmentMarketBadgeText}>🛒 ×{fromMarket}</Text>
+                                                        </View>
+                                                    )}
+                                                </View>
+                                            </View>
+                                        );
+                                    })}
+
+                                    {/* Summary footer */}
+                                    <View style={styles.fulfillmentFooter}>
+                                        <Text style={styles.fulfillmentFooterText}>
+                                            {t.drive.units_from_stock.replace('{{count}}', String(totalStockUnits))}
+                                            {totalMarketUnits > 0 ? `  ·  ${t.drive.units_from_market.replace('{{count}}', String(totalMarketUnits))}` : ''}
+                                        </Text>
+                                    </View>
                                 </View>
                             );
                         })()}
@@ -1284,9 +1304,71 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         paddingVertical: 8,
         backgroundColor: '#f5f3ff',
-        borderRadius: 8,
+        borderRadius: 10,
         borderWidth: 1,
         borderColor: '#ddd6fe',
+        gap: 5,
+    },
+    fulfillmentTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        marginBottom: 2,
+    },
+    fulfillmentTitle: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#7c3aed',
+        textTransform: 'uppercase',
+        letterSpacing: 0.4,
+    },
+    fulfillmentItemRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 8,
+    },
+    fulfillmentItemName: {
+        fontSize: 12,
+        color: '#374151',
+        flex: 1,
+    },
+    fulfillmentItemBadges: {
+        flexDirection: 'row',
+        gap: 4,
+    },
+    fulfillmentStockBadge: {
+        backgroundColor: 'rgba(124,58,237,0.12)',
+        borderRadius: 5,
+        paddingHorizontal: 5,
+        paddingVertical: 2,
+    },
+    fulfillmentStockBadgeText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#7c3aed',
+    },
+    fulfillmentMarketBadge: {
+        backgroundColor: '#F3F4F6',
+        borderRadius: 5,
+        paddingHorizontal: 5,
+        paddingVertical: 2,
+    },
+    fulfillmentMarketBadgeText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#6B7280',
+    },
+    fulfillmentFooter: {
+        marginTop: 2,
+        paddingTop: 5,
+        borderTopWidth: 1,
+        borderTopColor: '#e9d5ff',
+    },
+    fulfillmentFooterText: {
+        fontSize: 10,
+        color: '#7c3aed',
+        fontWeight: '600',
     },
     fulfillmentSection: {},
     fulfillmentHeader: {

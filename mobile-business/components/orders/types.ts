@@ -19,6 +19,10 @@ export interface Order {
     id: string;
     displayId: string;
     status: OrderStatus;
+    deliveryPrice?: number | null;
+    channel?: string | null;
+    recipientPhone?: string | null;
+    recipientName?: string | null;
     orderDate: string;
     preparingAt?: string | null;
     readyAt?: string | null;
@@ -43,7 +47,7 @@ export interface Order {
     }>;
 }
 
-export const UPCOMING_ORDER_STATUSES: OrderStatus[] = ['PENDING', 'PREPARING', 'READY'];
+export const UPCOMING_ORDER_STATUSES: OrderStatus[] = ['PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'];
 
 export const STATUS_COLORS: Record<OrderStatus, string> = {
     PENDING: '#f59e0b',

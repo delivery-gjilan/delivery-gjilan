@@ -120,6 +120,11 @@ export class SettlementCalculationEngine {
             // naturally via the amountToCollectFromCustomer calculation.
             this.addDriverTipSettlement(order, driverId, results);
 
+            // ── Automatic: own-vehicle bonus (if configured per driver) ──
+            // If the driver is marked as using their own vehicle and has a positive
+            // bonus amount configured, platform owes this fixed bonus per delivered order.
+            await this.addOwnVehicleBonusSettlement(order, driverId, results);
+
             // ── Automatic: catalog product revenue remittance (CASH_TO_DRIVER) ──
             // For adopted catalog products, the driver collected cash for items the
             // platform owns.  The driver must remit the full retail price.
@@ -183,28 +188,41 @@ export class SettlementCalculationEngine {
     }
 
     /**
-     * Automatic markup remittance: driver owes the platform the markup amount
-     * they collected in cash from the customer.
-     * Only applies to CASH_TO_DRIVER orders — for PREPAID_TO_PLATFORM the
-     * platform already collected the full amount directly from the customer.
+     * Automatic markup earning: records the platform's markup income.
+     * - CASH_TO_DRIVER: the driver collected the markup in cash and must remit it.
+     * - PREPAID_TO_PLATFORM: the platform already received the markup in the
+     *   customer's payment; record it as a direct RECEIVABLE so the settlement
+     *   preview reflects the full platform earnings.
      */
     private addMarkupSettlement(order: DbOrder, driverId: string | null, results: SettlementCalculation[]): void {
-        if (!driverId) return;
-        if (order.paymentCollection !== 'CASH_TO_DRIVER') return;
-
         const markupPrice = Number(order.markupPrice ?? 0);
         if (markupPrice <= 0) return;
 
-        results.push({
-            type: 'DRIVER',
-            direction: 'RECEIVABLE',
-            driverId,
-            businessId: null,
-            orderId: order.id,
-            amount: Number(markupPrice.toFixed(2)),
-            ruleId: null,
-            reason: `Markup remittance (€${markupPrice.toFixed(2)} cash collected)`,
-        });
+        if (order.paymentCollection === 'CASH_TO_DRIVER') {
+            if (!driverId) return;
+            results.push({
+                type: 'DRIVER',
+                direction: 'RECEIVABLE',
+                driverId,
+                businessId: null,
+                orderId: order.id,
+                amount: Number(markupPrice.toFixed(2)),
+                ruleId: null,
+                reason: `Markup remittance (€${markupPrice.toFixed(2)} cash collected)`,
+            });
+        } else {
+            // PREPAID_TO_PLATFORM: platform collected markup directly from customer
+            results.push({
+                type: 'DRIVER',
+                direction: 'RECEIVABLE',
+                driverId: driverId ?? null,
+                businessId: null,
+                orderId: order.id,
+                amount: Number(markupPrice.toFixed(2)),
+                ruleId: null,
+                reason: `Markup earning (€${markupPrice.toFixed(2)} collected in prepayment)`,
+            });
+        }
     }
 
     /**
@@ -254,6 +272,43 @@ export class SettlementCalculationEngine {
             amount: Number(driverTip.toFixed(2)),
             ruleId: null,
             reason: `Driver tip (€${driverTip.toFixed(2)} prepaid by customer)`,
+        });
+    }
+
+    /**
+     * Own-vehicle bonus: optional fixed amount owed to drivers who use their
+     * own vehicle for this delivered order.
+     */
+    private async addOwnVehicleBonusSettlement(
+        order: DbOrder,
+        driverId: string | null,
+        results: SettlementCalculation[],
+    ): Promise<void> {
+        if (!driverId) return;
+
+        const [driverRow] = await this.db
+            .select({
+                hasOwnVehicle: drivers.hasOwnVehicle,
+                ownVehicleBonusAmount: drivers.ownVehicleBonusAmount,
+            })
+            .from(drivers)
+            .where(eq(drivers.id, driverId))
+            .limit(1);
+
+        if (!driverRow?.hasOwnVehicle) return;
+
+        const bonus = Number(driverRow.ownVehicleBonusAmount ?? 0);
+        if (bonus <= 0) return;
+
+        results.push({
+            type: 'DRIVER',
+            direction: 'PAYABLE',
+            driverId,
+            businessId: null,
+            orderId: order.id,
+            amount: Number(bonus.toFixed(2)),
+            ruleId: null,
+            reason: `Own vehicle bonus (€${bonus.toFixed(2)})`,
         });
     }
 

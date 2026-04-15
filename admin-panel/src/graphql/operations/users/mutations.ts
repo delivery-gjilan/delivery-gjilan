@@ -77,11 +77,14 @@ export const DELETE_USER_MUTATION = graphql(`
 `);
 
 export const ADMIN_UPDATE_DRIVER_SETTINGS_MUTATION = graphql(`
-  mutation AdminUpdateDriverSettings($driverId: ID!, $commissionPercentage: Float, $maxActiveOrders: Int) {
-    adminUpdateDriverSettings(driverId: $driverId, commissionPercentage: $commissionPercentage, maxActiveOrders: $maxActiveOrders) {
+  mutation AdminUpdateDriverSettings($driverId: ID!, $commissionPercentage: Float, $maxActiveOrders: Int, $hasOwnVehicle: Boolean, $vehicleType: DriverVehicleType, $ownVehicleBonusAmount: Float) {
+    adminUpdateDriverSettings(driverId: $driverId, commissionPercentage: $commissionPercentage, maxActiveOrders: $maxActiveOrders, hasOwnVehicle: $hasOwnVehicle, vehicleType: $vehicleType, ownVehicleBonusAmount: $ownVehicleBonusAmount) {
       id
       commissionPercentage
       maxActiveOrders
+      hasOwnVehicle
+      vehicleType
+      ownVehicleBonusAmount
     }
   }
 `);

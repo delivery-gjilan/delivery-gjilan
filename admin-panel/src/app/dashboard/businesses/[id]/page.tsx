@@ -21,6 +21,8 @@ interface Business {
     isActive: boolean;
     createdAt: string;
     minOrderAmount?: number | null;
+    directDispatchEnabled?: boolean;
+    directDispatchFixedAmount?: number | null;
 }
 
 const TYPE_BADGE: Record<string, string> = {
@@ -103,6 +105,12 @@ export default function BusinessDetailsPage() {
                                 <span className="inline-flex items-center gap-1.5 text-xs font-medium text-red-400">
                                     <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
                                     Inactive
+                                </span>
+                            )}
+                            {b.directDispatchEnabled && (
+                                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-400">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
+                                    Direct Dispatch
                                 </span>
                             )}
                         </div>

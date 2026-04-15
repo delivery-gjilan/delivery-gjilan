@@ -55,15 +55,29 @@ services:
       REDIS_REQUIRED: "false"
     volumes:
       - api_logs:/app/logs
-    ports:
-      - "4000:4000"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+  # ── Caddy: reverse proxy + automatic TLS ──────────────────
+  caddy:
+    image: caddy:2-alpine
+    container_name: zippgo-dev-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile.dev:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
 volumes:
   db_data:
   redis_data:
   api_logs:
+  caddy_data:
+  caddy_config:

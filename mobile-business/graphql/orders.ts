@@ -8,6 +8,9 @@ export const GET_BUSINESS_ORDERS = graphql(`
                 id
                 displayId
                 userId
+                channel
+                recipientPhone
+                recipientName
                 orderPrice
                 deliveryPrice
                 totalPrice
@@ -114,6 +117,9 @@ export const ORDERS_SUBSCRIPTION = graphql(`
             id
             displayId
             userId
+            channel
+            recipientPhone
+            recipientName
             orderPrice
             deliveryPrice
             totalPrice
@@ -181,6 +187,37 @@ export const REMOVE_ORDER_ITEM = graphql(`
                     notes
                 }
             }
+        }
+    }
+`);
+
+// Direct Dispatch
+export const DIRECT_DISPATCH_AVAILABILITY = graphql(`
+    query DirectDispatchAvailability {
+        directDispatchAvailability {
+            available
+            reason
+            freeDriverCount
+        }
+    }
+`);
+
+export const CREATE_DIRECT_DISPATCH_ORDER = graphql(`
+    mutation CreateDirectDispatchOrder($input: CreateDirectDispatchOrderInput!) {
+        createDirectDispatchOrder(input: $input) {
+            id
+            displayId
+            status
+            channel
+            deliveryPrice
+            recipientPhone
+            recipientName
+            dropOffLocation {
+                address
+                latitude
+                longitude
+            }
+            driverNotes
         }
     }
 `);

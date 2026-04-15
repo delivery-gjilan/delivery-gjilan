@@ -70,7 +70,16 @@
     "accept_request_title": "Prano shlyerjen",
     "accept_request_text": "Pranimi do të shlyejë deri në {{amount}} për këtë periudhë. Vazhdon?",
     "accept_request_fallback": "Ta pranosh këtë kërkesë për shlyerje?",
-    "breakdown_title": "Ndarja e Kostove"
+    "breakdown_title": "Ndarja e Kostove",
+    "view_orders": "Shiko porositë",
+    "no_orders_for_category": "Nuk u gjetën porosi për këtë kategori",
+    "desc_auto_remittance": "Rregullimet e marzhit dhe shtesave",
+    "desc_stock_remittance": "Kthimi i kostos së stoqeve",
+    "desc_delivery_commission": "Komisioni mbi tarifat e dërgesës",
+    "desc_platform_commission": "Tarifa e platformës mbi nëntotalin",
+    "desc_promotion_cost": "Ndarja e kostove të zbritjeve",
+    "desc_driver_tip": "Bakshishi i përcjellë te shoferët",
+    "desc_catalog_revenue": "Të ardhurat nga produktet e katalogut"
   },
   "dashboard": {
     "title": "Paneli",
@@ -165,5 +174,23 @@
     "back_to_orders": "Kthehu te porositë",
     "access_restricted": "Qasje e kufizuar",
     "no_permission": "Nuk keni leje për menaxhimin e cilësimeve."
+  },
+  "directDispatch": {
+    "title": "Kërko Dërgesë",
+    "drivers_available": "{{count}} shofer(ë) të disponueshëm",
+    "no_drivers": "Nuk ka shoferë të disponueshëm tani",
+    "prep_title": "Koha e nisjes së dispatch-it",
+    "prep_hint": "Vendos minutat e përgatitjes që shoferët të njoftohen para se porosia të jetë gati.",
+    "phone": "Telefoni i marrësit",
+    "phone_placeholder": "+383 44 123 456",
+    "name": "Emri i marrësit",
+    "name_placeholder": "Opsionale",
+    "preparation_minutes": "Koha e përgatitjes (min)",
+    "preparation_minutes_placeholder": "p.sh. 15",
+    "address": "Adresa e dërgesës",
+    "address_placeholder": "p.sh. Rr. Adem Jashari, Nr. 12",
+    "notes": "Shënime për shofer",
+    "notes_placeholder": "Udhëzime opsionale për shofer",
+    "request_driver": "Kërko Shofer"
   }
 }

@@ -3,7 +3,7 @@
 > **MDS ID:** M13  
 > **App:** `mobile-business/`  
 > **Target users:** Business owners and employees (restaurant/shop operators)  
-> **Updated:** 2026-04-13
+> **Updated:** 2026-04-15
 
 ---
 
@@ -205,15 +205,19 @@ The primary operational screen. Full real-time order lifecycle management.
 - `FlatList` of order cards with status-color-coded left border
 - PENDING cards have **blinking red border** (`tick % 2 === 0`)
 - Collapsible item list (collapses beyond 5 items)
+- Left `StatusRail` includes status filters plus compact store open/closed, average prep-time, and Direct Call actions
+- The Direct Call action is removed live when the global store setting is turned off because the screen listens to `storeStatusUpdated`
+- Per-business direct-dispatch state is refreshed by the `businessUpdated(id)` subscription, so admin-side business edits drop the action without needing a full app restart
 - **ETA modal** — preset chips 5/10/15/25/30/45 min + custom input
 - **Add-time modal** — presets 5/10/15/20/30 + custom text input, capped at 180 min
 - **Store close modal** — optional closure reason text field
 - **Avg prep time modal** — presets 10/15/20/25/30/45 min
+- **Direct Dispatch modal** — full-screen request form with sticky header, fixed bottom action bar, live availability status, recipient fields, preparation-minute presets, and driver notes; no request-side fixed amount entry
 - **Product image modal** — populated for market-type businesses (shows item product images)
 - **Remove item modal** — required reason field
 - **Completed orders section** — paginated 10/page with Load More button
 - **Reviews section** — star rating + text display
-- **Store status bar** — at top of screen, open/closed indicator + toggle button
+- Empty order state is text-only (`No orders for now`) with no decorative icon
 - **Tablet layout** (`width >= 768`) — order cards rendered side-by-side
 
 **Behaviors:**
@@ -223,6 +227,21 @@ The primary operational screen. Full real-time order lifecycle management.
 - **Single-tap on market order** (420 ms debounce): opens product image modal
 - **Market business variant:** skips PREPARING state entirely; labels as "Packing"
 - **`scheduleRefetch()`:** custom throttler — 1200 ms cooldown + 350 ms debounce to avoid burst refetch storms
+
+- **`GetStoreStatus`** — queried to gate the Direct Call rail action visibility (both `storeSettings.directDispatchEnabled` AND `business.directDispatchEnabled` must be true)
+- **`DirectDispatchAvailability`** — checked when the Direct Call rail action opens the sheet (network-only); contains `available`, `reason`, `freeDriverCount`
+- **`CreateDirectDispatchOrder`** — mutation to create a direct dispatch order (recipientPhone, recipientName?, address, driverNotes?)
+  - Includes `preparationMinutes` so early dispatch timing can be scheduled from the request flow
+
+**Direct Dispatch rail action:**
+When both `storeSettings.directDispatchEnabled` and `business.directDispatchEnabled` are true, an indigo `Direct Call` action appears in the left status rail on the orders screen. Tapping it opens the `DirectDispatchSheet` bottom sheet.
+
+**`components/orders/DirectDispatchSheet.tsx`:**
+Slide-up animated bottom sheet for requesting a driver on-demand. Shows an availability status banner (green when drivers are free, red when none available) plus preparation-time controls so dispatch can start before the order is ready. Form fields: recipient phone (required), recipient name (optional), preparation minutes (required), address (required), driver notes (optional). Submits `CreateDirectDispatchOrder` mutation. On success, closes the sheet and triggers an order list refetch. Drop-off coordinates are hardcoded to the Gjilan area (42.46, 21.47) as a placeholder; map picker support is deferred.
+
+**`OrderCard` — Direct Dispatch display:**
+- Orders with `channel === 'DIRECT_DISPATCH'` show an indigo "Direct Call" badge (phone icon) below the status badge in the card header
+- Customer name/phone display uses `recipientName`/`recipientPhone` for direct dispatch orders instead of the user record
 
 ---
 
@@ -252,14 +271,21 @@ Read-only analytics view derived entirely from client-side computation over raw 
 
 ### `app/(tabs)/finances.tsx` — Finances Screen
 
-Full financial dashboard: revenue, platform owed amounts, settlement records, per-category cost breakdown, and pending settlement requests from admin.
+Full financial dashboard: revenue, platform owed amounts, settlement records, per-category cost breakdown with drill-down, and pending settlement requests from admin.
 
-**State (14 `useState`):**
+**State (17 `useState`):**
 - `period: 'today' | 'week' | 'month' | 'last_settlement' | 'custom' | 'all'`
 - `customStart`, `customEnd` (DD/MM/YYYY), `customStartInput`, `customEndInput`, `customModalOpen`
-- `refreshing`, `currentPage`
+- `refreshing`, `settlementOffset`, `loadingMore`
 - `disputeModalRequestId`, `rejectReason`, `respondingId`
-- `selectedSettlement` — drill-down detail view
+- `selectedSettlementOrder: SettlementOrderGroup | null` — order detail modal
+- `selectedCategory` — category drill-down `{ category, label, color, direction }`
+- `categorySettlements` — settlements fetched for selected category
+- `highlightCategory` — category key to highlight in order detail modal
+
+**Module-level types:**
+- `BusinessSettlement` — alias for `GetMyBusinessSettlementsQuery['settlements'][number]`
+- `SettlementOrderGroup` — `{ orderId, orderDisplayId, order, settlements, totalGross, totalReceivable, totalPayable, latestCreatedAt }`
 
 **Zustand:** `useAuthStore` (`user.businessId`)
 
@@ -267,18 +293,26 @@ Full financial dashboard: revenue, platform owed amounts, settlement records, pe
 - Query: `GET_LAST_BUSINESS_PAID_SETTLEMENT` — enables "From Last Settlement" period selector option
 - Query: `GET_MY_SETTLEMENT_REQUESTS` — `{ status: 'PENDING', limit: 20 }` pending admin requests
 - Query: `GET_MY_BUSINESS_SETTLEMENT_SUMMARY` — aggregated totals for selected period
-- Query: `GET_MY_BUSINESS_SETTLEMENTS` — raw settlement rows, `limit: 500`
+- Query: `GET_MY_BUSINESS_SETTLEMENTS` — raw settlement rows with `reason` field, paginated (50/page)
 - Query: `GET_BUSINESS_SETTLEMENT_BREAKDOWN` — per-category cost breakdown
+- Lazy Query: `GET_MY_BUSINESS_SETTLEMENTS($category)` — fired when a breakdown row is tapped; populates category orders modal
 - Mutation: `RESPOND_TO_SETTLEMENT_REQUEST` — accept/reject a request; reject requires a reason
 
 **UI:**
 - Horizontal-scroll period selector strip with 6 options ("Last Settlement" disabled if no paid settlement)
 - **Revenue card** — gross income (computed client-side from settlement rows)
 - **Owed card** — sum of PENDING/OVERDUE/PARTIALLY_PAID RECEIVABLE rows
-- Settlement breakdown list with colored dots, category, count, amount
+- **Cost Breakdown section** — tappable category rows with icon, label, description, record count + "View Orders ›", and total
+- **Category drill-down (3 layers):** (1) Tappable breakdown row fires lazy category query → (2) Category Orders Modal lists matching orders → (3) Order Detail Modal highlights matching settlement lines via `highlightCategory`
 - Pending requests section with Accept / Reject buttons (reject opens reason modal)
-- Paginated settlement records table (page size 20) with prev/next controls
+- Paginated settlement records table (page size 50) with prev/next controls
 - Custom range modal with DD/MM/YYYY text inputs and validation
+
+**Helpers:**
+- `getLineCategory(s)` — mirrors `SettlementRepository.buildCategoryCondition()` (uses `reason` field + rule type/promotion)
+- `getCategoryColor(category, direction)` — direction-aware color map
+- `getCategoryIcon(category)` — Ionicon name per category
+- `getCategoryDescription(category)` — short i18n explanation shown under category label in breakdown rows
 
 **Notable:** Revenue is computed locally from raw `GET_MY_BUSINESS_SETTLEMENTS` data using `calculateOrderItemSubtotal` (recursive, handles child items + selected options). Not from the summary API.
 

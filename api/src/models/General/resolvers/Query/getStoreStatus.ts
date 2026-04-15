@@ -18,6 +18,10 @@ const DEFAULT_STORE_STATUS = {
   inventoryModeEnabled: false,
   earlyDispatchLeadMinutes: 5,
   businessGracePeriodMinutes: 0,
+  directDispatchEnabled: false,
+  directDispatchDriverReserve: 2,
+  farOrderThresholdKm: 5,
+  gasPriorityWindowSeconds: 30,
 };
 
 export const getStoreStatus: NonNullable<QueryResolvers['getStoreStatus']> = async (
@@ -50,6 +54,10 @@ export const getStoreStatus: NonNullable<QueryResolvers['getStoreStatus']> = asy
         inventoryModeEnabled: settings[0].inventoryModeEnabled,
         earlyDispatchLeadMinutes: settings[0].earlyDispatchLeadMinutes,
         businessGracePeriodMinutes: settings[0].businessGracePeriodMinutes,
+        directDispatchEnabled: settings[0].directDispatchEnabled,
+        directDispatchDriverReserve: settings[0].directDispatchDriverReserve,
+        farOrderThresholdKm: settings[0].farOrderThresholdKm,
+        gasPriorityWindowSeconds: settings[0].gasPriorityWindowSeconds,
       };
     } catch (error) {
       // Keep dashboard pages usable even when storeSettings schema is temporarily out of sync.

@@ -5,9 +5,10 @@ import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { resolveDeviceId } from '@/utils/deviceId';
 import messaging, { firebase } from '@react-native-firebase/messaging';
-import { useMutation } from '@apollo/client/react';
+import { useMutation, useApolloClient } from '@apollo/client/react';
 import { useAuthStore } from '@/store/authStore';
 import { REGISTER_DEVICE_TOKEN, UNREGISTER_DEVICE_TOKEN, TRACK_PUSH_TELEMETRY } from '@/graphql/notifications';
+import { GET_BUSINESS_ORDERS } from '@/graphql/orders';
 import { useNotificationSettingsStore } from '@/store/useNotificationSettingsStore';
 
 function isLikelyRawApnsToken(token: string): boolean {
@@ -70,6 +71,7 @@ export function useNotifications() {
     const { isAuthenticated, token: authToken } = useAuthStore();
     const pushEnabled = useNotificationSettingsStore((state) => state.pushEnabled);
     const currentPushToken = useRef<string | null>(null);
+    const apolloClient = useApolloClient();
 
     // Set notification handler once per app lifetime (not at module load time)
     if (!notificationHandlerSet.current) {
@@ -195,6 +197,25 @@ export function useNotifications() {
                       type: data.type,
                       status: data.status,
                   });
+                  // Refetch orders when the grace-period notification fires.
+                  if (data.type === 'NEW_ORDER_BUSINESS') {
+                      apolloClient
+                          .query({ query: GET_BUSINESS_ORDERS, fetchPolicy: 'network-only' })
+                          .catch(() => null);
+                      // Firebase foreground messages are NOT shown as banners automatically.
+                      const title = remoteMessage?.notification?.title ?? 'New Order for Your Business';
+                      const body = remoteMessage?.notification?.body ?? 'You have a new incoming order. Tap to view details.';
+                      Notifications.scheduleNotificationAsync({
+                          content: {
+                              title,
+                              body,
+                              data: data as unknown as Record<string, unknown>,
+                              sound: 'default',
+                              priority: Notifications.AndroidNotificationPriority.MAX,
+                          },
+                          trigger: null,
+                      }).catch(() => null);
+                  }
               })
             : undefined;
 
@@ -205,6 +226,13 @@ export function useNotifications() {
                 campaignId: typeof notification.request.content.data?.campaignId === 'string' ? notification.request.content.data.campaignId : undefined,
                 orderId: typeof notification.request.content.data?.orderId === 'string' ? notification.request.content.data.orderId : undefined,
             });
+            // Refetch orders when the grace-period delayed push is received (background→foreground).
+            const notifType = notification.request.content.data?.type;
+            if (notifType === 'NEW_ORDER_BUSINESS') {
+                apolloClient
+                    .query({ query: GET_BUSINESS_ORDERS, fetchPolicy: 'network-only' })
+                    .catch(() => null);
+            }
         });
 
         const responseListener = Notifications.addNotificationResponseReceivedListener((response) => {

@@ -3,6 +3,7 @@ import { AppError } from '@/lib/errors';
 import { cache } from '@/lib/cache';
 import { SHIFT_DRIVERS_CACHE_KEY } from '@/models/Driver/resolvers/Mutation/adminSetShiftDrivers';
 import { adjustBusinessInventoryQuantities } from '@/services/order/adjustBusinessInventoryQuantities';
+import { buildBusinessGracePeriodFilter } from '@/services/scheduleBusinessNotification';
 
 export const allOrdersUpdated: NonNullable<SubscriptionResolvers['allOrdersUpdated']> = {
     subscribe: async (_parent, _args, { orderService, userData }) => {
@@ -32,15 +33,18 @@ export const allOrdersUpdated: NonNullable<SubscriptionResolvers['allOrdersUpdat
                 if (!userData.businessId) {
                     return [];
                 }
-                
-                const filteredOrders = [];
+
+                const businessOrders = [];
                 for (const order of allOrders) {
                     const containsBusiness = await orderService.orderContainsBusiness(order.id, userData.businessId);
                     if (containsBusiness) {
-                        filteredOrders.push(order);
+                        businessOrders.push(order);
                     }
                 }
-                
+
+                const withinGrace = await buildBusinessGracePeriodFilter();
+                const filteredOrders = businessOrders.filter(withinGrace);
+
                 return adjustBusinessInventoryQuantities(db, filteredOrders, userData.businessId);
 
             default:

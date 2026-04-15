@@ -138,6 +138,12 @@ export default function OrderDetailPanel({
                         <CopyableId displayId={order.displayId} />
                         <StatusBadge status={order.status} />
                     </div>
+                                        {order.channel === 'DIRECT_DISPATCH' && (
+                                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-orange-500/15 border border-orange-500/40 w-fit">
+                                                <Phone size={10} className="text-orange-400" />
+                                                <span className="text-[10px] font-semibold text-orange-300 uppercase tracking-wide">Direct Call</span>
+                                            </div>
+                                        )}
                     <div className="flex items-center gap-3 text-xs text-zinc-500">
                         <span className="flex items-center gap-1">
                             <Calendar size={11} />
@@ -164,7 +170,31 @@ export default function OrderDetailPanel({
 
                 {/* Customer + Driver */}
                 <div className="grid grid-cols-2 gap-3">
-                    {order.user && (
+                    {order.channel === 'DIRECT_DISPATCH' ? (
+                        <div className="bg-[#09090b] border border-orange-900/40 rounded-xl p-3">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Phone size={13} className="text-orange-500" />
+                                <span className="text-[10px] text-orange-600 uppercase tracking-wider font-medium">Recipient</span>
+                            </div>
+                            <div className="text-white text-sm font-medium">
+                                {order.recipientName ?? order.recipientPhone ?? '—'}
+                            </div>
+                            <div className="text-zinc-500 text-xs mt-1">
+                                Business: {businessList.map((b) => b.business.name).join(', ') || '—'}
+                            </div>
+                            <div className="text-emerald-300 text-xs mt-1 font-semibold">
+                                Agreed Amount: €{Number(order.deliveryPrice ?? 0).toFixed(2)}
+                            </div>
+                            {order.recipientName && order.recipientPhone && (
+                                <div className="flex items-center gap-1.5 mt-1.5">
+                                    <Phone size={11} className="text-zinc-600" />
+                                    <a href={`tel:${order.recipientPhone}`} className="text-zinc-400 text-xs hover:text-white transition-colors">
+                                        {order.recipientPhone}
+                                    </a>
+                                </div>
+                            )}
+                        </div>
+                    ) : order.user && (
                         <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-3">
                             <div className="flex items-center gap-2 mb-2">
                                 <User size={13} className="text-zinc-500" />

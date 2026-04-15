@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 
 export const adminUpdateDriverSettings: NonNullable<MutationResolvers['adminUpdateDriverSettings']> = async (
     _parent,
-    { driverId, commissionPercentage, maxActiveOrders, hasOwnVehicle },
+    { driverId, commissionPercentage, maxActiveOrders, hasOwnVehicle, vehicleType, ownVehicleBonusAmount },
     { userData, authService, db },
 ) => {
     if (userData.role !== 'ADMIN' && userData.role !== 'SUPER_ADMIN') {
@@ -28,6 +28,12 @@ export const adminUpdateDriverSettings: NonNullable<MutationResolvers['adminUpda
     }
     if (hasOwnVehicle !== null && hasOwnVehicle !== undefined) {
         updates.hasOwnVehicle = hasOwnVehicle;
+    }
+    if (vehicleType !== null && vehicleType !== undefined) {
+        updates.vehicleType = vehicleType;
+    }
+    if (ownVehicleBonusAmount !== null && ownVehicleBonusAmount !== undefined) {
+        updates.ownVehicleBonusAmount = String(ownVehicleBonusAmount);
     }
 
     if (Object.keys(updates).length > 0) {

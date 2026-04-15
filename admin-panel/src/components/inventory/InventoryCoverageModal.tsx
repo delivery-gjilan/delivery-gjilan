@@ -12,6 +12,7 @@ interface CoverageItem {
     fromMarket: number;
     status: string;
     deducted: boolean;
+    removedQty: number;
 }
 
 interface Coverage {
@@ -38,6 +39,8 @@ export default function InventoryCoverageModal({ orderId, displayId, coverage, l
     const stockItems = coverage?.items.filter((i) => i.fromStock > 0 && i.fromMarket === 0) ?? [];
     const marketItems = coverage?.items.filter((i) => i.fromMarket > 0 && i.fromStock === 0) ?? [];
     const mixedItems = coverage?.items.filter((i) => i.fromStock > 0 && i.fromMarket > 0) ?? [];
+    const totalFromStock = coverage?.items.reduce((sum, i) => sum + i.fromStock, 0) ?? 0;
+    const totalFromMarket = coverage?.items.reduce((sum, i) => sum + i.fromMarket, 0) ?? 0;
 
     return (
         <Modal isOpen onClose={onClose} title={`📦 Fulfillment Guide — #${displayId}`}>
@@ -57,16 +60,16 @@ export default function InventoryCoverageModal({ orderId, displayId, coverage, l
                     {/* Summary row */}
                     <div className="grid grid-cols-3 gap-3">
                         <div className="bg-violet-500/10 border border-violet-500/20 rounded-xl p-3 text-center">
-                            <div className="text-2xl font-bold text-violet-300">{coverage.fullyOwnedCount}</div>
+                            <div className="text-2xl font-bold text-violet-300">{totalFromStock}</div>
                             <div className="text-xs text-violet-400 mt-1">From your stock</div>
                         </div>
                         <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-center">
                             <div className="text-2xl font-bold text-amber-300">{coverage.partiallyOwnedCount}</div>
-                            <div className="text-xs text-amber-400 mt-1">Partial coverage</div>
+                            <div className="text-xs text-amber-400 mt-1">Partial items</div>
                         </div>
                         <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-center">
-                            <div className="text-2xl font-bold text-zinc-300">{coverage.marketOnlyCount}</div>
-                            <div className="text-xs text-zinc-400 mt-1">Market only</div>
+                            <div className="text-2xl font-bold text-zinc-300">{totalFromMarket}</div>
+                            <div className="text-xs text-zinc-400 mt-1">Buy from market</div>
                         </div>
                     </div>
 
@@ -102,7 +105,14 @@ export default function InventoryCoverageModal({ orderId, displayId, coverage, l
                                             </div>
                                         )}
                                         <span className="text-sm text-white flex-1 font-medium">{item.productName}</span>
-                                        <span className="text-violet-300 font-bold text-lg">×{item.fromStock}</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-violet-300 font-bold text-lg">×{item.fromStock}</span>
+                                            {(item.removedQty ?? 0) > 0 && (
+                                                <span className="text-[11px] font-semibold bg-red-500/15 border border-red-500/30 text-red-400 rounded-full px-2 py-0.5 whitespace-nowrap">
+                                                    −{item.removedQty} removed
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -134,7 +144,14 @@ export default function InventoryCoverageModal({ orderId, displayId, coverage, l
                                             </div>
                                         )}
                                         <span className="text-sm text-zinc-300 flex-1">{item.productName}</span>
-                                        <span className="text-zinc-200 font-bold text-lg">×{item.fromMarket}</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-zinc-200 font-bold text-lg">×{item.fromMarket}</span>
+                                            {(item.removedQty ?? 0) > 0 && (
+                                                <span className="text-[11px] font-semibold bg-red-500/15 border border-red-500/30 text-red-400 rounded-full px-2 py-0.5 whitespace-nowrap">
+                                                    −{item.removedQty} removed
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 ))}
                             </div>

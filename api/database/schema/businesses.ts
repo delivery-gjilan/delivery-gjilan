@@ -31,6 +31,10 @@ export const businesses = pgTable('businesses', {
     minOrderAmount: numeric('min_order_amount', { precision: 10, scale: 2 }).default('0').notNull(),
     isFeatured: boolean('is_featured').notNull().default(false),
     featuredSortOrder: integer('featured_sort_order').notNull().default(0),
+    /** Whether this business can create direct-dispatch (call-in) delivery orders. */
+    directDispatchEnabled: boolean('direct_dispatch_enabled').notNull().default(false),
+    /** Fixed direct-dispatch fee configured by admin (EUR). */
+    directDispatchFixedAmount: numeric('direct_dispatch_fixed_amount', { precision: 10, scale: 2 }).default('0').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
         .default(sql`CURRENT_TIMESTAMP`)
         .notNull(),

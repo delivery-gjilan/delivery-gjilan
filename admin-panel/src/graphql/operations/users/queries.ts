@@ -43,6 +43,9 @@ export const DRIVERS_QUERY = graphql(`
       phoneNumber
       commissionPercentage
       maxActiveOrders
+      hasOwnVehicle
+      vehicleType
+      ownVehicleBonusAmount
       driverLocation {
         latitude
         longitude

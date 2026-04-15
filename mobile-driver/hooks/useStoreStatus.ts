@@ -10,6 +10,7 @@ interface StoreStatus {
     dispatchModeEnabled: boolean;
     googleMapsNavEnabled: boolean;
     inventoryModeEnabled: boolean;
+    earlyDispatchLeadMinutes: number;
 }
 
 export function useStoreStatus() {
@@ -40,6 +41,7 @@ export function useStoreStatus() {
         dispatchModeEnabled: data?.getStoreStatus?.dispatchModeEnabled ?? false,
         googleMapsNavEnabled: data?.getStoreStatus?.googleMapsNavEnabled ?? false,
         inventoryModeEnabled: data?.getStoreStatus?.inventoryModeEnabled ?? false,
+        earlyDispatchLeadMinutes: data?.getStoreStatus?.earlyDispatchLeadMinutes ?? 5,
         loading,
     };
 }

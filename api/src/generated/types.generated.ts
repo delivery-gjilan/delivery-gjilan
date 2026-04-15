@@ -239,6 +239,8 @@ export type Business = {
   commissionPercentage: Scalars['Float']['output'];
   createdAt: Scalars['Date']['output'];
   description?: Maybe<Scalars['String']['output']>;
+  directDispatchEnabled: Scalars['Boolean']['output'];
+  directDispatchFixedAmount: Scalars['Float']['output'];
   featuredSortOrder: Scalars['Int']['output'];
   id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
@@ -515,6 +517,19 @@ export type CreateDeliveryZoneInput = {
   sortOrder?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type CreateDirectDispatchOrderInput = {
+  /** Optional notes for the driver. */
+  driverNotes?: InputMaybe<Scalars['String']['input']>;
+  /** Delivery address for the recipient. */
+  dropOffLocation: LocationInput;
+  /** Estimated preparation time in minutes for early dispatch scheduling. */
+  preparationMinutes: Scalars['Int']['input'];
+  /** Optional name of the recipient. */
+  recipientName?: InputMaybe<Scalars['String']['input']>;
+  /** Phone number of the recipient. */
+  recipientPhone: Scalars['String']['input'];
+};
+
 export type CreateOptionGroupInput = {
   displayOrder?: InputMaybe<Scalars['Int']['input']>;
   maxSelections: Scalars['Int']['input'];
@@ -749,6 +764,16 @@ export type DeviceToken = {
   userId: Scalars['ID']['output'];
 };
 
+export type DirectDispatchAvailability = {
+  __typename?: 'DirectDispatchAvailability';
+  /** Whether the business can create a direct dispatch order right now. */
+  available: Scalars['Boolean']['output'];
+  /** Number of free drivers available for dispatch. */
+  freeDriverCount: Scalars['Int']['output'];
+  /** Human-readable reason if not available. */
+  reason?: Maybe<Scalars['String']['output']>;
+};
+
 /** Result of driverLogin / driverRegister mutations */
 export type DriverAuthResult = {
   __typename?: 'DriverAuthResult';
@@ -952,6 +977,15 @@ export type DriverRegisterInput = {
   phoneNumber?: InputMaybe<Scalars['String']['input']>;
 };
 
+/**
+ * Vehicle type for drivers:
+ * - GAS: Internal combustion engine vehicle
+ * - ELECTRIC: Electric vehicle (e-bike, e-scooter, EV)
+ */
+export type DriverVehicleType =
+  | 'ELECTRIC'
+  | 'GAS';
+
 /** Single data point in the platform earnings trend. */
 export type EarningsTrendPoint = {
   __typename?: 'EarningsTrendPoint';
@@ -1127,6 +1161,7 @@ export type Mutation = {
   createCampaign: NotificationCampaign;
   createDeliveryPricingTier: DeliveryPricingTier;
   createDeliveryZone: DeliveryZone;
+  createDirectDispatchOrder: Order;
   createOption: Option;
   createOptionGroup: OptionGroup;
   createOrder: Order;
@@ -1314,6 +1349,8 @@ export type MutationadminUpdateDriverSettingsArgs = {
   driverId: Scalars['ID']['input'];
   hasOwnVehicle?: InputMaybe<Scalars['Boolean']['input']>;
   maxActiveOrders?: InputMaybe<Scalars['Int']['input']>;
+  ownVehicleBonusAmount?: InputMaybe<Scalars['Float']['input']>;
+  vehicleType?: InputMaybe<DriverVehicleType>;
 };
 
 
@@ -1398,6 +1435,11 @@ export type MutationcreateDeliveryPricingTierArgs = {
 
 export type MutationcreateDeliveryZoneArgs = {
   input: CreateDeliveryZoneInput;
+};
+
+
+export type MutationcreateDirectDispatchOrderArgs = {
+  input: CreateDirectDispatchOrderInput;
 };
 
 
@@ -2088,6 +2130,7 @@ export type Order = {
   businesses: Array<OrderBusiness>;
   cancellationReason?: Maybe<Scalars['String']['output']>;
   cancelledAt?: Maybe<Scalars['Date']['output']>;
+  channel: OrderChannel;
   deliveredAt?: Maybe<Scalars['Date']['output']>;
   deliveryPrice: Scalars['Float']['output'];
   displayId: Scalars['String']['output'];
@@ -2114,6 +2157,8 @@ export type Order = {
   preparingAt?: Maybe<Scalars['Date']['output']>;
   prioritySurcharge: Scalars['Float']['output'];
   readyAt?: Maybe<Scalars['Date']['output']>;
+  recipientName?: Maybe<Scalars['String']['output']>;
+  recipientPhone?: Maybe<Scalars['String']['output']>;
   review?: Maybe<OrderReview>;
   settlementPreview?: Maybe<OrderSettlementPreview>;
   status: OrderStatus;
@@ -2129,6 +2174,10 @@ export type OrderBusiness = {
   items: Array<OrderItem>;
   removedItems: Array<RemovedOrderItem>;
 };
+
+export type OrderChannel =
+  | 'DIRECT_DISPATCH'
+  | 'PLATFORM';
 
 export type OrderConnection = {
   __typename?: 'OrderConnection';
@@ -2159,6 +2208,7 @@ export type OrderCoverageItem = {
   productId: Scalars['ID']['output'];
   productImageUrl?: Maybe<Scalars['String']['output']>;
   productName: Scalars['String']['output'];
+  removedQty: Scalars['Int']['output'];
   status: InventoryCoverageStatus;
 };
 
@@ -2593,6 +2643,7 @@ export type Query = {
   deliveryPricingTiers: Array<DeliveryPricingTier>;
   deliveryZones: Array<DeliveryZone>;
   deviceTokens: Array<DeviceToken>;
+  directDispatchAvailability: DirectDispatchAvailability;
   driverBalance: SettlementSummary;
   /** Driver cash summary with settlement breakdown. Auto-scoped to current driver. */
   driverCashSummary: DriverCashSummary;
@@ -3083,6 +3134,7 @@ export type QuerysettlementSummaryArgs = {
 
 export type QuerysettlementsArgs = {
   businessId?: InputMaybe<Scalars['ID']['input']>;
+  category?: InputMaybe<Scalars['String']['input']>;
   direction?: InputMaybe<SettlementDirection>;
   driverId?: InputMaybe<Scalars['ID']['input']>;
   endDate?: InputMaybe<Scalars['Date']['input']>;
@@ -3387,8 +3439,14 @@ export type StoreStatus = {
   bannerType: BannerType;
   businessGracePeriodMinutes: Scalars['Int']['output'];
   closedMessage?: Maybe<Scalars['String']['output']>;
+  directDispatchDriverReserve: Scalars['Int']['output'];
+  directDispatchEnabled: Scalars['Boolean']['output'];
   dispatchModeEnabled: Scalars['Boolean']['output'];
   earlyDispatchLeadMinutes: Scalars['Int']['output'];
+  /** Distance (km) beyond which gas vehicles are dispatched first. 0 = disabled. */
+  farOrderThresholdKm: Scalars['Float']['output'];
+  /** Seconds gas drivers get head-start before electric drivers are notified for far orders. */
+  gasPriorityWindowSeconds: Scalars['Int']['output'];
   googleMapsNavEnabled: Scalars['Boolean']['output'];
   inventoryModeEnabled: Scalars['Boolean']['output'];
   isStoreClosed: Scalars['Boolean']['output'];
@@ -3410,6 +3468,7 @@ export type Subscription = {
   auditLogCreated: AuditLog;
   /** Business user receives messages from admin in real-time */
   businessMessageReceived: BusinessMessage;
+  businessUpdated: Business;
   driverConnectionStatusChanged: DriverConnection;
   /** Driver receives messages from admin in real-time */
   driverMessageReceived: DriverMessage;
@@ -3439,6 +3498,11 @@ export type SubscriptionauditLogCreatedArgs = {
   action?: InputMaybe<ActionType>;
   actorType?: InputMaybe<ActorType>;
   entityType?: InputMaybe<EntityType>;
+};
+
+
+export type SubscriptionbusinessUpdatedArgs = {
+  id: Scalars['ID']['input'];
 };
 
 
@@ -3530,6 +3594,8 @@ export type UpdateBusinessInput = {
   category?: InputMaybe<Scalars['String']['input']>;
   commissionPercentage?: InputMaybe<Scalars['Float']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
+  directDispatchEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  directDispatchFixedAmount?: InputMaybe<Scalars['Float']['input']>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
   isTemporarilyClosed?: InputMaybe<Scalars['Boolean']['input']>;
@@ -3640,8 +3706,12 @@ export type UpdateStoreStatusInput = {
   bannerType?: InputMaybe<BannerType>;
   businessGracePeriodMinutes?: InputMaybe<Scalars['Int']['input']>;
   closedMessage?: InputMaybe<Scalars['String']['input']>;
+  directDispatchDriverReserve?: InputMaybe<Scalars['Int']['input']>;
+  directDispatchEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   dispatchModeEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   earlyDispatchLeadMinutes?: InputMaybe<Scalars['Int']['input']>;
+  farOrderThresholdKm?: InputMaybe<Scalars['Float']['input']>;
+  gasPriorityWindowSeconds?: InputMaybe<Scalars['Int']['input']>;
   googleMapsNavEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   inventoryModeEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   isStoreClosed: Scalars['Boolean']['input'];
@@ -3690,6 +3760,7 @@ export type User = {
   isTrustedCustomer: Scalars['Boolean']['output'];
   lastName: Scalars['String']['output'];
   maxActiveOrders?: Maybe<Scalars['Int']['output']>;
+  ownVehicleBonusAmount?: Maybe<Scalars['Float']['output']>;
   permissions: Array<UserPermission>;
   phoneNumber?: Maybe<Scalars['String']['output']>;
   phoneVerified: Scalars['Boolean']['output'];
@@ -3697,6 +3768,7 @@ export type User = {
   role: UserRole;
   signupStep: SignupStep;
   totalOrders: Scalars['Int']['output'];
+  vehicleType?: Maybe<DriverVehicleType>;
 };
 
 export type UserAddress = {
@@ -3908,6 +3980,7 @@ export type ResolversTypes = {
   CreateCampaignInput: CreateCampaignInput;
   CreateDeliveryPricingTierInput: CreateDeliveryPricingTierInput;
   CreateDeliveryZoneInput: CreateDeliveryZoneInput;
+  CreateDirectDispatchOrderInput: CreateDirectDispatchOrderInput;
   CreateOptionGroupInput: CreateOptionGroupInput;
   CreateOptionInput: CreateOptionInput;
   CreateOrderChildItemInput: CreateOrderChildItemInput;
@@ -3934,6 +4007,7 @@ export type ResolversTypes = {
   DeviceAppType: ResolverTypeWrapper<'CUSTOMER' | 'DRIVER' | 'BUSINESS' | 'ADMIN'>;
   DevicePlatform: ResolverTypeWrapper<'IOS' | 'ANDROID'>;
   DeviceToken: ResolverTypeWrapper<Omit<DeviceToken, 'appType' | 'platform'> & { appType: ResolversTypes['DeviceAppType'], platform: ResolversTypes['DevicePlatform'] }>;
+  DirectDispatchAvailability: ResolverTypeWrapper<DirectDispatchAvailability>;
   DriverAuthResult: ResolverTypeWrapper<Omit<DriverAuthResult, 'driver'> & { driver: ResolversTypes['DriverBasicInfo'] }>;
   DriverBasicInfo: ResolverTypeWrapper<Omit<DriverBasicInfo, 'connectionStatus'> & { connectionStatus: ResolversTypes['DriverConnectionStatus'] }>;
   DriverCashSummary: ResolverTypeWrapper<DriverCashSummary>;
@@ -3951,6 +4025,7 @@ export type ResolversTypes = {
   DriverPttSignal: ResolverTypeWrapper<Omit<DriverPttSignal, 'action'> & { action: ResolversTypes['DriverPttSignalAction'] }>;
   DriverPttSignalAction: ResolverTypeWrapper<'STARTED' | 'STOPPED' | 'MUTE' | 'UNMUTE'>;
   DriverRegisterInput: DriverRegisterInput;
+  DriverVehicleType: ResolverTypeWrapper<'GAS' | 'ELECTRIC'>;
   EarningsTrendPoint: ResolverTypeWrapper<EarningsTrendPoint>;
   EntityType: ResolverTypeWrapper<'USER' | 'BUSINESS' | 'PRODUCT' | 'ORDER' | 'SETTLEMENT' | 'DRIVER' | 'CATEGORY' | 'SUBCATEGORY' | 'DELIVERY_ZONE'>;
   GetBannersFilter: GetBannersFilter;
@@ -3974,8 +4049,9 @@ export type ResolversTypes = {
   OperationalKPIs: ResolverTypeWrapper<OperationalKPIs>;
   Option: ResolverTypeWrapper<Option>;
   OptionGroup: ResolverTypeWrapper<OptionGroup>;
-  Order: ResolverTypeWrapper<Omit<Order, 'approvalReasons' | 'businesses' | 'driver' | 'orderPromotions' | 'paymentCollection' | 'status' | 'user'> & { approvalReasons?: Maybe<Array<ResolversTypes['ApprovalReason']>>, businesses: Array<ResolversTypes['OrderBusiness']>, driver?: Maybe<ResolversTypes['User']>, orderPromotions?: Maybe<Array<ResolversTypes['OrderPromotion']>>, paymentCollection: ResolversTypes['OrderPaymentCollection'], status: ResolversTypes['OrderStatus'], user?: Maybe<ResolversTypes['User']> }>;
+  Order: ResolverTypeWrapper<Omit<Order, 'approvalReasons' | 'businesses' | 'channel' | 'driver' | 'orderPromotions' | 'paymentCollection' | 'status' | 'user'> & { approvalReasons?: Maybe<Array<ResolversTypes['ApprovalReason']>>, businesses: Array<ResolversTypes['OrderBusiness']>, channel: ResolversTypes['OrderChannel'], driver?: Maybe<ResolversTypes['User']>, orderPromotions?: Maybe<Array<ResolversTypes['OrderPromotion']>>, paymentCollection: ResolversTypes['OrderPaymentCollection'], status: ResolversTypes['OrderStatus'], user?: Maybe<ResolversTypes['User']> }>;
   OrderBusiness: ResolverTypeWrapper<Omit<OrderBusiness, 'business'> & { business: ResolversTypes['Business'] }>;
+  OrderChannel: ResolverTypeWrapper<'PLATFORM' | 'DIRECT_DISPATCH'>;
   OrderConnection: ResolverTypeWrapper<Omit<OrderConnection, 'orders'> & { orders: Array<ResolversTypes['Order']> }>;
   OrderCoverage: ResolverTypeWrapper<Omit<OrderCoverage, 'items'> & { items: Array<ResolversTypes['OrderCoverageItem']> }>;
   OrderCoverageItem: ResolverTypeWrapper<Omit<OrderCoverageItem, 'status'> & { status: ResolversTypes['InventoryCoverageStatus'] }>;
@@ -4071,7 +4147,7 @@ export type ResolversTypes = {
   UpdateStoreStatusInput: UpdateStoreStatusInput;
   UpdateUserAddressInput: UpdateUserAddressInput;
   UpdateUserInput: UpdateUserInput;
-  User: ResolverTypeWrapper<Omit<User, 'business' | 'driverConnection' | 'permissions' | 'preferredLanguage' | 'role' | 'signupStep'> & { business?: Maybe<ResolversTypes['Business']>, driverConnection?: Maybe<ResolversTypes['DriverConnection']>, permissions: Array<ResolversTypes['UserPermission']>, preferredLanguage: ResolversTypes['AppLanguage'], role: ResolversTypes['UserRole'], signupStep: ResolversTypes['SignupStep'] }>;
+  User: ResolverTypeWrapper<Omit<User, 'business' | 'driverConnection' | 'permissions' | 'preferredLanguage' | 'role' | 'signupStep' | 'vehicleType'> & { business?: Maybe<ResolversTypes['Business']>, driverConnection?: Maybe<ResolversTypes['DriverConnection']>, permissions: Array<ResolversTypes['UserPermission']>, preferredLanguage: ResolversTypes['AppLanguage'], role: ResolversTypes['UserRole'], signupStep: ResolversTypes['SignupStep'], vehicleType?: Maybe<ResolversTypes['DriverVehicleType']> }>;
   UserAddress: ResolverTypeWrapper<UserAddress>;
   UserBehavior: ResolverTypeWrapper<UserBehavior>;
   UserPermission: ResolverTypeWrapper<'view_orders' | 'manage_orders' | 'view_products' | 'manage_products' | 'view_finances' | 'manage_settings' | 'view_analytics'>;
@@ -4127,6 +4203,7 @@ export type ResolversParentTypes = {
   CreateCampaignInput: CreateCampaignInput;
   CreateDeliveryPricingTierInput: CreateDeliveryPricingTierInput;
   CreateDeliveryZoneInput: CreateDeliveryZoneInput;
+  CreateDirectDispatchOrderInput: CreateDirectDispatchOrderInput;
   CreateOptionGroupInput: CreateOptionGroupInput;
   CreateOptionInput: CreateOptionInput;
   CreateOrderChildItemInput: CreateOrderChildItemInput;
@@ -4151,6 +4228,7 @@ export type ResolversParentTypes = {
   DeliveryZone: DeliveryZone;
   DeliveryZoneMatch: DeliveryZoneMatch;
   DeviceToken: DeviceToken;
+  DirectDispatchAvailability: DirectDispatchAvailability;
   DriverAuthResult: Omit<DriverAuthResult, 'driver'> & { driver: ResolversParentTypes['DriverBasicInfo'] };
   DriverBasicInfo: DriverBasicInfo;
   DriverCashSummary: DriverCashSummary;
@@ -4391,6 +4469,8 @@ export type BusinessResolvers<ContextType = GraphQLContext, ParentType extends R
   commissionPercentage?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   createdAt?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
   description?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  directDispatchEnabled?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  directDispatchFixedAmount?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   featuredSortOrder?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
@@ -4635,6 +4715,13 @@ export type DeviceTokenResolvers<ContextType = GraphQLContext, ParentType extend
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
+export type DirectDispatchAvailabilityResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['DirectDispatchAvailability'] = ResolversParentTypes['DirectDispatchAvailability']> = {
+  available?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  freeDriverCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  reason?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
 export type DriverAuthResultResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['DriverAuthResult'] = ResolversParentTypes['DriverAuthResult']> = {
   driver?: Resolver<ResolversTypes['DriverBasicInfo'], ParentType, ContextType>;
   message?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
@@ -4770,6 +4857,8 @@ export type DriverPttSignalResolvers<ContextType = GraphQLContext, ParentType ex
 
 export type DriverPttSignalActionResolvers = EnumResolverSignature<{ MUTE?: any, STARTED?: any, STOPPED?: any, UNMUTE?: any }, ResolversTypes['DriverPttSignalAction']>;
 
+export type DriverVehicleTypeResolvers = EnumResolverSignature<{ ELECTRIC?: any, GAS?: any }, ResolversTypes['DriverVehicleType']>;
+
 export type EarningsTrendPointResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['EarningsTrendPoint'] = ResolversParentTypes['EarningsTrendPoint']> = {
   count?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   date?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
@@ -4878,6 +4967,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   createCampaign?: Resolver<ResolversTypes['NotificationCampaign'], ParentType, ContextType, RequireFields<MutationcreateCampaignArgs, 'input'>>;
   createDeliveryPricingTier?: Resolver<ResolversTypes['DeliveryPricingTier'], ParentType, ContextType, RequireFields<MutationcreateDeliveryPricingTierArgs, 'input'>>;
   createDeliveryZone?: Resolver<ResolversTypes['DeliveryZone'], ParentType, ContextType, RequireFields<MutationcreateDeliveryZoneArgs, 'input'>>;
+  createDirectDispatchOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationcreateDirectDispatchOrderArgs, 'input'>>;
   createOption?: Resolver<ResolversTypes['Option'], ParentType, ContextType, RequireFields<MutationcreateOptionArgs, 'input' | 'optionGroupId'>>;
   createOptionGroup?: Resolver<ResolversTypes['OptionGroup'], ParentType, ContextType, RequireFields<MutationcreateOptionGroupArgs, 'input'>>;
   createOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationcreateOrderArgs, 'input'>>;
@@ -5073,6 +5163,7 @@ export type OrderResolvers<ContextType = GraphQLContext, ParentType extends Reso
   businesses?: Resolver<Array<ResolversTypes['OrderBusiness']>, ParentType, ContextType>;
   cancellationReason?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   cancelledAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
+  channel?: Resolver<ResolversTypes['OrderChannel'], ParentType, ContextType>;
   deliveredAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
   deliveryPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   displayId?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
@@ -5098,6 +5189,8 @@ export type OrderResolvers<ContextType = GraphQLContext, ParentType extends Reso
   preparingAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
   prioritySurcharge?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   readyAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
+  recipientName?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  recipientPhone?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   review?: Resolver<Maybe<ResolversTypes['OrderReview']>, ParentType, ContextType>;
   settlementPreview?: Resolver<Maybe<ResolversTypes['OrderSettlementPreview']>, ParentType, ContextType>;
   status?: Resolver<ResolversTypes['OrderStatus'], ParentType, ContextType>;
@@ -5114,6 +5207,8 @@ export type OrderBusinessResolvers<ContextType = GraphQLContext, ParentType exte
   removedItems?: Resolver<Array<ResolversTypes['RemovedOrderItem']>, ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
+
+export type OrderChannelResolvers = EnumResolverSignature<{ DIRECT_DISPATCH?: any, PLATFORM?: any }, ResolversTypes['OrderChannel']>;
 
 export type OrderConnectionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['OrderConnection'] = ResolversParentTypes['OrderConnection']> = {
   hasMore?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
@@ -5143,6 +5238,7 @@ export type OrderCoverageItemResolvers<ContextType = GraphQLContext, ParentType 
   productId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   productImageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   productName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  removedQty?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   status?: Resolver<ResolversTypes['InventoryCoverageStatus'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
@@ -5524,6 +5620,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
   deliveryPricingTiers?: Resolver<Array<ResolversTypes['DeliveryPricingTier']>, ParentType, ContextType>;
   deliveryZones?: Resolver<Array<ResolversTypes['DeliveryZone']>, ParentType, ContextType>;
   deviceTokens?: Resolver<Array<ResolversTypes['DeviceToken']>, ParentType, ContextType, Partial<QuerydeviceTokensArgs>>;
+  directDispatchAvailability?: Resolver<ResolversTypes['DirectDispatchAvailability'], ParentType, ContextType>;
   driverBalance?: Resolver<ResolversTypes['SettlementSummary'], ParentType, ContextType, RequireFields<QuerydriverBalanceArgs, 'driverId'>>;
   driverCashSummary?: Resolver<ResolversTypes['DriverCashSummary'], ParentType, ContextType, Partial<QuerydriverCashSummaryArgs>>;
   driverKPIs?: Resolver<Array<ResolversTypes['DriverKPI']>, ParentType, ContextType, RequireFields<QuerydriverKPIsArgs, 'endDate' | 'startDate'>>;
@@ -5783,8 +5880,12 @@ export type StoreStatusResolvers<ContextType = GraphQLContext, ParentType extend
   bannerType?: Resolver<ResolversTypes['BannerType'], ParentType, ContextType>;
   businessGracePeriodMinutes?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   closedMessage?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  directDispatchDriverReserve?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  directDispatchEnabled?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   dispatchModeEnabled?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   earlyDispatchLeadMinutes?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  farOrderThresholdKm?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  gasPriorityWindowSeconds?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   googleMapsNavEnabled?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   inventoryModeEnabled?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   isStoreClosed?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
@@ -5798,6 +5899,7 @@ export type SubscriptionResolvers<ContextType = GraphQLContext, ParentType exten
   allOrdersUpdated?: SubscriptionResolver<Array<ResolversTypes['Order']>, "allOrdersUpdated", ParentType, ContextType>;
   auditLogCreated?: SubscriptionResolver<ResolversTypes['AuditLog'], "auditLogCreated", ParentType, ContextType, Partial<SubscriptionauditLogCreatedArgs>>;
   businessMessageReceived?: SubscriptionResolver<ResolversTypes['BusinessMessage'], "businessMessageReceived", ParentType, ContextType>;
+  businessUpdated?: SubscriptionResolver<ResolversTypes['Business'], "businessUpdated", ParentType, ContextType, RequireFields<SubscriptionbusinessUpdatedArgs, 'id'>>;
   driverConnectionStatusChanged?: SubscriptionResolver<ResolversTypes['DriverConnection'], "driverConnectionStatusChanged", ParentType, ContextType, RequireFields<SubscriptiondriverConnectionStatusChangedArgs, 'driverId'>>;
   driverMessageReceived?: SubscriptionResolver<ResolversTypes['DriverMessage'], "driverMessageReceived", ParentType, ContextType>;
   driverPttSignal?: SubscriptionResolver<ResolversTypes['DriverPttSignal'], "driverPttSignal", ParentType, ContextType, RequireFields<SubscriptiondriverPttSignalArgs, 'driverId'>>;
@@ -5846,6 +5948,7 @@ export type UserResolvers<ContextType = GraphQLContext, ParentType extends Resol
   isTrustedCustomer?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   lastName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   maxActiveOrders?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
+  ownVehicleBonusAmount?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   permissions?: Resolver<Array<ResolversTypes['UserPermission']>, ParentType, ContextType>;
   phoneNumber?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   phoneVerified?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
@@ -5853,6 +5956,7 @@ export type UserResolvers<ContextType = GraphQLContext, ParentType extends Resol
   role?: Resolver<ResolversTypes['UserRole'], ParentType, ContextType>;
   signupStep?: Resolver<ResolversTypes['SignupStep'], ParentType, ContextType>;
   totalOrders?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  vehicleType?: Resolver<Maybe<ResolversTypes['DriverVehicleType']>, ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -5960,6 +6064,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   DeviceAppType?: DeviceAppTypeResolvers;
   DevicePlatform?: DevicePlatformResolvers;
   DeviceToken?: DeviceTokenResolvers<ContextType>;
+  DirectDispatchAvailability?: DirectDispatchAvailabilityResolvers<ContextType>;
   DriverAuthResult?: DriverAuthResultResolvers<ContextType>;
   DriverBasicInfo?: DriverBasicInfoResolvers<ContextType>;
   DriverCashSummary?: DriverCashSummaryResolvers<ContextType>;
@@ -5975,6 +6080,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   DriverOrderFinancials?: DriverOrderFinancialsResolvers<ContextType>;
   DriverPttSignal?: DriverPttSignalResolvers<ContextType>;
   DriverPttSignalAction?: DriverPttSignalActionResolvers;
+  DriverVehicleType?: DriverVehicleTypeResolvers;
   EarningsTrendPoint?: EarningsTrendPointResolvers<ContextType>;
   EntityType?: EntityTypeResolvers;
   HourlyDistribution?: HourlyDistributionResolvers<ContextType>;
@@ -5995,6 +6101,7 @@ export type Resolvers<ContextType = GraphQLContext> = {
   OptionGroup?: OptionGroupResolvers<ContextType>;
   Order?: OrderResolvers<ContextType>;
   OrderBusiness?: OrderBusinessResolvers<ContextType>;
+  OrderChannel?: OrderChannelResolvers;
   OrderConnection?: OrderConnectionResolvers<ContextType>;
   OrderCoverage?: OrderCoverageResolvers<ContextType>;
   OrderCoverageItem?: OrderCoverageItemResolvers<ContextType>;

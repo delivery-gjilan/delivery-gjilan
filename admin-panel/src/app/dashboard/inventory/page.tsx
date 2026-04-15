@@ -386,12 +386,13 @@ function InventoryContent({ businessId, businessName }: { businessId: string; bu
             ) : (
                 <div className="bg-[#111113] border border-zinc-800/50 rounded-xl overflow-hidden">
                     {/* Table Header */}
-                    <div className="grid grid-cols-[1fr_100px_100px_100px_100px_100px_120px] gap-3 px-4 py-2.5 border-b border-zinc-800/50 bg-zinc-900/30">
+                    <div className="grid grid-cols-[1fr_100px_100px_100px_100px_100px_100px_120px] gap-3 px-4 py-2.5 border-b border-zinc-800/50 bg-zinc-900/30">
                         <SortHeader label="Product" field="name" current={sortField} dir={sortDir} onToggle={toggleSort} />
                         <SortHeader label="Stock" field="quantity" current={sortField} dir={sortDir} onToggle={toggleSort} />
                         <SortHeader label="Cost" field="costPrice" current={sortField} dir={sortDir} onToggle={toggleSort} />
                         <div className="text-xs font-medium text-zinc-500">Base</div>
-                        <div className="text-xs font-medium text-zinc-500">Retail</div>
+                        <div className="text-xs font-medium text-zinc-500">Markup</div>
+                        <div className="text-xs font-medium text-zinc-500">Night</div>
                         <SortHeader label="Margin" field="margin" current={sortField} dir={sortDir} onToggle={toggleSort} />
                         <div className="text-xs font-medium text-zinc-500 text-right">Actions</div>
                     </div>
@@ -609,7 +610,7 @@ function InventoryRow({
             : "bg-emerald-500/10";
 
     return (
-        <div className="grid grid-cols-[1fr_100px_100px_100px_100px_100px_120px] gap-3 px-4 py-3 border-b border-zinc-800/30 hover:bg-zinc-800/20 transition-colors items-center group">
+        <div className="grid grid-cols-[1fr_100px_100px_100px_100px_100px_100px_120px] gap-3 px-4 py-3 border-b border-zinc-800/30 hover:bg-zinc-800/20 transition-colors items-center group">
             {/* Product */}
             <div className="flex items-center gap-3 min-w-0">
                 {item.productImageUrl ? (
@@ -664,12 +665,18 @@ function InventoryRow({
                 €{item.productBasePrice.toFixed(2)}
             </div>
 
-            {/* Retail Price (effective = markup or base) */}
+            {/* Markup Price */}
             <div className="text-sm text-zinc-300">
-                <span>€{effectivePrice.toFixed(2)}</span>
-                {item.productNightPrice != null && (
-                    <span className="ml-1 text-[10px] text-indigo-400" title="Night price">🌙€{item.productNightPrice.toFixed(2)}</span>
-                )}
+                {item.productMarkupPrice != null
+                    ? `€${item.productMarkupPrice.toFixed(2)}`
+                    : <span className="text-zinc-600">—</span>}
+            </div>
+
+            {/* Night Price */}
+            <div className="text-sm text-indigo-300">
+                {item.productNightPrice != null
+                    ? `€${item.productNightPrice.toFixed(2)}`
+                    : <span className="text-zinc-600">—</span>}
             </div>
 
             {/* Margin */}

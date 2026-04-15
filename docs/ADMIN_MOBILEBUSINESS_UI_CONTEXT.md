@@ -9,6 +9,7 @@ This document is a fast context handoff for future UI changes across `admin-pane
 
 ## Recent Updates
 
+- 2026-04-15: Mobile-business orders tab (`app/(tabs)/index.tsx`) now places the store open/closed control, average prep-time action, and Direct Call entry point inside the left status rail as compact stacked rail actions; the empty orders state no longer shows the centered illustration icon.
 - 2026-04-13: Admin promotions page (`/dashboard/promotions`) now has list-level filtering in the Promotions tab: search (name/code/description), status (active/inactive), apply mode (auto/manual code), target audience, and business scope filters. Business filter supports global-only, targeted-only, and a specific business match (creator business promos + platform promos with eligible business targeting).
 - 2026-04-13: Admin Promo Codes tab now supports persistent audience groups: select reusable groups, save current selected users as a new group, delete groups, and assign promotions using direct user selection plus audience group IDs.
 - 2026-03-19: Admin orders earnings calculation now derives business commission from active business settlement rules (same finance-rule source) instead of only business profile percentage, so `+earnings` matches configured `Settlement Rules` behavior.

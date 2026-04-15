@@ -1114,7 +1114,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                 {subcategories.find((subcategory) => subcategory.id === p.subcategoryId)?.name || "-"}
                                             </Td>
 
-                                            <Td>€{p.price.toFixed(2)}</Td>
+                                            <Td>â‚¬{p.price.toFixed(2)}</Td>
 
                                             <Td>
                                                 {p.isOnSale &&
@@ -1399,7 +1399,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                     {createForm.isOnSale && (
                         <div>
                             <label className="block text-xs font-medium text-zinc-400 mb-1.5">
-                                Discount % (0–100)
+                                Discount % (0â€“100)
                             </label>
                             <Input
                                 placeholder="e.g. 20"
@@ -1704,7 +1704,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                     {editForm.isOnSale && (
                         <div>
                             <label className="block text-xs font-medium text-zinc-400 mb-1.5">
-                                Discount % (0–100)
+                                Discount % (0â€“100)
                             </label>
                             <Input
                                 placeholder="e.g. 20"
@@ -2376,7 +2376,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
                                                 )}
                                             </div>
                                             <span className="text-sm text-zinc-400 flex-shrink-0">
-                                                €{cp.price.toFixed(2)}
+                                                â‚¬{cp.price.toFixed(2)}
                                             </span>
                                         </button>
                                     ));
@@ -2407,7 +2407,7 @@ export default function ProductsBlock({ businessId }: { businessId: string }) {
 
                         <div>
                             <label className="block text-xs font-medium text-zinc-400 mb-1.5">
-                                Retail Price (€) *
+                                Retail Price (â‚¬) *
                             </label>
                             <Input
                                 type="number"

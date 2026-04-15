@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -7,6 +7,8 @@ import {
     Modal,
     Pressable,
     Image,
+    Animated,
+    StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -385,7 +387,17 @@ export function OrderDetailPanel(props: OrderDetailPanelProps) {
         );
     }
 
-    // Phone: bottom-sheet modal
+    // Phone: bottom-sheet modal with animated backdrop
+    const backdropOpacity = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.timing(backdropOpacity, {
+            toValue: order ? 1 : 0,
+            duration: 200,
+            useNativeDriver: true,
+        }).start();
+    }, [!!order]);
+
     return (
         <Modal
             visible={!!order}
@@ -394,9 +406,18 @@ export function OrderDetailPanel(props: OrderDetailPanelProps) {
             onRequestClose={onClose}
         >
             <Pressable
-                style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' }}
+                style={{ flex: 1, justifyContent: 'flex-end' }}
                 onPress={onClose}
             >
+                <Animated.View
+                    style={{
+                        ...StyleSheet.absoluteFillObject,
+                        backgroundColor: 'rgba(0,0,0,0.6)',
+                        opacity: backdropOpacity,
+                    }}
+                    pointerEvents="none"
+                />
+
                 <Pressable
                     style={{
                         maxHeight: '88%',

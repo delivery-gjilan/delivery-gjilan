@@ -73,10 +73,16 @@ export function OrderCard({
         : businessOrder.items;
     const hiddenItemsCount = businessOrder.items.length - visibleItems.length;
 
-    const customerName = order.user
+    const isDirectDispatch = (order as any).channel === 'DIRECT_DISPATCH';
+    const customerName = isDirectDispatch
+        ? ((order as any).recipientName ?? t('orders.call_in_customer', 'Call-in Customer'))
+        : order.user
         ? `${order.user.firstName} ${order.user.lastName}`.trim()
         : t('orders.customer', 'Customer');
-    const customerPhone = order.user?.phoneNumber?.trim();
+    const customerPhone = isDirectDispatch
+        ? ((order as any).recipientPhone ?? null)
+        : order.user?.phoneNumber?.trim();
+    const agreedFee = Number((order as any).deliveryPrice ?? 0);
 
     const elapsedText =
         (order.status === 'PENDING' && getElapsedTime(order.orderDate)) ||
@@ -166,6 +172,20 @@ export function OrderCard({
                                     {statusLabels[order.status]}
                                 </Text>
                             </View>
+                            {(order as any).channel === 'DIRECT_DISPATCH' && (
+                                <View
+                                    className="flex-row items-center px-2 py-0.5 rounded-full mt-1"
+                                    style={{ backgroundColor: '#818CF820' }}
+                                >
+                                    <Ionicons name="call" size={9} color="#818CF8" />
+                                    <Text
+                                        className="font-bold ml-1"
+                                        style={{ fontSize: 9, color: '#818CF8' }}
+                                    >
+                                        Direct Call
+                                    </Text>
+                                </View>
+                            )}
                             {isPreparing && (
                                 <Text className="text-subtext text-[10px] mt-1">
                                     {t('orders.tap_twice_mark_ready', 'Tap twice to mark ready')}
@@ -224,6 +244,14 @@ export function OrderCard({
                                 <Ionicons name="call-outline" size={12} color="#94a3b8" />
                                 <Text className={`text-subtext ml-1.5 ${isTablet ? 'text-sm' : 'text-xs'}`} numberOfLines={1}>
                                     {customerPhone}
+                                </Text>
+                            </View>
+                        ) : null}
+                        {isDirectDispatch && agreedFee > 0 ? (
+                            <View className="flex-row items-center mt-1">
+                                <Ionicons name="cash-outline" size={12} color="#94a3b8" />
+                                <Text className={`text-subtext ml-1.5 ${isTablet ? 'text-sm' : 'text-xs'}`} numberOfLines={1}>
+                                    {t('directDispatch.agreed_amount', 'Agreed Amount (€)')}: €{agreedFee.toFixed(2)}
                                 </Text>
                             </View>
                         ) : null}
