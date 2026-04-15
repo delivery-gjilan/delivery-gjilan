@@ -297,7 +297,17 @@ export class OrderQueryModule {
                 .innerJoin(productsTable, eq(orderItemsTable.productId, productsTable.id))
                 .where(and(eq(orderItemsTable.orderId, orderId), eq(productsTable.businessId, businessId)))
                 .limit(1);
-            return match.length > 0;
+            if (match.length > 0) {
+                return true;
+            }
+
+            const directDispatchMatch = await db
+                .select({ id: ordersTable.id })
+                .from(ordersTable)
+                .where(and(eq(ordersTable.id, orderId), eq(ordersTable.businessId, businessId)))
+                .limit(1);
+
+            return directDispatchMatch.length > 0;
         } catch (error) {
             log.error({ err: error, orderId, businessId }, 'order:containsBusiness:error');
             return false;

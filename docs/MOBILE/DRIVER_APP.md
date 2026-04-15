@@ -1,6 +1,6 @@
 # Mobile Driver App
 
-<!-- MDS:M8 | Domain: Mobile | Updated: 2026-04-13 -->
+<!-- MDS:M8 | Domain: Mobile | Updated: 2026-04-16 -->
 <!-- Depends-On: A1, B1, B4, B5, B7, BL1 -->
 <!-- Depended-By: M1, O4 -->
 <!-- Nav: Heartbeat changes → also update B4 (Watchdog). Auth changes → also update B5. Subscription shape changes → verify map.tsx and navigation.tsx cache update logic. -->

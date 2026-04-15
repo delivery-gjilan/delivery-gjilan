@@ -6,6 +6,7 @@ import { DbSettlement } from '@/database/schema/settlements';
 export interface SettlementFilters {
     type?: string;
     direction?: string;
+    status?: string;
     isSettled?: boolean;
     driverId?: string;
     businessId?: string;
@@ -21,6 +22,7 @@ export interface SettlementFilters {
 export interface SettlementSummaryFilters {
     type?: string;
     direction?: string;
+    status?: string;
     isSettled?: boolean;
     driverId?: string;
     businessId?: string;
@@ -60,7 +62,14 @@ export class SettlementRepository {
             conditions.push(eq(settlements.direction, filters.direction as 'RECEIVABLE' | 'PAYABLE'));
         }
 
-        if (filters.isSettled !== undefined) {
+        if (filters.status) {
+            // Map status enum to isSettled boolean for DB query
+            // status: PENDING → isSettled = false
+            // status: PAID → isSettled = true
+            // status: OVERDUE, DISPUTED, CANCELLED → isSettled = true (legacy, kept for backward compatibility)
+            const isSettledValue = filters.status !== 'PENDING';
+            conditions.push(eq(settlements.isSettled, isSettledValue));
+        } else if (filters.isSettled !== undefined) {
             conditions.push(eq(settlements.isSettled, filters.isSettled));
         }
 
@@ -126,7 +135,14 @@ export class SettlementRepository {
             conditions.push(eq(settlements.direction, filters.direction as 'RECEIVABLE' | 'PAYABLE'));
         }
 
-        if (filters.isSettled !== undefined) {
+        if (filters.status) {
+            // Map status enum to isSettled boolean for DB query
+            // status: PENDING → isSettled = false
+            // status: PAID → isSettled = true
+            // status: OVERDUE, DISPUTED, CANCELLED → isSettled = true (legacy, kept for backward compatibility)
+            const isSettledValue = filters.status !== 'PENDING';
+            conditions.push(eq(settlements.isSettled, isSettledValue));
+        } else if (filters.isSettled !== undefined) {
             conditions.push(eq(settlements.isSettled, filters.isSettled));
         }
 

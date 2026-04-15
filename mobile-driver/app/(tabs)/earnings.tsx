@@ -107,7 +107,7 @@ export default function EarningsScreen() {
     const { data: settlementsData, loading: settlementsLoading, refetch: refetchSettlements, fetchMore: fetchMoreSettlements } = useQuery(
         GET_MY_SETTLEMENTS,
         {
-            variables: { startDate, endDate, limit: SETTLEMENT_PAGE_SIZE, offset: 0 },
+            variables: { status: 'PENDING', startDate, endDate, limit: SETTLEMENT_PAGE_SIZE, offset: 0 },
             fetchPolicy: 'network-only',
             onCompleted: (data) => {
                 const rows = data?.settlements ?? [];
@@ -222,7 +222,7 @@ export default function EarningsScreen() {
         setLoadingMore(true);
         try {
             const result = await fetchMoreSettlements({
-                variables: { startDate, endDate, limit: SETTLEMENT_PAGE_SIZE, offset: settlementOffset },
+                variables: { status: 'PENDING', startDate, endDate, limit: SETTLEMENT_PAGE_SIZE, offset: settlementOffset },
             });
             const rows = result.data?.settlements ?? [];
             setAllSettlements(prev => [...prev, ...rows]);
