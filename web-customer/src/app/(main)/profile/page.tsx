@@ -21,7 +21,8 @@ import {
 } from "lucide-react";
 import { SET_MY_PREFERRED_LANGUAGE_MUTATION } from "@/graphql/operations/auth/setMyPreferredLanguage";
 import { SET_MY_EMAIL_OPT_OUT_MUTATION } from "@/graphql/operations/auth/setMyEmailOptOut";
-import { GET_ORDERS } from \"@/graphql/operations/orders\";\nimport type { GqlOrder } from \"@/types/graphql\";
+import { GET_ORDERS } from "@/graphql/operations/orders";
+import type { GqlOrder } from "@/types/graphql";
 
 const ACTIVE_STATUSES = ["AWAITING_APPROVAL", "PENDING", "PREPARING", "READY", "OUT_FOR_DELIVERY"];
 
@@ -68,7 +69,7 @@ export default function ProfilePage() {
     }
 
     const ordersPayload = (ordersData as { orders?: GqlOrder[] | { orders?: GqlOrder[] } } | undefined)?.orders;
-    const allOrders: GqlOrder[] = Array.isArray(ordersPayload?.orders)
+    const allOrders: GqlOrder[] = ordersPayload && 'orders' in ordersPayload &&Array.isArray(ordersPayload?.orders)
         ? ordersPayload.orders
         : Array.isArray(ordersPayload)
         ? ordersPayload

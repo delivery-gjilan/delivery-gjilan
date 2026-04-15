@@ -308,7 +308,11 @@ export interface GqlValidationResult {
     freeDeliveryApplied: boolean;
     finalBasePrice: number;
     finalTotalPrice: number;
+    finalSubtotal?: number;
+    finalDeliveryPrice?: number;
+    finalTotal?: number;
     applicablePromotions: GqlPromotion[];
+    promotions?: GqlPromotion[];
 }
 
 // ---------------------------------------------------------------------------
