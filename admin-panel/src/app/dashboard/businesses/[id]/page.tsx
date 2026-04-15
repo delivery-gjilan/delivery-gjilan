@@ -21,6 +21,8 @@ interface Business {
     isActive: boolean;
     createdAt: string;
     minOrderAmount?: number | null;
+    directDispatchEnabled?: boolean;
+    directDispatchFixedAmount?: number | null;
 }
 
 const TYPE_BADGE: Record<string, string> = {

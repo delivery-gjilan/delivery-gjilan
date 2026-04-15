@@ -34,6 +34,7 @@ export const GET_BUSINESS_OPERATIONS = graphql(`
             temporaryClosureReason
             isOpen
             directDispatchEnabled
+            directDispatchFixedAmount
         }
     }
 `);

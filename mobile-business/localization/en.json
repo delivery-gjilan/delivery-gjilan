@@ -185,6 +185,7 @@
     "name_placeholder": "Optional",
     "agreed_amount": "Agreed Amount (€)",
     "agreed_amount_placeholder": "e.g. 3.50",
+    "fixed_amount_admin_hint": "Set by admin for this business.",
     "address": "Delivery Address",
     "address_placeholder": "e.g. Rr. Adem Jashari, Nr. 12",
     "notes": "Driver Notes",

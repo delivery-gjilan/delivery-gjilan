@@ -22,16 +22,16 @@ interface Props {
     onClose: () => void;
     onCreated: () => void;
     t: Record<string, any>;
+    fixedAmount: number;
 }
 
-export function DirectDispatchSheet({ visible, onClose, onCreated, t }: Props) {
+export function DirectDispatchSheet({ visible, onClose, onCreated, t, fixedAmount }: Props) {
     const insets = useSafeAreaInsets();
     const s = t.directDispatch ?? {};
 
     const [recipientPhone, setRecipientPhone] = useState('');
     const [recipientName, setRecipientName] = useState('');
     const [address, setAddress] = useState('');
-    const [agreedAmount, setAgreedAmount] = useState('');
     const [driverNotes, setDriverNotes] = useState('');
     const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -59,7 +59,6 @@ export function DirectDispatchSheet({ visible, onClose, onCreated, t }: Props) {
             setRecipientPhone('');
             setRecipientName('');
             setAddress('');
-            setAgreedAmount('');
             setDriverNotes('');
             setSubmitError(null);
             refetchAvail();
@@ -98,8 +97,8 @@ export function DirectDispatchSheet({ visible, onClose, onCreated, t }: Props) {
 
     const canSubmit =
         isAvailable &&
+        fixedAmount > 0 &&
         recipientPhone.trim().length >= 3 &&
-        Number(agreedAmount) > 0 &&
         address.trim().length >= 3 &&
         !creating;
 
@@ -115,7 +114,6 @@ export function DirectDispatchSheet({ visible, onClose, onCreated, t }: Props) {
                             longitude: 21.47,
                             address: address.trim(),
                         },
-                        agreedAmount: Number(agreedAmount),
                         recipientPhone: recipientPhone.trim(),
                         recipientName: recipientName.trim() || null,
                         driverNotes: driverNotes.trim() || null,
@@ -230,15 +228,15 @@ export function DirectDispatchSheet({ visible, onClose, onCreated, t }: Props) {
                             </View>
 
                             <View style={styles.field}>
-                                <Text style={styles.label}>{s.agreed_amount ?? 'Agreed Amount (€)'} *</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    value={agreedAmount}
-                                    onChangeText={setAgreedAmount}
-                                    placeholder={s.agreed_amount_placeholder ?? 'e.g. 3.50'}
-                                    placeholderTextColor="#4B5563"
-                                    keyboardType="decimal-pad"
-                                />
+                                <Text style={styles.label}>{s.agreed_amount ?? 'Agreed Amount (€)'}</Text>
+                                <View style={[styles.input, { justifyContent: 'center' }]}>
+                                    <Text style={{ color: '#E5E7EB', fontSize: 15, fontWeight: '600' }}>
+                                        €{Number(fixedAmount || 0).toFixed(2)}
+                                    </Text>
+                                </View>
+                                <Text style={{ marginTop: 6, color: '#9CA3AF', fontSize: 12 }}>
+                                    {s.fixed_amount_admin_hint ?? 'Set by admin for this business.'}
+                                </Text>
                             </View>
 
                             <View style={styles.field}>

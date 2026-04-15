@@ -54,6 +54,7 @@ export class BusinessService {
             isActive: business.isActive ?? true,
             commissionPercentage: Number(business.commissionPercentage ?? 0),
             minOrderAmount: Number(business.minOrderAmount ?? 0),
+            directDispatchFixedAmount: Number(business.directDispatchFixedAmount ?? 0),
             category: business.category ?? null,
             createdAt: new Date(business.createdAt),
             updatedAt: new Date(business.updatedAt),
@@ -143,9 +144,10 @@ export class BusinessService {
 
     async updateBusiness(id: string, input: UpdateBusinessInput): Promise<Business> {
         const validatedInput = businessValidator.validateUpdateBusiness(input);
+        const { directDispatchFixedAmount, ...validatedInputWithoutFixedAmount } = validatedInput;
 
-        const updateData: Parameters<typeof this.businessRepository.update>[1] & typeof validatedInput = {
-            ...validatedInput,
+        const updateData: Parameters<typeof this.businessRepository.update>[1] & typeof validatedInputWithoutFixedAmount = {
+            ...validatedInputWithoutFixedAmount,
         };
 
         if (validatedInput.workingHours) {
@@ -177,6 +179,9 @@ export class BusinessService {
             ...updateData,
             ...(input.minOrderAmount !== null && input.minOrderAmount !== undefined
                 ? { minOrderAmount: String(input.minOrderAmount) }
+                : {}),
+            ...(input.directDispatchFixedAmount !== null && input.directDispatchFixedAmount !== undefined
+                ? { directDispatchFixedAmount: String(directDispatchFixedAmount ?? input.directDispatchFixedAmount) }
                 : {}),
         });
         if (!updatedBusiness) throw AppError.notFound('Business');

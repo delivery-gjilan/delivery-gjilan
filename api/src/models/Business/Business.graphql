@@ -24,6 +24,7 @@ type Business {
     isFeatured: Boolean!
     featuredSortOrder: Int!
     directDispatchEnabled: Boolean!
+    directDispatchFixedAmount: Float!
     category: String
     isOpen: Boolean!
     ratingAverage: Float!
@@ -129,6 +130,7 @@ input UpdateBusinessInput {
     commissionPercentage: Float
     minOrderAmount: Float
     directDispatchEnabled: Boolean
+    directDispatchFixedAmount: Float
 }
 
 type Mutation {

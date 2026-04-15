@@ -240,6 +240,7 @@ export type Business = {
   createdAt: Scalars['Date']['output'];
   description?: Maybe<Scalars['String']['output']>;
   directDispatchEnabled: Scalars['Boolean']['output'];
+  directDispatchFixedAmount: Scalars['Float']['output'];
   featuredSortOrder: Scalars['Int']['output'];
   id: Scalars['ID']['output'];
   imageUrl?: Maybe<Scalars['String']['output']>;
@@ -517,8 +518,6 @@ export type CreateDeliveryZoneInput = {
 };
 
 export type CreateDirectDispatchOrderInput = {
-  /** Fixed fee agreed for the direct-call delivery. */
-  agreedAmount: Scalars['Float']['input'];
   /** Optional notes for the driver. */
   driverNotes?: InputMaybe<Scalars['String']['input']>;
   /** Delivery address for the recipient. */
@@ -3588,6 +3587,7 @@ export type UpdateBusinessInput = {
   commissionPercentage?: InputMaybe<Scalars['Float']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   directDispatchEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  directDispatchFixedAmount?: InputMaybe<Scalars['Float']['input']>;
   imageUrl?: InputMaybe<Scalars['String']['input']>;
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
   isTemporarilyClosed?: InputMaybe<Scalars['Boolean']['input']>;
@@ -4462,6 +4462,7 @@ export type BusinessResolvers<ContextType = GraphQLContext, ParentType extends R
   createdAt?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
   description?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   directDispatchEnabled?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  directDispatchFixedAmount?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   featuredSortOrder?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;

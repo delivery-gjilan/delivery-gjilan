@@ -217,6 +217,7 @@ type Business {
   createdAt: Date!
   description: String
   directDispatchEnabled: Boolean!
+  directDispatchFixedAmount: Float!
   featuredSortOrder: Int!
   id: ID!
   imageUrl: String
@@ -490,9 +491,6 @@ input CreateDeliveryZoneInput {
 }
 
 input CreateDirectDispatchOrderInput {
-  """Fixed fee agreed for the direct-call delivery."""
-  agreedAmount: Float!
-
   """Optional notes for the driver."""
   driverNotes: String
 
@@ -2405,6 +2403,7 @@ input UpdateBusinessInput {
   commissionPercentage: Float
   description: String
   directDispatchEnabled: Boolean
+  directDispatchFixedAmount: Float
   imageUrl: String
   isActive: Boolean
   isTemporarilyClosed: Boolean

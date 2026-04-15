@@ -41,7 +41,6 @@ export const createDirectDispatchOrder: NonNullable<MutationResolvers['createDir
         {
             businessId,
             dropOffLocation: input.dropOffLocation,
-            agreedAmount: input.agreedAmount,
             recipientPhone: input.recipientPhone,
             recipientName: input.recipientName ?? null,
             driverNotes: input.driverNotes ?? null,

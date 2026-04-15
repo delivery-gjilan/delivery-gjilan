@@ -43,7 +43,6 @@ export interface DirectDispatchAvailabilityResult {
 export interface CreateDirectDispatchInput {
     businessId: string;
     dropOffLocation: { latitude: number; longitude: number; address: string };
-    agreedAmount: number;
     recipientPhone: string;
     recipientName?: string | null;
     driverNotes?: string | null;
@@ -76,7 +75,10 @@ export class DirectDispatchService {
 
         // 2. Per-business gate
         const [business] = await this.db
-            .select({ directDispatchEnabled: businesses.directDispatchEnabled })
+            .select({
+                directDispatchEnabled: businesses.directDispatchEnabled,
+                directDispatchFixedAmount: businesses.directDispatchFixedAmount,
+            })
             .from(businesses)
             .where(eq(businesses.id, businessId))
             .limit(1);
@@ -86,6 +88,11 @@ export class DirectDispatchService {
         }
         if (!business.directDispatchEnabled) {
             return unavailable('Direct dispatch is not enabled for this business.');
+        }
+
+        const fixedAmount = Number(business.directDispatchFixedAmount ?? 0);
+        if (!Number.isFinite(fixedAmount) || fixedAmount <= 0) {
+            return unavailable('Direct dispatch fixed amount is not configured for this business.');
         }
 
         // 3. Driver capacity check
@@ -109,8 +116,15 @@ export class DirectDispatchService {
             throw new Error(availability.reason ?? 'Direct dispatch is not available.');
         }
 
-        if (!Number.isFinite(input.agreedAmount) || input.agreedAmount <= 0) {
-            throw new Error('Agreed amount must be greater than 0.');
+        const [business] = await this.db
+            .select({ directDispatchFixedAmount: businesses.directDispatchFixedAmount })
+            .from(businesses)
+            .where(eq(businesses.id, input.businessId))
+            .limit(1);
+
+        const fixedAmount = Number(business?.directDispatchFixedAmount ?? 0);
+        if (!Number.isFinite(fixedAmount) || fixedAmount <= 0) {
+            throw new Error('Direct dispatch fixed amount is not configured for this business.');
         }
 
         const displayId = this.generateDisplayId();
@@ -127,8 +141,8 @@ export class DirectDispatchService {
                 basePrice: 0,
                 markupPrice: 0,
                 actualPrice: 0,
-                // For DIRECT_DISPATCH, deliveryPrice represents the fixed agreed fee.
-                deliveryPrice: input.agreedAmount,
+                // For DIRECT_DISPATCH, deliveryPrice comes from business-level fixed amount.
+                deliveryPrice: fixedAmount,
                 prioritySurcharge: 0,
                 driverTip: 0,
                 paymentCollection: 'CASH_TO_DRIVER',
@@ -147,7 +161,7 @@ export class DirectDispatchService {
                 displayId,
                 businessId: input.businessId,
                 recipientPhone: input.recipientPhone,
-                agreedAmount: input.agreedAmount,
+                fixedAmount,
             },
             'directDispatch:orderCreated',
         );

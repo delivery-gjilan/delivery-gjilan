@@ -185,6 +185,7 @@
     "name_placeholder": "Opsionale",
     "agreed_amount": "Shuma e dakorduar (€)",
     "agreed_amount_placeholder": "p.sh. 3.50",
+    "fixed_amount_admin_hint": "Vendoset nga administratori për këtë biznes.",
     "address": "Adresa e dërgesës",
     "address_placeholder": "p.sh. Rr. Adem Jashari, Nr. 12",
     "notes": "Shënime për shofer",

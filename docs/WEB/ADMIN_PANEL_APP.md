@@ -152,7 +152,7 @@ The per-business Direct Dispatch toggle is exposed in both flows:
 - list-page `EditBusinessModal.tsx`
 - detail-page `EditBusinessDetailModal.tsx`
 
-The businesses list query shape used by the list-page modal includes `directDispatchEnabled`, so both edit paths read and persist the same toggle value.
+The businesses list query shape used by the list-page modal includes `directDispatchEnabled` and `directDispatchFixedAmount`, so both edit paths read and persist the same per-business Direct Dispatch settings.
 
 ### Auth Flow
 

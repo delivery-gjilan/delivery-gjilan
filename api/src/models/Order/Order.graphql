@@ -302,8 +302,6 @@ input CreateOrderInput {
 input CreateDirectDispatchOrderInput {
     """Delivery address for the recipient."""
     dropOffLocation: LocationInput!
-    """Fixed fee agreed for the direct-call delivery."""
-    agreedAmount: Float!
     """Phone number of the recipient."""
     recipientPhone: String!
     """Optional name of the recipient."""

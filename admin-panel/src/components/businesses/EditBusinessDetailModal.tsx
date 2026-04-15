@@ -18,6 +18,7 @@ interface Business {
     isActive: boolean;
     minOrderAmount?: number | null;
     directDispatchEnabled?: boolean;
+    directDispatchFixedAmount?: number | null;
 }
 
 interface EditBusinessDetailModalProps {
@@ -32,6 +33,7 @@ interface EditBusinessDetailModalProps {
         imageUrl: string | null;
         minOrderAmount: number;
         directDispatchEnabled: boolean;
+        directDispatchFixedAmount: number;
     }) => Promise<void>;
 }
 
@@ -49,6 +51,7 @@ export default function EditBusinessDetailModal({
         imageUrl: '',
         minOrderAmount: 0,
         directDispatchEnabled: false,
+        directDispatchFixedAmount: 0,
     });
 
     useEffect(() => {
@@ -61,6 +64,7 @@ export default function EditBusinessDetailModal({
                 imageUrl: business.imageUrl || '',
                 minOrderAmount: business.minOrderAmount ?? 0,
                 directDispatchEnabled: business.directDispatchEnabled ?? false,
+                directDispatchFixedAmount: business.directDispatchFixedAmount ?? 0,
             });
         }
     }, [isOpen, business]);
@@ -75,6 +79,7 @@ export default function EditBusinessDetailModal({
                 imageUrl: form.imageUrl || null,
                 minOrderAmount: form.minOrderAmount,
                 directDispatchEnabled: form.directDispatchEnabled,
+                directDispatchFixedAmount: form.directDispatchFixedAmount,
             });
             onClose();
             toast.success('Business updated');
@@ -145,6 +150,18 @@ export default function EditBusinessDetailModal({
                         onChange={(e) => setForm({ ...form, minOrderAmount: parseFloat(e.target.value) || 0 })}
                     />
                     <p className="text-xs text-zinc-600 mt-1">Set to 0 to disable</p>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-zinc-400 mb-1">Direct Dispatch Fixed Amount (€)</label>
+                    <Input
+                        type="number"
+                        min={0}
+                        step={0.5}
+                        value={form.directDispatchFixedAmount}
+                        onChange={(e) => setForm({ ...form, directDispatchFixedAmount: parseFloat(e.target.value) || 0 })}
+                    />
+                    <p className="text-xs text-zinc-600 mt-1">Per-business fixed fee for direct call orders</p>
                 </div>
 
                 <div>

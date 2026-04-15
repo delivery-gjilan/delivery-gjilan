@@ -30,6 +30,7 @@ export const GET_BUSINESS = graphql(`
             minOrderAmount
             category
             directDispatchEnabled
+            directDispatchFixedAmount
         }
     }
 `);
@@ -47,6 +48,7 @@ export const GET_BUSINESSES = graphql(`
             prepTimeOverrideMinutes
             minOrderAmount
             directDispatchEnabled
+            directDispatchFixedAmount
             location {
                 latitude
                 longitude

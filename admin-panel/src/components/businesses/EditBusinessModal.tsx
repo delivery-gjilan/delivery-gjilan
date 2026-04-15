@@ -42,6 +42,7 @@ export default function EditBusinessModal({
         workingHours: { opensAt: '08:00', closesAt: '23:00' },
         minOrderAmount: 0,
         directDispatchEnabled: false,
+        directDispatchFixedAmount: 0,
     });
 
     // Sync form when modal opens with a business
@@ -63,6 +64,7 @@ export default function EditBusinessModal({
                 },
                 minOrderAmount: business.minOrderAmount ?? 0,
                 directDispatchEnabled: business.directDispatchEnabled ?? false,
+                directDispatchFixedAmount: business.directDispatchFixedAmount ?? 0,
             });
             setEditImageFile(null);
             setEditImagePreview(business.imageUrl || null);
@@ -108,6 +110,7 @@ export default function EditBusinessModal({
                     workingHours: form.workingHours,
                     minOrderAmount: form.minOrderAmount,
                     directDispatchEnabled: form.directDispatchEnabled,
+                    directDispatchFixedAmount: form.directDispatchFixedAmount,
                 },
             },
         });
@@ -285,6 +288,20 @@ export default function EditBusinessModal({
                             <p className="text-xs text-zinc-500">Allow this business to request drivers for call-in orders.</p>
                         </div>
                     </label>
+
+                    <div>
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5">Direct Dispatch Fixed Amount (€)</label>
+                        <Input
+                            type="number"
+                            min={0}
+                            step={0.5}
+                            value={form.directDispatchFixedAmount}
+                            onChange={(e) => setForm({ ...form, directDispatchFixedAmount: parseFloat(e.target.value) || 0 })}
+                        />
+                        <p className="text-xs text-zinc-500 mt-1">
+                            Per-business fixed delivery fee used for direct call orders.
+                        </p>
+                    </div>
                 </div>
 
                 {/* Per-day Schedule Editor */}

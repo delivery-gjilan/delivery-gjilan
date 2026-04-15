@@ -20,7 +20,7 @@ Service: `api/src/services/DirectDispatchService.ts`
 - `createOrder(input, requestingUserId)` creates an `orders` row with:
   - `channel = DIRECT_DISPATCH`
   - `recipientPhone`, `recipientName`
-  - fixed fee from `agreedAmount` stored in `deliveryPrice`
+  - fixed fee from business-level `directDispatchFixedAmount` stored in `deliveryPrice`
   - `status = READY`
   - dropoff coordinates/address from request input
 
@@ -49,7 +49,7 @@ Background tolerance:
   - global `storeSettings.directDispatchEnabled`
   - per-business `business.directDispatchEnabled`
 - `DirectDispatchSheet` checks availability, shows free-driver status, and submits `createDirectDispatchOrder`.
-- Sheet includes agreed amount input and sends it in the mutation.
+- Sheet shows the admin-configured fixed amount for that business (read-only in mobile-business).
 - Direct-dispatch orders are visually tagged as Direct Call in order cards.
 - `OUT_FOR_DELIVERY` stays in upcoming/active list to preserve direct-call operational visibility.
 
@@ -69,12 +69,11 @@ Background tolerance:
 
 - Order queries/subscriptions include `channel`, `recipientPhone`, `recipientName`.
 - Orders list + order detail show Direct Call context, recipient info, business name, and agreed amount.
-- Per-business Direct Dispatch toggle exists in business detail modal:
-  - `EditBusinessDetailModal`
+- Per-business Direct Dispatch settings exist in both business edit flows:
+  - `EditBusinessModal` (list page)
+  - `EditBusinessDetailModal` (detail page)
+  - includes `directDispatchEnabled` and `directDispatchFixedAmount`
 - Global Direct Dispatch toggle exists in topbar store settings controls.
-
-Note on edit flows:
-- Business list-page modal (`EditBusinessModal`) is a separate flow and does not currently expose the per-business Direct Dispatch checkbox.
 
 ---
 

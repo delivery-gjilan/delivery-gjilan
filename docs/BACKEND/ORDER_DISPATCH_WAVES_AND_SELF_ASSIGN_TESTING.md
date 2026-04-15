@@ -129,11 +129,11 @@ Use three layers:
 2. `dispatchModeEnabled = false` restores normal available/pool filtering.
 3. Accept error classification remains correct for taken/max-active/not-available.
 
-## Suggested Test File Layout
+## Current Automated Coverage Files
 
 - `api/src/services/__tests__/OrderDispatchService.test.ts`
 - `api/src/models/Order/resolvers/Mutation/__tests__/assignDriverToOrder.test.ts`
-- `mobile-driver/utils/__tests__/driver-logic.test.ts` (extend existing dispatch mode coverage)
+- `mobile-driver/utils/__tests__/driver-logic.test.ts` (contains dispatch-mode related pure-logic tests and can be extended further)
 
 ## Practical Vitest Setup Notes
 

@@ -23,6 +23,7 @@ Direct Dispatch creates normal `orders` rows with `channel = DIRECT_DISPATCH` in
 
 ### `businesses`
 - `directDispatchEnabled: boolean` (per-business gate)
+- `directDispatchFixedAmount: number` (per-business fixed delivery fee set by admin)
 
 ### `orders`
 - `channel: PLATFORM | DIRECT_DISPATCH`
@@ -41,13 +42,14 @@ Direct Dispatch creates normal `orders` rows with `channel = DIRECT_DISPATCH` in
 ### Mutation
 - `createDirectDispatchOrder(input)`
   - Business-role only
-  - Input includes `agreedAmount` (fixed fee)
   - Creates a `DIRECT_DISPATCH` order and enters normal dispatch flow
 
 ### Service
 - `api/src/services/DirectDispatchService.ts`
   - `checkAvailability(businessId)` verifies global + per-business gates and counts available drivers
+  - validates per-business `directDispatchFixedAmount > 0`
   - `createOrder(input, requestingUserId)` inserts the order
+  - uses business-level `directDispatchFixedAmount` as order `deliveryPrice`
 
 ---
 
@@ -79,7 +81,8 @@ The request-driver FAB appears only when:
 
 - Checks `directDispatchAvailability` on open
 - Shows free-driver status banner
-- Collects recipient phone/name, agreed amount, address, driver notes
+- Collects recipient phone/name, address, driver notes
+- Displays read-only fixed amount configured by admin for the business
 - Submits `createDirectDispatchOrder`
 
 ### Active Order Visibility
@@ -100,7 +103,9 @@ Direct Dispatch orders are visually distinct:
 ## admin-panel
 
 - Orders list/detail consume `channel`, `recipientPhone`, `recipientName` and show Direct Call context.
-- Per-business toggle exists in business detail edit modal (`EditBusinessDetailModal`).
+- Per-business Direct Dispatch settings (`directDispatchEnabled`, `directDispatchFixedAmount`) are available in:
+  - list-page edit modal (`EditBusinessModal`)
+  - detail-page edit modal (`EditBusinessDetailModal`)
 - Global toggle exists in topbar store-status controls.
 
 ---
