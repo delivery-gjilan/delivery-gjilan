@@ -67,14 +67,14 @@ export async function scheduleBusinessNotification(
 
     const q = getBusinessNotifyQueue();
     // Remove any existing pending job for this order before adding the new one.
-    const existing = await q.getJob(`business-notify:${orderId}`);
+    const existing = await q.getJob(`business-notify-${orderId}`);
     if (existing) await existing.remove().catch(() => {});
 
     await q.add(
         'business-notify',
         { orderId, businessUserIds },
         {
-            jobId: `business-notify:${orderId}`,
+            jobId: `business-notify-${orderId}`,
             delay: delayMs,
         },
     );

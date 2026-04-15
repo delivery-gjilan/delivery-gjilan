@@ -79,7 +79,7 @@ export function startBusinessNotifyWorker(
 export async function cancelPendingBusinessNotification(orderId: string): Promise<void> {
     try {
         const q = getBusinessNotifyQueue();
-        const job = await q.getJob(`business-notify:${orderId}`);
+        const job = await q.getJob(`business-notify-${orderId}`);
         if (job) {
             await job.remove();
             log.info({ orderId }, 'businessNotify:cancelled');

@@ -148,14 +148,14 @@ export class OrderDispatchService {
 
         const q = getEarlyDispatchQueue();
         // Remove any existing pending job for this order before adding the new one.
-        const existing = await q.getJob(`early-dispatch:${orderId}`);
+        const existing = await q.getJob(`early-dispatch-${orderId}`);
         if (existing) await existing.remove().catch(() => {});
 
         await q.add(
             'early-dispatch',
             { orderId },
             {
-                jobId: `early-dispatch:${orderId}`,
+                jobId: `early-dispatch-${orderId}`,
                 delay: delayMs,
             },
         );
@@ -304,7 +304,7 @@ export class OrderDispatchService {
         }
         // Remove the pending BullMQ early-dispatch job (fire-and-forget).
         getEarlyDispatchQueue()
-            .getJob(`early-dispatch:${orderId}`)
+            .getJob(`early-dispatch-${orderId}`)
             .then((job) => job?.remove())
             .catch(() => {});
         // Clean up Redis state (fire-and-forget).
