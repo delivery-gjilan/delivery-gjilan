@@ -26,6 +26,7 @@
 | B9 | [BACKEND/UPLOADS_AND_S3.md](BACKEND/UPLOADS_AND_S3.md) | Backend | S3Service, upload/delete REST routes, key generation, auth gaps |
 | B10 | [BACKEND/AUDIT_LOGGING.md](BACKEND/AUDIT_LOGGING.md) | Backend | audit_logs table, actor/action/entity enums, AuditLogRepository |
 | B11 | [BACKEND/OUT_OF_ZONE_AND_APPROVAL.md](BACKEND/OUT_OF_ZONE_AND_APPROVAL.md) | Backend | Out-of-coverage handling, locationFlagged, approval-required orders, admin alerts |
+| B12 | [BACKEND/ORDER_DISPATCH_WAVES_AND_SELF_ASSIGN_TESTING.md](BACKEND/ORDER_DISPATCH_WAVES_AND_SELF_ASSIGN_TESTING.md) | Backend | Wave-1/wave-2 dispatch behavior, gas-priority branch, self-assign guards, and test strategy |
 | BL1 | [BUSINESS_LOGIC/SETTLEMENTS_AND_PROMOTIONS.md](BUSINESS_LOGIC/SETTLEMENTS_AND_PROMOTIONS.md) | Business Logic | Settlements, rules, promotions (including recurring windows and new-user targeting), FinancialService, PromotionEngine, mobile-customer progression bar |
 | BL2 | [BUSINESS_LOGIC/PRODUCT_BUSINESS_CATEGORY_REFACTOR_FLOW.md](BUSINESS_LOGIC/PRODUCT_BUSINESS_CATEGORY_REFACTOR_FLOW.md) | Business Logic | CRUD flows, delete semantics, hook consolidation |
 | BL3 | [BUSINESS_LOGIC/CART_ACTIVE_ORDER_FLOW_RECOMMENDATIONS.md](BUSINESS_LOGIC/CART_ACTIVE_ORDER_FLOW_RECOMMENDATIONS.md) | Business Logic | Cart store, subscription lifecycle, race conditions |
@@ -114,6 +115,7 @@ ARCHITECTURE (A1)
 │   │   │   └── BUSINESS_LOGIC/SETTLEMENTS_AND_PROMOTIONS (BL1)
 │   │   │       └── OPERATIONS/NOTIFICATIONS (O3)
 │   │   └── BUSINESS_LOGIC/SETTLEMENTS_AND_PROMOTIONS (BL1)
+│   ├── BACKEND/ORDER_DISPATCH_WAVES_AND_SELF_ASSIGN_TESTING (B12)
 │   ├── BACKEND/UPLOADS_AND_S3 (B9)
 │   ├── BACKEND/AUDIT_LOGGING (B10)
 │   └── BACKEND/WATCHDOG_HEARTBEAT (B4)
@@ -161,6 +163,7 @@ ARCHITECTURE (A1)
 | Concern | MDS Files |
 |---------|-----------|
 | Order creation flow | B2, B3, BL1 |
+| Dispatch waves and self-assign | B12, M8 |
 | Cart → checkout → order | BL3, M4, M5 |
 | Payment collection modes | B2, M4, BL1 |
 | Order tracking (realtime) | A1, B4, M3, M7, O12 |
@@ -170,6 +173,7 @@ ARCHITECTURE (A1)
 | Concern | MDS Files |
 |---------|-----------|
 | Heartbeat/presence | B4, A1 |
+| Dispatch expansion and claim race guards | B12, B4, M8 |
 | Watchdog state machine | B4, O1 |
 | Live ETA / tracking | B4, M3, O12 |
 | Driver settlements | BL1 |

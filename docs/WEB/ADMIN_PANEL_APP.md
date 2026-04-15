@@ -1,7 +1,7 @@
 # Admin Panel — Deep Dive (W1)
 
 **MDS ID:** W1  
-**Last updated:** 2026-04-14  
+**Last updated:** 2026-04-15  
 **Path:** `admin-panel/`  
 **Relates to:** M9 (mobile-admin deep dive), M6 (admin panel ↔ mobile-admin parity tracker), UI1, UI2, BL1–BL5, A1
 
@@ -148,7 +148,11 @@ Business management currently has two separate edit modal flows:
 - Dashboard list page (`/dashboard/businesses`) uses `EditBusinessModal.tsx`
 - Business detail page (`/dashboard/businesses/[id]`) uses `EditBusinessDetailModal.tsx`
 
-The per-business Direct Dispatch toggle is currently exposed in the detail-page flow (`EditBusinessDetailModal.tsx`).
+The per-business Direct Dispatch toggle is exposed in both flows:
+- list-page `EditBusinessModal.tsx`
+- detail-page `EditBusinessDetailModal.tsx`
+
+The businesses list query shape used by the list-page modal includes `directDispatchEnabled`, so both edit paths read and persist the same toggle value.
 
 ### Auth Flow
 

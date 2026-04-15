@@ -46,6 +46,7 @@ export const GET_BUSINESSES = graphql(`
             avgPrepTimeMinutes
             prepTimeOverrideMinutes
             minOrderAmount
+            directDispatchEnabled
             location {
                 latitude
                 longitude
