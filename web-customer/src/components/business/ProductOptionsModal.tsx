@@ -9,6 +9,7 @@ import Image from "next/image";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { X, Plus, Minus } from "lucide-react";
 import { Skeleton } from "@/components/ui/Skeleton"; //asdkoment
+import { GqlVariant } from "@/types/graphql";
 
 interface Props {
     productId: string | null;
