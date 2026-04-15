@@ -1,6 +1,7 @@
 import type { QueryResolvers } from './../../../../generated/types.generated';
 import { GraphQLError } from 'graphql';
 import { adjustBusinessInventoryQuantities } from '@/services/order/adjustBusinessInventoryQuantities';
+import { buildBusinessGracePeriodFilter } from '@/services/scheduleBusinessNotification';
 
 export const orders: NonNullable<QueryResolvers['orders']> = async (_parent, { limit, offset, statuses, startDate, endDate }, { orderService, userData, db }) => {
     if (!userData.userId) {
@@ -35,7 +36,9 @@ export const orders: NonNullable<QueryResolvers['orders']> = async (_parent, { l
                 });
             }
             const orders = await orderService.getOrdersByBusinessId(userData.businessId);
-            const adjusted = await adjustBusinessInventoryQuantities(db, orders, userData.businessId);
+            const withinGrace = await buildBusinessGracePeriodFilter();
+            const visible = orders.filter(withinGrace);
+            const adjusted = await adjustBusinessInventoryQuantities(db, visible, userData.businessId);
             return { orders: adjusted, totalCount: adjusted.length, hasMore: false };
         }
 

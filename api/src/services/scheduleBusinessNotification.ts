@@ -16,6 +16,30 @@ import logger from '@/lib/logger';
 
 const log = logger.child({ module: 'scheduleBusinessNotification' });
 
+/**
+ * Returns a filter function that removes PENDING orders still within the
+ * store-level grace period (i.e. orders the business should not yet see).
+ * Orders with any other status are always passed through.
+ */
+export async function buildBusinessGracePeriodFilter(): Promise<(order: { status: string; orderDate: string | Date }) => boolean> {
+    const db = await getDB();
+    const rows = await db
+        .select({ gracePeriod: storeSettings.businessGracePeriodMinutes })
+        .from(storeSettings)
+        .where(eq(storeSettings.id, 'default'))
+        .limit(1);
+
+    const gracePeriodMs = (rows[0]?.gracePeriod ?? 0) * 60_000;
+    if (gracePeriodMs <= 0) return () => true;
+
+    const now = Date.now();
+    return (order) => {
+        if (order.status !== 'PENDING') return true;
+        const orderTime = new Date(order.orderDate).getTime();
+        return now - orderTime >= gracePeriodMs;
+    };
+}
+
 export async function scheduleBusinessNotification(
     notificationService: NotificationService,
     businessUserIds: string[],

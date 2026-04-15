@@ -24,7 +24,8 @@ export function useGlobalOrderAccept() {
     const hasHydrated = useAuthStore((s) => s.hasHydrated);
     const currentDriverId = useAuthStore((s) => s.user?.id);
     const isOnline = useAuthStore((s) => s.isOnline);
-    const { dispatchModeEnabled } = useStoreStatus();
+    const { dispatchModeEnabled, earlyDispatchLeadMinutes } = useStoreStatus();
+    const earlyDispatchMs = earlyDispatchLeadMinutes * 60 * 1000;
 
     const pendingOrder = useOrderAcceptStore((s) => s.pendingOrder);
     const autoCountdown = useOrderAcceptStore((s) => s.autoCountdown);
@@ -70,7 +71,7 @@ export function useGlobalOrderAccept() {
     };
 
     // ── Precise per-order timers: fire exactly when each PREPARING order crosses
-    //    the 5-min threshold instead of polling every 30s.
+    //    the earlyDispatch threshold instead of polling every 30s.
     const [now, setNow] = useState(() => Date.now());
     useEffect(() => {
         const timers: ReturnType<typeof setTimeout>[] = [];
@@ -78,13 +79,13 @@ export function useGlobalOrderAccept() {
             if (o.status !== 'PREPARING' || o.driver?.id) continue;
             const readyAtMs = getEstimatedReadyMs(o);
             if (!readyAtMs) continue;
-            const thresholdMs = readyAtMs - 5 * 60 * 1000;
+            const thresholdMs = readyAtMs - earlyDispatchMs;
             const delayMs = thresholdMs - Date.now();
             if (delayMs <= 0) continue; // already past threshold — useMemo handles it immediately
             timers.push(setTimeout(() => setNow(Date.now()), delayMs));
         }
         return () => timers.forEach(clearTimeout);
-    }, [orders, getEstimatedReadyMs]);
+    }, [orders, getEstimatedReadyMs, earlyDispatchMs]);
 
     // Fallback ticker to avoid missing threshold transitions when JS timers are
     // paused (e.g. brief backgrounding) or when ETA fields change without a
@@ -117,7 +118,7 @@ export function useGlobalOrderAccept() {
             if (o.status === 'READY') return true;
             if (o.status === 'PREPARING') {
                 const estimatedReadyMs = getEstimatedReadyMs(o);
-                return estimatedReadyMs !== null && estimatedReadyMs - now <= 5 * 60 * 1000;
+                return estimatedReadyMs !== null && estimatedReadyMs - now <= earlyDispatchMs;
             }
             return false;
         }).sort((a, b) => {
@@ -140,7 +141,7 @@ export function useGlobalOrderAccept() {
             if (o.status === 'READY') return true;
             if (o.status === 'PREPARING') {
                 const estimatedReadyMs = getEstimatedReadyMs(o);
-                return estimatedReadyMs !== null && estimatedReadyMs - now <= 5 * 60 * 1000;
+                return estimatedReadyMs !== null && estimatedReadyMs - now <= earlyDispatchMs;
             }
             return false;
         });

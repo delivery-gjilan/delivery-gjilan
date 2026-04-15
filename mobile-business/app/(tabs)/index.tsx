@@ -371,6 +371,7 @@ export default function OrdersScreen() {
     const handleAcceptTap = useCallback((orderId: string) => {
         if (isMarket) {
             handleMarkReady(orderId);
+            setStatusFilter('READY');
             return;
         }
         dispatch({ type: 'OPEN_ETA_MODAL', orderId });
@@ -390,6 +391,7 @@ export default function OrdersScreen() {
             await startPreparing({ variables: { id: orderId, preparationMinutes: Math.round(finalEta) } });
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             dispatch({ type: 'CLOSE_ETA_MODAL' });
+            setStatusFilter('PREPARING');
             refetch();
         } catch (error: unknown) {
             Alert.alert(t('common.error', 'Error'), error instanceof Error ? error.message : 'Failed');
