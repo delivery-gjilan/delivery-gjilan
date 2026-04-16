@@ -14,3 +14,18 @@ export const ADMIN_MESSAGE_RECEIVED = gql`
     }
   }
 `;
+
+export const ADMIN_ANY_MESSAGE_RECEIVED = gql`
+  subscription AdminAnyMessageReceived {
+    adminAnyMessageReceived {
+      id
+      adminId
+      driverId
+      senderRole
+      body
+      alertType
+      readAt
+      createdAt
+    }
+  }
+`;

@@ -127,9 +127,8 @@ export default function MessagesScreen() {
         refetch();
     }, [refetch]));
 
-    // Derive base messages and adminId directly from query data (survives remount/cache)
+    // Derive base messages directly from query data (survives remount/cache)
     const baseMessages = queryData?.myBusinessMessages ?? [];
-    const adminId = baseMessages.find((m) => m.senderRole === 'ADMIN')?.adminId ?? null;
 
     // Merge base messages with any extras that arrived via subscription/mutation, filtered by clearedAt
     const messages = React.useMemo(() => {
@@ -141,6 +140,16 @@ export default function MessagesScreen() {
             .filter((m) => !clearedAt || parseDate(m.createdAt).getTime() > clearedAt)
             .sort((a, b) => parseDate(a.createdAt).getTime() - parseDate(b.createdAt).getTime());
     }, [baseMessages, extraMessages, clearedAt]);
+
+    // Resolve admin target from the merged stream so send works even when
+    // the first admin message arrives via subscription before query refresh.
+    const adminId = React.useMemo(() => {
+        for (let i = messages.length - 1; i >= 0; i -= 1) {
+            const msg = messages[i];
+            if (msg.senderRole === 'ADMIN' && msg.adminId) return msg.adminId;
+        }
+        return null;
+    }, [messages]);
 
     const [markRead] = useMutation(MARK_BUSINESS_MESSAGES_READ_BUSINESS);
     const [reply, { loading: replying }] = useMutation(REPLY_TO_BUSINESS_MESSAGE, {
@@ -191,7 +200,12 @@ export default function MessagesScreen() {
         const body = replyText.trim();
         if (!body || !adminId || replying) return;
         setReplyText('');
-        await reply({ variables: { adminId, body } });
+        try {
+            await reply({ variables: { adminId, body } });
+        } catch (error) {
+            setReplyText(body);
+            Alert.alert(t('common.error', 'Error'), error instanceof Error ? error.message : 'Failed to send message');
+        }
     };
 
     const handleClearChat = () => {

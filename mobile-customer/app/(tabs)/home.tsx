@@ -25,6 +25,7 @@ import { useServiceZoneCheck } from '@/hooks/useServiceZoneCheck';
 import { useHasActiveOrder } from '@/hooks/useHasActiveOrder';
 import { OutOfZoneSheet } from '@/components/OutOfZoneSheet';
 import { useAuthStore } from '@/store/authStore';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // Keep prompt evaluation session-scoped per user identity.
 // Reset when a different user logs in so the zone check always fires for new sessions.
@@ -59,6 +60,21 @@ function HorizontalCardSkeleton() {
 
 export default function Discover() {
     const theme = useTheme();
+    const featuredPalette = theme.dark
+        ? {
+            container: ['rgba(26,26,46,0.72)', 'rgba(15,52,96,0.72)'] as [string, string],
+            subtitle: 'rgba(255,255,255,0.66)',
+            ctaBg: 'rgba(255,255,255,0.12)',
+            ctaBorder: 'rgba(255,255,255,0.2)',
+            ctaText: '#E0ECFF',
+        }
+        : {
+            container: ['rgba(226,236,252,0.78)', 'rgba(205,224,249,0.78)'] as [string, string],
+            subtitle: 'rgba(30,58,138,0.62)',
+            ctaBg: 'rgba(30,64,175,0.09)',
+            ctaBorder: 'rgba(30,64,175,0.16)',
+            ctaText: '#1E3A8A',
+        };
     const router = useRouter();
     const { businesses, loading, error, refetch } = useBusinesses();
     const hasBusinesses = businesses.length > 0;
@@ -412,18 +428,22 @@ export default function Discover() {
                         {/* Featured Section */}
                         {featuredBusinesses.length > 0 && (
                         <Animated.View entering={hasAnimated.current ? undefined : FadeInDown.delay(350).duration(500)} style={{ marginBottom: 20 }}>
-                            <View style={{
-                                borderRadius: 0,
-                                overflow: 'hidden',
-                                backgroundColor: '#1A0E00',
-                            }}>
+                            <LinearGradient
+                                colors={featuredPalette.container}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={{
+                                    borderRadius: 16,
+                                    overflow: 'hidden',
+                                }}
+                            >
                                 {/* Header row */}
                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingTop: 18, paddingHorizontal: 16, paddingBottom: 4 }}>
                                     <View>
-                                        <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: -0.4 }}>
+                                        <Text style={{ color: theme.dark ? '#fff' : '#2E1065', fontSize: 20, fontWeight: '800', letterSpacing: -0.4 }}>
                                             Featured on Zipp
                                         </Text>
-                                        <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 2 }}>
+                                        <Text style={{ color: featuredPalette.subtitle, fontSize: 12, marginTop: 2 }}>
                                             Sponsored
                                         </Text>
                                     </View>
@@ -452,15 +472,15 @@ export default function Discover() {
                                         marginBottom: 16,
                                         paddingVertical: 13,
                                         borderRadius: 12,
-                                        backgroundColor: '#F59E0B26',
+                                        backgroundColor: featuredPalette.ctaBg,
                                         borderWidth: 1,
-                                        borderColor: '#F59E0B44',
+                                        borderColor: featuredPalette.ctaBorder,
                                         alignItems: 'center',
                                     }}
                                 >
-                                    <Text style={{ color: '#F59E0B', fontSize: 14, fontWeight: '700' }}>See all</Text>
+                                    <Text style={{ color: featuredPalette.ctaText, fontSize: 14, fontWeight: '700' }}>See all</Text>
                                 </TouchableOpacity>
-                            </View>
+                            </LinearGradient>
                         </Animated.View>
                         )}
 

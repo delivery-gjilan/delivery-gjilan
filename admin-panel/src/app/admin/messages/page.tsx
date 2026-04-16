@@ -116,54 +116,6 @@ function groupByDate<T extends BaseMessage>(messages: T[]) {
     return grouped;
 }
 
-// ─── Global Message Notifications ──────────────────────────────────────────────
-
-function GlobalMessageNotifications() {
-    const seenIdsRef = useRef<Set<string>>(new Set());
-    const { data: driversData } = useQuery(DRIVERS_QUERY);
-    const { data: usersData } = useQuery(USERS_QUERY);
-
-    // Get all driver and business user names for notifications
-    const driverMap = new Map((driversData?.drivers ?? []).map(d => [d.id, `${d.firstName} ${d.lastName}`.trim() || d.email]));
-    const userMap = new Map((usersData?.users ?? []).filter(u => u.role === 'BUSINESS_OWNER' || u.role === 'BUSINESS_EMPLOYEE').map(u => [u.id, `${u.firstName} ${u.lastName}`.trim() || u.email]));
-
-    // Poll driver thread list every 5 seconds for new messages — subscriptions require specific driverId
-    useQuery(GET_DRIVER_MESSAGE_THREADS, {
-        pollInterval: 5000,
-        onCompleted: (data) => {
-            const threads = data?.driverMessageThreads ?? [];
-            for (const thread of threads) {
-                const msg = thread?.lastMessage;
-                if (!msg) continue;
-                if (msg.senderRole === 'DRIVER' && !seenIdsRef.current.has(msg.id)) {
-                    seenIdsRef.current.add(msg.id);
-                    const driverName = driverMap.get(thread?.driverId) || 'Unknown Driver';
-                    toast.info(`📞 ${driverName}: ${msg.body}`, { description: formatTime(msg.createdAt) });
-                }
-            }
-        },
-    });
-
-    // Poll business thread list every 5 seconds for new messages — subscriptions require specific businessUserId
-    useQuery(GET_BUSINESS_MESSAGE_THREADS, {
-        pollInterval: 5000,
-        onCompleted: (data) => {
-            const threads = data?.businessMessageThreads ?? [];
-            for (const thread of threads) {
-                const msg = thread?.lastMessage;
-                if (!msg) continue;
-                if (msg.senderRole === 'BUSINESS' && !seenIdsRef.current.has(msg.id)) {
-                    seenIdsRef.current.add(msg.id);
-                    const userName = userMap.get(thread?.businessUserId) || 'Unknown Business';
-                    toast.info(`🏪 ${userName}: ${msg.body}`, { description: formatTime(msg.createdAt) });
-                }
-            }
-        },
-    });
-
-    return null;
-}
-
 // ─── Driver panel ──────────────────────────────────────────────────────────────
 
 function DriverPanel() {
@@ -274,7 +226,10 @@ function DriverPanel() {
                             <button key={t?.driverId} onClick={() => { if (t?.driverId) { setSelectedId(t.driverId); setSelectedName(t.driverName); setMessages([]); } }}
                                 className={`w-full text-left px-4 py-3 border-b border-white/5 transition-colors hover:bg-white/5 ${isActive ? 'bg-white/10' : ''}`}>
                                 <div className="flex items-center justify-between mb-1">
-                                    <span className="text-sm font-medium text-white truncate">{t?.driverName}</span>
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <span className="text-sm font-medium text-white truncate">{t?.driverName}</span>
+                                        <span className="text-[9px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded border border-indigo-500/30 bg-indigo-500/10 text-indigo-300 flex-shrink-0">Driver</span>
+                                    </div>
                                     {(t?.unreadCount ?? 0) > 0 && <span className="ml-2 flex-shrink-0 text-xs font-bold bg-indigo-500 text-white rounded-full w-5 h-5 flex items-center justify-center">{t?.unreadCount}</span>}
                                 </div>
                                 {t?.lastMessage && (
@@ -515,7 +470,10 @@ function BusinessPanel() {
                             <button key={t?.businessUserId} onClick={() => { if (t?.businessUserId) { setSelectedId(t.businessUserId); setSelectedName(t.businessUserName); setMessages([]); } }}
                                 className={`w-full text-left px-4 py-3 border-b border-white/5 transition-colors hover:bg-white/5 ${isActive ? 'bg-white/10' : ''}`}>
                                 <div className="flex items-center justify-between mb-1">
-                                    <span className="text-sm font-medium text-white truncate">{t?.businessUserName}</span>
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <span className="text-sm font-medium text-white truncate">{t?.businessUserName}</span>
+                                        <span className="text-[9px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded border border-purple-500/30 bg-purple-500/10 text-purple-300 flex-shrink-0">Business</span>
+                                    </div>
                                     {(t?.unreadCount ?? 0) > 0 && <span className="ml-2 flex-shrink-0 text-xs font-bold bg-purple-500 text-white rounded-full w-5 h-5 flex items-center justify-center">{t?.unreadCount}</span>}
                                 </div>
                                 {t?.lastMessage && (
@@ -664,9 +622,6 @@ export default function MessagesPage() {
 
     return (
         <div className="flex flex-col h-full gap-0">
-            {/* Global notifications listener */}
-            <GlobalMessageNotifications />
-
             {/* Tab bar */}
             <div className="flex-shrink-0 flex border-b border-white/10 mb-0">
                 <button

@@ -14,3 +14,18 @@ export const ADMIN_BUSINESS_MESSAGE_RECEIVED = graphql(`
     }
   }
 `);
+
+export const ADMIN_ANY_BUSINESS_MESSAGE_RECEIVED = graphql(`
+  subscription AdminAnyBusinessMessageReceived {
+    adminAnyBusinessMessageReceived {
+      id
+      adminId
+      businessUserId
+      senderRole
+      body
+      alertType
+      readAt
+      createdAt
+    }
+  }
+`);

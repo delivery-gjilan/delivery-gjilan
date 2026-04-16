@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/dashboard/sidebar";
 import Topbar from "@/components/dashboard/topbar";
+import GlobalAdminMessageNotifications from "@/components/dashboard/GlobalAdminMessageNotifications";
 import { useAuth } from "@/lib/auth-context";
 import { ReactNode } from "react";
 
@@ -50,6 +51,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           {children}
         </main>
       </div>
+      <GlobalAdminMessageNotifications />
     </div>
   );
 }

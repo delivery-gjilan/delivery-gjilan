@@ -213,7 +213,9 @@ Auth token is stored in `localStorage`. Several pages read it directly for REST 
 | `OrdersUpdated` (`userOrdersUpdated`) | orders | `useOrders`, `map/page` |
 | `DriversUpdated` | users | `drivers/page`, `useMapRealtimeData` |
 | `AdminMessageReceived` | driverMessages | `map/page`, `admin/messages` |
+| `AdminAnyMessageReceived` | driverMessages | `admin/messages` global notifications |
 | `AdminBusinessMessageReceived` | businessMessages | `map/page`, `admin/messages` |
+| `AdminAnyBusinessMessageReceived` | businessMessages | `admin/messages` global notifications |
 | `AdminPttSignal` | users/ptt | `useAdminPtt` |
 
 ---
@@ -433,9 +435,9 @@ Business picker + `<CategoriesBlock>` + `<SubcategoriesBlock>`. **Note:** `GET_B
 
 ### `/admin/messages` — Admin Messaging Center
 
-**GraphQL:** 6 queries, 4 mutations, 2 subscriptions (driver + business channels).
+**GraphQL:** 6 queries, 4 mutations, 4 subscriptions (driver/business thread channels + global driver/business broadcast channels).
 
-**Key features:** Two-panel chat UI. Thread list (288px) + message view. New thread picker via search modal. `alertType` (INFO/WARNING/URGENT) styled badge. Read receipts for admin-sent messages. Date separators. Real-time via subscriptions. Thread list polls every 30s as fallback. De-duplicate message append.
+**Key features:** Two-panel chat UI. Thread list (288px) + message view. New thread picker via search modal. `alertType` (INFO/WARNING/URGENT) styled badge. Read receipts for admin-sent messages. Date separators. Real-time via subscriptions. Global incoming driver/business notifications use `adminAnyMessageReceived` and `adminAnyBusinessMessageReceived`, are mounted at shared admin/dashboard layout level (so they work across admin routes), and trigger immediate thread-list refetch; global toast copy explicitly labels source type (`Driver message` vs `Business message`) and sender identity (name plus business context when available); thread rows also include explicit source chips (`Driver` / `Business`) next to participant names. Per-thread subscriptions (`adminMessageReceived`, `adminBusinessMessageReceived`) continue to drive active chat panes. Thread list polls every 30s as fallback. De-duplicate message append. Global incoming notifications are toast-based (Sonner), not modal-based.
 
 ### `/admin/financial/settlements` — Full Settlement Management
 
@@ -640,12 +642,12 @@ Pure function `canAccessAdminPanelPath(role, pathname)` — defines allowed path
 ### Business Messages (`graphql/operations/businessMessages/`)
 - **Queries:** `BusinessMessageThreads`, `BusinessMessages`
 - **Mutations:** `SendBusinessMessage`, `MarkBusinessMessagesRead`
-- **Subscriptions:** `AdminBusinessMessageReceived`
+- **Subscriptions:** `AdminBusinessMessageReceived`, `AdminAnyBusinessMessageReceived`
 
 ### Driver Messages (`graphql/operations/driverMessages/`)
 - **Queries:** `DriverMessageThreads`, `DriverMessages`
 - **Mutations:** `SendDriverMessage`, `MarkDriverMessagesRead`
-- **Subscriptions:** `AdminMessageReceived`
+- **Subscriptions:** `AdminMessageReceived`, `AdminAnyMessageReceived`
 
 ### Auth (`graphql/operations/auth/`)
 - **Mutations:** `Login`

@@ -397,7 +397,7 @@ After DELIVERED status, a review prompt is queued:
 ### Marketing
 | Component | Purpose |
 |-----------|---------|
-| `PromoSlider` | Horizontal banner carousel on home screen |
+| `PromoSlider` | Horizontal home banner carousel with auto-scroll, infinite-loop snapping, and rotating fallback gradients from the home palette constants (`#009de0→#006da3`, `#1a1a2e→#0f3460`, `#7209b7→#3a0ca3`) |
 | `GlobalPromoBanner` | Platform-wide promo banner |
 | `InfoBanner` | Warning/info banner (store status, etc.) |
 

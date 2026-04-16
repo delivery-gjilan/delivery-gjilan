@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useSubscription } from '@apollo/client/react';
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/store/authStore';
 import { useOrderAcceptStore } from '@/store/orderAcceptStore';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
@@ -41,6 +42,9 @@ interface IncomingMessage {
  */
 export function AppOverlays() {
     const router = useRouter();
+    const pathname = usePathname();
+    const insets = useSafeAreaInsets();
+    const { height: viewportHeight } = useWindowDimensions();
     const isNetworkConnected = useAuthStore((s) => s.isNetworkConnected);
     const isOnline = useAuthStore((s) => s.isOnline);
     const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -63,6 +67,10 @@ export function AppOverlays() {
 
     const [poolOpen, setPoolOpen] = useState(false);
     const didStartupAssignedRedirectRef = useRef(false);
+    const isDriveTab = pathname === '/(tabs)/drive' || pathname === '/drive';
+    const isNavigationScreen = pathname === '/navigation';
+    const isCompactHeight = viewportHeight < 760;
+    const driveFloatingTopBase = insets.top + (isCompactHeight ? 240 : 272);
 
     // Vibrate when a new order pops up
     useEffect(() => {
@@ -157,10 +165,12 @@ export function AppOverlays() {
             {/* Order accept sheet + dismiss backdrop */}
             {isAuthenticated && pendingOrder && (
                 <>
-                    <Pressable
-                        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 299 }}
-                        onPress={() => !accepting && handleSkipOrder()}
-                    />
+                    {!isDriveTab && !isNavigationScreen && (
+                        <Pressable
+                            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 299 }}
+                            onPress={() => !accepting && handleSkipOrder()}
+                        />
+                    )}
                     <OrderAcceptSheet
                         order={pendingOrder}
                         onAccept={handleAcceptOrder}
@@ -176,8 +186,11 @@ export function AppOverlays() {
             {/* PTT floating button */}
             {isAuthenticated && isOnline && (
                 <View style={{
-                    position: 'absolute', top: '50%', right: 16, zIndex: 60,
-                    alignItems: 'flex-end', gap: 4, transform: [{ translateY: -29 }],
+                    position: 'absolute', right: 16, zIndex: 60,
+                    ...(isDriveTab
+                        ? { top: driveFloatingTopBase }
+                        : { bottom: 120 }),
+                    alignItems: 'flex-end', gap: 4,
                 }}>
                     {isTalking && (
                         <View style={{ backgroundColor: 'rgba(239,68,68,0.9)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
@@ -212,7 +225,10 @@ export function AppOverlays() {
                 <Pressable
                     onPress={() => setPoolOpen(true)}
                     style={{
-                        position: 'absolute', bottom: 100, right: 16, zIndex: 60,
+                        position: 'absolute', right: 16, zIndex: 60,
+                        ...(isDriveTab
+                            ? { top: driveFloatingTopBase + 70 }
+                            : { bottom: 100 }),
                         backgroundColor: '#0b1120', borderRadius: 18, width: 58, height: 58,
                         alignItems: 'center', justifyContent: 'center',
                         borderWidth: 1, borderColor: 'rgba(34,211,238,0.25)',

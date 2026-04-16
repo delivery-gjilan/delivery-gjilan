@@ -1,5 +1,5 @@
 import React, { useMemo, useCallback, useRef, useState, useEffect } from 'react';
-import { View, Text, Image, StyleSheet, ActivityIndicator, Pressable, Alert, ActionSheetIOS, Platform, Linking, useColorScheme, Animated, PanResponder } from 'react-native';
+import { View, Text, Image, StyleSheet, ActivityIndicator, Pressable, Alert, ActionSheetIOS, Platform, Linking, useColorScheme, Animated, PanResponder, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Mapbox from '@rnmapbox/maps';
@@ -52,6 +52,8 @@ export default function MapScreen() {
     };
     const theme = useTheme();
     const insets = useSafeAreaInsets();
+    const { height: viewportHeight } = useWindowDimensions();
+    const isCompactHeight = viewportHeight < 760;
     const router = useRouter();
     const colorScheme = useColorScheme();
     const mapStyle = colorScheme === 'dark'
@@ -143,6 +145,16 @@ export default function MapScreen() {
     );
 
     const isInitialOrdersLoading = hasHydrated && !!currentDriverId && isOrdersBootstrapping;
+    const singleCardBottomOffset = insets.bottom + (isCompactHeight ? 52 : 60);
+    const stackedCardBottomOffset = insets.bottom + (isCompactHeight ? 10 : 14);
+    const floatingControlsBottom =
+        assignedOrders.length > 0
+            ? insets.bottom + (assignedOrders.length === 1
+                ? (isCompactHeight ? 290 : 320)
+                : (isCompactHeight ? 230 : 260))
+            : 20 + insets.bottom;
+    const floatingControlsTop = insets.top + (isCompactHeight ? 148 : 176);
+    const dotPagerBottom = BOTTOM_BAR_HEIGHT - (isCompactHeight ? 30 : 24);
 
     // â”€â”€ Focused order object â”€â”€
     const focusedOrder = useMemo(
@@ -707,7 +719,7 @@ export default function MapScreen() {
             </Mapbox.MapView>
 
             {/* â•â•â• Right-side buttons â•â•â• */}
-            <View style={[styles.rightButtons, { bottom: (assignedOrders.length > 0 ? BOTTOM_BAR_HEIGHT + 12 : 20 + insets.bottom) }]}>
+            <View style={[styles.rightButtons, { top: floatingControlsTop }]}>
                 {/* Arrived at pickup shortcut */}
                 {(() => {
                     const t = assignedOrders.length === 1
@@ -727,8 +739,8 @@ export default function MapScreen() {
                         </Pressable>
                     );
                 })()}
-                {/* Lock camera + Recenter (compact pill) */}
-                <View style={styles.mapControlPill}>
+                {/* Lock camera + Recenter side rail */}
+                <View style={styles.mapControlRail}>
                     <Pressable
                         style={[styles.mapControlBtn, followDriver && styles.mapControlBtnActive]}
                         onPress={toggleFollowDriver}
@@ -739,7 +751,7 @@ export default function MapScreen() {
                             color={followDriver ? '#4285F4' : '#6B7280'}
                         />
                     </Pressable>
-                    <View style={styles.mapControlDivider} />
+                    <View style={styles.mapControlDividerVertical} />
                     <Pressable
                         style={styles.mapControlBtn}
                         onPress={recenterOnDriver}
@@ -806,7 +818,16 @@ export default function MapScreen() {
                 const cardCashToCollect = Number((order as any).cashToCollect ?? 0);
 
                 return (
-                    <View style={[styles.singleCardWrap, { bottom: 12 + insets.bottom }]}>
+                    <View
+                        style={[
+                            styles.singleCardWrap,
+                            {
+                                left: total === 1 ? 8 : 12,
+                                right: total === 1 ? 8 : 12,
+                                bottom: total === 1 ? singleCardBottomOffset : stackedCardBottomOffset,
+                            },
+                        ]}
+                    >
                         {/* Stack depth shadow (visible when 2+ orders) */}
                         {total > 1 && (
                             <View style={styles.cardStackBehind} pointerEvents="none" />
@@ -1003,7 +1024,7 @@ export default function MapScreen() {
             {assignedOrders.length > 1 && (() => {
                 const idx = Math.min(currentCardIndex, assignedOrders.length - 1);
                 return (
-                    <View style={[styles.dotPager, { bottom: BOTTOM_BAR_HEIGHT - 24 }]}>
+                    <View style={[styles.dotPager, { bottom: dotPagerBottom }]}>
                         {assignedOrders.map((_, i: number) => (
                             <View
                                 key={i}
@@ -1158,11 +1179,10 @@ const styles = StyleSheet.create({
     mapBtnArrived: {
         backgroundColor: '#16a34a',
     },
-    mapControlPill: {
-        flexDirection: 'row',
+    mapControlRail: {
         alignItems: 'center',
         backgroundColor: 'rgba(15,23,42,0.92)',
-        borderRadius: 22,
+        borderRadius: 18,
         borderWidth: 1,
         borderColor: 'rgba(148,163,184,0.28)',
         shadowColor: '#000',
@@ -1181,9 +1201,9 @@ const styles = StyleSheet.create({
     mapControlBtnActive: {
         backgroundColor: 'rgba(0,157,224,0.2)',
     },
-    mapControlDivider: {
-        width: 1,
-        height: 22,
+    mapControlDividerVertical: {
+        width: 24,
+        height: 1,
         backgroundColor: 'rgba(148,163,184,0.3)',
     },
     poolBadge: {

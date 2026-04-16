@@ -102,8 +102,7 @@ export function PromoSlider({ banners }: PromoSliderProps) {
 
     const renderItem = ({ item, index }: { item: PromoBanner; index: number }) => {
         const hasImage = !!item.imageUrl;
-        const gradientIndex = index % GRADIENTS.length;
-        const gradient = GRADIENTS[gradientIndex];
+        const gradient = GRADIENTS[index % GRADIENTS.length];
 
         return (
             <TouchableOpacity
