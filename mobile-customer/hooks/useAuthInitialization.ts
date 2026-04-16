@@ -22,6 +22,13 @@ export function useAuthInitialization() {
         fetchPolicy: 'network-only',
     });
 
+    const getInitialRoute = (candidate: User): '/auth-selection' | '/(tabs)/home' | '/signup' => {
+        if (candidate.isBanned) {
+            return '/auth-selection';
+        }
+        return candidate.signupStep === SignupStep.Completed ? '/(tabs)/home' : '/signup';
+    };
+
     useEffect(() => {
         if (hasInitialized.current) {
             return;
@@ -79,11 +86,7 @@ export function useAuthInitialization() {
 
             if (user) {
                 console.log('[AuthInit] Falling back to persisted user session');
-                if (user.signupStep === SignupStep.Completed) {
-                    router.replace('/(tabs)/home');
-                } else {
-                    router.replace('/signup');
-                }
+                router.replace(getInitialRoute(user));
                 setIsInitializing(false);
                 hasInitialized.current = true;
                 return;
@@ -108,13 +111,9 @@ export function useAuthInitialization() {
             }
 
             // Redirect based on signup completion status
-            if (data.me.signupStep === SignupStep.Completed) {
-                console.log('[AuthInit] Signup complete, redirecting to home');
-                router.replace('/(tabs)/home');
-            } else {
-                console.log('[AuthInit] Signup incomplete, redirecting to signup');
-                router.replace('/signup');
-            }
+            const targetRoute = getInitialRoute(data.me as User);
+            console.log('[AuthInit] Redirecting after ME query:', targetRoute);
+            router.replace(targetRoute);
 
             setIsInitializing(false);
             hasInitialized.current = true;

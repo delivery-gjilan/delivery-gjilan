@@ -39,7 +39,7 @@ interface AuthState {
  * Calculate authentication status from token and user signup step
  */
 const calculateIsAuthenticated = (token: string | null, user: User | null): boolean => {
-    return !!(token && user && user.signupStep === 'COMPLETED');
+    return !!(token && user && user.signupStep === 'COMPLETED' && !user.isBanned);
 };
 
 export const useAuthStore = create<AuthState>()(

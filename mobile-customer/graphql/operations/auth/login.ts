@@ -1,6 +1,6 @@
-import { graphql } from '@/gql';
+import { gql } from '@apollo/client';
 
-export const LOGIN_MUTATION = graphql(`
+export const LOGIN_MUTATION = gql`
     mutation Login($input: LoginInput!) {
         login(input: $input) {
             token
@@ -15,9 +15,10 @@ export const LOGIN_MUTATION = graphql(`
                 phoneVerified
                 phoneNumber
                 role
+                isBanned
                 preferredLanguage
             }
             message
         }
     }
-`);
+`;

@@ -17,6 +17,7 @@ import { useActiveOrdersTracking } from '@/hooks/useActiveOrdersTracking';
 import { useStoreStatusInit, useStoreStatus } from '@/hooks/useStoreStatus';
 import { useNotifications } from '@/hooks/useNotifications';
 import StoreClosedScreen from '@/components/StoreClosedScreen';
+import SuspendedAccountScreen from '@/components/SuspendedAccountScreen';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ToastContainer } from '@/components/Toast';
 import SuccessModalContainer from '@/components/SuccessModalContainer';
@@ -35,6 +36,7 @@ function AppContent() {
     const { isStoreClosed, closedMessage, wasOpenOnEntry, loading: storeStatusLoading } = useStoreStatus();
     const hasActiveOrders = useActiveOrdersStore((state) => state.hasActiveOrders);
     const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+    const user = useAuthStore((state) => state.user);
 
     // Initialize push notifications
     useNotifications();
@@ -44,6 +46,11 @@ function AppContent() {
 
     // Start/update Live Activity from anywhere in the app when it moves to background.
     useBackgroundLiveActivity();
+
+    // Block app access for suspended accounts.
+    if (user?.isBanned) {
+        return <SuspendedAccountScreen />;
+    }
 
     // Show store closed screen if store is closed
     if (storeStatusLoading) {

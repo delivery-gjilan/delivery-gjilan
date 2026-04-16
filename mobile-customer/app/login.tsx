@@ -43,6 +43,11 @@ export default function LoginScreen() {
                 setEmail('');
                 setPassword('');
 
+                if (result.user.isBanned) {
+                    router.replace('/auth-selection');
+                    return;
+                }
+
                 if (result.user.signupStep === 'COMPLETED') {
                     router.replace('/brand-splash');
                 } else {

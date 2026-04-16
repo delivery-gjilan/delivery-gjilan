@@ -85,6 +85,7 @@ index.tsx (Expo entry)
                  ├── useNotifications() → FCM token registration
                  ├── useActiveOrdersTracking() → order subscription + store sync
                  ├── useBackgroundLiveActivity() → iOS Live Activity updates
+                 ├── Suspended account check (`user.isBanned`) → full-screen support-contact blocker
                  ├── Store closed check (blocks only if closed on entry and no active orders)
                  └── Stack Navigator
                       ├── Global overlays: FloatingBars, Toast, SuccessModal,
@@ -96,9 +97,10 @@ index.tsx (Expo entry)
 1. Load token from SecureStore (iOS Keychain / Android Keystore)
 2. If no token → `/auth-selection`
 3. If token, run `Me` query
-4. On success with `signupStep === 'COMPLETED'` → `/(tabs)/home`
-5. On success with incomplete signup → `/signup` (resume)
-6. On network error → fall back to persisted user (don't clear token)
+4. On success with `isBanned === true` → `/auth-selection` (global suspended-account blocker is shown in root layout)
+5. On success with `signupStep === 'COMPLETED'` → `/(tabs)/home`
+6. On success with incomplete signup → `/signup` (resume)
+7. On network error → fall back to persisted user (don't clear token)
 
 **Brand splash** (`brand-splash.tsx`): Animated logo + progress bar over 2.8s. Provides warm-up time for prefetch and cache prep before home screen.
 
@@ -384,6 +386,7 @@ After DELIVERED status, a review prompt is queued:
 | `ErrorBoundary` | Catches render errors, shows fallback UI |
 | `LoadingScreen` | Full-screen spinner |
 | `StoreClosedScreen` | Blocks app when store closed on entry and user has no active orders |
+| `SuspendedAccountScreen` | Blocks all app routes when authenticated/persisted user has `isBanned = true`; shows support contact number and one-tap call action |
 
 ### Modals & Sheets
 | Component | Purpose |

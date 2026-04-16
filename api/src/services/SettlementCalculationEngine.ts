@@ -325,7 +325,7 @@ export class SettlementCalculationEngine {
                 ownVehicleBonusAmount: drivers.ownVehicleBonusAmount,
             })
             .from(drivers)
-            .where(eq(drivers.id, driverId))
+            .where(eq(drivers.userId, driverId))
             .limit(1);
 
         if (!driverRow?.hasOwnVehicle) return;
@@ -364,7 +364,7 @@ export class SettlementCalculationEngine {
         const [driverRow] = await this.db
             .select({ commissionPercentage: drivers.commissionPercentage })
             .from(drivers)
-            .where(eq(drivers.id, driverId))
+            .where(eq(drivers.userId, driverId))
             .limit(1);
 
         const commission = Number(driverRow?.commissionPercentage ?? 0);

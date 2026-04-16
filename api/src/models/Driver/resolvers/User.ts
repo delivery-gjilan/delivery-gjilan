@@ -7,6 +7,24 @@ import { getLiveDriverEta } from '@/lib/driverEtaCache';
  * Resolves the driverConnection field for driver users
  */
 export const User: Pick<UserResolvers, 'commissionPercentage'|'driverConnection'|'hasOwnVehicle'|'maxActiveOrders'|'ownVehicleBonusAmount'|'vehicleType'|'__isTypeOf'> = {
+  commissionPercentage: async (parent, _args, { driverService }) => {
+    if (parent.role !== 'DRIVER' || !driverService) return null;
+    try {
+      const driver = await driverService.getDriverWithConnection(String(parent.id));
+      return Number(driver?.commissionPercentage ?? 0);
+    } catch {
+      return null;
+    }
+  },
+  maxActiveOrders: async (parent, _args, { driverService }) => {
+    if (parent.role !== 'DRIVER' || !driverService) return null;
+    try {
+      const driver = await driverService.getDriverWithConnection(String(parent.id));
+      return Number(driver?.maxActiveOrders ?? 2);
+    } catch {
+      return null;
+    }
+  },
   hasOwnVehicle: async (parent, _args, { driverService }) => {
     if (parent.role !== 'DRIVER' || !driverService) return null;
     try {
