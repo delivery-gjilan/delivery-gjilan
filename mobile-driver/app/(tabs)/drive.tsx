@@ -797,7 +797,7 @@ export default function MapScreen() {
                 const statusColor = STATUS_COLORS[order.status] ?? '#6B7280';
                 const bizName = order.businesses?.[0]?.business?.name ?? '?';
                 const initial = bizName.charAt(0).toUpperCase();
-                const earnings = Number(order.deliveryPrice ?? 0).toFixed(2);
+                const earnings = Number(order.driverTakeHomePreview ?? order.deliveryPrice ?? 0).toFixed(2);
                 const dropAddress = order.dropOffLocation?.address ?? '';
                 const shortDrop = dropAddress.split(',')[0] || '';
                 const isReady = order.status === 'READY';
@@ -812,9 +812,6 @@ export default function MapScreen() {
                 const recipientLabel = order.recipientName ?? order.recipientPhone ?? null;
                 const allItems = order.businesses?.flatMap((b) => b.items ?? []) ?? [];
                 const totalStockUnits = allItems.reduce((sum, it) => sum + (it.inventoryQuantity ?? 0), 0);
-                const orderPrice = Number((order as any).orderPrice ?? 0);
-                const inventoryPrice = Number((order as any).inventoryPrice ?? 0);
-                const businessPrice = Math.max(0, orderPrice - inventoryPrice);
                 const cardCashToCollect = Number((order as any).cashToCollect ?? 0);
 
                 return (
@@ -900,16 +897,11 @@ export default function MapScreen() {
                             )}
                         </View>
 
-                        {(isDirectDispatch || totalStockUnits > 0 || businessPrice > 0) && (
+                        {(isDirectDispatch || totalStockUnits > 0) && (
                             <View style={styles.cardSignalRow}>
                                 {totalStockUnits > 0 && (
                                     <View style={styles.cardSignalStock}>
                                         <Text style={styles.cardSignalStockText}>📦 {totalStockUnits} stock</Text>
-                                    </View>
-                                )}
-                                {businessPrice > 0 && (
-                                    <View style={styles.cardSignalPay}>
-                                        <Text style={styles.cardSignalPayText}>pay biz −€{businessPrice.toFixed(2)}</Text>
                                     </View>
                                 )}
                                 {isDirectDispatch && cardCashToCollect > 0 && (

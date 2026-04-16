@@ -18,11 +18,7 @@ export function NavigationOrderCard({
 }: Props) {
     const [isExpanded, setIsExpanded] = useState(false);
 
-    const driverEarning = (order.deliveryPrice ?? 0) + (order.driverTip ?? 0);
-    const orderPrice = Number((order as any).orderPrice ?? 0);
-    const inventoryPrice = Number((order as any).inventoryPrice ?? 0);
-    const businessPrice = Math.max(0, orderPrice - inventoryPrice);
-    const netEarnings = Math.max(0, driverEarning - businessPrice);
+    const netEarnings = Number(order.driverTakeHomePreview ?? 0);
 
     const allItems = (order.businesses ?? []).flatMap((b) => b.items ?? []);
     const totalStockUnits = allItems.reduce((sum, it) => sum + (it.inventoryQuantity ?? 0), 0);
@@ -105,16 +101,6 @@ export function NavigationOrderCard({
 
                     {/* Financial Summary */}
                     <View style={styles.financialSummary}>
-                        <View style={styles.financialRow}>
-                            <Text style={styles.financialLabel}>Earnings</Text>
-                            <Text style={styles.financialValue}>€{driverEarning.toFixed(2)}</Text>
-                        </View>
-                        {businessPrice > 0 && (
-                            <View style={styles.financialRow}>
-                                <Text style={styles.financialLabel}>Pay Business</Text>
-                                <Text style={[styles.financialValue, { color: '#ef4444' }]}>−€{businessPrice.toFixed(2)}</Text>
-                            </View>
-                        )}
                         <View style={[styles.financialRow, styles.financialRowNet]}>
                             <Text style={styles.financialNetLabel}>You Keep</Text>
                             <Text style={styles.financialNetValue}>€{netEarnings.toFixed(2)}</Text>

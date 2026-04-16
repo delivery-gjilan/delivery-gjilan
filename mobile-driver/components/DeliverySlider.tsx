@@ -185,31 +185,6 @@ export function DeliverySlider({
                                 {customerPaymentAmount != null ? `€${customerPaymentAmount.toFixed(2)}` : 'Confirm amount'}
                             </Text>
                         </View>
-
-                        collectCard: {
-                            backgroundColor: 'rgba(16,185,129,0.1)',
-                            borderRadius: 12,
-                            borderWidth: 1,
-                            borderColor: 'rgba(16,185,129,0.32)',
-                            paddingHorizontal: 12,
-                            paddingVertical: 10,
-                            marginBottom: 12,
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                        },
-                        collectLabel: {
-                            color: '#86efac',
-                            fontSize: 13,
-                            fontWeight: '700',
-                        },
-                        collectAmount: {
-                            color: '#22c55e',
-                            fontSize: 22,
-                            fontWeight: '900',
-                            letterSpacing: -0.4,
-                        },
-                        </View>
                     </>
                 ) : (
                     /* ── Cancel sheet ── */
@@ -349,6 +324,29 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 6,
+    },
+    collectCard: {
+        backgroundColor: 'rgba(16,185,129,0.1)',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(16,185,129,0.32)',
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        marginBottom: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    collectLabel: {
+        color: '#86efac',
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    collectAmount: {
+        color: '#22c55e',
+        fontSize: 22,
+        fontWeight: '900',
+        letterSpacing: -0.4,
     },
     itemsSection: {
         marginBottom: 12,

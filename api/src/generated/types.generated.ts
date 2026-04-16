@@ -2140,6 +2140,8 @@ export type Order = {
   driverArrivedAtPickup?: Maybe<Scalars['Date']['output']>;
   driverAssignedAt?: Maybe<Scalars['Date']['output']>;
   driverNotes?: Maybe<Scalars['String']['output']>;
+  /** Driver take-home preview for this order for the querying driver. Includes retained cash after paying the business plus net driver settlements such as delivery compensation, promo-funded payouts, commission remittances, and tip passthrough. */
+  driverTakeHomePreview?: Maybe<Scalars['Float']['output']>;
   driverTip: Scalars['Float']['output'];
   dropOffLocation: Location;
   estimatedReadyAt?: Maybe<Scalars['Date']['output']>;
@@ -5178,6 +5180,7 @@ export type OrderResolvers<ContextType = GraphQLContext, ParentType extends Reso
   driverArrivedAtPickup?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
   driverAssignedAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
   driverNotes?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  driverTakeHomePreview?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   driverTip?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   dropOffLocation?: Resolver<ResolversTypes['Location'], ParentType, ContextType>;
   estimatedReadyAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;

@@ -32,6 +32,7 @@
 | BL4 | [BUSINESS_LOGIC/PERSONAL_INVENTORY_COVERAGE.md](BUSINESS_LOGIC/PERSONAL_INVENTORY_COVERAGE.md) | Business Logic | ⚠️ **Superseded by FF1** — see FUTURE_FEATURES/PERSONAL_INVENTORY_COVERAGE.md |
 | BL5 | [BANNER_MANAGEMENT.md](BANNER_MANAGEMENT.md) | Business Logic | Banner system: multi-media support, business/product/promotion targeting, scheduling, display contexts, admin panel UI |
 | BL6 | [SETTLEMENT_KINDS.md](SETTLEMENT_KINDS.md) | Business Logic | All 8 settlement categories, rule scoping/priority, payment method impact, when settlements are created |
+| BL7 | [BUSINESS_LOGIC/DIRECT_DISPATCH_COMMISSION_ONE_TAKE.md](BUSINESS_LOGIC/DIRECT_DISPATCH_COMMISSION_ONE_TAKE.md) | Business Logic | One-take business configuration for direct dispatch fixed fee + platform commission %, and channel-isolated settlement rule behavior |
 | FF1 | [FUTURE_FEATURES/PERSONAL_INVENTORY_COVERAGE.md](FUTURE_FEATURES/PERSONAL_INVENTORY_COVERAGE.md) | Future Feature | Personal stock tracking, order coverage split, margin optimisation |
 | FF2 | [FUTURE_FEATURES/BUSINESS_DISPATCH.md](FUTURE_FEATURES/BUSINESS_DISPATCH.md) | **Implemented** | Business-initiated direct dispatch: `channel=DIRECT_DISPATCH` orders, `directDispatchAvailability` query, `createDirectDispatchOrder` mutation, `DirectDispatchService`, `DirectDispatchSheet` in mobile-business, orange badges in mobile-driver |
 | FF3 | [FUTURE_FEATURES/CUSTOM_NAVIGATION.md](FUTURE_FEATURES/CUSTOM_NAVIGATION.md) | Future Feature | Migrating from `@badatgil/expo-mapbox-navigation` SDK to custom `@rnmapbox/maps` navigation — cost driver, unused hook inventory, step-by-step migration plan |
@@ -209,7 +210,7 @@ ARCHITECTURE (A1)
 ### Financial Domain
 | Concern | MDS Files |
 |---------|-----------|
-| Settlement rules | BL1 |
+| Settlement rules | BL1, BL7 |
 | Promotion engine | BL1, B2, B3 |
 | Payment collection | B2, M4, BL1 |
 | Financial dashboards | BL1, O11 |

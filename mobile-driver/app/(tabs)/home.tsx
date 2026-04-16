@@ -59,7 +59,7 @@ function OrderCard({
     const firstBusiness = order.businesses?.[0];
     const bizName = firstBusiness?.business?.name ?? "Business";
     const dropAddress = order.dropOffLocation?.address ?? "—";
-    const driverEarning = (order.deliveryPrice ?? 0) + (order.driverTip ?? 0);
+    const driverTakeHome = Number(order.driverTakeHomePreview ?? order.deliveryPrice ?? 0);
     const orderPrice = Number((order as any).orderPrice ?? 0);
     const inventoryPrice = Number((order as any).inventoryPrice ?? 0);
     const businessPrice = Math.max(0, orderPrice - inventoryPrice);
@@ -186,7 +186,7 @@ function OrderCard({
                 </View>
             )}
 
-            {(isDirectDispatch || totalStockUnits > 0 || businessPrice > 0) && (
+            {(isDirectDispatch || totalStockUnits > 0) && (
                 <View style={{ flexDirection: "row", gap: 6, paddingHorizontal: 16, paddingBottom: 10, flexWrap: "wrap" }}>
                     {totalStockUnits > 0 && (
                         <View style={{ backgroundColor: "rgba(114,9,183,0.18)", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 }}>
@@ -196,11 +196,6 @@ function OrderCard({
                     {totalMarketUnits > 0 && totalStockUnits > 0 && (
                         <View style={{ backgroundColor: "rgba(0,157,224,0.16)", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 }}>
                             <Text style={{ fontSize: 11, fontWeight: "700", color: "#7dd3fc" }}>🛒 {totalMarketUnits} market</Text>
-                        </View>
-                    )}
-                    {businessPrice > 0 && (
-                        <View style={{ backgroundColor: "rgba(239,68,68,0.16)", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 }}>
-                            <Text style={{ fontSize: 11, fontWeight: "700", color: "#fca5a5" }}>pay biz −€{businessPrice.toFixed(2)}</Text>
                         </View>
                     )}
                 </View>
@@ -224,21 +219,14 @@ function OrderCard({
                     {/* Net earnings - prominent */}
                     <View style={{ flexDirection: "row", alignItems: "baseline", gap: 4, marginBottom: 2 }}>
                         <Text style={{ fontSize: 22, fontWeight: "900", color: "#22c55e", letterSpacing: -0.5 }}>
-                            €{driverEarning.toFixed(2)}
+                            €{driverTakeHome.toFixed(2)}
                         </Text>
-                        {businessPrice > 0 && (
-                            <Text style={{ fontSize: 11, fontWeight: "700", color: "#ef4444" }}>
-                                · −€{businessPrice.toFixed(2)} biz
-                            </Text>
-                        )}
                     </View>
                     
                     {/* Breakdown text */}
-                    {(order.driverTip > 0 || businessPrice > 0) && (
+                    {order.driverTip > 0 && (
                         <Text style={{ fontSize: 10, color: theme.colors.subtext }}>
-                            {order.driverTip > 0 && `incl. €${order.driverTip.toFixed(2)} tip`}
-                            {order.driverTip > 0 && businessPrice > 0 && " · "}
-                            {businessPrice > 0 && `pay business on checkout`}
+                            incl. €{order.driverTip.toFixed(2)} tip
                         </Text>
                     )}
                     

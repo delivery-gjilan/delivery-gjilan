@@ -1435,6 +1435,11 @@ type Order {
   driverArrivedAtPickup: Date
   driverAssignedAt: Date
   driverNotes: String
+
+  """
+  Driver take-home preview for this order for the querying driver. Includes retained cash after paying the business plus net driver settlements such as delivery compensation, promo-funded payouts, commission remittances, and tip passthrough.
+  """
+  driverTakeHomePreview: Float
   driverTip: Float!
   dropOffLocation: Location!
   estimatedReadyAt: Date

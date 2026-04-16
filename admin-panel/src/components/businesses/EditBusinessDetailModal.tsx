@@ -1,12 +1,27 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useApolloClient, useMutation } from '@apollo/client/react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Modal from '@/components/ui/Modal';
-import { BusinessType } from '@/gql/graphql';
+import {
+    BusinessType,
+    SettlementAmountType,
+    SettlementDirection,
+    SettlementEntityType,
+    SettlementRuleScope,
+    SettlementRuleType,
+} from '@/gql/graphql';
 import { toast } from 'sonner';
+import {
+    CREATE_SETTLEMENT_RULE,
+    GET_SETTLEMENT_RULES,
+    UPDATE_SETTLEMENT_RULE,
+} from '@/graphql/operations/settlements/settlementRules';
+
+const DIRECT_DISPATCH_ONLY_RULE_MARKER = '[DIRECT_DISPATCH_ONLY]';
 
 interface Business {
     id: string;
@@ -43,6 +58,10 @@ export default function EditBusinessDetailModal({
     onClose,
     onSave,
 }: EditBusinessDetailModalProps) {
+    const apolloClient = useApolloClient();
+    const [createSettlementRule] = useMutation(CREATE_SETTLEMENT_RULE);
+    const [updateSettlementRule] = useMutation(UPDATE_SETTLEMENT_RULE);
+
     const [form, setForm] = useState({
         name: '',
         phoneNumber: '',
@@ -52,6 +71,7 @@ export default function EditBusinessDetailModal({
         minOrderAmount: 0,
         directDispatchEnabled: false,
         directDispatchFixedAmount: 0,
+        directDispatchCommissionPercent: 0,
     });
 
     useEffect(() => {
@@ -65,9 +85,117 @@ export default function EditBusinessDetailModal({
                 minOrderAmount: business.minOrderAmount ?? 0,
                 directDispatchEnabled: business.directDispatchEnabled ?? false,
                 directDispatchFixedAmount: business.directDispatchFixedAmount ?? 0,
+                directDispatchCommissionPercent: 0,
             });
         }
     }, [isOpen, business]);
+
+    useEffect(() => {
+        if (!isOpen || !business?.id) return;
+
+        let cancelled = false;
+        (async () => {
+            const { data } = await apolloClient.query({
+                query: GET_SETTLEMENT_RULES,
+                variables: {
+                    filter: {
+                        businessIds: [business.id],
+                        entityTypes: [SettlementEntityType.Driver],
+                        scopes: [SettlementRuleScope.Business],
+                        type: SettlementRuleType.DeliveryPrice,
+                    },
+                    limit: 50,
+                    offset: 0,
+                },
+                fetchPolicy: 'network-only',
+            });
+
+            if (cancelled) return;
+
+            const existingRule = (data?.settlementRules ?? [])
+                .filter((rule) => (rule.notes ?? '').includes(DIRECT_DISPATCH_ONLY_RULE_MARKER))
+                .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0];
+
+            setForm((prev) => ({
+                ...prev,
+                directDispatchCommissionPercent: Number(existingRule?.amount ?? 0),
+            }));
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [apolloClient, business?.id, isOpen]);
+
+    async function syncDirectDispatchCommissionRule(businessId: string) {
+        const { data } = await apolloClient.query({
+            query: GET_SETTLEMENT_RULES,
+            variables: {
+                filter: {
+                    businessIds: [businessId],
+                    entityTypes: [SettlementEntityType.Driver],
+                    scopes: [SettlementRuleScope.Business],
+                    type: SettlementRuleType.DeliveryPrice,
+                },
+                limit: 50,
+                offset: 0,
+            },
+            fetchPolicy: 'network-only',
+        });
+
+        const existingRule = (data?.settlementRules ?? [])
+            .filter((rule) => (rule.notes ?? '').includes(DIRECT_DISPATCH_ONLY_RULE_MARKER))
+            .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0];
+
+        const shouldEnableRule = form.directDispatchEnabled && form.directDispatchCommissionPercent > 0;
+
+        if (!shouldEnableRule) {
+            if (existingRule?.isActive) {
+                await updateSettlementRule({
+                    variables: {
+                        id: existingRule.id,
+                        input: { isActive: false },
+                    },
+                });
+            }
+            return;
+        }
+
+        const commonInput = {
+            name: 'Direct Dispatch Driver Commission',
+            type: SettlementRuleType.DeliveryPrice,
+            entityType: SettlementEntityType.Driver,
+            direction: SettlementDirection.Receivable,
+            amountType: SettlementAmountType.Percent,
+            amount: form.directDispatchCommissionPercent,
+            businessId,
+            notes: `${DIRECT_DISPATCH_ONLY_RULE_MARKER} Applied only to DIRECT_DISPATCH delivery fee settlements.`,
+        };
+
+        if (existingRule) {
+            await updateSettlementRule({
+                variables: {
+                    id: existingRule.id,
+                    input: {
+                        name: commonInput.name,
+                        type: commonInput.type,
+                        direction: commonInput.direction,
+                        amountType: commonInput.amountType,
+                        amount: commonInput.amount,
+                        isActive: true,
+                        notes: commonInput.notes,
+                    },
+                },
+            });
+            return;
+        }
+
+        await createSettlementRule({
+            variables: {
+                input: commonInput,
+            },
+        });
+    }
 
     async function handleSave() {
         try {
@@ -81,6 +209,9 @@ export default function EditBusinessDetailModal({
                 directDispatchEnabled: form.directDispatchEnabled,
                 directDispatchFixedAmount: form.directDispatchFixedAmount,
             });
+            if (business?.id) {
+                await syncDirectDispatchCommissionRule(business.id);
+            }
             onClose();
             toast.success('Business updated');
         } catch {
@@ -162,6 +293,23 @@ export default function EditBusinessDetailModal({
                         onChange={(e) => setForm({ ...form, directDispatchFixedAmount: parseFloat(e.target.value) || 0 })}
                     />
                     <p className="text-xs text-zinc-600 mt-1">Per-business fixed fee for direct call orders</p>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-zinc-400 mb-1">Direct Dispatch Platform Commission (%)</label>
+                    <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={0.5}
+                        value={form.directDispatchCommissionPercent}
+                        onChange={(e) =>
+                            setForm({ ...form, directDispatchCommissionPercent: parseFloat(e.target.value) || 0 })
+                        }
+                    />
+                    <p className="text-xs text-zinc-600 mt-1">
+                        Applied only to direct call delivery fee settlements, not to normal platform or promo delivery rules.
+                    </p>
                 </div>
 
                 <div>

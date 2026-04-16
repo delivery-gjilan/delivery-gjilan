@@ -196,11 +196,7 @@ export default function Topbar() {
         .map((business) => [business.id, String(Number(business.directDispatchFixedAmount).toFixed(2))]),
     );
     setDirectDispatchTargetEnabled(nextEnabled);
-    setSelectedBusinessIds(
-      businesses
-        .filter((business) => Boolean(business.directDispatchEnabled) !== nextEnabled)
-        .map((business) => business.id),
-    );
+    setSelectedBusinessIds((current) => current.filter((id) => businesses.some((business) => business.id === id)));
     setBusinessAmountDrafts(initialDrafts);
     setDirectDispatchSearch("");
     setShowFixedAmountModal(false);
@@ -666,9 +662,7 @@ export default function Topbar() {
                 : "Choose which businesses should be disabled together with the global direct-dispatch switch."}
             </p>
             <p className="text-zinc-400 text-[11px] mt-2">
-              {directDispatchTargetEnabled
-                ? "By default, businesses that are currently disabled are preselected."
-                : "By default, businesses that are currently enabled are preselected."}
+              Selections stay manual. We keep only businesses you previously selected.
             </p>
           </div>
 

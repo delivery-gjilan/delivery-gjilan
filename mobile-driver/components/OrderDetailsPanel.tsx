@@ -21,11 +21,7 @@ export function OrderDetailsPanel({
     const isDirectDispatch = order.channel === 'DIRECT_DISPATCH';
     const bizName = order.businesses?.[0]?.business?.name ?? 'Business';
     const recipientLabel = order.recipientName ?? order.recipientPhone ?? '—';
-    const driverEarning = (order.deliveryPrice ?? 0) + (order.driverTip ?? 0);
-    const orderPrice = Number((order as any).orderPrice ?? 0);
-    const inventoryPrice = Number((order as any).inventoryPrice ?? 0);
-    const businessPrice = Math.max(0, orderPrice - inventoryPrice);
-    const netEarnings = Math.max(0, driverEarning - businessPrice);
+    const netEarnings = Number(order.driverTakeHomePreview ?? 0);
 
     const allItems = (order.businesses ?? []).flatMap((b) => b.items ?? []);
     const itemCount = allItems.length;
@@ -62,7 +58,6 @@ export function OrderDetailsPanel({
                                 {itemCount > 0 ? `${itemCount} item${itemCount !== 1 ? 's' : ''}` : 'No items'}
                                 {' · '}
                                 €{netEarnings.toFixed(2)}
-                                {businessPrice > 0 && ` (−€${businessPrice.toFixed(2)} biz)`}
                             </Text>
                         </View>
                     </View>
@@ -134,18 +129,8 @@ export function OrderDetailsPanel({
 
                     <View style={[styles.section, styles.financialSection]}>
                         <Text style={styles.sectionLabel}>YOUR EARNINGS</Text>
-                        <View style={styles.earningsRow}>
-                            <Text style={styles.earningsLabel}>You Earn:</Text>
-                            <Text style={styles.earningsAmount}>€{driverEarning.toFixed(2)}</Text>
-                        </View>
-                        {businessPrice > 0 && (
-                            <View style={styles.earningsRow}>
-                                <Text style={styles.deductionLabel}>Pay Business:</Text>
-                                <Text style={styles.deductionAmount}>−€{businessPrice.toFixed(2)}</Text>
-                            </View>
-                        )}
                         <View style={[styles.earningsRow, styles.netRow]}>
-                            <Text style={styles.netLabel}>Net:</Text>
+                            <Text style={styles.netLabel}>You Keep:</Text>
                             <Text style={styles.netAmount}>€{netEarnings.toFixed(2)}</Text>
                         </View>
                     </View>

@@ -134,9 +134,8 @@ export function OrderInspectSheet({
     }, [acceptPulse, accepting, isAvailable, takenByOther]);
 
     useEffect(() => {
-        // Inventory orders start collapsed to keep the sheet shorter while still exposing a breakdown on expand.
-        setItemsExpanded(!hasInventory);
-    }, [order?.id, hasInventory]);
+        setItemsExpanded(true);
+    }, [order?.id]);
 
     useEffect(() => {
         setFallbackRouteInfo(null);
@@ -238,7 +237,8 @@ export function OrderInspectSheet({
     const commissionPct = Number(metricsData?.myDriverMetrics?.commissionPercentage ?? 0);
     const deliveryFeeAmount = Number(order.deliveryPrice ?? 0);
     const commissionAmount = deliveryFeeAmount * (Math.max(0, commissionPct) / 100);
-    const netEarnings = Math.max(0, deliveryFeeAmount - commissionAmount);
+    const fallbackNetEarnings = Math.max(0, deliveryFeeAmount - commissionAmount);
+    const netEarnings = Number(order.driverTakeHomePreview ?? fallbackNetEarnings);
 
     const primaryAction = useMemo(() => {
         if (isAvailable) {

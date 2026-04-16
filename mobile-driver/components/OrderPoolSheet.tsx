@@ -99,8 +99,7 @@ export function OrderPoolSheet({ orders, accepting = false, onAccept, onAcceptAn
                             const businessPrice = Math.max(0, orderPrice - inventoryPrice);
                             const dropAddress = order.dropOffLocation?.address ?? '';
                             const shortAddress = dropAddress.split(',')[0] || s.see_map;
-                            const deliveryFee = Number(order.deliveryPrice ?? 0).toFixed(2);
-                            const orderTip = Number(order.driverTip ?? 0);
+                            const takeHome = Number(order.driverTakeHomePreview ?? order.deliveryPrice ?? 0).toFixed(2);
                             const isReady = order.status === 'READY';
                             const isDirectDispatch = order.channel === 'DIRECT_DISPATCH';
                             const etaLabel = (() => {
@@ -151,7 +150,7 @@ export function OrderPoolSheet({ orders, accepting = false, onAccept, onAcceptAn
                                             {/* Earnings */}
                                             <View style={styles.earningsBadge}>
                                                 <Text style={styles.earningsLabel}>{s.earn}</Text>
-                                                <Text style={styles.earningsValue}>€{deliveryFee}{orderTip > 0 ? ` +€${orderTip.toFixed(2)}` : ''}</Text>
+                                                <Text style={styles.earningsValue}>€{takeHome}</Text>
                                             </View>
                                         </View>
 
@@ -177,7 +176,7 @@ export function OrderPoolSheet({ orders, accepting = false, onAccept, onAcceptAn
                                             </View>
                                         </View>
 
-                                        {(totalStockUnits > 0 || businessPrice > 0 || isDirectDispatch) && (
+                                        {(totalStockUnits > 0 || isDirectDispatch) && (
                                             <View style={styles.signalRow}>
                                                 {totalStockUnits > 0 && (
                                                     <View style={styles.signalChipStock}>
@@ -187,11 +186,6 @@ export function OrderPoolSheet({ orders, accepting = false, onAccept, onAcceptAn
                                                 {totalMarketUnits > 0 && totalStockUnits > 0 && (
                                                     <View style={styles.signalChipMarket}>
                                                         <Text style={styles.signalChipMarketText}>🛒 {totalMarketUnits} market</Text>
-                                                    </View>
-                                                )}
-                                                {businessPrice > 0 && (
-                                                    <View style={styles.signalChipPay}>
-                                                        <Text style={styles.signalChipPayText}>pay biz −€{businessPrice.toFixed(2)}</Text>
                                                     </View>
                                                 )}
                                                 <Text style={styles.inspectHint}>Tap card for details</Text>

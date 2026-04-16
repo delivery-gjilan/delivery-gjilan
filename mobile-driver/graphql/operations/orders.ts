@@ -17,6 +17,7 @@ export const GET_ORDERS = graphql(`
                 orderPrice
                 deliveryPrice
                 totalPrice
+                driverTakeHomePreview
                 inventoryPrice
                 driverTip
                 cashToCollect
@@ -71,6 +72,7 @@ export const GET_ORDER = graphql(`
             orderPrice
             deliveryPrice
             totalPrice
+            driverTakeHomePreview
             driverTip
             cashToCollect
             dropOffLocation {
@@ -152,6 +154,7 @@ export const ALL_ORDERS_UPDATED = graphql(`
             orderPrice
             deliveryPrice
             totalPrice
+            driverTakeHomePreview
             driverTip
             cashToCollect
             dropOffLocation {

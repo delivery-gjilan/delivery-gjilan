@@ -140,6 +140,15 @@ export default function NavigationScreen() {
         fetchPolicy: 'cache-and-network',
         pollInterval: 60_000,
     });
+    const commissionPct = Number(metricsData?.myDriverMetrics?.commissionPercentage ?? 0);
+    const getDriverTakeHome = useCallback((driverOrder: DriverOrder | null | undefined) => {
+        if (!driverOrder) return 0;
+        if (driverOrder.driverTakeHomePreview != null) return Number(driverOrder.driverTakeHomePreview);
+
+        const deliveryFeeAmount = Number(driverOrder.deliveryPrice ?? 0);
+        const commissionAmount = deliveryFeeAmount * (Math.max(0, commissionPct) / 100);
+        return Math.max(0, deliveryFeeAmount - commissionAmount);
+    }, [commissionPct]);
 
     /* â”€â”€ Orders query â€” updated via subscription; initial load via query â”€â”€ */
     const { data } = useQuery(GET_ORDERS, {
@@ -543,7 +552,7 @@ export default function NavigationScreen() {
                             const isFocused = o.id === order?.id;
                             const bizName = o.businesses?.[0]?.business?.name ?? '?';
                             const initial = bizName.charAt(0).toUpperCase();
-                            const earnings = Number(o.deliveryPrice ?? 0).toFixed(2);
+                            const earnings = getDriverTakeHome(o).toFixed(2);
                             const dropAddress = o.dropOffLocation?.address ?? '';
                             const shortDrop = dropAddress.split(',')[0] || '';
                             const isReady = o.status === 'READY';
@@ -812,7 +821,7 @@ export default function NavigationScreen() {
 
                         // Spring the success card up from the panel area to screen centre
                         const fo2 = assignedOrders.find((o) => o.id === order?.id);
-                        setSuccessCardPrice(fo2?.deliveryPrice ?? 0);
+                        setSuccessCardPrice(getDriverTakeHome(fo2));
                         successCardStartTimerRef.current = setTimeout(() => {
                             if (!successAnimationActiveRef.current) return;
                             successCardY.setValue(320);

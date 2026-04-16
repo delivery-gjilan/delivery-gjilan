@@ -42,7 +42,7 @@ type Period = 'today' | 'week' | 'month' | 'last_settlement' | 'custom' | 'all';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10000;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -468,7 +468,7 @@ export default function FinancesScreen() {
         const color = getCategoryColor(item.category, item.direction);
         setSelectedCategory({ category: item.category, label: item.label, color, direction: item.direction });
         setCategorySettlements([]);
-        fetchCategorySettlements({ variables: { businessId, direction: item.direction, category: item.category, startDate, endDate, limit: 100, offset: 0 } });
+        fetchCategorySettlements({ variables: { businessId, direction: item.direction, category: item.category, startDate, endDate, limit: 10000, offset: 0 } });
     }, [fetchCategorySettlements, businessId, startDate, endDate]);
     // Compute revenue generated & commission owed from settlement rows
     const computed = useMemo(() => {

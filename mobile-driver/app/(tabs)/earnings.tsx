@@ -24,7 +24,7 @@ type BreakdownItem = GetSettlementBreakdownQuery['settlementBreakdown'][number];
 
 type Period = 'today' | 'week' | 'month' | 'last_month' | 'all';
 
-const SETTLEMENT_PAGE_SIZE = 20;
+const SETTLEMENT_PAGE_SIZE = 10000;
 
 function getPeriodDates(period: Period): { startDate?: string; endDate?: string } {
     const now = new Date();
@@ -214,7 +214,7 @@ export default function EarningsScreen() {
         const cfg = getCategoryConfig(item.category, item.direction);
         setSelectedCategory({ category: item.category, label: item.label, color: cfg.color, direction: item.direction });
         setCategorySettlements([]);
-        fetchCategorySettlements({ variables: { category: item.category, direction: item.direction, startDate, endDate, limit: 100 } });
+        fetchCategorySettlements({ variables: { category: item.category, direction: item.direction, startDate, endDate, limit: 10000 } });
     }, [fetchCategorySettlements, startDate, endDate]);
 
     const handleLoadMoreSettlements = useCallback(async () => {

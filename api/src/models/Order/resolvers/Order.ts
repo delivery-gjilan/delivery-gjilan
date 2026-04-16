@@ -3,6 +3,7 @@ import { SettlementCalculationEngine } from '@/services/SettlementCalculationEng
 import { orderItems as orderItemsTable, orderReviews, orders as ordersTable } from '@/database/schema';
 import { eq } from 'drizzle-orm';
 import logger from '@/lib/logger';
+import { calculateDriverTakeHomePreview } from './driverTakeHomePreview';
 
 export const Order: OrderResolvers = {
     userId: (parent) => {
@@ -110,6 +111,34 @@ export const Order: OrderResolvers = {
             };
         } catch (error) {
             logger.error({ err: error, orderId: parent.id }, 'order:settlementPreview failed');
+            return null;
+        }
+    },
+
+    driverTakeHomePreview: async (parent, _args, { db, userData }) => {
+        if (!userData.userId) return null;
+        if (userData.role !== 'DRIVER' && userData.role !== 'SUPER_ADMIN' && userData.role !== 'ADMIN') {
+            return null;
+        }
+
+        try {
+            const orderId = String(parent.id);
+            const [[dbOrder], items] = await Promise.all([
+                db.select().from(ordersTable).where(eq(ordersTable.id, orderId)),
+                db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, orderId)),
+            ]);
+            if (!dbOrder) return null;
+
+            const previewDriverId = userData.role === 'DRIVER'
+                ? userData.userId
+                : (dbOrder.driverId ?? null);
+            if (!previewDriverId) return null;
+
+            const engine = new SettlementCalculationEngine(db);
+            const calculations = await engine.calculateOrderSettlements(dbOrder, items, previewDriverId);
+            return calculateDriverTakeHomePreview(dbOrder, calculations);
+        } catch (error) {
+            logger.error({ err: error, orderId: parent.id }, 'order:driverTakeHomePreview failed');
             return null;
         }
     },
