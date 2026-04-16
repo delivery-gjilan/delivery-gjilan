@@ -1,4 +1,4 @@
-enum OrderStatus {
+﻿enum OrderStatus {
     PENDING
     PREPARING
     READY
@@ -213,7 +213,9 @@ type Order {
     settlementPreview: OrderSettlementPreview
     """Total base price of items fulfilled from operator inventory. Null when inventory mode is off or no stock was used."""
     inventoryPrice: Float
-}
+        """For DIRECT_DISPATCH orders: cash the driver should collect from the customer. Null if not specified by the business."""
+        cashToCollect: Float
+    }
 
 type OrderConnection {
     orders: [Order!]!
@@ -300,8 +302,6 @@ input CreateOrderInput {
 }
 
 input CreateDirectDispatchOrderInput {
-    """Delivery address for the recipient."""
-    dropOffLocation: LocationInput!
     """Estimated preparation time in minutes for early dispatch scheduling."""
     preparationMinutes: Int!
     """Phone number of the recipient."""
@@ -310,6 +310,8 @@ input CreateDirectDispatchOrderInput {
     recipientName: String
     """Optional notes for the driver."""
     driverNotes: String
+    """Cash amount the driver should collect from the customer. Null if unknown at dispatch time."""
+    cashToCollect: Float
 }
 
 type DirectDispatchAvailability {

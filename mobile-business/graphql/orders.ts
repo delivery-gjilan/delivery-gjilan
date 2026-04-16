@@ -212,12 +212,8 @@ export const CREATE_DIRECT_DISPATCH_ORDER = graphql(`
             deliveryPrice
             recipientPhone
             recipientName
-            dropOffLocation {
-                address
-                latitude
-                longitude
-            }
             driverNotes
+            cashToCollect
         }
     }
 `);

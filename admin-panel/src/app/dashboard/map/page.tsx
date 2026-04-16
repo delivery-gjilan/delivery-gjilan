@@ -814,6 +814,7 @@ export default function MapPage() {
     }>();
 
     activeOrders.forEach((order) => {
+      if (order.channel === 'DIRECT_DISPATCH') return;
       const risk = getOrderSlaRisk(order, now, statusChangeTime);
       if (risk.level === 'ok') return;
       const drop = order?.dropOffLocation;
@@ -1520,7 +1521,20 @@ export default function MapPage() {
 
   const focusOrder = useCallback((order: MapOrderLike) => {
     const map = mapRef.current?.getMap?.();
-    if (!map || !order.dropOffLocation) return;
+    if (!map) return;
+
+    const isDirectDispatch = order.channel === 'DIRECT_DISPATCH';
+    if (isDirectDispatch) {
+      const pickup = order.businesses
+        ?.map((entry) => (entry as MapBusinessEntryLike)?.business?.location)
+        ?.find((location) => isValidLatLng(location?.latitude, location?.longitude));
+      if (pickup) {
+        map.flyTo({ center: [pickup.longitude, pickup.latitude], zoom: 15, duration: 600, essential: true });
+      }
+      return;
+    }
+
+    if (!order.dropOffLocation) return;
 
     const dropoff = order.dropOffLocation;
     const driverLocation = order.driver?.id ? driverMap[order.driver.id]?.driverLocation : null;
@@ -1678,6 +1692,7 @@ export default function MapPage() {
         {/* ── Route Polylines ── */}
         {activeOrders.map((order) => {
           if (!showPolylines[order.id] || !orderDistances[order.id]) return null;
+          if (order.channel === 'DIRECT_DISPATCH') return null;
           const routes = orderDistances[order.id];
 
           // PREPARING: show pickup → dropoff (amber, same as PENDING)
@@ -1792,6 +1807,7 @@ export default function MapPage() {
 
         {/* ── Order Markers ── */}
         {filteredOrders.map((order) => {
+          if (order.channel === 'DIRECT_DISPATCH') return null;
           const drop = order.dropOffLocation;
           if (!drop?.latitude || !drop?.longitude) return null;
           const statusColor = ORDER_STATUS_COLORS[order.status as keyof typeof ORDER_STATUS_COLORS] || ORDER_STATUS_COLORS.PENDING;
@@ -2117,7 +2133,7 @@ export default function MapPage() {
                       <span className="text-[9px] text-orange-300/70 truncate">{order.recipientPhone}</span>
                     </div>
                   )}
-                  {order.dropOffLocation?.address && (
+                  {order.channel !== "DIRECT_DISPATCH" && order.dropOffLocation?.address && (
                     <div className="flex items-center gap-1 mt-0.5 pl-3">
                       <span className="text-[9px] text-zinc-600">📍</span>
                       <span className="text-[9px] text-zinc-500 truncate">{order.dropOffLocation.address}</span>
@@ -3323,7 +3339,7 @@ function BottomDetailPanel({
               </button>
             )}
           </div>
-          {order.dropOffLocation?.address && (
+          {order.channel !== "DIRECT_DISPATCH" && order.dropOffLocation?.address && (
             <div className="text-xs text-zinc-600 leading-tight pl-10 truncate">{order.dropOffLocation.address}</div>
           )}
           {getApprovalReasons(order).includes('FIRST_ORDER') && (

@@ -183,7 +183,10 @@ export default function OrderDetailPanel({
                                 Business: {businessList.map((b) => b.business.name).join(', ') || '—'}
                             </div>
                             <div className="text-emerald-300 text-xs mt-1 font-semibold">
-                                Agreed Amount: €{Number(order.deliveryPrice ?? 0).toFixed(2)}
+                                Driver cut: €{Number(order.deliveryPrice ?? 0).toFixed(2)}
+                            </div>
+                            <div className="text-zinc-400 text-xs mt-1">
+                                Collect from customer: {Number(order.cashToCollect ?? 0) > 0 ? `€${Number(order.cashToCollect).toFixed(2)}` : 'Confirm at pickup'}
                             </div>
                             {order.recipientName && order.recipientPhone && (
                                 <div className="flex items-center gap-1.5 mt-1.5">
@@ -277,9 +280,9 @@ export default function OrderDetailPanel({
                 <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-3">
                     <div className="flex items-center gap-2 mb-1.5">
                         <MapPin size={13} className="text-zinc-500" />
-                        <span className="text-[10px] text-zinc-600 uppercase tracking-wider font-medium">Delivery Address</span>
+                        <span className="text-[10px] text-zinc-600 uppercase tracking-wider font-medium">{order.channel === 'DIRECT_DISPATCH' ? 'Dropoff' : 'Delivery Address'}</span>
                     </div>
-                    <span className="text-white text-sm">{order.dropOffLocation.address}</span>
+                    <span className="text-white text-sm">{order.channel === 'DIRECT_DISPATCH' ? 'Given at pickup by business' : order.dropOffLocation.address}</span>
                 </div>
 
                 {/* Driver notes */}

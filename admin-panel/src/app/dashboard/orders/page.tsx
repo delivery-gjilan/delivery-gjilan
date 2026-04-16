@@ -237,11 +237,6 @@ export default function OrdersPage() {
         return source.map(normalizeFetchedOrder);
     }, [orders]);
 
-    const selectedOrder = useMemo(
-        () => selectedOrderId ? (normalizedOrders.find((o) => o.id === selectedOrderId) ?? null) : null,
-        [selectedOrderId, normalizedOrders]
-    );
-
     const matchesSearch = useCallback((order: Order, q: string) => {
         if (!q) return true;
         const lower = q.toLowerCase();
@@ -306,6 +301,13 @@ export default function OrdersPage() {
         const source = Array.isArray(completedOrdersRaw) ? completedOrdersRaw : [];
         return source.map(normalizeFetchedOrder);
     }, [completedOrdersRaw]);
+
+    const selectedOrder = useMemo(
+        () => selectedOrderId
+            ? (normalizedOrders.find((o) => o.id === selectedOrderId) ?? completedOrders.find((o) => o.id === selectedOrderId) ?? null)
+            : null,
+        [selectedOrderId, normalizedOrders, completedOrders]
+    );
 
     const filteredCompletedOrders = useMemo(() => {
         let result = completedOrders;
@@ -639,7 +641,10 @@ export default function OrdersPage() {
                                                             <span className="text-xs text-zinc-500">{order.recipientPhone}</span>
                                                         )}
                                                         <span className="inline-flex items-center rounded-full bg-emerald-500/15 border border-emerald-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
-                                                            Agreed €{Number(order.deliveryPrice ?? 0).toFixed(2)}
+                                                            Driver cut €{Number(order.deliveryPrice ?? 0).toFixed(2)}
+                                                        </span>
+                                                        <span className="inline-flex items-center rounded-full bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-300">
+                                                            Collect {Number(order.cashToCollect ?? 0) > 0 ? `€${Number(order.cashToCollect).toFixed(2)}` : 'at pickup'}
                                                         </span>
                                                     </div>
                                                 ) : order.user && (
@@ -686,7 +691,7 @@ export default function OrdersPage() {
                                             {/* Address */}
                                             <div className="mb-3 flex items-start gap-2">
                                                 <MapPin size={14} className="text-zinc-600 mt-0.5 flex-shrink-0" />
-                                                <span className="text-xs text-zinc-500 line-clamp-1">{order.dropOffLocation.address}</span>
+                                                <span className="text-xs text-zinc-500 line-clamp-1">{order.channel === 'DIRECT_DISPATCH' ? 'Dropoff given at pickup' : order.dropOffLocation.address}</span>
                                             </div>
 
                                             {/* Driver notes */}

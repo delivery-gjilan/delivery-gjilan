@@ -11,6 +11,7 @@ export const GET_ORDERS = graphql(`
                 channel
                 recipientPhone
                 recipientName
+                cashToCollect
                 orderPrice
                 deliveryPrice
                 originalPrice
@@ -120,6 +121,7 @@ export const GET_ORDER = graphql(`
             channel
             recipientPhone
             recipientName
+            cashToCollect
             orderPrice
             deliveryPrice
             originalPrice
@@ -211,6 +213,7 @@ export const GET_ORDERS_BY_STATUS = graphql(`
             channel
             recipientPhone
             recipientName
+            cashToCollect
             orderPrice
             deliveryPrice
             originalPrice
@@ -264,6 +267,7 @@ export const GET_CANCELLED_ORDERS = graphql(`
             channel
             recipientPhone
             recipientName
+            cashToCollect
             orderPrice
             deliveryPrice
             totalPrice

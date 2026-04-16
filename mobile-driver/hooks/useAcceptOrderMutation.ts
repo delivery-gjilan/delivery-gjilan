@@ -6,7 +6,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useOrderAcceptStore } from '@/store/orderAcceptStore';
 import { useNavigationStore } from '@/store/navigationStore';
 import { useNavigationLocationStore } from '@/store/navigationLocationStore';
-import type { NavigationPhase } from '@/store/navigationStore';
+import { buildNavOrder, orderToPhase } from '@/utils/orderToNavOrder';
 
 interface UseAcceptOrderMutationOptions {
     currentDriverId: string | undefined;
@@ -89,45 +89,15 @@ export function useAcceptOrderMutation({
         if (!order) return;
 
         await executeAcceptMutation(orderId, () => {
-            const bizLoc = order.businesses?.[0]?.business?.location;
-            const dropLoc = order.dropOffLocation;
-            if (!bizLoc) return;
-
             const loc =
                 useNavigationLocationStore.getState().location ??
                 useNavigationLocationStore.getState().lastKnownCoords;
             if (!loc) return;
 
-            const pickup = {
-                latitude: Number(bizLoc.latitude),
-                longitude: Number(bizLoc.longitude),
-                label: order.businesses?.[0]?.business?.name ?? 'Pickup',
-            };
-            const dropoff = dropLoc
-                ? {
-                    latitude: Number(dropLoc.latitude),
-                    longitude: Number(dropLoc.longitude),
-                    label: dropLoc.address ?? 'Drop-off',
-                }
-                : null;
-            const customerName = order.user
-                ? `${order.user.firstName} ${order.user.lastName}`
-                : 'Customer';
+            const navOrder = buildNavOrder(order);
+            if (!navOrder) return;
 
-            const navOrder = {
-                id: order.id,
-                status: order.status,
-                businessName: order.businesses?.[0]?.business?.name ?? 'Business',
-                customerName,
-                customerPhone: order.user?.phoneNumber ?? null,
-                pickup,
-                dropoff,
-            };
-
-            const phase: NavigationPhase =
-                order.status === 'OUT_FOR_DELIVERY' ? 'to_dropoff' : 'to_pickup';
-
-            startNavigation(navOrder, phase, loc);
+            startNavigation(navOrder, orderToPhase(order.status), loc);
             router.push('/navigation' as any);
         });
     }, [executeAcceptMutation, startNavigation, router]);

@@ -19,6 +19,7 @@ export const GET_ORDERS = graphql(`
                 totalPrice
                 inventoryPrice
                 driverTip
+                cashToCollect
                 dropOffLocation {
                     latitude
                     longitude
@@ -71,6 +72,7 @@ export const GET_ORDER = graphql(`
             deliveryPrice
             totalPrice
             driverTip
+            cashToCollect
             dropOffLocation {
                 latitude
                 longitude

@@ -1,7 +1,7 @@
 # Direct Dispatch — Current State (O22)
 
 **MDS ID:** O22  
-**Last updated:** 2026-04-15  
+**Last updated:** 2026-04-16  
 **Scope:** Backend/API, mobile-business, mobile-driver, admin-panel
 
 ---
@@ -21,9 +21,10 @@ Service: `api/src/services/DirectDispatchService.ts`
   - `channel = DIRECT_DISPATCH`
   - `recipientPhone`, `recipientName`
   - fixed fee from business-level `directDispatchFixedAmount` stored in `deliveryPrice`
+  - optional `cashToCollect` (amount expected from customer)
   - `status = PREPARING`
   - `preparationMinutes`, `preparingAt`, `estimatedReadyAt`
-  - dropoff coordinates/address from request input
+  - dropoff placeholder values when destination is not known at creation time (`dropoffLat=0`, `dropoffLng=0`, `dropoffAddress=''`)
 
 - The mutation schedules early dispatch using the submitted preparation minutes.
 - When the order later becomes `READY`, the normal READY dispatch path still re-runs as needed.
@@ -56,6 +57,8 @@ Background tolerance:
 - The business-level gate is refreshed by the `businessUpdated(id)` subscription, so admin changes to a specific business hide the control and close any open request modal immediately after the update lands.
 - `DirectDispatchSheet` is presented as a full-screen request modal, checks availability, shows free-driver status, and submits `createDirectDispatchOrder`.
 - The modal collects preparation minutes so early dispatch timing can be scheduled from the request.
+- The modal collects optional `cashToCollect` from the business so the driver sees expected cash collection before delivery.
+- The modal does not require a dropoff address at request time.
 - The modal no longer shows the fixed amount.
 - Direct-dispatch orders are visually tagged as Direct Call in order cards.
 - `OUT_FOR_DELIVERY` stays in upcoming/active list to preserve direct-call operational visibility.
@@ -65,17 +68,22 @@ Background tolerance:
 ## Implemented mobile-driver Behavior
 
 - Driver order operations include `channel`, `recipientPhone`, `recipientName`.
+- Driver order operations include `cashToCollect`.
 - Direct-dispatch visuals:
   - `OrderAcceptSheet`: Direct Call badge + recipient label
   - `OrderPoolSheet`: orange accent + Direct Call badge
-  - `OrderDetailSheet`: Direct Call badge + recipient-based identity
+  - `OrderDetailSheet`: Direct Call badge + recipient-based identity + DD cash panel that emphasizes driver cut and expected customer collection
+- On the driver map surface (`drive` tab), direct-dispatch orders do not render dropoff pins or pickup-to-dropoff preview lines.
+- Direct-dispatch navigation flow is pickup-first only until destination is provided by the business at pickup.
 
 ---
 
 ## Implemented admin-panel Behavior
 
-- Order queries/subscriptions include `channel`, `recipientPhone`, `recipientName`.
-- Orders list + order detail show Direct Call context, recipient info, business name, and agreed amount.
+- Order queries/subscriptions include `channel`, `recipientPhone`, `recipientName`, `cashToCollect`.
+- Orders list + order detail show Direct Call context, recipient info, business name, driver cut, and customer-collection expectation.
+- For direct-dispatch UI, dropoff is presented as provided at pickup instead of a pre-known destination.
+- On the admin map surface, direct-dispatch orders do not render dropoff markers, dropoff route polylines, or dropoff address snippets.
 - Per-business Direct Dispatch settings exist in both business edit flows:
   - `EditBusinessModal` (list page)
   - `EditBusinessDetailModal` (detail page)

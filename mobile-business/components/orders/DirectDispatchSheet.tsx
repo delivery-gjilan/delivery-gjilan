@@ -32,9 +32,9 @@ export function DirectDispatchSheet({ visible, onClose, onCreated, t }: Props) {
 
     const [recipientPhone, setRecipientPhone] = useState('');
     const [recipientName, setRecipientName] = useState('');
-    const [address, setAddress] = useState('');
     const [preparationMinutes, setPreparationMinutes] = useState('15');
     const [driverNotes, setDriverNotes] = useState('');
+    const [cashToCollect, setCashToCollect] = useState('');
     const [submitError, setSubmitError] = useState<string | null>(null);
 
     const { data: availData, loading: availLoading, refetch: refetchAvail } = useQuery(
@@ -57,9 +57,9 @@ export function DirectDispatchSheet({ visible, onClose, onCreated, t }: Props) {
         if (visible) {
             setRecipientPhone('');
             setRecipientName('');
-            setAddress('');
             setPreparationMinutes('15');
             setDriverNotes('');
+            setCashToCollect('');
             setSubmitError(null);
             refetchAvail();
         }
@@ -74,7 +74,6 @@ export function DirectDispatchSheet({ visible, onClose, onCreated, t }: Props) {
     const canSubmit =
         isAvailable &&
         recipientPhone.trim().length >= 3 &&
-        address.trim().length >= 3 &&
         Number.isInteger(parsedPreparationMinutes) &&
         parsedPreparationMinutes >= 1 &&
         parsedPreparationMinutes <= 180 &&
@@ -87,15 +86,11 @@ export function DirectDispatchSheet({ visible, onClose, onCreated, t }: Props) {
             await createOrder({
                 variables: {
                     input: {
-                        dropOffLocation: {
-                            latitude: 42.46,
-                            longitude: 21.47,
-                            address: address.trim(),
-                        },
                         preparationMinutes: parsedPreparationMinutes,
                         recipientPhone: recipientPhone.trim(),
                         recipientName: recipientName.trim() || null,
                         driverNotes: driverNotes.trim() || null,
+                        cashToCollect: cashToCollect.trim() ? parseFloat(cashToCollect) : null,
                     },
                 },
             });
@@ -250,13 +245,14 @@ export function DirectDispatchSheet({ visible, onClose, onCreated, t }: Props) {
                             </View>
 
                             <View style={styles.field}>
-                                <Text style={styles.label}>{s.address ?? 'Delivery Address'} *</Text>
+                                <Text style={styles.label}>{s.cash_to_collect ?? 'Cash to Collect from Customer'}</Text>
                                 <TextInput
                                     style={styles.input}
-                                    value={address}
-                                    onChangeText={setAddress}
-                                    placeholder={s.address_placeholder ?? 'e.g. Rr. Adem Jashari, Nr. 12'}
+                                    value={cashToCollect}
+                                    onChangeText={setCashToCollect}
+                                    placeholder={s.cash_to_collect_placeholder ?? 'e.g. 12.50 (optional)'}
                                     placeholderTextColor="#4B5563"
+                                    keyboardType="decimal-pad"
                                 />
                             </View>
 

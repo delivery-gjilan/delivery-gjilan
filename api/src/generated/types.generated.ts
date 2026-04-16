@@ -518,10 +518,10 @@ export type CreateDeliveryZoneInput = {
 };
 
 export type CreateDirectDispatchOrderInput = {
+  /** Cash amount the driver should collect from the customer. Null if unknown at dispatch time. */
+  cashToCollect?: InputMaybe<Scalars['Float']['input']>;
   /** Optional notes for the driver. */
   driverNotes?: InputMaybe<Scalars['String']['input']>;
-  /** Delivery address for the recipient. */
-  dropOffLocation: LocationInput;
   /** Estimated preparation time in minutes for early dispatch scheduling. */
   preparationMinutes: Scalars['Int']['input'];
   /** Optional name of the recipient. */
@@ -2130,6 +2130,8 @@ export type Order = {
   businesses: Array<OrderBusiness>;
   cancellationReason?: Maybe<Scalars['String']['output']>;
   cancelledAt?: Maybe<Scalars['Date']['output']>;
+  /** For DIRECT_DISPATCH orders: cash the driver should collect from the customer. Null if not specified by the business. */
+  cashToCollect?: Maybe<Scalars['Float']['output']>;
   channel: OrderChannel;
   deliveredAt?: Maybe<Scalars['Date']['output']>;
   deliveryPrice: Scalars['Float']['output'];
@@ -5163,6 +5165,7 @@ export type OrderResolvers<ContextType = GraphQLContext, ParentType extends Reso
   businesses?: Resolver<Array<ResolversTypes['OrderBusiness']>, ParentType, ContextType>;
   cancellationReason?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   cancelledAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
+  cashToCollect?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   channel?: Resolver<ResolversTypes['OrderChannel'], ParentType, ContextType>;
   deliveredAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
   deliveryPrice?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;

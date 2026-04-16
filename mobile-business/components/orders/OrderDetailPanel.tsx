@@ -47,7 +47,64 @@ function PanelContent({
     if (!order) return null;
 
     const businessOrder = order.businesses.find((b) => b.business.id === businessId);
-    if (!businessOrder) return null;
+    if (!businessOrder) {
+        return (
+            <View style={{ flex: 1, backgroundColor: '#0f172a' }}>
+                <View
+                    style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        paddingHorizontal: 16,
+                        paddingVertical: 14,
+                        borderBottomWidth: 1,
+                        borderBottomColor: 'rgba(255,255,255,0.07)',
+                    }}
+                >
+                    <View style={{ flex: 1 }}>
+                        <Text style={{ color: '#f1f5f9', fontWeight: '800', fontSize: 17 }}>
+                            #{order.displayId}
+                        </Text>
+                        <Text style={{ color: '#64748b', fontSize: 12 }}>
+                            {t('orders.details_unavailable', 'Order details temporarily unavailable')}
+                        </Text>
+                    </View>
+                    <TouchableOpacity
+                        onPress={onClose}
+                        hitSlop={8}
+                        style={{
+                            width: 30,
+                            height: 30,
+                            borderRadius: 8,
+                            backgroundColor: 'rgba(255,255,255,0.07)',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                        }}
+                    >
+                        <Ionicons name="close" size={16} color="#64748b" />
+                    </TouchableOpacity>
+                </View>
+
+                <View style={{ flex: 1, padding: 16, justifyContent: 'center' }}>
+                    <View
+                        style={{
+                            borderRadius: 14,
+                            padding: 14,
+                            backgroundColor: 'rgba(255,255,255,0.06)',
+                            borderWidth: 1,
+                            borderColor: 'rgba(255,255,255,0.08)',
+                        }}
+                    >
+                        <Text style={{ color: '#f1f5f9', fontSize: 14, fontWeight: '700', marginBottom: 6 }}>
+                            {t('orders.details_not_ready_title', 'Details are syncing')}
+                        </Text>
+                        <Text style={{ color: '#94a3b8', fontSize: 13, lineHeight: 19 }}>
+                            {t('orders.details_not_ready_message', 'Please close and reopen this order card in a moment.')}
+                        </Text>
+                    </View>
+                </View>
+            </View>
+        );
+    }
 
     const businessSubtotal = businessOrder.items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
     const isPending = order.status === 'PENDING';
@@ -420,6 +477,7 @@ export function OrderDetailPanel(props: OrderDetailPanelProps) {
 
                 <Pressable
                     style={{
+                        backgroundColor: '#0f172a',
                         maxHeight: '88%',
                         borderTopLeftRadius: 28,
                         borderTopRightRadius: 28,

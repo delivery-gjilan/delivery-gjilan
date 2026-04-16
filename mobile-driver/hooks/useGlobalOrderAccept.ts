@@ -156,7 +156,9 @@ export function useGlobalOrderAccept() {
         return orders.find((o) => o.id === pendingOrder.id) ?? pendingOrder;
     }, [pendingOrder, orders]);
 
-    // ── Dismiss stale modal: clear pendingOrder if it's no longer in availableOrders ──
+    // ── Dismiss stale modal: clear pendingOrder if it's no longer in poolOrders ──
+    // Uses poolOrders (not availableOrders) so the driver can inspect orders they previously
+    // skipped — skipped orders are still in poolOrders but filtered from availableOrders.
     // Skip when takenByOther is active — the 3-second overlay timer owns the dismissal.
     // Skip when accepting — the subscription may fire before the mutation error returns,
     // which would clear pendingOrder before we can show the "taken" overlay.
@@ -164,7 +166,7 @@ export function useGlobalOrderAccept() {
         const store = useOrderAcceptStore.getState();
         if (!store.pendingOrder) return;
         if (store.takenByOther || store.accepting) return;
-        const stillAvailable = availableOrders.some((o) => o.id === store.pendingOrder.id);
+        const stillAvailable = poolOrders.some((o) => o.id === store.pendingOrder.id);
         if (!stillAvailable) {
             // Check why it disappeared: still in the order list but now has a different driver
             // means someone else took it — show the overlay instead of silently dismissing.
@@ -175,7 +177,7 @@ export function useGlobalOrderAccept() {
                 store.setPendingOrder(null);
             }
         }
-    }, [availableOrders, orders, currentDriverId]);
+    }, [poolOrders, orders, currentDriverId]);
 
     // ── Auto-present (capacity-aware) ──
     // Depends on pendingOrder so after skip/dismiss the next order surfaces immediately.

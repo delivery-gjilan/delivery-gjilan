@@ -1,4 +1,4 @@
-import { relations, sql } from 'drizzle-orm';
+﻿import { relations, sql } from 'drizzle-orm';
 import {
     pgTable,
     varchar,
@@ -46,7 +46,7 @@ export const orders = pgTable(
         markupPrice: numeric('markup_price', { mode: 'number', precision: 10, scale: 2 }).notNull().default(0),
         actualPrice: numeric('actual_price', { mode: 'number', precision: 10, scale: 2 }).notNull(),
         /**
-         * businessPrice — what the business actually earns from this order's items.
+         * businessPrice â€” what the business actually earns from this order's items.
          * Starts equal to basePrice. When business-funded promotions are applied by
          * the business, their discount reduces this value (the business absorbs the
          * discount rather than the platform). Used as the commission base for
@@ -54,7 +54,7 @@ export const orders = pgTable(
          */
         businessPrice: numeric('business_price', { mode: 'number', precision: 10, scale: 2 }),
         /**
-         * inventoryPrice — total base price of items covered by the operator's
+         * inventoryPrice â€” total base price of items covered by the operator's
          * personal inventory for this order. Excluded from basePrice and
          * businessPrice so the business is only paid for market-sourced items.
          * Used as the settlement amount the driver owes the platform for stock items.
@@ -62,6 +62,8 @@ export const orders = pgTable(
         inventoryPrice: numeric('inventory_price', { mode: 'number', precision: 10, scale: 2 }),
         originalDeliveryPrice: numeric('original_delivery_price', { mode: 'number', precision: 10, scale: 2 }),
         deliveryPrice: numeric('delivery_price', { mode: 'number', precision: 10, scale: 2 }).notNull(),
+        /** cashToCollect — DIRECT_DISPATCH only: amount driver collects from customer. Null = not specified. */
+        cashToCollect: numeric('cash_to_collect', { mode: 'number', precision: 10, scale: 2 }),
         prioritySurcharge: numeric('priority_surcharge', { mode: 'number', precision: 10, scale: 2 }).notNull().default(0),
         driverTip: numeric('driver_tip', { mode: 'number', precision: 10, scale: 2 }).notNull().default(0),
 

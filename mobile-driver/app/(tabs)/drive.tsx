@@ -117,7 +117,7 @@ export default function MapScreen() {
             zoomLevel: hasActiveNavigation ? 16 : 14.5,
             animationDuration: 600,
             animationMode: 'easeTo',
-        });
+        } as any);
     }, [location, hasActiveNavigation]);
 
     const recenterOnDriver = useCallback(() => {
@@ -131,7 +131,7 @@ export default function MapScreen() {
             bearing: location.heading ?? 0,
             animationDuration: 300,
             animationMode: 'easeTo',
-        });
+        } as any);
     }, [followDriver, location]);
 
     const allMapOrders = useMemo(
@@ -169,6 +169,7 @@ export default function MapScreen() {
 
             const bizLoc = focusedOrder.businesses?.[0]?.business?.location;
             const dropLoc = focusedOrder.dropOffLocation;
+            const isDirectDispatch = focusedOrder.channel === 'DIRECT_DISPATCH';
             if (!bizLoc) return;
 
             const driverCoord = { latitude: loc.latitude, longitude: loc.longitude };
@@ -177,7 +178,9 @@ export default function MapScreen() {
                 ? { latitude: Number(dropLoc.latitude), longitude: Number(dropLoc.longitude) }
                 : null;
 
-            if (focusedOrder.status === 'OUT_FOR_DELIVERY' && dropoffCoord) {
+            const canUseDropoff = Boolean(dropoffCoord) && !isDirectDispatch;
+
+            if (focusedOrder.status === 'OUT_FOR_DELIVERY' && canUseDropoff && dropoffCoord) {
                 // Clear the pickupâ†’dropoff preview â€” not needed while delivering
                 if (!cancelled) {
                     setPreviewRouteCoords(null);
@@ -194,12 +197,15 @@ export default function MapScreen() {
                     setRouteCoords(result.coordinates);
                     setRouteInfo({ distanceKm: result.distanceKm, durationMin: result.durationMin });
                 }
-                if (dropoffCoord) {
+                if (canUseDropoff && dropoffCoord) {
                     const preview = await fetchRouteGeometry(pickupCoord, dropoffCoord);
                     if (!cancelled && preview) {
                         setPreviewRouteCoords(preview.coordinates);
                         setPreviewRouteInfo({ distanceKm: preview.distanceKm, durationMin: preview.durationMin });
                     }
+                } else if (!cancelled) {
+                    setPreviewRouteCoords(null);
+                    setPreviewRouteInfo(null);
                 }
             }
         };
@@ -246,6 +252,7 @@ export default function MapScreen() {
     const focusOrder = useCallback((order: DriverOrder) => {
         const bizLoc = order.businesses?.[0]?.business?.location;
         const dropLoc = order.dropOffLocation;
+        const canUseDropoff = order.channel !== 'DIRECT_DISPATCH' && !!dropLoc;
 
         setFocusedOrderId(order.id);
 
@@ -258,14 +265,14 @@ export default function MapScreen() {
         const padBottom = BOTTOM_BAR_HEIGHT + 20;
 
         // OUT_FOR_DELIVERY: show driver + dropoff only
-        if (order.status === 'OUT_FOR_DELIVERY' && dropLoc && location) {
+        if (order.status === 'OUT_FOR_DELIVERY' && canUseDropoff && dropLoc && location) {
             const lats = [Number(dropLoc.latitude), location.latitude];
             const lngs = [Number(dropLoc.longitude), location.longitude];
             const ne: [number, number] = [Math.max(...lngs) + 0.005, Math.max(...lats) + 0.005];
             const sw: [number, number] = [Math.min(...lngs) - 0.005, Math.min(...lats) - 0.005];
 
             cameraRef.current?.fitBounds(ne, sw, [padTop, 20, padBottom, 20], 1200);
-        } else if (bizLoc && dropLoc && location) {
+        } else if (bizLoc && canUseDropoff && dropLoc && location) {
             // Not delivering yet: show driver + pickup + dropoff (3 points)
             const lats = [location.latitude, Number(bizLoc.latitude), Number(dropLoc.latitude)];
             const lngs = [location.longitude, Number(bizLoc.longitude), Number(dropLoc.longitude)];
@@ -291,7 +298,7 @@ export default function MapScreen() {
                 bearing: 0,
                 animationDuration: 500,
                 animationMode: 'easeTo',
-            });
+            } as any);
         } else {
             centerCameraOnDriver(true);
         }
@@ -302,7 +309,7 @@ export default function MapScreen() {
         if (!targetId) return;
         setMarkingPickedUpIds(prev => new Set(prev).add(targetId));
         try {
-            await updateOrderStatus({ variables: { id: targetId, status: 'OUT_FOR_DELIVERY' } });
+            await updateOrderStatus({ variables: { id: targetId, status: 'OUT_FOR_DELIVERY' as any } });
             // Immediately launch turn-by-turn navigation to dropoff
             const order = allMapOrders.find((o) => o.id === targetId);
             if (order && location) {
@@ -609,8 +616,8 @@ export default function MapScreen() {
                     const dropLoc = order.dropOffLocation;
                     const biz = order.businesses?.[0]?.business;
                     const bizName = biz?.name ?? '?';
-                    const bizImageUrl = biz?.imageUrl;
-                    const isRestaurant = biz?.businessType === 'RESTAURANT';
+                    const bizImageUrl = (biz as any)?.imageUrl;
+                    const isRestaurant = (biz as any)?.businessType === 'RESTAURANT';
 
                     return (
                         <React.Fragment key={order.id}>
@@ -646,7 +653,7 @@ export default function MapScreen() {
                                 </Mapbox.PointAnnotation>
                             )}
 
-                            {isAssigned && isFocused && dropLoc && (
+                            {isAssigned && isFocused && !isDirectDispatch && dropLoc && (
                                 <Mapbox.PointAnnotation
                                     id={`dropoff-${order.id}`}
                                     coordinate={[Number(dropLoc.longitude), Number(dropLoc.latitude)]}
@@ -744,6 +751,7 @@ export default function MapScreen() {
             {assignedOrders.length > 0 && (() => {
                 const idx = Math.min(currentCardIndex, assignedOrders.length - 1);
                 const order = assignedOrders[idx];
+                if (!order) return null;
                 const statusColor = STATUS_COLORS[order.status] ?? '#6B7280';
                 const bizName = order.businesses?.[0]?.business?.name ?? '?';
                 const initial = bizName.charAt(0).toUpperCase();
@@ -758,6 +766,13 @@ export default function MapScreen() {
                     ? Math.max(0, Math.ceil((new Date(order.estimatedReadyAt).getTime() - nowTs) / 60000))
                     : null;
                 const total = assignedOrders.length;
+                const isDirectDispatch = order.channel === 'DIRECT_DISPATCH';
+                const recipientLabel = order.recipientName ?? order.recipientPhone ?? null;
+                const allItems = order.businesses?.flatMap((b) => b.items ?? []) ?? [];
+                const totalStockUnits = allItems.reduce((sum, it) => sum + (it.inventoryQuantity ?? 0), 0);
+                const orderPrice = Number((order as any).orderPrice ?? 0);
+                const inventoryPrice = Number((order as any).inventoryPrice ?? 0);
+                const businessPrice = Math.max(0, orderPrice - inventoryPrice);
 
                 return (
                     <View style={[styles.singleCardWrap, { bottom: 12 + insets.bottom }]}>
@@ -788,13 +803,23 @@ export default function MapScreen() {
                                 <Text style={styles.cardAvatarText}>{initial}</Text>
                             </View>
                             <View style={styles.cardHeaderInfo}>
-                                <Text style={styles.cardBizName} numberOfLines={1}>{bizName}</Text>
-                                {shortDrop ? (
+                                <View style={styles.cardBizRow}>
+                                    <Text style={styles.cardBizName} numberOfLines={1}>{bizName}</Text>
+                                    {isDirectDispatch && (
+                                        <View style={styles.cardDirectBadge}>
+                                            <Ionicons name="call" size={10} color="#fff" />
+                                            <Text style={styles.cardDirectBadgeText}>Direct Call</Text>
+                                        </View>
+                                    )}
+                                </View>
+                                {recipientLabel ? (
+                                    <Text style={[styles.cardAddress, isDirectDispatch && styles.cardRecipient]} numberOfLines={1}>{recipientLabel}</Text>
+                                ) : shortDrop ? (
                                     <Text style={styles.cardAddress} numberOfLines={1}>{shortDrop}</Text>
                                 ) : null}
                             </View>
                             <View style={styles.cardEarningsBadge}>
-                                <Text style={styles.cardEarningsText}>â‚¬{earnings}</Text>
+                                <Text style={styles.cardEarningsText}>€{earnings}</Text>
                             </View>
                         </View>
 
@@ -818,26 +843,38 @@ export default function MapScreen() {
                                     {prepMinsLeft === 0 ? t.drive.almost_ready : t.drive.ready_min.replace('{{min}}', String(prepMinsLeft))}
                                 </Text>
                             )}
-                            {/* Swipe hint â€” only when multiple orders */}
                             {total > 1 && (
                                 <Text style={styles.cardSwipeHint}>{t.drive.swipe_hint}</Text>
                             )}
                         </View>
 
+                        {(isDirectDispatch || totalStockUnits > 0 || businessPrice > 0) && (
+                            <View style={styles.cardSignalRow}>
+                                {totalStockUnits > 0 && (
+                                    <View style={styles.cardSignalStock}>
+                                        <Text style={styles.cardSignalStockText}>📦 {totalStockUnits} stock</Text>
+                                    </View>
+                                )}
+                                {businessPrice > 0 && (
+                                    <View style={styles.cardSignalPay}>
+                                        <Text style={styles.cardSignalPayText}>pay biz −€{businessPrice.toFixed(2)}</Text>
+                                    </View>
+                                )}
+                            </View>
+                        )}
+
                         {/* Fulfillment guide — visible when order has stock items */}
                         {(() => {
-                            const allItems = order.businesses?.flatMap((b) => b.items ?? []) ?? [];
                             const stockItems = allItems.filter((it) => (it.inventoryQuantity ?? 0) > 0);
                             if (stockItems.length === 0) return null;
 
-                            const totalStockUnits = allItems.reduce((sum, it) => sum + (it.inventoryQuantity ?? 0), 0);
                             const totalMarketUnits = allItems.reduce((sum, it) => sum + Math.max(0, it.quantity - (it.inventoryQuantity ?? 0)), 0);
 
                             return (
                                 <View style={styles.fulfillmentGuide}>
                                     <View style={styles.fulfillmentTitleRow}>
                                         <Ionicons name="cube-outline" size={12} color="#7c3aed" />
-                                        <Text style={styles.fulfillmentTitle}>{t.drive.fulfillment_guide}</Text>
+                                        <Text style={styles.fulfillmentTitle}>Fulfillment guide</Text>
                                     </View>
 
                                     {/* Per-item rows */}
@@ -866,8 +903,8 @@ export default function MapScreen() {
                                     {/* Summary footer */}
                                     <View style={styles.fulfillmentFooter}>
                                         <Text style={styles.fulfillmentFooterText}>
-                                            {t.drive.units_from_stock.replace('{{count}}', String(totalStockUnits))}
-                                            {totalMarketUnits > 0 ? `  ·  ${t.drive.units_from_market.replace('{{count}}', String(totalMarketUnits))}` : ''}
+                                            {`${totalStockUnits} from stock`}
+                                            {totalMarketUnits > 0 ? `  ·  ${totalMarketUnits} from market` : ''}
                                         </Text>
                                     </View>
                                 </View>
@@ -1221,14 +1258,38 @@ const styles = StyleSheet.create({
         flex: 1,
         gap: 2,
     },
+    cardBizRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
     cardBizName: {
         fontSize: 15,
         fontWeight: '700',
         color: '#f1f5f9',
     },
+    cardDirectBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: '#F97316',
+        borderRadius: 999,
+        paddingHorizontal: 7,
+        paddingVertical: 3,
+    },
+    cardDirectBadgeText: {
+        fontSize: 9,
+        fontWeight: '800',
+        color: '#fff',
+        letterSpacing: 0.2,
+    },
     cardAddress: {
         fontSize: 11,
         color: '#64748b',
+    },
+    cardRecipient: {
+        color: '#fdba74',
+        fontWeight: '700',
     },
     cardEarningsBadge: {
         backgroundColor: 'rgba(5,46,22,0.9)',
@@ -1274,6 +1335,35 @@ const styles = StyleSheet.create({
         color: 'rgba(148,163,184,0.45)',
         fontSize: 10,
         fontWeight: '500',
+    },
+    cardSignalRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        flexWrap: 'wrap',
+        marginTop: -1,
+    },
+    cardSignalStock: {
+        backgroundColor: 'rgba(124,58,237,0.16)',
+        borderRadius: 999,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+    },
+    cardSignalStockText: {
+        color: '#c4b5fd',
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    cardSignalPay: {
+        backgroundColor: 'rgba(239,68,68,0.14)',
+        borderRadius: 999,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+    },
+    cardSignalPayText: {
+        color: '#fca5a5',
+        fontSize: 11,
+        fontWeight: '700',
         marginLeft: 'auto' as any,
     },
     cardCta: {

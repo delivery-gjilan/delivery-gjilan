@@ -42,11 +42,12 @@ export interface DirectDispatchAvailabilityResult {
 
 export interface CreateDirectDispatchInput {
     businessId: string;
-    dropOffLocation: { latitude: number; longitude: number; address: string };
+    dropOffLocation?: { latitude: number; longitude: number; address: string } | null;
     preparationMinutes: number;
     recipientPhone: string;
     recipientName?: string | null;
     driverNotes?: string | null;
+    cashToCollect?: number | null;
 }
 
 export class DirectDispatchService {
@@ -158,9 +159,10 @@ export class DirectDispatchService {
                 preparationMinutes: input.preparationMinutes,
                 preparingAt: now.toISOString(),
                 estimatedReadyAt: estimatedReadyAt.toISOString(),
-                dropoffLat: input.dropOffLocation.latitude,
-                dropoffLng: input.dropOffLocation.longitude,
-                dropoffAddress: input.dropOffLocation.address,
+                    dropoffLat: input.dropOffLocation?.latitude ?? 0,
+                    dropoffLng: input.dropOffLocation?.longitude ?? 0,
+                    dropoffAddress: input.dropOffLocation?.address ?? '',
+                    cashToCollect: input.cashToCollect ?? null,
                 driverNotes: input.driverNotes ?? null,
             })
             .returning();

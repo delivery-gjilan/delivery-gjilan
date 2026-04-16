@@ -40,11 +40,12 @@ export const createDirectDispatchOrder: NonNullable<MutationResolvers['createDir
     const dbOrder = await service.createOrder(
         {
             businessId,
-            dropOffLocation: input.dropOffLocation,
+            dropOffLocation: input.dropOffLocation ?? null,
             preparationMinutes: input.preparationMinutes,
             recipientPhone: input.recipientPhone,
             recipientName: input.recipientName ?? null,
             driverNotes: input.driverNotes ?? null,
+            cashToCollect: input.cashToCollect ?? null,
         },
         userId,
     );

@@ -491,11 +491,13 @@ input CreateDeliveryZoneInput {
 }
 
 input CreateDirectDispatchOrderInput {
+  """
+  Cash amount the driver should collect from the customer. Null if unknown at dispatch time.
+  """
+  cashToCollect: Float
+
   """Optional notes for the driver."""
   driverNotes: String
-
-  """Delivery address for the recipient."""
-  dropOffLocation: LocationInput!
 
   """Estimated preparation time in minutes for early dispatch scheduling."""
   preparationMinutes: Int!
@@ -1420,6 +1422,11 @@ type Order {
   businesses: [OrderBusiness!]!
   cancellationReason: String
   cancelledAt: Date
+
+  """
+  For DIRECT_DISPATCH orders: cash the driver should collect from the customer. Null if not specified by the business.
+  """
+  cashToCollect: Float
   channel: OrderChannel!
   deliveredAt: Date
   deliveryPrice: Float!

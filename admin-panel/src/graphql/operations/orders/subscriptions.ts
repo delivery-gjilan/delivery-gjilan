@@ -8,6 +8,7 @@ export const ORDERS_SUBSCRIPTION = gql(`
             channel
             recipientPhone
             recipientName
+            cashToCollect
             orderPrice
             deliveryPrice
             originalPrice
@@ -80,6 +81,7 @@ export const ALL_ORDERS_SUBSCRIPTION = gql(`
             channel
             recipientPhone
             recipientName
+            cashToCollect
             orderPrice
             deliveryPrice
             originalPrice

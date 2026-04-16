@@ -25,16 +25,20 @@ export function buildNavOrder(order: DriverOrder): NavigationOrder | null {
           }
         : null;
 
-    const customerName = order.user
+    const isDirectDispatch = order.channel === 'DIRECT_DISPATCH';
+    const customerName = isDirectDispatch
+        ? order.recipientName ?? order.recipientPhone ?? 'Direct Call'
+        : order.user
         ? `${order.user.firstName} ${order.user.lastName}`
         : 'Customer';
+    const customerPhone = isDirectDispatch ? order.recipientPhone ?? null : order.user?.phoneNumber ?? null;
 
     return {
         id: order.id,
         status: order.status,
         businessName: order.businesses?.[0]?.business?.name ?? 'Business',
         customerName,
-        customerPhone: order.user?.phoneNumber ?? null,
+        customerPhone,
         pickup,
         dropoff,
     };
