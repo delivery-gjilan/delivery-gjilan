@@ -222,6 +222,11 @@ export function OrderInspectSheet({
         }
     }, [onMarkPickedUp]);
 
+    // Calculate net earnings (after business payment deduction)
+    const driverTip = Number(order.driverTip ?? 0);
+    const grossEarnings = Number(deliveryFee) + driverTip;
+    const netEarnings = Math.max(0, grossEarnings - businessPrice);
+
     const primaryAction = useMemo(() => {
         if (isAvailable) {
             return {
@@ -406,69 +411,135 @@ export function OrderInspectSheet({
                     )}
 
                     <View style={styles.sectionHeaderRow}>
-                        <Text style={styles.sectionTitle}>Cash On This Order</Text>
+                        <Text style={styles.sectionTitle}>Your Earnings</Text>
                     </View>
                     <View style={styles.cashBreakdown}>
                         <View style={styles.cashRows}>
+                            {/* Delivery Fee */}
+                            <View style={styles.cashRow}>
+                                <View style={styles.cashRowLeft}>
+                                    <View style={[styles.cashDot, { backgroundColor: '#3B82F6' }]} />
+                                    <View>
+                                        <Text style={styles.cashRowLabel}>Delivery Fee</Text>
+                                        <Text style={styles.cashRowHint}>Your compensation for delivery</Text>
+                                    </View>
+                                </View>
+                                <Text style={[styles.cashRowAmount, { color: '#3B82F6' }]}>+€{Number(deliveryFee).toFixed(2)}</Text>
+                            </View>
+
+                            {/* Tip (if any) */}
+                            {driverTip > 0 && (
+                                <View style={styles.cashRow}>
+                                    <View style={styles.cashRowLeft}>
+                                        <View style={[styles.cashDot, { backgroundColor: '#EC4899' }]} />
+                                        <View>
+                                            <Text style={styles.cashRowLabel}>Tip</Text>
+                                            <Text style={styles.cashRowHint}>Customer appreciation</Text>
+                                        </View>
+                                    </View>
+                                    <Text style={[styles.cashRowAmount, { color: '#EC4899' }]}>+€{driverTip.toFixed(2)}</Text>
+                                </View>
+                            )}
+
+                            {/* Subtotal earnings */}
+                            {(businessPrice > 0 || !isDirectDispatch) && (
+                                <View style={styles.cashRow}>
+                                    <View style={styles.cashRowLeft}>
+                                        <View style={[styles.cashDot, { backgroundColor: '#9CA3AF' }]} />
+                                        <View>
+                                            <Text style={styles.cashRowLabel}>Subtotal</Text>
+                                            <Text style={styles.cashRowHint}>Before deductions</Text>
+                                        </View>
+                                    </View>
+                                    <Text style={[styles.cashRowAmount, { color: '#6B7280', fontWeight: '600' }]}>€{grossEarnings.toFixed(2)}</Text>
+                                </View>
+                            )}
+
+                            {/* Business Payment Deduction (Market Items) */}
                             {!isDirectDispatch && businessPrice > 0 && (
                                 <View style={styles.cashRow}>
                                     <View style={styles.cashRowLeft}>
                                         <View style={[styles.cashDot, { backgroundColor: '#EF4444' }]} />
                                         <View>
-                                            <Text style={styles.cashRowLabel}>{cashCopy.payBusiness}</Text>
-                                            <Text style={styles.cashRowHint}>{cashCopy.payBusinessHint}</Text>
+                                            <Text style={[styles.cashRowLabel, { fontWeight: '700' }]}>Pay Business</Text>
+                                            <Text style={styles.cashRowHint}>Market items you source on-site</Text>
                                         </View>
                                     </View>
-                                    <Text style={[styles.cashRowAmount, { color: '#EF4444' }]}>-€{businessPrice.toFixed(2)}</Text>
+                                    <Text style={[styles.cashRowAmount, { color: '#EF4444', fontWeight: '700' }]}>−€{businessPrice.toFixed(2)}</Text>
                                 </View>
                             )}
-                            {!isDirectDispatch && (
-                                <View style={styles.cashRow}>
-                                    <View style={styles.cashRowLeft}>
-                                        <View style={[styles.cashDot, { backgroundColor: '#10B981' }]} />
-                                        <View>
-                                            <Text style={styles.cashRowLabel}>{cashCopy.collectCustomer}</Text>
-                                            <Text style={styles.cashRowHint}>{cashCopy.collectCustomerHint}</Text>
-                                        </View>
-                                    </View>
-                                    <Text style={[styles.cashRowAmount, { color: '#10B981' }]}>+€{totalPrice.toFixed(2)}</Text>
-                                </View>
-                            )}
-                            {isDirectDispatch && cashToCollect > 0 && (
-                                <View style={styles.cashRow}>
-                                    <View style={styles.cashRowLeft}>
-                                        <View style={[styles.cashDot, { backgroundColor: '#10B981' }]} />
-                                        <View>
-                                            <Text style={styles.cashRowLabel}>Collect from customer</Text>
-                                            <Text style={styles.cashRowHint}>Cash to collect on delivery</Text>
-                                        </View>
-                                    </View>
-                                    <Text style={[styles.cashRowAmount, { color: '#10B981' }]}>+€{cashToCollect.toFixed(2)}</Text>
-                                </View>
-                            )}
-                            {isDirectDispatch && cashToCollect === 0 && (
-                                <View style={styles.cashRow}>
-                                    <View style={styles.cashRowLeft}>
-                                        <View style={[styles.cashDot, { backgroundColor: '#9CA3AF' }]} />
-                                        <View>
-                                            <Text style={styles.cashRowLabel}>Collect from customer</Text>
-                                            <Text style={styles.cashRowHint}>Confirm amount with business</Text>
-                                        </View>
-                                    </View>
-                                </View>
-                            )}
-                            <View style={[styles.cashRow, styles.cashRowLast]}>
+
+                            {/* NET EARNINGS - HIGHLIGHTED */}
+                            <View style={[styles.cashRow, styles.cashRowLast, styles.netEarningsRow]}>
                                 <View style={styles.cashRowLeft}>
-                                    <View style={[styles.cashDot, { backgroundColor: '#6366F1' }]} />
+                                    <View style={[styles.cashDot, { backgroundColor: '#22C55E' }]} />
                                     <View>
-                                        <Text style={[styles.cashRowLabel, { color: '#6366F1', fontWeight: '700' }]}>{cashCopy.yourCut}</Text>
-                                        <Text style={styles.cashRowHint}>{cashCopy.yourCutHint}</Text>
+                                        <Text style={[styles.cashRowLabel, styles.netEarningsLabel]}>You Keep</Text>
+                                        <Text style={styles.cashRowHint}>Your final payout</Text>
                                     </View>
                                 </View>
-                                <Text style={[styles.cashRowAmount, styles.cashCutAmount]}>€{deliveryFee}</Text>
+                                <Text style={[styles.cashRowAmount, styles.netEarningsAmount]}>€{netEarnings.toFixed(2)}</Text>
                             </View>
                         </View>
                     </View>
+
+                    {/* Customer Collection Section (separate from earnings) */}
+                    {!isDirectDispatch && (
+                        <>
+                            <View style={styles.sectionHeaderRow}>
+                                <Text style={styles.sectionTitle}>Cash From Customer</Text>
+                            </View>
+                            <View style={styles.cashBreakdown}>
+                                <View style={styles.cashRows}>
+                                    <View style={[styles.cashRow, styles.cashRowLast]}>
+                                        <View style={styles.cashRowLeft}>
+                                            <View style={[styles.cashDot, { backgroundColor: '#10B981' }]} />
+                                            <View>
+                                                <Text style={styles.cashRowLabel}>{cashCopy.collectCustomer}</Text>
+                                                <Text style={styles.cashRowHint}>{cashCopy.collectCustomerHint}</Text>
+                                            </View>
+                                        </View>
+                                        <Text style={[styles.cashRowAmount, { color: '#10B981' }]}>+€{totalPrice.toFixed(2)}</Text>
+                                    </View>
+                                </View>
+                            </View>
+                        </>
+                    )}
+
+                    {/* Direct Dispatch Cash Section */}
+                    {isDirectDispatch && (
+                        <>
+                            <View style={styles.sectionHeaderRow}>
+                                <Text style={styles.sectionTitle}>Cash From Customer</Text>
+                            </View>
+                            <View style={styles.cashBreakdown}>
+                                <View style={styles.cashRows}>
+                                    {cashToCollect > 0 ? (
+                                        <View style={[styles.cashRow, styles.cashRowLast]}>
+                                            <View style={styles.cashRowLeft}>
+                                                <View style={[styles.cashDot, { backgroundColor: '#10B981' }]} />
+                                                <View>
+                                                    <Text style={styles.cashRowLabel}>Collect from customer</Text>
+                                                    <Text style={styles.cashRowHint}>Cash to collect on delivery</Text>
+                                                </View>
+                                            </View>
+                                            <Text style={[styles.cashRowAmount, { color: '#10B981' }]}>+€{cashToCollect.toFixed(2)}</Text>
+                                        </View>
+                                    ) : (
+                                        <View style={[styles.cashRow, styles.cashRowLast]}>
+                                            <View style={styles.cashRowLeft}>
+                                                <View style={[styles.cashDot, { backgroundColor: '#9CA3AF' }]} />
+                                                <View>
+                                                    <Text style={styles.cashRowLabel}>Collect from customer</Text>
+                                                    <Text style={styles.cashRowHint}>Confirm amount with business</Text>
+                                                </View>
+                                            </View>
+                                        </View>
+                                    )}
+                                </View>
+                            </View>
+                        </>
+                    )}
 
                     {!!order.driverNotes && (
                         <View style={styles.notesRow}>
@@ -831,6 +902,22 @@ const styles = StyleSheet.create({
         fontWeight: '900',
         fontSize: 20,
         letterSpacing: -0.5,
+    },
+    netEarningsRow: {
+        backgroundColor: '#F0FDF4',
+        borderTopWidth: 1,
+        borderTopColor: '#D1FAE5',
+        paddingTop: 10,
+    },
+    netEarningsLabel: {
+        color: '#15803D',
+        fontWeight: '800',
+    },
+    netEarningsAmount: {
+        color: '#22C55E',
+        fontWeight: '900',
+        fontSize: 24,
+        letterSpacing: -0.6,
     },
     notesRow: {
         backgroundColor: '#FFFBEB',

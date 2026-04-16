@@ -256,6 +256,7 @@ The most complex visual page. Full-screen Mapbox GL map with driver positions, o
 - Per-driver/order warning thresholds: PENDING >2min, READY >3min, OUT_FOR_DELIVERY >10min.
 - Status-to-cancel transition opens the same `CancelOrderModal` used in Orders, keeping reason capture and settlement decisions consistent across both pages.
 - Driver/business chat panels with unread count tracking.
+- Business chat open actions execute `GET_BUSINESS_MESSAGES` with explicit lazy-query variables (`businessUserId`, `limit`, `offset`), which keeps Apollo option-shape expectations intact during click handling.
 - Core map helpers (trust markers, approval reasons, ETA fallback, status timing, and auto-assign/status action handlers) now use explicit local user/order/driver shape aliases instead of raw `any` parameters.
 - Render-layer typing cleanup is applied through map markers, right-panel cards, driver/business/chat panes, approval modal, and bottom detail helper components, with local shape aliases covering settlement preview and inventory badges instead of broad `any` casts.
 - `// @ts-nocheck` — entire file bypasses TypeScript type safety.

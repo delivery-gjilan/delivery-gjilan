@@ -22,6 +22,18 @@ import { useOrderAcceptStore } from "@/store/orderAcceptStore";
 import { useRouter } from "expo-router";
 import { OrderDetailSheet } from "@/components/OrderDetailSheet";
 import type { DriverOrder } from "@/utils/types";
+import { LinearGradient } from "expo-linear-gradient";
+
+const UI = {
+    bgTop: "#1a1a2e",
+    bgBottom: "#0f3460",
+    card: "#111827",
+    cardBorder: "rgba(148,163,184,0.28)",
+    text: "#E2E8F0",
+    subtext: "#94A3B8",
+    accent: "#009de0",
+    accentDeep: "#006da3",
+};
 
 // ─── Order Card ──────────────────────────────────────────────────────────────
 
@@ -100,12 +112,12 @@ function OrderCard({
             marginHorizontal: 16,
             marginBottom: 12,
             borderRadius: 20,
-            backgroundColor: theme.colors.card,
+            backgroundColor: UI.card,
             borderWidth: 1,
             borderColor:
                 isDirectDispatch ? "#f9731640"
-                : variant === "available" ? "#16a34a30"
-                : theme.colors.border,
+                : variant === "available" ? "rgba(0,157,224,0.35)"
+                : UI.cardBorder,
             overflow: "hidden",
         }}>
             {isDirectDispatch && <View style={{ height: 4, backgroundColor: "#f97316" }} />}
@@ -119,7 +131,7 @@ function OrderCard({
                 paddingBottom: 10,
             }}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
-                    <Text style={{ fontSize: 16, fontWeight: "800", color: theme.colors.text, flexShrink: 1 }}>
+                    <Text style={{ fontSize: 16, fontWeight: "800", color: UI.text, flexShrink: 1 }}>
                         {bizName}
                     </Text>
                     {isDirectDispatch && (
@@ -127,8 +139,8 @@ function OrderCard({
                             flexDirection: "row",
                             alignItems: "center",
                             gap: 4,
-                            backgroundColor: "#fff7ed",
-                            borderColor: "#fdba74",
+                            backgroundColor: "rgba(249,115,22,0.12)",
+                            borderColor: "rgba(249,115,22,0.5)",
                             borderWidth: 1,
                             borderRadius: 999,
                             paddingHorizontal: 8,
@@ -139,12 +151,12 @@ function OrderCard({
                         </View>
                     )}
                     <View style={{
-                        backgroundColor: "#f1f5f9",
+                        backgroundColor: "rgba(148,163,184,0.18)",
                         borderRadius: 8,
                         paddingHorizontal: 7,
                         paddingVertical: 2,
                     }}>
-                        <Text style={{ fontSize: 11, fontWeight: "700", color: "#64748b" }}>
+                        <Text style={{ fontSize: 11, fontWeight: "700", color: UI.subtext }}>
                             #{order.displayId}
                         </Text>
                     </View>
@@ -168,7 +180,7 @@ function OrderCard({
             {/* Items */}
             {itemSummary.length > 0 && (
                 <View style={{ paddingHorizontal: 16, paddingBottom: 10 }}>
-                    <Text style={{ fontSize: 13, color: theme.colors.subtext }} numberOfLines={1}>
+                    <Text style={{ fontSize: 13, color: UI.subtext }} numberOfLines={1}>
                         {itemSummary}{moreCount > 0 ? ` +${moreCount} more` : ""}
                     </Text>
                 </View>
@@ -177,18 +189,18 @@ function OrderCard({
             {(isDirectDispatch || totalStockUnits > 0 || businessPrice > 0) && (
                 <View style={{ flexDirection: "row", gap: 6, paddingHorizontal: 16, paddingBottom: 10, flexWrap: "wrap" }}>
                     {totalStockUnits > 0 && (
-                        <View style={{ backgroundColor: "#f5f3ff", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 }}>
-                            <Text style={{ fontSize: 11, fontWeight: "700", color: "#7c3aed" }}>📦 {totalStockUnits} stock</Text>
+                        <View style={{ backgroundColor: "rgba(114,9,183,0.18)", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 }}>
+                            <Text style={{ fontSize: 11, fontWeight: "700", color: "#c4b5fd" }}>📦 {totalStockUnits} stock</Text>
                         </View>
                     )}
                     {totalMarketUnits > 0 && totalStockUnits > 0 && (
-                        <View style={{ backgroundColor: "#eff6ff", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 }}>
-                            <Text style={{ fontSize: 11, fontWeight: "700", color: "#2563eb" }}>🛒 {totalMarketUnits} market</Text>
+                        <View style={{ backgroundColor: "rgba(0,157,224,0.16)", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 }}>
+                            <Text style={{ fontSize: 11, fontWeight: "700", color: "#7dd3fc" }}>🛒 {totalMarketUnits} market</Text>
                         </View>
                     )}
                     {businessPrice > 0 && (
-                        <View style={{ backgroundColor: "#fef2f2", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 }}>
-                            <Text style={{ fontSize: 11, fontWeight: "700", color: "#dc2626" }}>pay biz −€{businessPrice.toFixed(2)}</Text>
+                        <View style={{ backgroundColor: "rgba(239,68,68,0.16)", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 }}>
+                            <Text style={{ fontSize: 11, fontWeight: "700", color: "#fca5a5" }}>pay biz −€{businessPrice.toFixed(2)}</Text>
                         </View>
                     )}
                 </View>
@@ -196,35 +208,43 @@ function OrderCard({
 
             {/* Drop-off address */}
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, paddingBottom: 14 }}>
-                <Ionicons name="location-outline" size={13} color={theme.colors.subtext} />
-                <Text style={{ fontSize: 13, color: theme.colors.subtext, flex: 1 }} numberOfLines={1}>
+                <Ionicons name="location-outline" size={13} color={UI.subtext} />
+                <Text style={{ fontSize: 13, color: UI.subtext, flex: 1 }} numberOfLines={1}>
                     {dropAddress}
                 </Text>
             </View>
 
             {/* Divider */}
-            <View style={{ height: 1, backgroundColor: theme.colors.border }} />
+            <View style={{ height: 1, backgroundColor: "rgba(148,163,184,0.18)" }} />
 
             {/* Footer */}
             <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, gap: 10 }}>
                 {/* Earnings */}
                 <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 22, fontWeight: "900", color: "#22c55e", letterSpacing: -0.5 }}>
-                        €{driverEarning.toFixed(2)}
-                    </Text>
-                    {order.driverTip > 0 && (
-                        <Text style={{ fontSize: 11, color: theme.colors.subtext }}>
-                            incl. €{order.driverTip.toFixed(2)} tip
+                    {/* Net earnings - prominent */}
+                    <View style={{ flexDirection: "row", alignItems: "baseline", gap: 4, marginBottom: 2 }}>
+                        <Text style={{ fontSize: 22, fontWeight: "900", color: "#22c55e", letterSpacing: -0.5 }}>
+                            €{driverEarning.toFixed(2)}
+                        </Text>
+                        {businessPrice > 0 && (
+                            <Text style={{ fontSize: 11, fontWeight: "700", color: "#ef4444" }}>
+                                · −€{businessPrice.toFixed(2)} biz
+                            </Text>
+                        )}
+                    </View>
+                    
+                    {/* Breakdown text */}
+                    {(order.driverTip > 0 || businessPrice > 0) && (
+                        <Text style={{ fontSize: 10, color: theme.colors.subtext }}>
+                            {order.driverTip > 0 && `incl. €${order.driverTip.toFixed(2)} tip`}
+                            {order.driverTip > 0 && businessPrice > 0 && " · "}
+                            {businessPrice > 0 && `pay business on checkout`}
                         </Text>
                     )}
-                    {businessPrice > 0 && (
-                        <Text style={{ fontSize: 11, color: "#ef4444", fontWeight: "600" }}>
-                            pay biz −€{businessPrice.toFixed(2)}
-                        </Text>
-                    )}
+                    
                     {variant === "available" && onOpenDetails && (
-                        <Text style={{ fontSize: 11, color: theme.colors.subtext }}>
-                            Tap card for full details
+                        <Text style={{ fontSize: 10, color: UI.subtext, marginTop: 2 }}>
+                            Tap card for details
                         </Text>
                     )}
                 </View>
@@ -238,7 +258,7 @@ function OrderCard({
                         }}
                         activeOpacity={0.8}
                         style={{
-                            backgroundColor: "#16a34a",
+                            backgroundColor: UI.accentDeep,
                             borderRadius: 14,
                             paddingVertical: 12,
                             paddingHorizontal: 22,
@@ -260,7 +280,9 @@ function OrderCard({
                         }}
                         activeOpacity={0.8}
                         style={{
-                            backgroundColor: "#1f2937",
+                            backgroundColor: "#1a1a2e",
+                            borderWidth: 1,
+                            borderColor: "rgba(148,163,184,0.25)",
                             borderRadius: 14,
                             paddingVertical: 12,
                             paddingHorizontal: 22,
@@ -361,13 +383,13 @@ export default function Home() {
                 paddingBottom: 12,
             }}>
                 <View>
-                    <Text style={{ fontSize: 26, fontWeight: "900", color: theme.colors.text, letterSpacing: -0.5 }}>
+                    <Text style={{ fontSize: 26, fontWeight: "900", color: UI.text, letterSpacing: -0.5 }}>
                         {t.tabs.orders}
                     </Text>
                     {/* Connection pill */}
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 3 }}>
                         <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: connColor }} />
-                        <Text style={{ fontSize: 11, fontWeight: "600", color: theme.colors.subtext }}>
+                        <Text style={{ fontSize: 11, fontWeight: "600", color: UI.subtext }}>
                             {connLabel}
                         </Text>
                     </View>
@@ -385,16 +407,16 @@ export default function Home() {
                         paddingVertical: 10,
                         paddingHorizontal: 16,
                         borderRadius: 20,
-                        backgroundColor: isOnline ? "#0f2318" : theme.colors.card,
+                        backgroundColor: isOnline ? "rgba(0,157,224,0.18)" : "rgba(15,23,42,0.88)",
                         borderWidth: 1.5,
-                        borderColor: isOnline ? "#16a34a50" : theme.colors.border,
+                        borderColor: isOnline ? "rgba(0,157,224,0.55)" : "rgba(148,163,184,0.25)",
                     }}
                 >
                     {updatingStatus
                         ? <ActivityIndicator size="small" color={isOnline ? "#4ade80" : theme.colors.subtext} />
-                        : <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isOnline ? "#22c55e" : "#6b7280" }} />
+                        : <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isOnline ? UI.accent : "#6b7280" }} />
                     }
-                    <Text style={{ fontSize: 13, fontWeight: "800", color: isOnline ? "#4ade80" : theme.colors.subtext }}>
+                    <Text style={{ fontSize: 13, fontWeight: "800", color: isOnline ? "#67e8f9" : UI.subtext }}>
                         {isOnline ? t.home.online : t.home.offline}
                     </Text>
                 </TouchableOpacity>
@@ -402,9 +424,9 @@ export default function Home() {
 
             {/* Dispatch mode banner */}
             {dispatchModeEnabled && isOnline && (
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 16, marginBottom: 10, backgroundColor: "#fef3c710", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: "#fef3c730" }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 16, marginBottom: 10, backgroundColor: "rgba(0,109,163,0.14)", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: "rgba(0,157,224,0.26)" }}>
                     <Ionicons name="car-outline" size={15} color="#fbbf24" />
-                    <Text style={{ fontSize: 12, fontWeight: "600", color: "#fbbf24", flex: 1 }}>
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: "#67e8f9", flex: 1 }}>
                         {t.home.dispatch_mode_title} — {t.home.dispatch_mode_sub}
                     </Text>
                 </View>
@@ -429,17 +451,17 @@ export default function Home() {
                                 gap: 6,
                                 paddingVertical: 10,
                                 borderRadius: 14,
-                                backgroundColor: active ? activeColor + "20" : theme.colors.card,
+                                backgroundColor: active ? activeColor + "22" : "rgba(15,23,42,0.9)",
                                 borderWidth: 1.5,
-                                borderColor: active ? activeColor + "60" : theme.colors.border,
+                                borderColor: active ? activeColor + "70" : "rgba(148,163,184,0.22)",
                             }}
                         >
-                            <Text style={{ fontSize: 13, fontWeight: "800", color: active ? activeColor : theme.colors.subtext }}>
+                            <Text style={{ fontSize: 13, fontWeight: "800", color: active ? activeColor : UI.subtext }}>
                                 {f === "available" ? t.home.tab_available : t.home.tab_my_orders}
                             </Text>
                             {count > 0 && (
-                                <View style={{ backgroundColor: active ? activeColor : theme.colors.border, borderRadius: 8, minWidth: 18, paddingHorizontal: 5, paddingVertical: 1, alignItems: "center" }}>
-                                    <Text style={{ fontSize: 11, fontWeight: "800", color: active ? "#fff" : theme.colors.subtext }}>
+                                <View style={{ backgroundColor: active ? activeColor : "rgba(148,163,184,0.28)", borderRadius: 8, minWidth: 18, paddingHorizontal: 5, paddingVertical: 1, alignItems: "center" }}>
+                                    <Text style={{ fontSize: 11, fontWeight: "800", color: active ? "#fff" : UI.subtext }}>
                                         {count}
                                     </Text>
                                 </View>
@@ -454,18 +476,21 @@ export default function Home() {
     // ── Empty / loading states ──
     if (isOrdersBootstrapping) {
         return (
-            <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
+            <LinearGradient colors={[UI.bgTop, UI.bgBottom]} style={{ flex: 1 }}>
+            <SafeAreaView style={{ flex: 1, backgroundColor: "transparent" }}>
                 {ListHeader}
                 <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
                     <ActivityIndicator size="large" color={theme.colors.primary} />
-                    <Text style={{ marginTop: 12, fontSize: 14, color: theme.colors.subtext }}>{t.common.loading}</Text>
+                    <Text style={{ marginTop: 12, fontSize: 14, color: UI.subtext }}>{t.common.loading}</Text>
                 </View>
             </SafeAreaView>
+            </LinearGradient>
         );
     }
 
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
+        <LinearGradient colors={[UI.bgTop, UI.bgBottom]} style={{ flex: 1 }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: "transparent" }}>
             <FlatList
                 data={displayedOrders}
                 keyExtractor={(item) => item.id}
@@ -486,31 +511,31 @@ export default function Home() {
                     <View style={{ alignItems: "center", justifyContent: "center", paddingTop: 60, paddingHorizontal: 32 }}>
                         {!isOnline ? (
                             <>
-                                <Ionicons name="power-outline" size={48} color={theme.colors.subtext} style={{ marginBottom: 16 }} />
-                                <Text style={{ fontSize: 17, fontWeight: "700", color: theme.colors.text, textAlign: "center", marginBottom: 6 }}>
+                                <Ionicons name="power-outline" size={48} color={UI.subtext} style={{ marginBottom: 16 }} />
+                                <Text style={{ fontSize: 17, fontWeight: "700", color: UI.text, textAlign: "center", marginBottom: 6 }}>
                                     {t.home.offline_title}
                                 </Text>
-                                <Text style={{ fontSize: 14, color: theme.colors.subtext, textAlign: "center" }}>
+                                <Text style={{ fontSize: 14, color: UI.subtext, textAlign: "center" }}>
                                     {t.home.offline_sub}
                                 </Text>
                             </>
                         ) : tab === "available" ? (
                             <>
-                                <Ionicons name="time-outline" size={48} color={theme.colors.subtext} style={{ marginBottom: 16 }} />
-                                <Text style={{ fontSize: 17, fontWeight: "700", color: theme.colors.text, textAlign: "center", marginBottom: 6 }}>
+                                <Ionicons name="time-outline" size={48} color={UI.subtext} style={{ marginBottom: 16 }} />
+                                <Text style={{ fontSize: 17, fontWeight: "700", color: UI.text, textAlign: "center", marginBottom: 6 }}>
                                     {t.home.waiting_title}
                                 </Text>
-                                <Text style={{ fontSize: 14, color: theme.colors.subtext, textAlign: "center" }}>
+                                <Text style={{ fontSize: 14, color: UI.subtext, textAlign: "center" }}>
                                     {t.home.waiting_sub}
                                 </Text>
                             </>
                         ) : (
                             <>
-                                <Ionicons name="checkmark-done-outline" size={48} color={theme.colors.subtext} style={{ marginBottom: 16 }} />
-                                <Text style={{ fontSize: 17, fontWeight: "700", color: theme.colors.text, textAlign: "center", marginBottom: 6 }}>
+                                <Ionicons name="checkmark-done-outline" size={48} color={UI.subtext} style={{ marginBottom: 16 }} />
+                                <Text style={{ fontSize: 17, fontWeight: "700", color: UI.text, textAlign: "center", marginBottom: 6 }}>
                                     {t.home.no_assigned_title}
                                 </Text>
-                                <Text style={{ fontSize: 14, color: theme.colors.subtext, textAlign: "center" }}>
+                                <Text style={{ fontSize: 14, color: UI.subtext, textAlign: "center" }}>
                                     {t.home.no_assigned_sub}
                                 </Text>
                             </>
@@ -522,7 +547,7 @@ export default function Home() {
             {selectedAssignedOrder && (
                 <>
                     <Pressable
-                        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.24)" }}
+                        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(2,6,23,0.45)" }}
                         onPress={() => setSelectedAssignedOrder(null)}
                     />
                     <OrderDetailSheet
@@ -539,6 +564,7 @@ export default function Home() {
                 </>
             )}
         </SafeAreaView>
+        </LinearGradient>
     );
 }
 

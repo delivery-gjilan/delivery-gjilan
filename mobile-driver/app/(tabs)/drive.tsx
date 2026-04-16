@@ -20,6 +20,7 @@ import { useSharedOrderAccept } from '@/hooks/GlobalOrderAcceptContext';
 import type { DriverOrder } from '@/utils/types';
 import { normalizeCoordinate } from '@/utils/locationValidation';
 import type { Feature, LineString } from 'geojson';
+import { OrderDetailsPanel } from '@/components/OrderDetailsPanel';
 
 /* â”€â”€â”€ Constants â”€â”€â”€ */
 const BOTTOM_BAR_HEIGHT = 108;
@@ -62,6 +63,7 @@ export default function MapScreen() {
     const cameraRef = useRef<Mapbox.Camera>(null);
 
     const [focusedOrderId, setFocusedOrderId] = useState<string | null>(null);
+    const [showOrderDetails, setShowOrderDetails] = useState(false);
     const isOnline = useAuthStore((state) => state.isOnline);
     const connectionStatus = useAuthStore((state) => state.connectionStatus);
     const { dispatchModeEnabled, googleMapsNavEnabled, inventoryModeEnabled } = useStoreStatus();
@@ -147,6 +149,10 @@ export default function MapScreen() {
         () => allMapOrders.find((o) => o.id === focusedOrderId) ?? null,
         [allMapOrders, focusedOrderId],
     );
+
+    useEffect(() => {
+        setShowOrderDetails(false);
+    }, [focusedOrderId]);
 
     // â”€â”€ Fetch route when focused order changes â”€â”€
     const locationRef = useRef(location);
@@ -496,6 +502,17 @@ export default function MapScreen() {
 
     return (
         <View style={styles.container}>
+            {focusedOrder && (
+                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 25, paddingHorizontal: 12, paddingTop: insets.top + 8 }}>
+                    <OrderDetailsPanel
+                        order={focusedOrder}
+                        isExpanded={showOrderDetails}
+                        onToggle={() => setShowOrderDetails((prev) => !prev)}
+                        onNavigate={() => handleNavigationPress(focusedOrder)}
+                    />
+                </View>
+            )}
+
             {/* â•â•â• Full-screen Map â•â•â• */}
             <Mapbox.MapView
                 style={styles.map}
@@ -1122,7 +1139,9 @@ const styles = StyleSheet.create({
         width: 48,
         height: 48,
         borderRadius: 24,
-        backgroundColor: '#fff',
+        backgroundColor: 'rgba(15,23,42,0.92)',
+        borderWidth: 1,
+        borderColor: 'rgba(148,163,184,0.28)',
         alignItems: 'center',
         justifyContent: 'center',
         shadowColor: '#000',
@@ -1132,9 +1151,9 @@ const styles = StyleSheet.create({
         elevation: 5,
     },
     mapBtnActive: {
-        backgroundColor: '#EFF6FF',
+        backgroundColor: 'rgba(0,157,224,0.2)',
         borderWidth: 1.5,
-        borderColor: '#4285F4',
+        borderColor: '#009de0',
     },
     mapBtnArrived: {
         backgroundColor: '#16a34a',
@@ -1142,8 +1161,10 @@ const styles = StyleSheet.create({
     mapControlPill: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#fff',
+        backgroundColor: 'rgba(15,23,42,0.92)',
         borderRadius: 22,
+        borderWidth: 1,
+        borderColor: 'rgba(148,163,184,0.28)',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.18,
@@ -1158,12 +1179,12 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     mapControlBtnActive: {
-        backgroundColor: '#EFF6FF',
+        backgroundColor: 'rgba(0,157,224,0.2)',
     },
     mapControlDivider: {
         width: 1,
         height: 22,
-        backgroundColor: '#E5E7EB',
+        backgroundColor: 'rgba(148,163,184,0.3)',
     },
     poolBadge: {
         position: 'absolute',
@@ -1316,7 +1337,7 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     cardEarningsBadge: {
-        backgroundColor: 'rgba(5,46,22,0.9)',
+        backgroundColor: 'rgba(0,109,163,0.3)',
         borderRadius: 8,
         paddingHorizontal: 8,
         paddingVertical: 3,
@@ -1325,7 +1346,7 @@ const styles = StyleSheet.create({
     cardEarningsText: {
         fontSize: 13,
         fontWeight: '700',
-        color: '#22c55e',
+        color: '#67e8f9',
     },
     cardMidRow: {
         flexDirection: 'row',
@@ -1417,10 +1438,10 @@ const styles = StyleSheet.create({
         marginBottom: 4,
         paddingHorizontal: 10,
         paddingVertical: 8,
-        backgroundColor: '#f5f3ff',
+        backgroundColor: 'rgba(26,26,46,0.78)',
         borderRadius: 10,
         borderWidth: 1,
-        borderColor: '#ddd6fe',
+        borderColor: 'rgba(114,9,183,0.45)',
         gap: 5,
     },
     fulfillmentTitleRow: {
@@ -1444,7 +1465,7 @@ const styles = StyleSheet.create({
     },
     fulfillmentItemName: {
         fontSize: 12,
-        color: '#374151',
+        color: '#cbd5e1',
         flex: 1,
     },
     fulfillmentItemBadges: {
@@ -1463,7 +1484,7 @@ const styles = StyleSheet.create({
         color: '#7c3aed',
     },
     fulfillmentMarketBadge: {
-        backgroundColor: '#F3F4F6',
+        backgroundColor: 'rgba(0,157,224,0.2)',
         borderRadius: 5,
         paddingHorizontal: 5,
         paddingVertical: 2,
@@ -1471,7 +1492,7 @@ const styles = StyleSheet.create({
     fulfillmentMarketBadgeText: {
         fontSize: 11,
         fontWeight: '600',
-        color: '#6B7280',
+        color: '#7dd3fc',
     },
     fulfillmentFooter: {
         marginTop: 2,

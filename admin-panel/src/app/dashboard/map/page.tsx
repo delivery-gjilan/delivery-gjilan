@@ -2658,7 +2658,7 @@ export default function MapPage() {
                         <button
                           onClick={() => {
                             setChatBizUserId(health.userId);
-                            loadBizMessages(health.userId);
+                            loadBizMessages({ variables: { businessUserId: health.userId, limit: 50, offset: 0 } });
                           }}
                           className="h-5 w-5 flex items-center justify-center rounded bg-zinc-800 text-zinc-500 hover:text-sky-400 transition">
                           <MessageSquare size={8} />

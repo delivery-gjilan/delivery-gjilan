@@ -21,6 +21,7 @@ import { useTranslations } from '@/hooks/useTranslations';
 import type { DriverOrder } from '@/utils/types';
 import { normalizeCoordinate } from '@/utils/locationValidation';
 import * as Haptics from 'expo-haptics';
+import { NavigationOrderCard } from '@/components/NavigationOrderCard';
 
 /* â”€â”€â”€ Screen constants â”€â”€â”€ */
 const STATUS_COLORS: Record<string, string> = {
@@ -421,6 +422,16 @@ export default function NavigationScreen() {
 
     return (
         <View style={styles.container}>
+            {/* Order details card (collapsible) */}
+            {order && (
+                <View style={[styles.orderCardContainer, { top: insets.top + 12 }]}>
+                    <NavigationOrderCard
+                        order={order}
+                        isDirectDispatch={order.channel === 'DIRECT_DISPATCH'}
+                    />
+                </View>
+            )}
+
             {/* â•â•â• Full-screen Mapbox Navigation â•â•â• */}
             <MapboxNavigationView
                 ref={mapViewRef}
@@ -888,7 +899,14 @@ export default function NavigationScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#1a1a2e',
+        backgroundColor: '#0f172a',
+    },
+    orderCardContainer: {
+        position: 'absolute',
+        left: 12,
+        right: 12,
+        zIndex: 50,
+        maxWidth: '100%',
     },
     navView: {
         flex: 1,
@@ -1030,7 +1048,9 @@ const styles = StyleSheet.create({
         width: 44,
         height: 44,
         borderRadius: 22,
-        backgroundColor: 'rgba(0,0,0,0.55)',
+        backgroundColor: 'rgba(15,23,42,0.86)',
+        borderWidth: 1,
+        borderColor: 'rgba(148,163,184,0.32)',
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -1072,7 +1092,9 @@ const styles = StyleSheet.create({
         width: 48,
         height: 48,
         borderRadius: 24,
-        backgroundColor: '#fff',
+        backgroundColor: 'rgba(15,23,42,0.92)',
+        borderWidth: 1,
+        borderColor: 'rgba(148,163,184,0.3)',
         alignItems: 'center',
         justifyContent: 'center',
         shadowColor: '#000',
@@ -1111,8 +1133,8 @@ const styles = StyleSheet.create({
         elevation: 12,
     },
     barCardFocused: {
-        backgroundColor: 'rgba(30,27,75,0.92)',
-        borderColor: 'rgba(139,92,246,0.4)',
+        backgroundColor: 'rgba(15,52,96,0.9)',
+        borderColor: 'rgba(0,157,224,0.45)',
     },
     barCardTop: {
         flexDirection: 'row',
@@ -1143,10 +1165,10 @@ const styles = StyleSheet.create({
     },
     barDropAddress: {
         fontSize: 10,
-        color: '#64748b',
+        color: '#94A3B8',
     },
     barEarnings: {
-        backgroundColor: 'rgba(5, 46, 22, 0.9)',
+        backgroundColor: 'rgba(0,109,163,0.36)',
         borderRadius: 6,
         paddingHorizontal: 6,
         paddingVertical: 2,
@@ -1155,7 +1177,7 @@ const styles = StyleSheet.create({
     barEarningsText: {
         fontSize: 11,
         fontWeight: '700',
-        color: '#22c55e',
+        color: '#67e8f9',
     },
     barCardBottom: {
         flexDirection: 'row',
