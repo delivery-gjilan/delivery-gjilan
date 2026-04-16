@@ -66,5 +66,9 @@ export const createDirectDispatchOrder: NonNullable<MutationResolvers['createDir
         });
     }
 
+    log.info({ orderId: dbOrder.id, displayId: dbOrder.displayId }, 'directDispatch:about to publish all orders');
+    await orderService.publishAllOrders();
+    log.info({ orderId: dbOrder.id }, 'directDispatch:published');
+
     return order;
 };

@@ -10,10 +10,11 @@ interface Props {
     accepting?: boolean;
     onAccept: (order: DriverOrder) => void;
     onAcceptAndNavigate: (order: DriverOrder) => void;
+    onViewDetails: (order: DriverOrder) => void;
     onClose: () => void;
 }
 
-export function OrderPoolSheet({ orders, accepting = false, onAccept, onAcceptAndNavigate, onClose }: Props) {
+export function OrderPoolSheet({ orders, accepting = false, onAccept, onAcceptAndNavigate, onViewDetails, onClose }: Props) {
     const insets = useSafeAreaInsets();
     const { t } = useTranslations();
     const s = t.orderPool;
@@ -83,9 +84,19 @@ export function OrderPoolSheet({ orders, accepting = false, onAccept, onAcceptAn
                         {orders.map((order) => {
                             const biz = order.businesses?.[0]?.business;
                             const bizName = biz?.name ?? 'Business';
+                            const recipientLabel = order.recipientName ?? order.recipientPhone ?? null;
                             const itemCount = (order.businesses ?? []).reduce(
                                 (acc: number, b) => acc + (b.items?.length ?? 0), 0,
                             );
+                            const items = (order.businesses ?? []).flatMap((b) => b.items ?? []);
+                            const totalStockUnits = items.reduce((sum, item) => sum + (item.inventoryQuantity ?? 0), 0);
+                            const totalMarketUnits = items.reduce(
+                                (sum, item) => sum + Math.max(0, item.quantity - (item.inventoryQuantity ?? 0)),
+                                0,
+                            );
+                            const orderPrice = Number((order as any).orderPrice ?? 0);
+                            const inventoryPrice = Number((order as any).inventoryPrice ?? 0);
+                            const businessPrice = Math.max(0, orderPrice - inventoryPrice);
                             const dropAddress = order.dropOffLocation?.address ?? '';
                             const shortAddress = dropAddress.split(',')[0] || s.see_map;
                             const deliveryFee = Number(order.deliveryPrice ?? 0).toFixed(2);
@@ -103,7 +114,7 @@ export function OrderPoolSheet({ orders, accepting = false, onAccept, onAcceptAn
                             })();
 
                             return (
-                                <View key={order.id} style={styles.card}>
+                                <Pressable key={order.id} style={[styles.card, isDirectDispatch && styles.cardDirect]} onPress={() => onViewDetails(order)}>
                                     {/* Left accent */}
                                     <View style={[styles.cardAccent, isReady && styles.cardAccentReady, isDirectDispatch && styles.cardAccentDirect]} />
 
@@ -132,6 +143,9 @@ export function OrderPoolSheet({ orders, accepting = false, onAccept, onAcceptAn
                                                     )}
                                                 </View>
                                                 <Text style={styles.orderId}>#{order.displayId ?? '—'}</Text>
+                                                {isDirectDispatch && recipientLabel ? (
+                                                    <Text style={styles.directCallRecipient} numberOfLines={1}>{recipientLabel}</Text>
+                                                ) : null}
                                             </View>
 
                                             {/* Earnings */}
@@ -163,6 +177,27 @@ export function OrderPoolSheet({ orders, accepting = false, onAccept, onAcceptAn
                                             </View>
                                         </View>
 
+                                        {(totalStockUnits > 0 || businessPrice > 0 || isDirectDispatch) && (
+                                            <View style={styles.signalRow}>
+                                                {totalStockUnits > 0 && (
+                                                    <View style={styles.signalChipStock}>
+                                                        <Text style={styles.signalChipStockText}>📦 {totalStockUnits} stock</Text>
+                                                    </View>
+                                                )}
+                                                {totalMarketUnits > 0 && totalStockUnits > 0 && (
+                                                    <View style={styles.signalChipMarket}>
+                                                        <Text style={styles.signalChipMarketText}>🛒 {totalMarketUnits} market</Text>
+                                                    </View>
+                                                )}
+                                                {businessPrice > 0 && (
+                                                    <View style={styles.signalChipPay}>
+                                                        <Text style={styles.signalChipPayText}>pay biz −€{businessPrice.toFixed(2)}</Text>
+                                                    </View>
+                                                )}
+                                                <Text style={styles.inspectHint}>Tap card for details</Text>
+                                            </View>
+                                        )}
+
                                         {/* Row 3: direct action CTAs */}
                                         <View style={styles.ctaRow}>
                                             <Pressable
@@ -191,7 +226,7 @@ export function OrderPoolSheet({ orders, accepting = false, onAccept, onAcceptAn
                                             </Pressable>
                                         </View>
                                     </View>
-                                </View>
+                                </Pressable>
                             );
                         })}
                     </ScrollView>
@@ -331,6 +366,10 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(255,255,255,0.08)',
         overflow: 'hidden',
     },
+    cardDirect: {
+        backgroundColor: 'rgba(249,115,22,0.07)',
+        borderColor: 'rgba(249,115,22,0.22)',
+    },
     cardAccent: {
         width: 3,
         backgroundColor: '#6366f1',
@@ -401,6 +440,12 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         letterSpacing: 0.2,
     },
+    directCallRecipient: {
+        color: '#fdba74',
+        fontSize: 12,
+        fontWeight: '700',
+        marginTop: 3,
+    },
     bizName: {
         color: '#f1f5f9',
         fontSize: 14,
@@ -434,6 +479,52 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         gap: 6,
         flexWrap: 'wrap',
+    },
+    signalRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        flexWrap: 'wrap',
+        marginTop: -2,
+    },
+    signalChipStock: {
+        backgroundColor: 'rgba(124,58,237,0.16)',
+        borderRadius: 999,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+    },
+    signalChipStockText: {
+        color: '#c4b5fd',
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    signalChipMarket: {
+        backgroundColor: 'rgba(3,105,161,0.16)',
+        borderRadius: 999,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+    },
+    signalChipMarketText: {
+        color: '#7dd3fc',
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    signalChipPay: {
+        backgroundColor: 'rgba(239,68,68,0.14)',
+        borderRadius: 999,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+    },
+    signalChipPayText: {
+        color: '#fca5a5',
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    inspectHint: {
+        color: '#94a3b8',
+        fontSize: 11,
+        fontWeight: '600',
+        marginLeft: 'auto',
     },
     chip: {
         flexDirection: 'row',

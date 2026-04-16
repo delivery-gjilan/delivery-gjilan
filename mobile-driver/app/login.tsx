@@ -33,7 +33,7 @@ export default function LoginScreen() {
 
     useEffect(() => {
         if (hasHydrated && isAuthenticated) {
-            router.replace('/(tabs)/drive');
+            router.replace('/brand-splash');
         }
     }, [hasHydrated, isAuthenticated, router]);
 
@@ -46,7 +46,7 @@ export default function LoginScreen() {
         setError(null);
         try {
             await login(email.trim(), password);
-            router.replace('/(tabs)/home');
+            router.replace('/brand-splash');
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Login failed');
         }

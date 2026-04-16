@@ -2054,10 +2054,11 @@ export default function MapPage() {
               const businessName = order.businesses?.[0]?.business?.name || "Unknown";
               const isSelected = selectedOrderId === order.id;
               const isPending = order.status === "PENDING";
+              const isDirectCall = order.channel === "DIRECT_DISPATCH";
               const orderDateMs = parseServerTimeMs(order.orderDate) ?? now;
               const elapsed = now - orderDateMs;
               const pendingTooLong = isPending && elapsed > PENDING_WARNING_MS;
-              const customerName = order.user ? `${order.user.firstName} ${order.user.lastName}` : "Unknown";
+              const customerName = isDirectCall ? (order.recipientName || order.recipientPhone || "Unknown") : (order.user ? `${order.user.firstName} ${order.user.lastName}` : "Unknown");
               const distanceData = orderDistances[order.id];
               const preview = order.settlementPreview;
               const marginSeverity = preview ? getMarginSeverity(preview.netMargin) : null;
@@ -2076,35 +2077,52 @@ export default function MapPage() {
                   onClick={() => selectOrder(order.id)}
                   className={`w-full text-left px-2.5 py-1.5 rounded-lg border-l-2 transition-all ${
                     isSelected
-                      ? 'bg-white/[0.06]'
+                      ? isDirectCall ? 'bg-orange-500/[0.08]' : 'bg-white/[0.06]'
                       : pendingTooLong
                         ? 'bg-red-500/[0.06] animate-pulse'
                         : 'hover:bg-white/[0.04]'
                   }`}
-                  style={{ borderLeftColor: isSelected ? statusColor.hex : pendingTooLong ? '#ef4444' : `${statusColor.hex}44` }}>
+                  style={{ borderLeftColor: isSelected ? (isDirectCall ? '#F97316' : statusColor.hex) : pendingTooLong ? '#ef4444' : `${statusColor.hex}44` }}>
                   
-                  {/* Row 1: Business + elapsed */}
+                  {/* Row 1: Business + elapsed, with DD badge */}
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: pendingTooLong ? "#ef4444" : statusColor.hex }} />
-                      <span className="text-[13px] font-medium text-white truncate">{businessName}</span>
+                      <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: isDirectCall ? '#F97316' : pendingTooLong ? "#ef4444" : statusColor.hex }} />
+                      <span className={`text-[13px] font-medium truncate ${isDirectCall ? 'text-orange-300' : 'text-white'}`}>{businessName}</span>
+                      {isDirectCall && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-orange-500/20 text-orange-300 font-semibold flex-shrink-0 uppercase tracking-wide">DC</span>
+                      )}
                     </div>
                     <span className={`text-[10px] font-mono flex-shrink-0 ${pendingTooLong ? "text-red-400" : "text-zinc-600"}`}>
                       {formatElapsed(elapsed)}
                     </span>
                   </div>
                   
-                  {/* Row 2: Status · Customer */}
+                  {/* Row 2: Status · Customer/Recipient */}
                   <div className="flex items-center gap-1.5 mt-0.5 pl-3">
-                    <span className={`text-[9px] font-semibold uppercase flex-shrink-0 ${pendingTooLong ? "text-red-400" : statusColor.text}`}>
+                    <span className={`text-[9px] font-semibold uppercase flex-shrink-0 ${isDirectCall ? 'text-orange-400' : pendingTooLong ? "text-red-400" : statusColor.text}`}>
                       {order.status.replace(/_/g, " ")}
                     </span>
                     {pendingTooLong && (
                       <span className="text-[8px] px-1 py-px rounded bg-red-500/20 text-red-300 font-bold flex-shrink-0">LATE</span>
                     )}
                     <span className="text-zinc-700 text-[9px]">·</span>
-                    <span className="text-[10px] text-zinc-500 truncate">{customerName}</span>
+                    <span className={`text-[10px] truncate ${isDirectCall ? 'text-orange-300/80' : 'text-zinc-500'}`}>{customerName}</span>
                   </div>
+
+                  {/* Row 3: Recipient phone (for DC) or address snippet */}
+                  {isDirectCall && order.recipientPhone && (
+                    <div className="flex items-center gap-1 mt-0.5 pl-3">
+                      <span className="text-[9px] text-orange-300/60 font-medium">📱</span>
+                      <span className="text-[9px] text-orange-300/70 truncate">{order.recipientPhone}</span>
+                    </div>
+                  )}
+                  {order.dropOffLocation?.address && (
+                    <div className="flex items-center gap-1 mt-0.5 pl-3">
+                      <span className="text-[9px] text-zinc-600">📍</span>
+                      <span className="text-[9px] text-zinc-500 truncate">{order.dropOffLocation.address}</span>
+                    </div>
+                  )}
 
                   {/* Prep time alert (compact inline) */}
                   {(() => {
@@ -3265,29 +3283,45 @@ function BottomDetailPanel({
             </button>
           </div>
           <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-              <User size={13} className="text-blue-400" />
+            <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
+              order.channel === "DIRECT_DISPATCH" ? 'bg-orange-500/20' : 'bg-blue-500/20'
+            }`}>
+              <User size={13} className={order.channel === "DIRECT_DISPATCH" ? 'text-orange-400' : 'text-blue-400'} />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-white truncate">{customerName}</div>
-              <div className="text-xs text-zinc-500">{customerTotalOrders} total orders</div>
-              {customerPhone && <div className="text-xs text-zinc-500">{customerPhone}</div>}
+              <div className="flex items-center gap-2">
+                <div className={`text-sm font-medium truncate ${order.channel === "DIRECT_DISPATCH" ? 'text-orange-300' : 'text-white'}`}>{customerName}</div>
+                {order.channel === "DIRECT_DISPATCH" && (
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-orange-500/20 text-orange-300 font-semibold flex-shrink-0 uppercase tracking-wide">Direct Call</span>
+                )}
+              </div>
+              {order.channel === "DIRECT_DISPATCH" && order.recipientPhone && (
+                <div className="text-xs text-orange-300/70">📱 {order.recipientPhone}</div>
+              )}
+              {order.channel !== "DIRECT_DISPATCH" && (
+                <>
+                  <div className="text-xs text-zinc-500">{customerTotalOrders} total orders</div>
+                  {customerPhone && <div className="text-xs text-zinc-500">{customerPhone}</div>}
+                </>
+              )}
             </div>
-            <button
-              onClick={() => onToggleTrustedCustomer(order.user, !customerTrusted)}
-              disabled={!order.user?.id || trustUpdatingUserId === order.user?.id}
-              className={`flex-shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-medium border transition disabled:opacity-50 ${
-                customerTrusted
-                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25'
-                  : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'
-              }`}
-            >
-              {trustUpdatingUserId === order.user?.id
-                ? 'Saving...'
-                : customerTrusted
-                  ? 'Trusted'
-                  : 'Mark trusted'}
-            </button>
+            {order.channel !== "DIRECT_DISPATCH" && (
+              <button
+                onClick={() => onToggleTrustedCustomer(order.user, !customerTrusted)}
+                disabled={!order.user?.id || trustUpdatingUserId === order.user?.id}
+                className={`flex-shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-medium border transition disabled:opacity-50 ${
+                  customerTrusted
+                    ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25'
+                    : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'
+                }`}
+              >
+                {trustUpdatingUserId === order.user?.id
+                  ? 'Saving...'
+                  : customerTrusted
+                    ? 'Trusted'
+                    : 'Mark trusted'}
+              </button>
+            )}
           </div>
           {order.dropOffLocation?.address && (
             <div className="text-xs text-zinc-600 leading-tight pl-10 truncate">{order.dropOffLocation.address}</div>

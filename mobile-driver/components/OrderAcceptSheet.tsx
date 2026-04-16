@@ -11,6 +11,10 @@ import type { DriverOrder } from '@/utils/types';
 const COUNTDOWN_DURATION = 15;
 const RING_R = 20;
 const RING_C = 2 * Math.PI * RING_R;
+const DD_ORANGE = '#F97316';
+const DD_ORANGE_DARK = '#ea6500';
+const DD_ORANGE_BG = 'rgba(249,115,22,0.08)';
+const DD_ORANGE_BORDER = 'rgba(249,115,22,0.30)';
 
 interface Props {
     order: DriverOrder;
@@ -39,7 +43,6 @@ export function OrderAcceptSheet({
     const { t } = useTranslations();
     const s = t.orderAccept;
     const [countdown, setCountdown] = useState(COUNTDOWN_DURATION);
-    const [itemsExpanded, setItemsExpanded] = useState(false);
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const slideY = useRef(new Animated.Value(-500)).current;
     // Tick every 30s so ETA display stays live
@@ -70,8 +73,6 @@ export function OrderAcceptSheet({
     }, [order?.id]);
 
     useEffect(() => {
-        // Collapse items on new order
-        setItemsExpanded(false);
         slideY.setValue(-500);
         Animated.spring(slideY, {
             toValue: 0,
@@ -169,9 +170,9 @@ export function OrderAcceptSheet({
 
     const ringOffset = (RING_C * (COUNTDOWN_DURATION - countdown)) / COUNTDOWN_DURATION;
     const isUrgent = countdown <= 5;
+    const ringColor = isDirectDispatch ? DD_ORANGE : (isUrgent ? '#EF4444' : '#10B981');
 
     // Inventory breakdown
-    const stockItems = allItems.filter((it) => (it.inventoryQuantity ?? 0) > 0);
     const totalStockUnits = allItems.reduce((sum, it) => sum + (it.inventoryQuantity ?? 0), 0);
     const totalMarketUnits = allItems.reduce((sum, it) => sum + Math.max(0, it.quantity - (it.inventoryQuantity ?? 0)), 0);
     const hasInventory = totalStockUnits > 0;
@@ -186,11 +187,29 @@ export function OrderAcceptSheet({
     return (
         <Animated.View style={[styles.root, { transform: [{ translateY: slideY }] }]}>
             <View
-                style={[styles.sheet, { paddingTop: insets.top + 8 }]}
+                style={[
+                    styles.sheet,
+                    isDirectDispatch && styles.sheetDD,
+                    { paddingTop: insets.top + (isDirectDispatch ? 0 : 8) },
+                ]}
                 onLayout={(e) => onHeightChange?.(e.nativeEvent.layout.height)}
             >
+                {/* DD: full-width orange accent bar flush with top */}
+                {isDirectDispatch && <View style={styles.ddAccentBar} />}
+
+                {/* DD: prominent call banner */}
+                {isDirectDispatch && (
+                    <View style={styles.ddBanner}>
+                        <Ionicons name="call" size={13} color={DD_ORANGE} />
+                        <Text style={styles.ddBannerLabel}>DIRECT CALL</Text>
+                        {recipientLabel ? (
+                            <Text style={styles.ddBannerRecipient} numberOfLines={1}>· {recipientLabel}</Text>
+                        ) : null}
+                    </View>
+                )}
+
                 {/* Draggable body */}
-                <View {...panResponder.panHandlers} style={styles.dragBody}>
+                <View {...panResponder.panHandlers} style={[styles.dragBody, isDirectDispatch && { paddingTop: 10 }]}>
 
                     {/* Header: countdown ring + label + business name */}
                     <View style={styles.headerRow}>
@@ -199,12 +218,12 @@ export function OrderAcceptSheet({
                                 <Svg width={52} height={52} viewBox="0 0 52 52">
                                     <Circle
                                         cx={26} cy={26} r={RING_R}
-                                        stroke="#E5E7EB"
+                                        stroke={isDirectDispatch ? 'rgba(249,115,22,0.18)' : '#E5E7EB'}
                                         strokeWidth={3.5} fill="none"
                                     />
                                     <Circle
                                         cx={26} cy={26} r={RING_R}
-                                        stroke={isUrgent ? '#EF4444' : '#10B981'}
+                                        stroke={ringColor}
                                         strokeWidth={3.5} fill="none"
                                         strokeDasharray={`${RING_C} ${RING_C}`}
                                         strokeDashoffset={ringOffset}
@@ -212,7 +231,7 @@ export function OrderAcceptSheet({
                                         rotation="-90" origin="26, 26"
                                     />
                                 </Svg>
-                                <Text style={[styles.countdownText, isUrgent && { color: '#EF4444' }]}>
+                                <Text style={[styles.countdownText, { color: ringColor }]}>
                                     {countdown}
                                 </Text>
                             </View>
@@ -220,25 +239,22 @@ export function OrderAcceptSheet({
 
                         <View style={styles.headerTextBlock}>
                             <View style={styles.headerLabelRow}>
-                                <Text style={styles.headerLabel}>{s.new_order}</Text>
-                                {isDirectDispatch && (
-                                    <View style={styles.directCallBadge}>
-                                        <Ionicons name="call" size={10} color="#fff" />
-                                        <Text style={styles.directCallText}>{s.direct_call}</Text>
-                                    </View>
-                                )}
+                                <Text style={[styles.headerLabel, isDirectDispatch && { color: DD_ORANGE, fontWeight: '700' }]}>
+                                    {isDirectDispatch ? 'NEW CALL' : s.new_order}
+                                </Text>
                             </View>
                             <Text style={styles.bizName} numberOfLines={1}>{bizName}</Text>
-                            {isDirectDispatch && recipientLabel ? (
-                                <Text style={styles.recipientLabel} numberOfLines={1}>{recipientLabel}</Text>
-                            ) : null}
                         </View>
                     </View>
 
+                    <View style={styles.sectionHeaderRow}>
+                        <Text style={styles.sectionTitle}>Order Summary</Text>
+                    </View>
+
                     {/* Info row: earnings / ETA / distance / drop-off */}
-                    <View style={styles.infoRow}>
+                    <View style={[styles.infoRow, isDirectDispatch && styles.infoRowDD]}>
                         <View style={styles.infoItem}>
-                            <Text style={styles.infoValue}>€{deliveryFee}</Text>
+                            <Text style={[styles.infoValue, isDirectDispatch && { color: DD_ORANGE, fontWeight: '800' }]}>€{deliveryFee}</Text>
                             <Text style={styles.infoLabel}>{isDirectDispatch ? 'Agreed fee' : s.you_earn}</Text>
                         </View>
                         <View style={styles.infoDivider} />
@@ -266,73 +282,52 @@ export function OrderAcceptSheet({
                         </View>
                     </View>
 
-                    {/* Items toggle */}
-                    <Pressable
-                        style={[styles.itemsToggle, itemsExpanded && styles.itemsToggleOpen]}
-                        onPress={() => setItemsExpanded(v => !v)}
-                    >
-                        <View style={styles.itemsToggleLeft}>
-                            <Ionicons name="bag-handle-outline" size={15} color="#6B7280" />
-                            <Text style={styles.itemsToggleText}>
-                                {itemCount} {itemCount === 1 ? s.item : s.items}
-                            </Text>
-                        </View>
-                        <Ionicons
-                            name={itemsExpanded ? 'chevron-up' : 'chevron-down'}
-                            size={14}
-                            color="#9CA3AF"
-                        />
-                    </Pressable>
-
-                    {/* Items expanded list */}
-                    {itemsExpanded && allItems.length > 0 && (
-                        <View style={styles.itemsList}>
-                            {allItems.slice(0, 8).map((item, idx: number) => (
-                                <View key={idx} style={[styles.itemRow, idx < allItems.slice(0, 8).length - 1 && styles.itemRowBorder]}>
-                                    <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-                                    <View style={styles.itemQtyBadge}>
-                                        <Text style={styles.itemQtyText}>x{item.quantity}</Text>
-                                    </View>
+                    {/* Items list — grouped by source */}
+                    {allItems.length > 0 && (
+                        <View style={styles.itemsSection}>
+                            <View style={styles.itemsSectionHeader}>
+                                <Ionicons name="bag-handle-outline" size={13} color="#6B7280" />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.itemsSectionTitle}>Pickup Plan</Text>
+                                    <Text style={styles.itemsSectionSubtitle}>
+                                        {hasInventory
+                                            ? `Collect ${totalStockUnits} from your stock and ${totalMarketUnits} from the business.`
+                                            : `${itemCount} ${itemCount === 1 ? s.item : s.items} to collect at the business.`}
+                                    </Text>
                                 </View>
-                            ))}
+                            </View>
+                            {allItems.slice(0, 8).map((item, idx: number) => {
+                                const fromStock = item.inventoryQuantity ?? 0;
+                                const fromMarket = Math.max(0, item.quantity - fromStock);
+                                return (
+                                    <View key={idx} style={[styles.itemRow2, idx < Math.min(allItems.length, 8) - 1 && styles.itemRow2Border]}>
+                                        <Text style={styles.itemName2} numberOfLines={1}>{item.name}</Text>
+                                        <View style={styles.itemSourceTags}>
+                                            {fromStock > 0 && (
+                                                <View style={styles.stockTag}>
+                                                    <Ionicons name="cube" size={9} color="#7c3aed" />
+                                                    <Text style={styles.stockTagText}>×{fromStock}</Text>
+                                                </View>
+                                            )}
+                                            {fromMarket > 0 && (
+                                                <View style={styles.marketTag}>
+                                                    <Ionicons name="storefront-outline" size={9} color="#0369a1" />
+                                                    <Text style={styles.marketTagText}>×{fromMarket}</Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                    </View>
+                                );
+                            })}
                             {allItems.length > 8 && (
                                 <Text style={styles.itemsMore}>{s.more.replace('{{count}}', String(allItems.length - 8))}</Text>
                             )}
                         </View>
                     )}
 
-                    {/* Inventory banner — shown when any items come from operator stock */}
-                    {hasInventory && (
-                        <View style={styles.inventoryBanner}>
-                            <View style={styles.inventoryBannerHeader}>
-                                <Ionicons name="cube-outline" size={13} color="#7c3aed" />
-                                <Text style={styles.inventoryBannerTitle}>{s.stock_banner_title}</Text>
-                            </View>
-                            <View style={styles.inventoryItemsList}>
-                                {stockItems.map((it, i) => (
-                                    <View key={i} style={styles.inventoryItemRow}>
-                                        <Text style={styles.inventoryItemName} numberOfLines={1}>{it.name}</Text>
-                                        <View style={styles.inventoryItemQty}>
-                                            <Ionicons name="cube" size={10} color="#7c3aed" />
-                                            <Text style={styles.inventoryItemQtyText}>×{it.inventoryQuantity}</Text>
-                                        </View>
-                                    </View>
-                                ))}
-                            </View>
-                            <View style={styles.inventoryTotalsRow}>
-                                {totalStockUnits > 0 && (
-                                    <View style={styles.inventoryTotalBadge}>
-                                        <Text style={styles.inventoryTotalBadgeText}>📦 {totalStockUnits} from stock</Text>
-                                    </View>
-                                )}
-                                {totalMarketUnits > 0 && (
-                                    <View style={[styles.inventoryTotalBadge, styles.inventoryMarketBadge]}>
-                                        <Text style={[styles.inventoryTotalBadgeText, { color: '#6B7280' }]}>🛒 {totalMarketUnits} from market</Text>
-                                    </View>
-                                )}
-                            </View>
-                        </View>
-                    )}
+                    <View style={styles.sectionHeaderRow}>
+                        <Text style={styles.sectionTitle}>Cash On This Order</Text>
+                    </View>
 
                     {/* Cash breakdown */}
                     <View style={styles.cashBreakdown}>
@@ -368,7 +363,7 @@ export function OrderAcceptSheet({
                                         <Text style={styles.cashRowHint}>{s.your_cut_hint}</Text>
                                     </View>
                                 </View>
-                                <Text style={[styles.cashRowAmount, { color: '#6366F1', fontWeight: '800', fontSize: 16 }]}>€{deliveryFee}</Text>
+                                <Text style={[styles.cashRowAmount, { color: '#6366F1', fontWeight: '900', fontSize: 20, letterSpacing: -0.5 }]}>€{deliveryFee}</Text>
                             </View>
                         </View>
                     </View>
@@ -385,14 +380,14 @@ export function OrderAcceptSheet({
                     <Pressable
                         onPress={handleAccept}
                         disabled={accepting}
-                        style={[styles.acceptBtn, accepting && { opacity: 0.6 }]}
+                        style={[styles.acceptBtn, isDirectDispatch && styles.acceptBtnDD, accepting && { opacity: 0.6 }]}
                     >
                         {accepting ? (
                             <ActivityIndicator size={18} color="#fff" />
                         ) : (
                             <>
-                                <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                                <Text style={styles.acceptText}>{s.accept_order}</Text>
+                                <Ionicons name={isDirectDispatch ? 'call' : 'checkmark-circle'} size={20} color="#fff" />
+                                <Text style={styles.acceptText}>{isDirectDispatch ? 'Accept Call' : s.accept_order}</Text>
                             </>
                         )}
                     </Pressable>
@@ -402,10 +397,10 @@ export function OrderAcceptSheet({
                         <Pressable
                             onPress={handleAcceptAndNavigate}
                             disabled={accepting}
-                            style={[styles.navBtn, accepting && { opacity: 0.6 }]}
+                            style={[styles.navBtn, isDirectDispatch && styles.navBtnDD, accepting && { opacity: 0.6 }]}
                         >
-                            <Ionicons name="navigate-outline" size={16} color="#10B981" />
-                            <Text style={styles.navBtnText}>{s.accept_navigate}</Text>
+                            <Ionicons name="navigate-outline" size={16} color={isDirectDispatch ? DD_ORANGE : '#10B981'} />
+                            <Text style={[styles.navBtnText, isDirectDispatch && { color: DD_ORANGE }]}>{s.accept_navigate}</Text>
                         </Pressable>
                     )}
 
@@ -453,6 +448,51 @@ const styles = StyleSheet.create({
         shadowRadius: 20,
         elevation: 24,
     },
+    sheetDD: {
+        shadowColor: DD_ORANGE,
+        shadowOpacity: 0.25,
+        shadowRadius: 26,
+        elevation: 30,
+    },
+    ddAccentBar: {
+        height: 4,
+        backgroundColor: DD_ORANGE,
+    },
+    ddBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: DD_ORANGE_BG,
+        borderBottomWidth: 1,
+        borderBottomColor: DD_ORANGE_BORDER,
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+    },
+    ddBannerLabel: {
+        color: DD_ORANGE,
+        fontSize: 12,
+        fontWeight: '800',
+        letterSpacing: 0.8,
+    },
+    ddBannerRecipient: {
+        color: DD_ORANGE_DARK,
+        fontSize: 12,
+        fontWeight: '600',
+        flex: 1,
+    },
+    infoRowDD: {
+        backgroundColor: 'rgba(249,115,22,0.06)',
+        borderWidth: 1,
+        borderColor: 'rgba(249,115,22,0.16)',
+    },
+    acceptBtnDD: {
+        backgroundColor: DD_ORANGE,
+        shadowColor: DD_ORANGE,
+    },
+    navBtnDD: {
+        borderColor: DD_ORANGE_BORDER,
+        backgroundColor: 'rgba(249,115,22,0.06)',
+    },
     dragBody: {
         paddingHorizontal: 20,
         paddingTop: 4,
@@ -488,27 +528,7 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         letterSpacing: 0.4,
     },
-    directCallBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 3,
-        backgroundColor: '#F97316',
-        borderRadius: 4,
-        paddingHorizontal: 5,
-        paddingVertical: 2,
-    },
-    directCallText: {
-        color: '#fff',
-        fontSize: 9,
-        fontWeight: '700',
-        letterSpacing: 0.3,
-    },
-    recipientLabel: {
-        color: '#F97316',
-        fontSize: 12,
-        fontWeight: '600',
-        marginTop: 2,
-    },
+    // directCallBadge removed — replaced by ddBanner
     bizName: {
         color: '#111827',
         fontSize: 22,
@@ -559,113 +579,66 @@ const styles = StyleSheet.create({
         backgroundColor: '#E5E7EB',
         marginHorizontal: 12,
     },
-    itemsToggle: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        borderRadius: 10,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        marginBottom: 8,
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-        backgroundColor: '#FAFAFA',
+    sectionHeaderRow: {
+        marginBottom: 6,
     },
-    itemsToggleOpen: {
-        borderColor: '#D1D5DB',
-        backgroundColor: '#F3F4F6',
+    sectionTitle: {
+        color: '#6B7280',
+        fontSize: 11,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+        letterSpacing: 0.6,
     },
-    itemsToggleLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 7,
-    },
-    itemsToggleText: {
-        color: '#374151',
-        fontSize: 13,
-        fontWeight: '600',
-    },
-    itemsList: {
+    itemsSection: {
         backgroundColor: '#F9FAFB',
         borderRadius: 10,
-        paddingHorizontal: 12,
-        paddingVertical: 4,
-        marginBottom: 8,
         borderWidth: 1,
         borderColor: '#E5E7EB',
-    },
-    itemRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 8,
-    },
-    itemRowBorder: {
-        borderBottomWidth: 1,
-        borderBottomColor: '#F3F4F6',
-    },
-    itemName: {
-        color: '#374151',
-        fontSize: 13,
-        flex: 1,
-    },
-    itemQtyBadge: {
-        backgroundColor: '#E5E7EB',
-        borderRadius: 6,
-        paddingHorizontal: 7,
-        paddingVertical: 2,
-        marginLeft: 10,
-    },
-    itemQtyText: {
-        color: '#6B7280',
-        fontSize: 12,
-        fontWeight: '700',
-    },
-    itemsMore: {
-        color: '#9CA3AF',
-        fontSize: 11,
-        paddingVertical: 6,
-        textAlign: 'center',
-    },
-
-    /* -- Inventory banner -- */
-    inventoryBanner: {
-        backgroundColor: '#f5f3ff',
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#ddd6fe',
         paddingHorizontal: 12,
-        paddingVertical: 10,
+        paddingTop: 8,
+        paddingBottom: 4,
         marginBottom: 8,
     },
-    inventoryBannerHeader: {
+    itemsSectionHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 5,
-        marginBottom: 8,
+        gap: 6,
+        marginBottom: 6,
     },
-    inventoryBannerTitle: {
+    itemsSectionTitle: {
+        color: '#6B7280',
         fontSize: 11,
         fontWeight: '700',
-        color: '#7c3aed',
         textTransform: 'uppercase',
         letterSpacing: 0.4,
     },
-    inventoryItemsList: {
-        gap: 4,
-        marginBottom: 8,
+    itemsSectionSubtitle: {
+        color: '#9CA3AF',
+        fontSize: 11,
+        fontWeight: '500',
+        marginTop: 2,
     },
-    inventoryItemRow: {
+    itemRow2: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        paddingVertical: 6,
     },
-    inventoryItemName: {
-        fontSize: 13,
+    itemRow2Border: {
+        borderBottomWidth: 1,
+        borderBottomColor: '#F3F4F6',
+    },
+    itemName2: {
         color: '#374151',
+        fontSize: 13,
         flex: 1,
+        marginRight: 8,
     },
-    inventoryItemQty: {
+    itemSourceTags: {
+        flexDirection: 'row',
+        gap: 4,
+    },
+    stockTag: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 3,
@@ -674,28 +647,30 @@ const styles = StyleSheet.create({
         paddingHorizontal: 6,
         paddingVertical: 2,
     },
-    inventoryItemQtyText: {
-        fontSize: 12,
+    stockTagText: {
+        fontSize: 11,
         fontWeight: '700',
         color: '#7c3aed',
     },
-    inventoryTotalsRow: {
+    marketTag: {
         flexDirection: 'row',
-        gap: 6,
-    },
-    inventoryTotalBadge: {
-        backgroundColor: 'rgba(124,58,237,0.1)',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: '#e0f2fe',
         borderRadius: 6,
-        paddingHorizontal: 8,
-        paddingVertical: 3,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
     },
-    inventoryMarketBadge: {
-        backgroundColor: '#F3F4F6',
-    },
-    inventoryTotalBadgeText: {
+    marketTagText: {
         fontSize: 11,
-        fontWeight: '600',
-        color: '#7c3aed',
+        fontWeight: '700',
+        color: '#0369a1',
+    },
+    itemsMore: {
+        color: '#9CA3AF',
+        fontSize: 11,
+        paddingVertical: 6,
+        textAlign: 'center',
     },
 
     /* -- Cash breakdown -- */
@@ -807,7 +782,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         gap: 6,
         marginBottom: 6,
-        backgroundColor: 'transparent',
+        backgroundColor: 'rgba(16,185,129,0.06)',
     },
     navBtnText: {
         color: '#10B981',

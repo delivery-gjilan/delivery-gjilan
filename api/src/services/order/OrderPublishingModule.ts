@@ -46,7 +46,10 @@ export class OrderPublishingModule {
 
     async publishAllOrders() {
         const dbOrders = await this.deps.orderRepository.findUncompleted();
+        console.log(`[OrderPublishing] publishAllOrders: found ${dbOrders.length} uncompleted orders`);
         const orders = await Promise.all(dbOrders.map((o) => this.mapping.mapToOrder(o)));
+        console.log(`[OrderPublishing] publishAllOrders: mapped to ${orders.length} GraphQL orders, publishing...`);
         publish(this.deps.pubsub, topics.allOrdersChanged(), { orders });
+        console.log(`[OrderPublishing] publishAllOrders: published`);
     }
 }

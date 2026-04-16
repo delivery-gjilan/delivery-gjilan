@@ -46,7 +46,9 @@ export function useMapRealtimeData() {
         startPolling,
         stopPolling,
     } = useQuery(DriversDocument, { fetchPolicy: 'no-cache' });
-    const { data: orderData, refetch: refetchOrders } = useQuery(GetOrdersDocument);
+    const { data: orderData, refetch: refetchOrders } = useQuery(GetOrdersDocument, {
+        fetchPolicy: 'network-only',
+    });
 
     const [driversLive, setDriversLive] = useState<DriverItem[]>([]);
     const [realtimeHealth, setRealtimeHealth] = useState({

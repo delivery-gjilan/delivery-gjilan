@@ -18,6 +18,7 @@ function AppContent() {
     useDriverTracking();
     useNotifications();
     useNetworkStatus();
+    const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
     useEffect(() => {
         useAuthStore.getState().setAppSessionActive(true);
@@ -29,9 +30,13 @@ function AppContent() {
     return (
         <>
             <AppOverlays />
-            <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="login" options={{ headerShown: false }} />
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack
+                initialRouteName={isAuthenticated ? 'brand-splash' : 'login'}
+                screenOptions={{ headerShown: false, animation: 'none' }}
+            >
+                <Stack.Screen name="login" options={{ headerShown: false, animation: 'none' }} />
+                <Stack.Screen name="brand-splash" options={{ headerShown: false, animation: 'fade' }} />
+                <Stack.Screen name="(tabs)" options={{ headerShown: false, animation: 'none' }} />
                 <Stack.Screen
                     name="navigation"
                     options={{

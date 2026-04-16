@@ -11,6 +11,8 @@ Direct Dispatch creates normal `orders` rows with `channel = DIRECT_DISPATCH` in
 
 - Business requests a driver from mobile-business.
 - API creates a lightweight order with recipient details and preparation timing.
+- The create flow publishes the all-orders subscription immediately, so admin orders and map surfaces receive the new order without waiting for a later status change.
+- Admin order mapping derives the business label from `orders.businessId` when there are no `orderItems`, so direct-call orders still show the originating business.
 - Existing early-dispatch + READY dispatch flow sends it to available drivers.
 - Driver accepts using the normal assignment flow.
 

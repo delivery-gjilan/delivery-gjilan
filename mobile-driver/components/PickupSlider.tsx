@@ -33,21 +33,43 @@ export function PickupSlider({
     const confirmed  = useRef(false);
     const [done, setDone] = useState(false);
     const [splashVisible, setSplashVisible] = useState(false);
+    const etaLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+    const splashLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+    const confettiTimeoutsRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
+    const confirmTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // ETA badge idle animation: spring-in → gentle float
     const etaScale  = useRef(new Animated.Value(0)).current;
     const etaHoverY = useRef(new Animated.Value(0)).current;
     useEffect(() => {
-        if (etaMins == null) return;
+        etaLoopRef.current?.stop();
+        etaLoopRef.current = null;
+
+        if (etaMins == null) {
+            etaScale.setValue(0);
+            etaHoverY.setValue(0);
+            return;
+        }
+
+        etaScale.setValue(0);
+        etaHoverY.setValue(0);
+
         Animated.spring(etaScale, { toValue: 1, useNativeDriver: true, tension: 160, friction: 7 })
             .start(() => {
-                Animated.loop(
+                const loop = Animated.loop(
                     Animated.sequence([
                         Animated.timing(etaHoverY, { toValue: -5, duration: 900, useNativeDriver: true }),
                         Animated.timing(etaHoverY, { toValue: 0,  duration: 900, useNativeDriver: true }),
                     ]),
-                ).start();
+                );
+                etaLoopRef.current = loop;
+                loop.start();
             });
+
+        return () => {
+            etaLoopRef.current?.stop();
+            etaLoopRef.current = null;
+        };
     }, [etaScale, etaHoverY, etaMins]);
 
     // Splash card (post-confirm) animations
@@ -71,23 +93,54 @@ export function PickupSlider({
     const launchSplash = useCallback(() => {
         setSplashVisible(true);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+        splashLoopRef.current?.stop();
+        splashLoopRef.current = null;
+        confettiTimeoutsRef.current.forEach((id) => clearTimeout(id));
+        confettiTimeoutsRef.current = [];
+        if (confirmTimeoutRef.current) {
+            clearTimeout(confirmTimeoutRef.current);
+            confirmTimeoutRef.current = null;
+        }
+
+        splashOpacity.setValue(0);
+        splashScale.setValue(0.4);
+        splashHoverY.setValue(0);
+        splashConfetti.forEach((p) => p.anim.setValue(0));
+
         splashConfetti.forEach((p, i) => {
-            setTimeout(() => {
-                Animated.timing(p.anim, { toValue: 1, duration: 900, useNativeDriver: false }).start();
+            const timeoutId = setTimeout(() => {
+                Animated.timing(p.anim, { toValue: 1, duration: 900, useNativeDriver: true }).start();
             }, i * 28);
+            confettiTimeoutsRef.current.push(timeoutId);
         });
         Animated.parallel([
             Animated.spring(splashScale, { toValue: 1, useNativeDriver: true, tension: 160, friction: 7 }),
             Animated.timing(splashOpacity, { toValue: 1, duration: 220, useNativeDriver: true }),
         ]).start(() => {
-            Animated.loop(
+            const loop = Animated.loop(
                 Animated.sequence([
                     Animated.timing(splashHoverY, { toValue: -8, duration: 850, useNativeDriver: true }),
                     Animated.timing(splashHoverY, { toValue: 0,  duration: 850, useNativeDriver: true }),
                 ]),
-            ).start();
+            );
+            splashLoopRef.current = loop;
+            loop.start();
         });
     }, [splashConfetti, splashScale, splashOpacity, splashHoverY]);
+
+    useEffect(() => {
+        return () => {
+            etaLoopRef.current?.stop();
+            splashLoopRef.current?.stop();
+            confettiTimeoutsRef.current.forEach((id) => clearTimeout(id));
+            confettiTimeoutsRef.current = [];
+            if (confirmTimeoutRef.current) {
+                clearTimeout(confirmTimeoutRef.current);
+                confirmTimeoutRef.current = null;
+            }
+        };
+    }, []);
 
     const fillOpacity  = translateX.interpolate({ inputRange: [0, 200], outputRange: [0, 1], extrapolate: 'clamp' });
     const labelOpacity = translateX.interpolate({ inputRange: [0, 80],  outputRange: [1, 0], extrapolate: 'clamp' });
@@ -108,7 +161,10 @@ export function PickupSlider({
                     Animated.timing(translateX, { toValue: max, duration: 120, useNativeDriver: true })
                         .start(() => {
                             launchSplash();
-                            setTimeout(async () => { await onConfirm(); }, 1900);
+                            confirmTimeoutRef.current = setTimeout(async () => {
+                                await onConfirm();
+                                confirmTimeoutRef.current = null;
+                            }, 1900);
                         });
                 } else {
                     Animated.spring(translateX, { toValue: 0, useNativeDriver: true, tension: 80, friction: 12 }).start();

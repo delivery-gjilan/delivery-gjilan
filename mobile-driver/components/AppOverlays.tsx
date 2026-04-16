@@ -154,17 +154,23 @@ export function AppOverlays() {
                 </View>
             )}
 
-            {/* Order accept sheet */}
+            {/* Order accept sheet + dismiss backdrop */}
             {isAuthenticated && pendingOrder && (
-                <OrderAcceptSheet
-                    order={pendingOrder}
-                    onAccept={handleAcceptOrder}
-                    onAcceptAndNavigate={handleAcceptAndNavigate}
-                    onSkip={handleSkipOrder}
-                    accepting={accepting}
-                    autoCountdown={autoCountdown}
-                    takenByOther={takenByOther}
-                />
+                <>
+                    <Pressable
+                        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 299 }}
+                        onPress={() => !accepting && handleSkipOrder()}
+                    />
+                    <OrderAcceptSheet
+                        order={pendingOrder}
+                        onAccept={handleAcceptOrder}
+                        onAcceptAndNavigate={handleAcceptAndNavigate}
+                        onSkip={handleSkipOrder}
+                        accepting={accepting}
+                        autoCountdown={autoCountdown}
+                        takenByOther={takenByOther}
+                    />
+                </>
             )}
 
             {/* PTT floating button */}
@@ -231,6 +237,10 @@ export function AppOverlays() {
                 <OrderPoolSheet
                     orders={poolOrders}
                     accepting={accepting}
+                    onViewDetails={(order) => {
+                        setPoolOpen(false);
+                        useOrderAcceptStore.getState().setPendingOrder(order, false);
+                    }}
                     onAccept={(order) => {
                         setPoolOpen(false);
                         handleAcceptOrder(order.id);
