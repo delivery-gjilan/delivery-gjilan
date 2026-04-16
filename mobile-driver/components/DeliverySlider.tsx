@@ -16,10 +16,7 @@ interface Props {
     arrivedNotifSent: boolean;
     arrivedAt: number;
     notifiedAt: number | null;
-    businesses: DriverOrder['businesses'];
-    orderPrice: number;
-    deliveryPrice: number;
-    totalPrice: number;
+    customerPaymentAmount: number | null;
     insetBottom: number;
     onNotify: () => void;
     onPingAgain: () => void;
@@ -35,10 +32,7 @@ export function DeliverySlider({
     arrivedNotifSent,
     arrivedAt,
     notifiedAt,
-    businesses,
-    orderPrice,
-    deliveryPrice,
-    totalPrice,
+    customerPaymentAmount,
     insetBottom,
     onNotify,
     onPingAgain,
@@ -185,88 +179,36 @@ export function DeliverySlider({
                             </Pressable>
                         </View>
 
-                        {/* Order items + pricing */}
-                        {businesses.length > 0 && (
-                            <View style={styles.itemsSection}>
-                                <ScrollView style={{ maxHeight: 108 }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-                                    {businesses.flatMap((b) => b.items ?? []).map((item, i: number) => (
-                                        <View key={i} style={styles.itemRow}>
-                                            <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-                                            <Text style={styles.itemQty}>×{item.quantity}</Text>
-                                        </View>
-                                    ))}
-                                </ScrollView>
-                                <View style={styles.pricingRow}>
-                                    <Text style={styles.pricingLabel}>{s.subtotal}</Text>
-                                    <Text style={styles.pricingValue}>€{orderPrice.toFixed(2)}</Text>
-                                </View>
-                                <View style={styles.pricingRow}>
-                                    <Text style={styles.pricingLabel}>{s.delivery_fee}</Text>
-                                    <Text style={styles.pricingValue}>€{deliveryPrice.toFixed(2)}</Text>
-                                </View>
-                                <View style={[styles.pricingRow, styles.pricingTotal]}>
-                                    <Text style={styles.pricingTotalLabel}>{s.total}</Text>
-                                    <Text style={styles.pricingTotalValue}>€{totalPrice.toFixed(2)}</Text>
-                                </View>
-                            </View>
-                        )}
-
-                        {/* Delivery slider */}
-                        <View
-                            style={styles.track}
-                            onLayout={(e) => { trackWidth.current = e.nativeEvent.layout.width; }}
-                        >
-                            <Animated.View style={[styles.fill, { opacity: fillOpacity }]} />
-                            <Animated.Text style={[styles.trackLabel, { opacity: labelOpacity }]}>
-                                {s.slide_confirm}
-                            </Animated.Text>
-                            <Animated.View
-                                style={[styles.thumb, { transform: [{ translateX }] }]}
-                                {...deliveryPan.panHandlers}
-                            >
-                                <Ionicons name="checkmark" size={24} color="#fff" />
-                            </Animated.View>
+                        <View style={styles.collectCard}>
+                            <Text style={styles.collectLabel}>Collect from customer</Text>
+                            <Text style={styles.collectAmount}>
+                                {customerPaymentAmount != null ? `€${customerPaymentAmount.toFixed(2)}` : 'Confirm amount'}
+                            </Text>
                         </View>
 
-                        {/* Trouble row */}
-                        <View style={styles.troubleRow}>
-                            <Text style={styles.troubleLabel}>{s.customer_not_here}</Text>
-
-                            <Pressable
-                                style={[styles.troubleBtn, !pingUnlocked && styles.troubleBtnLocked]}
-                                disabled={!pingUnlocked}
-                                onPress={onPingAgain}
-                            >
-                                <Ionicons
-                                    name="notifications-outline"
-                                    size={13}
-                                    color={pingUnlocked ? '#f59e0b' : '#475569'}
-                                />
-                                <Text style={[styles.troubleBtnText, { color: pingUnlocked ? '#f59e0b' : '#475569' }]}>
-                                    {pingUnlocked
-                                        ? s.ping_again
-                                        : (!arrivedNotifSent ? s.ping : s.ping_time.replace('{{time}}', fmtTime(pingRemaining)))}
-                                </Text>
-                            </Pressable>
-
-                            <Pressable
-                                style={[
-                                    styles.troubleBtn,
-                                    styles.troubleBtnCancel,
-                                    !cancelUnlocked && styles.troubleBtnLocked,
-                                ]}
-                                disabled={!cancelUnlocked}
-                                onPress={() => setShowCancelSheet(true)}
-                            >
-                                <Ionicons
-                                    name="close-circle-outline"
-                                    size={13}
-                                    color={cancelUnlocked ? '#ef4444' : '#475569'}
-                                />
-                                <Text style={[styles.troubleBtnText, { color: cancelUnlocked ? '#ef4444' : '#475569' }]}>
-                                    {cancelUnlocked ? s.cancel_order : s.cancel_time.replace('{{time}}', fmtTime(cancelRemaining))}
-                                </Text>
-                            </Pressable>
+                        collectCard: {
+                            backgroundColor: 'rgba(16,185,129,0.1)',
+                            borderRadius: 12,
+                            borderWidth: 1,
+                            borderColor: 'rgba(16,185,129,0.32)',
+                            paddingHorizontal: 12,
+                            paddingVertical: 10,
+                            marginBottom: 12,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                        },
+                        collectLabel: {
+                            color: '#86efac',
+                            fontSize: 13,
+                            fontWeight: '700',
+                        },
+                        collectAmount: {
+                            color: '#22c55e',
+                            fontSize: 22,
+                            fontWeight: '900',
+                            letterSpacing: -0.4,
+                        },
                         </View>
                     </>
                 ) : (

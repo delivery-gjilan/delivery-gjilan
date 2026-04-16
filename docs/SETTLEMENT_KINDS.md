@@ -66,24 +66,33 @@ This document describes every kind of settlement the platform creates when an or
 - **Direction:** RECEIVABLE or PAYABLE (depends on rule config)
 - **Trigger:** A settlement rule of type `DELIVERY_PRICE` matches the order
 - **Logic:** Uses **most-specific-wins** strategy: if a combo rule exists, only that applies; else promotion rule; else business rule; else global rule. Amount is calculated on the delivery price.
-- **Reason format:** `"Settlement rule '{ruleName}': {percent}% of delivery price EUR {deliveryPrice} for order {displayId}"`
+- **Reason format:** `"Driver receivable on delivery fee (...)"` / `"Business payable on delivery fee (...)"`
 
-### 7. PROMOTION_COST — Promotion-Linked Adjustments
+### 7. DIRECT_CALL_FIXED_FEE — Direct Dispatch Fixed Delivery Payment
+
+- **Type:** DRIVER or BUSINESS
+- **Direction:** RECEIVABLE or PAYABLE (depends on matching delivery rule or fallback commission)
+- **Trigger:** `DIRECT_DISPATCH` order where delivery settlements are created from the business fixed amount
+- **Logic:** Delivery settlements for direct-call orders are labeled as direct-call fixed payment entries and are grouped separately in breakdown/drill-down.
+- **Reason format:** `"Direct call fixed payment: Driver receivable on delivery fee (...)"` or `"Direct call fixed payment commission (...)"`
+
+### 8. PROMOTION_COST — Promotion-Linked Adjustments
 
 - **Type:** DRIVER or BUSINESS
 - **Direction:** RECEIVABLE or PAYABLE
 - **Trigger:** Settlement rules linked to a specific promotion
 - **Logic:** These are standard ORDER_PRICE or DELIVERY_PRICE rules that have a `promotionId` associated. They appear in the breakdown as a separate category from regular commission.
+- **Labeling:** Promotion-linked rows keep `PROMOTION_COST` category and use rule label; when no explicit rule name is present, business-created promotions are labeled as Business Promotion Cost.
 - **Note:** The breakdown resolver categorizes any rule with a `promotionId` as `PROMOTION_COST`.
 
-### 8. Driver Commission Fallback
+### 9. Driver Commission Fallback
 
 - **Type:** DRIVER
 - **Direction:** RECEIVABLE (driver owes platform)
 - **Trigger:** No `DELIVERY_PRICE` rule matched and the driver has a `commissionPercentage` set on their record
 - **Logic:** Fallback: if no delivery-price rule applies, the driver's own commission percentage from their profile is used on the delivery price. This ensures there's always a delivery commission even without explicit rules.
 - **Reason format:** `"Driver commission ({percent}%) on delivery price EUR {deliveryPrice} for order {displayId}"`
-- **Note:** In the breakdown, this appears under `DELIVERY_COMMISSION` (null ruleId, categorized by the resolver as `AUTO_REMITTANCE` with RECEIVABLE direction unless a specific rule label is present).
+- **Note:** For direct-call orders this is recorded as `"Direct call fixed payment commission (...)"` and appears under `DIRECT_CALL_FIXED_FEE`.
 
 ---
 
@@ -105,7 +114,7 @@ Settlement rules can be scoped at different levels:
 
 ## When Settlements Are Created
 
-Settlements are created by `FinancialService.createSettlementsOnDelivery()` which is called when an order status transitions to `DELIVERED`. The `SettlementCalculationEngine` computes all entries, and they are batch-inserted into the `settlements` table.
+Settlements are created by `FinancialService.createOrderSettlements()` when an order status transitions to `DELIVERED`. The `SettlementCalculationEngine` computes all entries, and they are batch-inserted into the `settlements` table.
 
 ---
 

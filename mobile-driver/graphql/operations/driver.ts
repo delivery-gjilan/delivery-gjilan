@@ -15,10 +15,11 @@ export const GET_MY_DRIVER_METRICS = graphql(`
     }
 `);
 export const GET_MY_SETTLEMENTS = graphql(`
-    query GetMySettlements($status: SettlementStatus, $category: String, $startDate: Date, $endDate: Date, $limit: Int, $offset: Int) {
+    query GetMySettlements($status: SettlementStatus, $direction: SettlementDirection, $category: String, $startDate: Date, $endDate: Date, $limit: Int, $offset: Int) {
         settlements(
             type: DRIVER
             status: $status
+            direction: $direction
             category: $category
             startDate: $startDate
             endDate: $endDate

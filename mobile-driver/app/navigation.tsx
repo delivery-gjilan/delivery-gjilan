@@ -428,6 +428,8 @@ export default function NavigationScreen() {
                     <NavigationOrderCard
                         order={order}
                         isDirectDispatch={order.channel === 'DIRECT_DISPATCH'}
+                        etaMins={durationRemainingS != null ? Math.ceil(durationRemainingS / 60) : null}
+                        phase={phase}
                     />
                 </View>
             )}
@@ -523,36 +525,7 @@ export default function NavigationScreen() {
                 </View>
             )}
 
-            {/* â•â•â• Today's earnings floating pill â•â•â• */}
-            {(() => {
-                const metrics = metricsData?.myDriverMetrics;
-                const net = Number(metrics?.netEarningsToday ?? 0).toFixed(2);
-                const count = metrics?.deliveredTodayCount ?? 0;
-                return (
-                    <View style={[styles.earningsPill, { top: insets.top + 12 }]}>
-                        <Ionicons name="wallet-outline" size={14} color="#22c55e" />
-                        <Text style={styles.earningsPillAmount}>€{net}</Text>
-                        <View style={styles.earningsPillDivider} />
-                        <Ionicons name="bicycle-outline" size={13} color="#94a3b8" />
-                        <Text style={styles.earningsPillCount}>{count}</Text>
-                    </View>
-                );
-            })()}
-
-            {/* â•â•â• ETA pill (live from nav SDK) â•â•â• */}
-            {durationRemainingS != null && !showPickupPanel && !showDeliveryPanel && (
-                <View style={[styles.etaPill, { top: insets.top + 12 }]}>
-                    <Ionicons name="time-outline" size={13} color="#38bdf8" />
-                    <Text style={styles.etaPillText}>
-                        {durationRemainingS < 60
-                            ? t.navigation.less_than_one_min
-                            : `${Math.ceil(durationRemainingS / 60)} ${t.navigation.min}`}
-                    </Text>
-                    <Text style={styles.etaPillLabel}>
-                        {phase === 'to_pickup' ? t.navigation.to_pickup : t.navigation.to_dropoff}
-                    </Text>
-                </View>
-            )}
+            {/* ETA and phase are shown in the top NavigationOrderCard to avoid overlay collisions */}
 
             {/* â•â•â• Order cards bar (bottom) â•â•â• */}
             {assignedOrders.length >= 1 && (
@@ -781,10 +754,11 @@ export default function NavigationScreen() {
                     arrivedNotifSent={arrivedNotifSent}
                     arrivedAt={arrivedAt}
                     notifiedAt={notifiedAt}
-                    businesses={fo?.businesses ?? []}
-                    orderPrice={fo?.orderPrice ?? 0}
-                    deliveryPrice={fo?.deliveryPrice ?? 0}
-                    totalPrice={fo?.totalPrice ?? 0}
+                    customerPaymentAmount={
+                        fo?.channel === 'DIRECT_DISPATCH'
+                            ? Number(fo?.cashToCollect ?? 0)
+                            : Number(fo?.totalPrice ?? 0)
+                    }
                     insetBottom={insets.bottom}
                     onNotify={() => {
                         if (!order?.id || arrivedNotifSent) return;
@@ -1055,38 +1029,12 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
 
-    /* â”€â”€ Cancel button (loading state) â”€â”€ */
-    cancelBtn: {
-        position: 'absolute',
-        left: 16,
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: 'rgba(255,255,255,0.15)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-
-    /* â”€â”€ Control buttons â”€â”€ */
-    controlBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: 'rgba(0,0,0,0.3)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    controlBtnExit: {
-        backgroundColor: 'rgba(239,68,68,0.7)',
-    },
-
-    /* â”€â”€ Right-side buttons â”€â”€ */
     rightButtons: {
         position: 'absolute',
         right: 16,
         alignItems: 'center',
         gap: 10,
-        zIndex: 50,
+        zIndex: 90,
     },
     mapBtn: {
         width: 48,
@@ -1104,26 +1052,23 @@ const styles = StyleSheet.create({
         elevation: 5,
     },
 
-    /* â”€â”€ Order cards bar â”€â”€ */
     bottomBar: {
         position: 'absolute',
-        left: 0,
-        right: 0,
-        zIndex: 50,
+        left: 12,
+        right: 12,
+        zIndex: 90,
     },
     barContent: {
-        paddingHorizontal: 12,
-        gap: 10,
-        flexDirection: 'row',
-        alignItems: 'stretch',
+        paddingRight: 8,
+        gap: 8,
     },
     barCard: {
-        width: 240,
-        borderRadius: 14,
-        backgroundColor: 'rgba(10,12,24,0.88)',
+        width: 242,
         borderLeftWidth: 3,
+        borderRadius: 12,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.09)',
+        borderColor: 'rgba(148,163,184,0.25)',
+        backgroundColor: 'rgba(15,23,42,0.86)',
         padding: 10,
         gap: 8,
         shadowColor: '#000',
@@ -1132,6 +1077,7 @@ const styles = StyleSheet.create({
         shadowRadius: 12,
         elevation: 12,
     },
+
     barCardFocused: {
         backgroundColor: 'rgba(15,52,96,0.9)',
         borderColor: 'rgba(0,157,224,0.45)',

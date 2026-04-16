@@ -67,7 +67,7 @@ function formatDateTime(dateStr?: string | null) {
 export default function EarningsScreen() {
     const theme = useTheme();
     const { t } = useTranslations();
-    const [period, setPeriod] = useState<Period>('today');
+    const [period, setPeriod] = useState<Period>('all');
     const [refreshing, setRefreshing] = useState(false);
     const [disputeModalRequestId, setDisputeModalRequestId] = useState<string | null>(null);
     const [rejectReason, setRejectReason] = useState('');
@@ -101,13 +101,13 @@ export default function EarningsScreen() {
 
     const { data: breakdownData, loading: breakdownLoading, refetch: refetchBreakdown } = useQuery(
         GET_SETTLEMENT_BREAKDOWN,
-        { variables: { isSettled: false, startDate, endDate }, fetchPolicy: 'network-only' },
+        { variables: { startDate, endDate }, fetchPolicy: 'network-only' },
     );
 
     const { data: settlementsData, loading: settlementsLoading, refetch: refetchSettlements, fetchMore: fetchMoreSettlements } = useQuery(
         GET_MY_SETTLEMENTS,
         {
-            variables: { status: 'PENDING', startDate, endDate, limit: SETTLEMENT_PAGE_SIZE, offset: 0 },
+            variables: { startDate, endDate, limit: SETTLEMENT_PAGE_SIZE, offset: 0 },
             fetchPolicy: 'network-only',
             onCompleted: (data) => {
                 const rows = data?.settlements ?? [];
@@ -214,7 +214,7 @@ export default function EarningsScreen() {
         const cfg = getCategoryConfig(item.category, item.direction);
         setSelectedCategory({ category: item.category, label: item.label, color: cfg.color, direction: item.direction });
         setCategorySettlements([]);
-        fetchCategorySettlements({ variables: { category: item.category, startDate, endDate, limit: 100 } });
+        fetchCategorySettlements({ variables: { category: item.category, direction: item.direction, startDate, endDate, limit: 100 } });
     }, [fetchCategorySettlements, startDate, endDate]);
 
     const handleLoadMoreSettlements = useCallback(async () => {
@@ -222,7 +222,7 @@ export default function EarningsScreen() {
         setLoadingMore(true);
         try {
             const result = await fetchMoreSettlements({
-                variables: { status: 'PENDING', startDate, endDate, limit: SETTLEMENT_PAGE_SIZE, offset: settlementOffset },
+                variables: { startDate, endDate, limit: SETTLEMENT_PAGE_SIZE, offset: settlementOffset },
             });
             const rows = result.data?.settlements ?? [];
             setAllSettlements(prev => [...prev, ...rows]);
@@ -315,6 +315,11 @@ export default function EarningsScreen() {
                 color: direction === "PAYABLE" ? "#22c55e" : "#f59e0b",
                 explain: t.earnings.explain_delivery ?? "Commission on delivery fee",
             },
+            DIRECT_CALL_FIXED_FEE: {
+                icon: "call-outline",
+                color: direction === "PAYABLE" ? "#22c55e" : "#0ea5e9",
+                explain: "Direct call fixed delivery payment",
+            },
             PLATFORM_COMMISSION: {
                 icon: "business-outline",
                 color: "#f59e0b",
@@ -355,6 +360,7 @@ export default function EarningsScreen() {
     const getSettlementTag = (s: Settlement) => {
         if (s.direction === "PAYABLE") return { label: t.earnings.you_receive ?? "You receive", color: "#22c55e" };
         if (s.reason?.startsWith("Stock item")) return { label: t.earnings.stock_remittance ?? "Stock Items", color: "#a855f7" };
+        if (s.reason?.startsWith("Direct call fixed payment")) return { label: "Direct Call", color: "#0ea5e9" };
         if (s.reason?.startsWith("Markup")) return { label: t.earnings.markup ?? "Markup", color: "#ef4444" };
         if (s.reason?.startsWith("Priority")) return { label: t.earnings.priority ?? "Priority Fee", color: "#ef4444" };
         if (s.reason?.startsWith("Driver tip")) return { label: t.earnings.tip_label ?? "Tip", color: "#22c55e" };
@@ -365,6 +371,7 @@ export default function EarningsScreen() {
 
     // Map a settlement line to its computed category (mirrors backend logic)
     const getLineCategory = (s: Settlement): string => {
+        if (s.reason?.startsWith("Direct call fixed payment")) return "DIRECT_CALL_FIXED_FEE";
         if (!s.rule?.id) {
             if (s.reason?.startsWith("Stock item")) return "STOCK_REMITTANCE";
             if (s.reason?.startsWith("Driver tip")) return "DRIVER_TIP";
@@ -378,10 +385,12 @@ export default function EarningsScreen() {
 
     const getCategoryColor = (cat: string, direction?: string): string => {
         if (cat === 'DELIVERY_COMMISSION' && direction === 'PAYABLE') return '#22c55e';
+        if (cat === 'DIRECT_CALL_FIXED_FEE' && direction === 'PAYABLE') return '#22c55e';
         const map: Record<string, string> = {
             AUTO_REMITTANCE: '#ef4444',
             STOCK_REMITTANCE: '#a855f7',
             DELIVERY_COMMISSION: '#f59e0b',
+            DIRECT_CALL_FIXED_FEE: '#0ea5e9',
             PLATFORM_COMMISSION: '#f59e0b',
             PROMOTION_COST: '#f59e0b',
             DRIVER_TIP: '#22c55e',
@@ -395,6 +404,7 @@ export default function EarningsScreen() {
             AUTO_REMITTANCE: t.earnings.cat_markup ?? 'Markup',
             STOCK_REMITTANCE: t.earnings.cat_stock ?? 'Stock',
             DELIVERY_COMMISSION: t.earnings.cat_delivery ?? 'Delivery',
+            DIRECT_CALL_FIXED_FEE: 'Direct Call',
             PLATFORM_COMMISSION: t.earnings.cat_commission ?? 'Commission',
             PROMOTION_COST: t.earnings.cat_promo ?? 'Promo',
             DRIVER_TIP: t.earnings.cat_tip ?? 'Tip',
@@ -743,6 +753,8 @@ export default function EarningsScreen() {
                                 const businessNames = firstSettlement?.order?.businesses?.map((b) => b.business?.name).filter(Boolean).join(", ") ?? "—";
                                 const hasPending = settlementsForOrder.some((s) => s.status !== 'PAID');
                                 const netAmount = Number(orderGroup.totalPayable ?? 0) - Number(orderGroup.totalReceivable ?? 0);
+                                const commissionAmount = Number(orderGroup.totalReceivable ?? 0);
+                                const payoutAmount = Number(orderGroup.totalPayable ?? 0);
                                 const amountColor = netAmount >= 0 ? theme.colors.income : '#f59e0b';
                                 const orderLabel = orderGroup.orderDisplayId ? `#${orderGroup.orderDisplayId}` : t.earnings.delivery;
                                 const lineCount = settlementsForOrder.length;
@@ -774,6 +786,25 @@ export default function EarningsScreen() {
                                         <Text style={[es.historyReason, { color: theme.colors.text }]} numberOfLines={2}>
                                             {lineCount} settlement line{lineCount === 1 ? '' : 's'}
                                         </Text>
+
+                                        <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+                                            <View style={{ backgroundColor: '#f59e0b18', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                                                <Text style={{ fontSize: 10, color: theme.colors.subtext }}>
+                                                    Commission
+                                                </Text>
+                                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#f59e0b' }}>
+                                                    -{formatCurrency(commissionAmount)}
+                                                </Text>
+                                            </View>
+                                            <View style={{ backgroundColor: theme.colors.income + '18', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                                                <Text style={{ fontSize: 10, color: theme.colors.subtext }}>
+                                                    Platform pays
+                                                </Text>
+                                                <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.income }}>
+                                                    +{formatCurrency(payoutAmount)}
+                                                </Text>
+                                            </View>
+                                        </View>
 
                                         {/* Category tags */}
                                         {(() => {

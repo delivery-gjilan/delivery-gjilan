@@ -831,6 +831,7 @@ export class OrderFlowHarness {
             appliesTo: 'PRICE' | 'DELIVERY';
             discountAmount: number;
         }>;
+        channel?: 'PLATFORM' | 'DIRECT_DISPATCH';
     }): Promise<{ order: DbOrder; items: DbOrderItem[] }> {
         const {
             subtotal,
@@ -841,6 +842,7 @@ export class OrderFlowHarness {
             payment = 'CASH_TO_DRIVER',
             driverUserId = IDS.driverUserId,
             promoRows = [],
+            channel = 'PLATFORM',
         } = params;
         const effectiveBusinessPrice = businessPriceParam ?? subtotal;
 
@@ -865,10 +867,13 @@ export class OrderFlowHarness {
                 deliveryPrice,
                 prioritySurcharge,
                 paymentCollection: payment,
+                channel,
                 status: 'DELIVERED',
                 dropoffLat: TEST_LAT,
                 dropoffLng: TEST_LNG,
                 dropoffAddress: 'Test Dropoff',
+                recipientPhone: channel === 'DIRECT_DISPATCH' ? '+38344123456' : null,
+                recipientName: channel === 'DIRECT_DISPATCH' ? 'Direct Dispatch Customer' : null,
                 deliveredAt: now,
                 orderDate: now,
                 createdAt: now,
@@ -932,6 +937,7 @@ export class OrderFlowHarness {
         ruleId: string | null;
         driverId: string | null;
         businessId: string | null;
+        reason: string | null;
     }>> {
         await this.financialService.createOrderSettlements(order, items, order.driverId);
         const rows = await this.settlementRepo.getSettlements({ orderId: order.id });
@@ -942,7 +948,22 @@ export class OrderFlowHarness {
             ruleId: r.ruleId ?? null,
             driverId: r.driverId ?? null,
             businessId: r.businessId ?? null,
+            reason: r.reason ?? null,
         }));
+    }
+
+    async setRuleActive(ruleId: string, isActive: boolean): Promise<void> {
+        await this.db
+            .update(settlementRules)
+            .set({ isActive, updatedAt: new Date().toISOString() })
+            .where(eq(settlementRules.id, ruleId));
+    }
+
+    async setDriverCommissionPercentage(commissionPercentage: string): Promise<void> {
+        await this.db
+            .update(drivers)
+            .set({ commissionPercentage, updatedAt: new Date().toISOString() })
+            .where(eq(drivers.id, IDS.driverProfileId));
     }
 
     // -----------------------------------------------------------------------

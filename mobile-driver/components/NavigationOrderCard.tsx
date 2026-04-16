@@ -6,11 +6,15 @@ import type { DriverOrder } from '@/utils/types';
 interface Props {
     order: DriverOrder;
     isDirectDispatch?: boolean;
+    etaMins?: number | null;
+    phase?: 'to_pickup' | 'to_dropoff' | null;
 }
 
 export function NavigationOrderCard({
     order,
     isDirectDispatch = false,
+    etaMins = null,
+    phase = null,
 }: Props) {
     const [isExpanded, setIsExpanded] = useState(false);
 
@@ -24,7 +28,8 @@ export function NavigationOrderCard({
     const totalStockUnits = allItems.reduce((sum, it) => sum + (it.inventoryQuantity ?? 0), 0);
     const totalMarketUnits = allItems.reduce((sum, it) => sum + Math.max(0, it.quantity - (it.inventoryQuantity ?? 0)), 0);
 
-    const phase = order.status === 'OUT_FOR_DELIVERY' ? 'to_dropoff' : 'to_pickup';
+    const derivedPhase = order.status === 'OUT_FOR_DELIVERY' ? 'to_dropoff' : 'to_pickup';
+    const currentPhase = phase ?? derivedPhase;
     const businessName = order.businesses?.[0]?.business?.name ?? 'Business';
     const recipientLabel = order.recipientName ?? order.recipientPhone ?? null;
 
@@ -40,9 +45,16 @@ export function NavigationOrderCard({
                     <Text style={styles.pillTitle} numberOfLines={1}>
                         Order #{order.displayId}
                     </Text>
-                    <Text style={styles.pillSubtitle} numberOfLines={1}>
-                        {phase === 'to_dropoff' ? recipientLabel || 'Delivery' : businessName}
-                    </Text>
+                    <View style={styles.pillSubtitleRow}>
+                        <Text style={styles.pillSubtitle} numberOfLines={1}>
+                            {currentPhase === 'to_dropoff' ? recipientLabel || 'Delivery' : businessName}
+                        </Text>
+                        {etaMins != null && (
+                            <Text style={styles.pillEta}>
+                                · {etaMins <= 0 ? '<1m' : `${etaMins}m`} {currentPhase === 'to_dropoff' ? 'drop' : 'pickup'}
+                            </Text>
+                        )}
+                    </View>
                 </View>
                 <View style={styles.pillRight}>
                     <Text style={styles.pillEarning}>€{netEarnings.toFixed(2)}</Text>
@@ -57,7 +69,7 @@ export function NavigationOrderCard({
             {/* Expanded Details */}
             {isExpanded && (
                 <View style={styles.expandedPanel}>
-                    {phase === 'to_pickup' ? (
+                    {currentPhase === 'to_pickup' ? (
                         <>
                             <View style={styles.detailRow}>
                                 <Text style={styles.detailLabel}>Business</Text>
@@ -152,6 +164,17 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: '#94A3B8',
         marginTop: 2,
+    },
+    pillSubtitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 2,
+        gap: 4,
+    },
+    pillEta: {
+        fontSize: 11,
+        color: '#67E8F9',
+        fontWeight: '700',
     },
     pillRight: {
         alignItems: 'flex-end',

@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Animated, PanResponder, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Animated, PanResponder, ActivityIndicator, ScrollView, useWindowDimensions } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useQuery } from '@apollo/client/react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslations } from '@/hooks/useTranslations';
 import { calculateRouteDistance } from '@/utils/mapbox';
+import { GET_MY_DRIVER_METRICS } from '@/graphql/operations/driver';
 import type { DriverOrder } from '@/utils/types';
 
 const COUNTDOWN_DURATION = 15;
@@ -52,7 +54,7 @@ export function OrderInspectSheet({
     order,
     onClose,
     onAccept,
-    onAcceptAndNavigate,
+    onAcceptAndNavigate: _onAcceptAndNavigate,
     onNavigate,
     onMarkPickedUp,
     accepting = false,
@@ -62,6 +64,7 @@ export function OrderInspectSheet({
     routeInfo: externalRouteInfo = null,
 }: Props) {
     const insets = useSafeAreaInsets();
+    const { height: viewportHeight } = useWindowDimensions();
     const { t } = useTranslations();
     const s = t.orderAccept;
     const slideY = useRef(new Animated.Value(-500)).current;
@@ -70,6 +73,9 @@ export function OrderInspectSheet({
     const [markingPickedUp, setMarkingPickedUp] = useState(false);
     const [nowTs, setNowTs] = useState(() => Date.now());
     const [fallbackRouteInfo, setFallbackRouteInfo] = useState<{ distanceKm: number; durationMin: number } | null>(null);
+    const [itemsExpanded, setItemsExpanded] = useState(true);
+    const acceptPulse = useRef(new Animated.Value(1)).current;
+    const { data: metricsData } = useQuery(GET_MY_DRIVER_METRICS, { fetchPolicy: 'cache-first' });
 
     const isAvailable = mode === 'available';
     const isAssigned = mode === 'assigned';
@@ -86,22 +92,14 @@ export function OrderInspectSheet({
     const businessPrice = Math.max(0, orderPrice - inventoryPrice);
     const totalPrice = Number(order.totalPrice ?? 0);
     const deliveryFee = Number(order.deliveryPrice ?? 0).toFixed(2);
-    const dropAddress = order.dropOffLocation?.address ?? '';
-    const shortAddress = dropAddress.split(',')[0] || s.see_map;
     const cashToCollect = Number((order as any).cashToCollect ?? 0);
     const statusLabel = STATUS_LABELS[order.status] ?? order.status;
     const statusColor = STATUS_COLORS[order.status] ?? '#6B7280';
 
     const ringColor = isDirectDispatch ? DD_ORANGE : countdown <= 5 ? '#EF4444' : '#10B981';
     const ringOffset = (RING_C * (COUNTDOWN_DURATION - countdown)) / COUNTDOWN_DURATION;
-    const cashCopy = {
-        payBusiness: 'Pay business',
-        payBusinessHint: 'Market items you buy on-site',
-        collectCustomer: 'Collect from customer',
-        collectCustomerHint: 'Total cash to collect',
-        yourCut: 'Your cut',
-        yourCutHint: 'Delivery fee you keep',
-    };
+    const collectFromCustomer = isDirectDispatch ? cashToCollect : totalPrice;
+    const showCollectAmount = !isDirectDispatch || cashToCollect > 0;
 
     const etaLabel = (() => {
         if (order.status === 'READY') return isAssigned ? 'Ready for pickup' : s.ready_now;
@@ -119,6 +117,26 @@ export function OrderInspectSheet({
         const id = setInterval(() => setNowTs(Date.now()), 30_000);
         return () => clearInterval(id);
     }, []);
+
+    useEffect(() => {
+        if (!isAvailable || accepting || takenByOther) {
+            acceptPulse.setValue(1);
+            return;
+        }
+        const loop = Animated.loop(
+            Animated.sequence([
+                Animated.timing(acceptPulse, { toValue: 1.035, duration: 760, useNativeDriver: true }),
+                Animated.timing(acceptPulse, { toValue: 1.0, duration: 760, useNativeDriver: true }),
+            ]),
+        );
+        loop.start();
+        return () => loop.stop();
+    }, [acceptPulse, accepting, isAvailable, takenByOther]);
+
+    useEffect(() => {
+        // Inventory orders start collapsed to keep the sheet shorter while still exposing a breakdown on expand.
+        setItemsExpanded(!hasInventory);
+    }, [order?.id, hasInventory]);
 
     useEffect(() => {
         setFallbackRouteInfo(null);
@@ -205,12 +223,6 @@ export function OrderInspectSheet({
         onAccept?.(order.id);
     }, [onAccept, order.id]);
 
-    const handleAcceptAndNavigate = useCallback(() => {
-        if (timerRef.current) clearInterval(timerRef.current);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-        onAcceptAndNavigate?.(order.id);
-    }, [onAcceptAndNavigate, order.id]);
-
     const handleMarkPickedUp = useCallback(async () => {
         if (!onMarkPickedUp) return;
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -222,10 +234,11 @@ export function OrderInspectSheet({
         }
     }, [onMarkPickedUp]);
 
-    // Calculate net earnings (after business payment deduction)
-    const driverTip = Number(order.driverTip ?? 0);
-    const grossEarnings = Number(deliveryFee) + driverTip;
-    const netEarnings = Math.max(0, grossEarnings - businessPrice);
+    // Driver take for this card follows delivery-fee minus platform commission.
+    const commissionPct = Number(metricsData?.myDriverMetrics?.commissionPercentage ?? 0);
+    const deliveryFeeAmount = Number(order.deliveryPrice ?? 0);
+    const commissionAmount = deliveryFeeAmount * (Math.max(0, commissionPct) / 100);
+    const netEarnings = Math.max(0, deliveryFeeAmount - commissionAmount);
 
     const primaryAction = useMemo(() => {
         if (isAvailable) {
@@ -250,17 +263,6 @@ export function OrderInspectSheet({
     }, [accepting, handleAccept, isAvailable, isDirectDispatch, onNavigate, order.status, s.accept_order]);
 
     const secondaryAction = useMemo(() => {
-        if (isAvailable && onAcceptAndNavigate) {
-            return {
-                label: s.accept_navigate,
-                icon: 'navigate-outline',
-                onPress: handleAcceptAndNavigate,
-                style: [styles.secondaryBtn, isDirectDispatch && styles.secondaryBtnDD],
-                textStyle: [styles.secondaryBtnText, isDirectDispatch && { color: DD_ORANGE }],
-                loading: accepting,
-            };
-        }
-
         if (isAssigned && order.status === 'READY' && onMarkPickedUp) {
             return {
                 label: 'Mark Picked Up',
@@ -273,12 +275,19 @@ export function OrderInspectSheet({
         }
 
         return null;
-    }, [accepting, handleAcceptAndNavigate, handleMarkPickedUp, isAssigned, isAvailable, isDirectDispatch, markingPickedUp, onAcceptAndNavigate, onMarkPickedUp, order.status, s.accept_navigate]);
+    }, [handleMarkPickedUp, isAssigned, markingPickedUp, onMarkPickedUp, order.status]);
 
     return (
         <Animated.View style={[styles.root, { transform: [{ translateY: slideY }] }]}>
             <View
-                style={[styles.sheet, isDirectDispatch && styles.sheetDD, { paddingTop: insets.top + (isDirectDispatch ? 0 : 8) }]}
+                style={[
+                    styles.sheet,
+                    isDirectDispatch && styles.sheetDD,
+                    {
+                        paddingTop: insets.top + (isDirectDispatch ? 0 : 8),
+                        maxHeight: Math.max(420, Math.floor(viewportHeight * 0.78)),
+                    },
+                ]}
                 onLayout={(e) => onHeightChange?.(e.nativeEvent.layout.height)}
             >
                 {isDirectDispatch && <View style={styles.ddAccentBar} />}
@@ -291,8 +300,13 @@ export function OrderInspectSheet({
                     </View>
                 )}
 
-                <View {...panResponder.panHandlers} style={[styles.body, isDirectDispatch && { paddingTop: 10 }]}>
-                    <View style={styles.headerRow}>
+                <ScrollView
+                    style={styles.bodyScroll}
+                    contentContainerStyle={[styles.body, isDirectDispatch && { paddingTop: 10, paddingBottom: 10 }]}
+                    showsVerticalScrollIndicator={false}
+                    bounces
+                >
+                    <View {...panResponder.panHandlers} style={styles.headerRow}>
                         {isAvailable && autoCountdown ? (
                             <View style={styles.ringContainer}>
                                 <Svg width={52} height={52} viewBox="0 0 52 52">
@@ -313,19 +327,26 @@ export function OrderInspectSheet({
                                 </Svg>
                                 <Text style={[styles.countdownText, { color: ringColor }]}>{countdown}</Text>
                             </View>
-                        ) : (
+                        ) : isAssigned ? (
                             <View style={[styles.statusBadge, { backgroundColor: `${statusColor}15`, borderColor: `${statusColor}30` }]}>
-                                <Text style={[styles.statusBadgeText, { color: isDirectDispatch && isAssigned ? DD_ORANGE : statusColor }]}>
-                                    {isAssigned ? statusLabel : 'Available'}
+                                <Text style={[styles.statusBadgeText, { color: isDirectDispatch ? DD_ORANGE : statusColor }]}>
+                                    {statusLabel}
                                 </Text>
                             </View>
+                        ) : (
+                            <View style={styles.statusSpacer} />
                         )}
 
                         <View style={styles.headerTextBlock}>
-                            <Text style={[styles.headerLabel, isDirectDispatch && { color: DD_ORANGE }]}>
-                                {isAvailable ? (isDirectDispatch ? 'NEW CALL' : s.new_order) : 'ORDER DETAILS'}
-                            </Text>
-                            <Text style={styles.bizName} numberOfLines={1}>{bizName}</Text>
+                            {!isAvailable && (
+                                <Text style={[styles.headerLabel, isDirectDispatch && { color: DD_ORANGE }]}>
+                                    ORDER DETAILS
+                                </Text>
+                            )}
+                            <View style={styles.bizRow}>
+                                <Text style={styles.bizName} numberOfLines={1}>{bizName}</Text>
+                                <Text style={styles.earnInlineText}>You earn €{netEarnings.toFixed(2)}</Text>
+                            </View>
                             {!isDirectDispatch && recipientLabel ? (
                                 <Text style={styles.recipientText} numberOfLines={1}>{recipientLabel}</Text>
                             ) : null}
@@ -341,11 +362,6 @@ export function OrderInspectSheet({
                     </View>
                     <View style={[styles.infoRow, isDirectDispatch && styles.infoRowDD]}>
                         <View style={styles.infoItem}>
-                            <Text style={[styles.infoValue, isDirectDispatch && { color: DD_ORANGE, fontWeight: '800' }]}>€{deliveryFee}</Text>
-                            <Text style={styles.infoLabel}>{isDirectDispatch ? 'Agreed fee' : s.you_earn}</Text>
-                        </View>
-                        <View style={styles.infoDivider} />
-                        <View style={styles.infoItem}>
                             <Text style={[styles.infoValue, order.status === 'READY' && { color: '#10B981' }]}>{etaLabel}</Text>
                             <Text style={styles.infoLabel}>{isAvailable ? s.food_status : 'Status'}</Text>
                         </View>
@@ -358,11 +374,6 @@ export function OrderInspectSheet({
                                 </View>
                             </>
                         ) : null}
-                        <View style={styles.infoDivider} />
-                        <View style={[styles.infoItem, { flex: 1 }]}> 
-                            <Text style={styles.infoValue} numberOfLines={1}>{isDirectDispatch ? 'Given at pickup' : shortAddress}</Text>
-                            <Text style={styles.infoLabel}>{s.dropoff}</Text>
-                        </View>
                     </View>
 
                     {allItems.length > 0 && (
@@ -371,18 +382,35 @@ export function OrderInspectSheet({
                                 <Text style={styles.sectionTitle}>Pickup Plan</Text>
                             </View>
                             <View style={styles.itemsSection}>
-                                <View style={styles.itemsSectionHeader}>
-                                    <Ionicons name="bag-handle-outline" size={13} color="#6B7280" />
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={styles.itemsSectionTitle}>{itemCount} {itemCount === 1 ? s.item : s.items}</Text>
-                                        <Text style={styles.itemsSectionSubtitle}>
-                                            {hasInventory
-                                                ? `Collect ${totalStockUnits} from your stock and ${totalMarketUnits} from the business.`
-                                                : `${itemCount} ${itemCount === 1 ? 'item' : 'items'} to collect at the business.`}
-                                        </Text>
+                                <Pressable style={styles.itemsToggleRow} onPress={() => setItemsExpanded((v) => !v)}>
+                                    <View style={styles.itemsSectionHeader}>
+                                        <Ionicons name="bag-handle-outline" size={13} color="#6B7280" />
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.itemsSectionTitle}>{itemCount} {itemCount === 1 ? s.item : s.items}</Text>
+                                            <Text style={styles.itemsSectionSubtitle}>
+                                                {hasInventory
+                                                    ? `Inventory split: ${totalStockUnits} stock, ${totalMarketUnits} business.`
+                                                    : `${itemCount} ${itemCount === 1 ? 'item' : 'items'} to collect at the business.`}
+                                            </Text>
+                                        </View>
                                     </View>
-                                </View>
-                                {allItems.slice(0, 8).map((item, idx: number) => {
+                                    <Ionicons name={itemsExpanded ? 'chevron-up' : 'chevron-down'} size={16} color="#6B7280" />
+                                </Pressable>
+
+                                {!itemsExpanded && hasInventory && (
+                                    <View style={styles.itemsCollapsedSummary}>
+                                        <View style={styles.summaryChip}>
+                                            <Ionicons name="cube" size={11} color="#7c3aed" />
+                                            <Text style={styles.summaryChipText}>Stock ×{totalStockUnits}</Text>
+                                        </View>
+                                        <View style={styles.summaryChip}>
+                                            <Ionicons name="storefront-outline" size={11} color="#0369a1" />
+                                            <Text style={styles.summaryChipText}>Business ×{totalMarketUnits}</Text>
+                                        </View>
+                                    </View>
+                                )}
+
+                                {itemsExpanded && allItems.slice(0, 8).map((item, idx: number) => {
                                     const fromStock = item.inventoryQuantity ?? 0;
                                     const fromMarket = Math.max(0, item.quantity - fromStock);
                                     return (
@@ -405,141 +433,45 @@ export function OrderInspectSheet({
                                         </View>
                                     );
                                 })}
-                                {allItems.length > 8 && <Text style={styles.itemsMore}>+{allItems.length - 8} more items</Text>}
+
+                                {itemsExpanded && allItems.length > 8 && <Text style={styles.itemsMore}>+{allItems.length - 8} more items</Text>}
                             </View>
                         </>
                     )}
 
                     <View style={styles.sectionHeaderRow}>
-                        <Text style={styles.sectionTitle}>Your Earnings</Text>
+                        <Text style={styles.sectionTitle}>Cash Flow</Text>
                     </View>
                     <View style={styles.cashBreakdown}>
                         <View style={styles.cashRows}>
-                            {/* Delivery Fee */}
-                            <View style={styles.cashRow}>
-                                <View style={styles.cashRowLeft}>
-                                    <View style={[styles.cashDot, { backgroundColor: '#3B82F6' }]} />
-                                    <View>
-                                        <Text style={styles.cashRowLabel}>Delivery Fee</Text>
-                                        <Text style={styles.cashRowHint}>Your compensation for delivery</Text>
-                                    </View>
-                                </View>
-                                <Text style={[styles.cashRowAmount, { color: '#3B82F6' }]}>+€{Number(deliveryFee).toFixed(2)}</Text>
-                            </View>
-
-                            {/* Tip (if any) */}
-                            {driverTip > 0 && (
-                                <View style={styles.cashRow}>
-                                    <View style={styles.cashRowLeft}>
-                                        <View style={[styles.cashDot, { backgroundColor: '#EC4899' }]} />
-                                        <View>
-                                            <Text style={styles.cashRowLabel}>Tip</Text>
-                                            <Text style={styles.cashRowHint}>Customer appreciation</Text>
-                                        </View>
-                                    </View>
-                                    <Text style={[styles.cashRowAmount, { color: '#EC4899' }]}>+€{driverTip.toFixed(2)}</Text>
-                                </View>
-                            )}
-
-                            {/* Subtotal earnings */}
-                            {(businessPrice > 0 || !isDirectDispatch) && (
-                                <View style={styles.cashRow}>
-                                    <View style={styles.cashRowLeft}>
-                                        <View style={[styles.cashDot, { backgroundColor: '#9CA3AF' }]} />
-                                        <View>
-                                            <Text style={styles.cashRowLabel}>Subtotal</Text>
-                                            <Text style={styles.cashRowHint}>Before deductions</Text>
-                                        </View>
-                                    </View>
-                                    <Text style={[styles.cashRowAmount, { color: '#6B7280', fontWeight: '600' }]}>€{grossEarnings.toFixed(2)}</Text>
-                                </View>
-                            )}
-
-                            {/* Business Payment Deduction (Market Items) */}
-                            {!isDirectDispatch && businessPrice > 0 && (
+                            {!isDirectDispatch && (
                                 <View style={styles.cashRow}>
                                     <View style={styles.cashRowLeft}>
                                         <View style={[styles.cashDot, { backgroundColor: '#EF4444' }]} />
                                         <View>
-                                            <Text style={[styles.cashRowLabel, { fontWeight: '700' }]}>Pay Business</Text>
-                                            <Text style={styles.cashRowHint}>Market items you source on-site</Text>
+                                            <Text style={[styles.cashRowLabel, { fontWeight: '700' }]}>Give business</Text>
+                                            <Text style={styles.cashRowHint}>Market items paid at pickup</Text>
                                         </View>
                                     </View>
                                     <Text style={[styles.cashRowAmount, { color: '#EF4444', fontWeight: '700' }]}>−€{businessPrice.toFixed(2)}</Text>
                                 </View>
                             )}
 
-                            {/* NET EARNINGS - HIGHLIGHTED */}
-                            <View style={[styles.cashRow, styles.cashRowLast, styles.netEarningsRow]}>
+                            <View style={styles.cashRow}>
                                 <View style={styles.cashRowLeft}>
-                                    <View style={[styles.cashDot, { backgroundColor: '#22C55E' }]} />
+                                    <View style={[styles.cashDot, { backgroundColor: '#10B981' }]} />
                                     <View>
-                                        <Text style={[styles.cashRowLabel, styles.netEarningsLabel]}>You Keep</Text>
-                                        <Text style={styles.cashRowHint}>Your final payout</Text>
+                                        <Text style={styles.cashRowLabel}>Collect from customer</Text>
+                                        <Text style={styles.cashRowHint}>{isDirectDispatch ? 'Cash to collect on drop-off' : 'Total due from customer'}</Text>
                                     </View>
                                 </View>
-                                <Text style={[styles.cashRowAmount, styles.netEarningsAmount]}>€{netEarnings.toFixed(2)}</Text>
+                                <Text style={[styles.cashRowAmount, { color: '#10B981' }]}>
+                                    {showCollectAmount ? `+€${collectFromCustomer.toFixed(2)}` : 'Confirm at pickup'}
+                                </Text>
                             </View>
+
                         </View>
                     </View>
-
-                    {/* Customer Collection Section (separate from earnings) */}
-                    {!isDirectDispatch && (
-                        <>
-                            <View style={styles.sectionHeaderRow}>
-                                <Text style={styles.sectionTitle}>Cash From Customer</Text>
-                            </View>
-                            <View style={styles.cashBreakdown}>
-                                <View style={styles.cashRows}>
-                                    <View style={[styles.cashRow, styles.cashRowLast]}>
-                                        <View style={styles.cashRowLeft}>
-                                            <View style={[styles.cashDot, { backgroundColor: '#10B981' }]} />
-                                            <View>
-                                                <Text style={styles.cashRowLabel}>{cashCopy.collectCustomer}</Text>
-                                                <Text style={styles.cashRowHint}>{cashCopy.collectCustomerHint}</Text>
-                                            </View>
-                                        </View>
-                                        <Text style={[styles.cashRowAmount, { color: '#10B981' }]}>+€{totalPrice.toFixed(2)}</Text>
-                                    </View>
-                                </View>
-                            </View>
-                        </>
-                    )}
-
-                    {/* Direct Dispatch Cash Section */}
-                    {isDirectDispatch && (
-                        <>
-                            <View style={styles.sectionHeaderRow}>
-                                <Text style={styles.sectionTitle}>Cash From Customer</Text>
-                            </View>
-                            <View style={styles.cashBreakdown}>
-                                <View style={styles.cashRows}>
-                                    {cashToCollect > 0 ? (
-                                        <View style={[styles.cashRow, styles.cashRowLast]}>
-                                            <View style={styles.cashRowLeft}>
-                                                <View style={[styles.cashDot, { backgroundColor: '#10B981' }]} />
-                                                <View>
-                                                    <Text style={styles.cashRowLabel}>Collect from customer</Text>
-                                                    <Text style={styles.cashRowHint}>Cash to collect on delivery</Text>
-                                                </View>
-                                            </View>
-                                            <Text style={[styles.cashRowAmount, { color: '#10B981' }]}>+€{cashToCollect.toFixed(2)}</Text>
-                                        </View>
-                                    ) : (
-                                        <View style={[styles.cashRow, styles.cashRowLast]}>
-                                            <View style={styles.cashRowLeft}>
-                                                <View style={[styles.cashDot, { backgroundColor: '#9CA3AF' }]} />
-                                                <View>
-                                                    <Text style={styles.cashRowLabel}>Collect from customer</Text>
-                                                    <Text style={styles.cashRowHint}>Confirm amount with business</Text>
-                                                </View>
-                                            </View>
-                                        </View>
-                                    )}
-                                </View>
-                            </View>
-                        </>
-                    )}
 
                     {!!order.driverNotes && (
                         <View style={styles.notesRow}>
@@ -549,16 +481,18 @@ export function OrderInspectSheet({
                     )}
 
                     <View style={styles.actionsRow}>
-                        <Pressable onPress={primaryAction.onPress} disabled={primaryAction.loading || markingPickedUp} style={[...primaryAction.style, (primaryAction.loading || markingPickedUp) && { opacity: 0.6 }]}>
-                            {primaryAction.loading ? (
-                                <ActivityIndicator size={18} color="#fff" />
-                            ) : (
-                                <>
-                                    <Ionicons name={primaryAction.icon as any} size={20} color="#fff" />
-                                    <Text style={primaryAction.textStyle}>{primaryAction.label}</Text>
-                                </>
-                            )}
-                        </Pressable>
+                        <Animated.View style={isAvailable ? { transform: [{ scale: acceptPulse }] } : undefined}>
+                            <Pressable onPress={primaryAction.onPress} disabled={primaryAction.loading || markingPickedUp} style={[...primaryAction.style, (primaryAction.loading || markingPickedUp) && { opacity: 0.6 }]}>
+                                {primaryAction.loading ? (
+                                    <ActivityIndicator size={18} color="#fff" />
+                                ) : (
+                                    <>
+                                        <Ionicons name={primaryAction.icon as any} size={20} color="#fff" />
+                                        <Text style={primaryAction.textStyle}>{primaryAction.label}</Text>
+                                    </>
+                                )}
+                            </Pressable>
+                        </Animated.View>
 
                         {secondaryAction && (
                             <Pressable onPress={secondaryAction.onPress} disabled={secondaryAction.loading || accepting} style={[...secondaryAction.style, (secondaryAction.loading || accepting) && { opacity: 0.6 }]}>
@@ -574,10 +508,12 @@ export function OrderInspectSheet({
                         )}
                     </View>
 
-                    <Pressable onPress={onClose} style={styles.closeLink} disabled={accepting || markingPickedUp} hitSlop={8}>
-                        <Text style={styles.closeLinkText}>{isAvailable && autoCountdown ? s.skip : s.close}</Text>
-                    </Pressable>
-                </View>
+                    {!isAvailable && (
+                        <Pressable onPress={onClose} style={styles.closeLink} disabled={accepting || markingPickedUp} hitSlop={8}>
+                            <Text style={styles.closeLinkText}>{s.close}</Text>
+                        </Pressable>
+                    )}
+                </ScrollView>
 
                 <View style={styles.handle} />
 
@@ -647,6 +583,9 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         flex: 1,
     },
+    bodyScroll: {
+        flexGrow: 0,
+    },
     body: {
         paddingHorizontal: 20,
         paddingTop: 4,
@@ -661,6 +600,12 @@ const styles = StyleSheet.create({
     headerTextBlock: {
         flex: 1,
     },
+    bizRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 8,
+    },
     headerLabel: {
         color: '#6B7280',
         fontSize: 11,
@@ -670,9 +615,16 @@ const styles = StyleSheet.create({
     },
     bizName: {
         color: '#111827',
-        fontSize: 22,
+        fontSize: 21,
         fontWeight: '800',
         letterSpacing: -0.4,
+        flex: 1,
+    },
+    earnInlineText: {
+        color: '#16A34A',
+        fontSize: 13,
+        fontWeight: '800',
+        flexShrink: 0,
     },
     recipientText: {
         color: '#6B7280',
@@ -716,6 +668,10 @@ const styles = StyleSheet.create({
         fontWeight: '800',
         textTransform: 'uppercase',
         letterSpacing: 0.4,
+    },
+    statusSpacer: {
+        width: 52,
+        height: 52,
     },
     sectionHeaderRow: {
         marginBottom: 6,
@@ -777,7 +733,35 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
+        flex: 1,
+    },
+    itemsToggleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
         marginBottom: 6,
+    },
+    itemsCollapsedSummary: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 6,
+        marginBottom: 4,
+    },
+    summaryChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: '#F3F4F6',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+    },
+    summaryChipText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#374151',
     },
     itemsSectionTitle: {
         color: '#6B7280',
@@ -896,28 +880,6 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '700',
         marginLeft: 8,
-    },
-    cashCutAmount: {
-        color: '#6366F1',
-        fontWeight: '900',
-        fontSize: 20,
-        letterSpacing: -0.5,
-    },
-    netEarningsRow: {
-        backgroundColor: '#F0FDF4',
-        borderTopWidth: 1,
-        borderTopColor: '#D1FAE5',
-        paddingTop: 10,
-    },
-    netEarningsLabel: {
-        color: '#15803D',
-        fontWeight: '800',
-    },
-    netEarningsAmount: {
-        color: '#22C55E',
-        fontWeight: '900',
-        fontSize: 24,
-        letterSpacing: -0.6,
     },
     notesRow: {
         backgroundColor: '#FFFBEB',

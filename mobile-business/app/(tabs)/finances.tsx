@@ -164,8 +164,8 @@ export default function FinancesScreen() {
     const { t } = useTranslation();
     const router = useRouter();
     const { user } = useAuthStore();
-    const [financeTab, setFinanceTab] = useState<'stats' | 'settlements'>('stats');
-    const [period, setPeriod] = useState<Period>('month');
+    const [financeTab, setFinanceTab] = useState<'stats' | 'settlements'>('settlements');
+    const [period, setPeriod] = useState<Period>('all');
     const [customStart, setCustomStart] = useState('');
     const [customEnd, setCustomEnd] = useState('');
     const [customModalOpen, setCustomModalOpen] = useState(false);
@@ -386,6 +386,7 @@ export default function FinancesScreen() {
 
     // Map a settlement line to its computed category (mirrors backend logic)
     const getLineCategory = (s: Settlement): string => {
+        if (s.reason?.startsWith("Direct call fixed payment")) return "DIRECT_CALL_FIXED_FEE";
         if (!s.rule?.id) {
             if (s.reason?.startsWith("Stock item")) return "STOCK_REMITTANCE";
             if (s.reason?.startsWith("Driver tip")) return "DRIVER_TIP";
@@ -402,6 +403,7 @@ export default function FinancesScreen() {
             AUTO_REMITTANCE: '#ef4444',
             STOCK_REMITTANCE: '#a855f7',
             DELIVERY_COMMISSION: direction === 'PAYABLE' ? '#22c55e' : '#f59e0b',
+            DIRECT_CALL_FIXED_FEE: direction === 'PAYABLE' ? '#22c55e' : '#0ea5e9',
             PLATFORM_COMMISSION: '#f59e0b',
             PROMOTION_COST: '#f59e0b',
             DRIVER_TIP: '#22c55e',
@@ -415,6 +417,7 @@ export default function FinancesScreen() {
             AUTO_REMITTANCE: 'swap-horizontal-outline',
             STOCK_REMITTANCE: 'cube-outline',
             DELIVERY_COMMISSION: 'bicycle-outline',
+            DIRECT_CALL_FIXED_FEE: 'call-outline',
             PLATFORM_COMMISSION: 'business-outline',
             PROMOTION_COST: 'pricetag-outline',
             DRIVER_TIP: 'heart-outline',
@@ -428,6 +431,7 @@ export default function FinancesScreen() {
             AUTO_REMITTANCE: t('finances.desc_auto_remittance', 'Markup & surcharge adjustments'),
             STOCK_REMITTANCE: t('finances.desc_stock_remittance', 'Stock item cost remittance'),
             DELIVERY_COMMISSION: t('finances.desc_delivery_commission', 'Commission on delivery fees'),
+            DIRECT_CALL_FIXED_FEE: t('finances.desc_direct_call_fixed_fee', 'Direct call fixed delivery payment'),
             PLATFORM_COMMISSION: t('finances.desc_platform_commission', 'Platform fee on order subtotal'),
             PROMOTION_COST: t('finances.desc_promotion_cost', 'Promotional discount cost share'),
             DRIVER_TIP: t('finances.desc_driver_tip', 'Tips forwarded to drivers'),
@@ -464,7 +468,7 @@ export default function FinancesScreen() {
         const color = getCategoryColor(item.category, item.direction);
         setSelectedCategory({ category: item.category, label: item.label, color, direction: item.direction });
         setCategorySettlements([]);
-        fetchCategorySettlements({ variables: { businessId, category: item.category, startDate, endDate, limit: 100, offset: 0 } });
+        fetchCategorySettlements({ variables: { businessId, direction: item.direction, category: item.category, startDate, endDate, limit: 100, offset: 0 } });
     }, [fetchCategorySettlements, businessId, startDate, endDate]);
     // Compute revenue generated & commission owed from settlement rows
     const computed = useMemo(() => {

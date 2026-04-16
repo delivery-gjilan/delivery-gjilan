@@ -1,5 +1,5 @@
 import { type DbType } from '@/database';
-import { DbOrder, DbOrderItem, settlementRules, orderPromotions, products, drivers } from '@/database/schema';
+import { DbOrder, DbOrderItem, settlementRules, orderPromotions, products, drivers, promotions } from '@/database/schema';
 import { orderCoverageLogs } from '@/database/schema/orderCoverageLogs';
 import { orderItems } from '@/database/schema/orderItems';
 import { storeSettings } from '@/database/schema/storeSettings';
@@ -22,6 +22,7 @@ export interface SettlementCalculation {
 }
 
 type DbSettlementRule = typeof settlementRules.$inferSelect;
+const DIRECT_DISPATCH_ONLY_RULE_MARKER = '[DIRECT_DISPATCH_ONLY]';
 
 export class SettlementCalculationEngine {
     constructor(private db: Database) {}
@@ -46,10 +47,17 @@ export class SettlementCalculationEngine {
                     .from(orderPromotions)
                     .where(eq(orderPromotions.orderId, order.id)),
             ]);
-            const orderBusinessIds = [...new Set(productRows.map((p) => p.businessId).filter(Boolean))] as string[];
+            const orderBusinessIds = [...new Set([...productRows.map((p) => p.businessId), order.businessId].filter(Boolean))] as string[];
 
             // ── Step 2: Collect promotion IDs applied to this order ──
             const orderPromotionIds = promoRows.map((r) => r.promotionId);
+            const promotionRows = orderPromotionIds.length > 0
+                ? await this.db
+                    .select({ id: promotions.id, creatorType: promotions.creatorType })
+                    .from(promotions)
+                    .where(inArray(promotions.id, orderPromotionIds))
+                : [];
+            const promotionCreatorTypeById = new Map(promotionRows.map((p) => [p.id, p.creatorType]));
 
             // ── Step 3: Fetch all active, applicable settlement rules ──
             const allRules = await this.db
@@ -130,22 +138,43 @@ export class SettlementCalculationEngine {
             // platform owns.  The driver must remit the full retail price.
             await this.addCatalogProductSettlements(order, orderItems, driverId, results);
 
-            // ── Delivery fee rules (most-specific-wins: BP > P > B > G) ──
-            // If no rules at any level, fall back to the driver's own commission %.
+            // ── Delivery fee rules ──
+            // Normal channels: most-specific-wins (BP > P > B > G), excluding rules
+            // explicitly marked as direct-dispatch-only.
+            // Direct dispatch: if direct-dispatch-only rules exist, apply only those
+            // business-scoped rules so settlement logic does not mix with normal channel
+            // delivery rules.
             let selectedDeliveryRules: typeof allRules = [];
-            if (businessPromoRules.some((r) => r.type === 'DELIVERY_PRICE')) {
-                selectedDeliveryRules = businessPromoRules.filter((r) => r.type === 'DELIVERY_PRICE');
-            } else if (promotionRules.some((r) => r.type === 'DELIVERY_PRICE')) {
-                selectedDeliveryRules = promotionRules.filter((r) => r.type === 'DELIVERY_PRICE');
-            } else if (businessRules.some((r) => r.type === 'DELIVERY_PRICE')) {
-                selectedDeliveryRules = businessRules.filter((r) => r.type === 'DELIVERY_PRICE');
+            const isDirectDispatchOrder = order.channel === 'DIRECT_DISPATCH';
+            const directDispatchOnlyBusinessRules = businessRules.filter(
+                (r) => r.type === 'DELIVERY_PRICE' && this.isDirectDispatchOnlyRule(r),
+            );
+
+            if (isDirectDispatchOrder && directDispatchOnlyBusinessRules.length > 0) {
+                selectedDeliveryRules = directDispatchOnlyBusinessRules;
             } else {
-                selectedDeliveryRules = globalRules.filter((r) => r.type === 'DELIVERY_PRICE');
+                if (businessPromoRules.some((r) => r.type === 'DELIVERY_PRICE' && !this.isDirectDispatchOnlyRule(r))) {
+                    selectedDeliveryRules = businessPromoRules.filter(
+                        (r) => r.type === 'DELIVERY_PRICE' && !this.isDirectDispatchOnlyRule(r),
+                    );
+                } else if (promotionRules.some((r) => r.type === 'DELIVERY_PRICE' && !this.isDirectDispatchOnlyRule(r))) {
+                    selectedDeliveryRules = promotionRules.filter(
+                        (r) => r.type === 'DELIVERY_PRICE' && !this.isDirectDispatchOnlyRule(r),
+                    );
+                } else if (businessRules.some((r) => r.type === 'DELIVERY_PRICE' && !this.isDirectDispatchOnlyRule(r))) {
+                    selectedDeliveryRules = businessRules.filter(
+                        (r) => r.type === 'DELIVERY_PRICE' && !this.isDirectDispatchOnlyRule(r),
+                    );
+                } else {
+                    selectedDeliveryRules = globalRules.filter(
+                        (r) => r.type === 'DELIVERY_PRICE' && !this.isDirectDispatchOnlyRule(r),
+                    );
+                }
             }
 
             if (selectedDeliveryRules.length > 0) {
                 for (const rule of selectedDeliveryRules) {
-                    this.applyRule(rule, order, orderBusinessIds, driverId, results);
+                    this.applyRule(rule, order, orderBusinessIds, driverId, results, promotionCreatorTypeById);
                 }
             } else {
                 // Fallback: use the driver's individual commission rate applied to
@@ -166,7 +195,7 @@ export class SettlementCalculationEngine {
             }
 
             for (const rule of selectedOrderRules) {
-                this.applyRule(rule, order, orderBusinessIds, driverId, results);
+                this.applyRule(rule, order, orderBusinessIds, driverId, results, promotionCreatorTypeById);
             }
 
             log.info(
@@ -185,6 +214,10 @@ export class SettlementCalculationEngine {
             log.error({ err: error, orderId: order.id }, 'settlement:calculate:error');
             throw error;
         }
+    }
+
+    private isDirectDispatchOnlyRule(rule: DbSettlementRule): boolean {
+        return (rule.notes ?? '').includes(DIRECT_DISPATCH_ONLY_RULE_MARKER);
     }
 
     /**
@@ -348,7 +381,10 @@ export class SettlementCalculationEngine {
             orderId: order.id,
             amount,
             ruleId: null,
-            reason: `Driver delivery commission (${commission}% of €${deliveryPrice.toFixed(2)})`,
+            reason:
+                order.channel === 'DIRECT_DISPATCH'
+                    ? `Direct call fixed payment commission (${commission}% of €${deliveryPrice.toFixed(2)})`
+                    : `Driver delivery commission (${commission}% of €${deliveryPrice.toFixed(2)})`,
         });
     }
 
@@ -358,6 +394,7 @@ export class SettlementCalculationEngine {
         orderBusinessIds: string[],
         driverId: string | null,
         results: SettlementCalculation[],
+        promotionCreatorTypeById: Map<string, string>,
     ): void {
         if (rule.entityType === 'DRIVER' && !driverId) return;
 
@@ -396,6 +433,12 @@ export class SettlementCalculationEngine {
             : `${Number(rule.amount)}% of €${base.toFixed(2)}`;
         const typeLabel = rule.type === 'DELIVERY_PRICE' ? 'delivery fee' : 'order price';
         const dirLabel = rule.direction === 'RECEIVABLE' ? 'receivable' : 'payable';
+        const promotionCreatorType = rule.promotionId ? promotionCreatorTypeById.get(rule.promotionId) : null;
+        const reasonPrefix = order.channel === 'DIRECT_DISPATCH' && rule.type === 'DELIVERY_PRICE'
+            ? 'Direct call fixed payment'
+            : (rule.promotionId
+                ? (promotionCreatorType === 'BUSINESS' ? 'Business promotion adjustment' : 'Platform promotion adjustment')
+                : null);
 
         if (rule.entityType === 'BUSINESS') {
             const targetBusinessIds = rule.businessId ? [rule.businessId] : orderBusinessIds;
@@ -408,7 +451,9 @@ export class SettlementCalculationEngine {
                     orderId: order.id,
                     amount: Number(amount.toFixed(2)),
                     ruleId: rule.id,
-                    reason: `Business ${dirLabel} on ${typeLabel} (${ruleLabel})`,
+                    reason: reasonPrefix
+                        ? `${reasonPrefix}: Business ${dirLabel} on ${typeLabel} (${ruleLabel})`
+                        : `Business ${dirLabel} on ${typeLabel} (${ruleLabel})`,
                 });
             }
         } else {
@@ -420,7 +465,9 @@ export class SettlementCalculationEngine {
                 orderId: order.id,
                 amount: Number(amount.toFixed(2)),
                 ruleId: rule.id,
-                reason: `Driver ${dirLabel} on ${typeLabel} (${ruleLabel})`,
+                reason: reasonPrefix
+                    ? `${reasonPrefix}: Driver ${dirLabel} on ${typeLabel} (${ruleLabel})`
+                    : `Driver ${dirLabel} on ${typeLabel} (${ruleLabel})`,
             });
         }
     }

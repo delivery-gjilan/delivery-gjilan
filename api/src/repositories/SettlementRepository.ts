@@ -467,6 +467,8 @@ export class SettlementRepository {
                 return and(nullRuleId, like(settlements.reason, 'Driver tip%'));
             case 'CATALOG_REVENUE':
                 return and(nullRuleId, like(settlements.reason, 'Catalog product%'));
+            case 'DIRECT_CALL_FIXED_FEE':
+                return like(settlements.reason, 'Direct call fixed payment%');
             case 'AUTO_REMITTANCE':
                 // Null ruleId and NOT any of the special reason patterns (handle null reason)
                 return and(
@@ -474,6 +476,7 @@ export class SettlementRepository {
                     or(isNull(settlements.reason), not(like(settlements.reason, 'Stock item%'))),
                     or(isNull(settlements.reason), not(like(settlements.reason, 'Driver tip%'))),
                     or(isNull(settlements.reason), not(like(settlements.reason, 'Catalog product%'))),
+                    or(isNull(settlements.reason), not(like(settlements.reason, 'Direct call fixed payment%'))),
                 );
             case 'PROMOTION_COST':
                 // Has a rule that has a promotionId

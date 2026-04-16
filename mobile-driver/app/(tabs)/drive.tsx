@@ -145,7 +145,7 @@ export default function MapScreen() {
     );
 
     const isInitialOrdersLoading = hasHydrated && !!currentDriverId && isOrdersBootstrapping;
-    const singleCardBottomOffset = insets.bottom + (isCompactHeight ? 52 : 60);
+    const singleCardBottomOffset = insets.bottom + (isCompactHeight ? 8 : 10);
     const stackedCardBottomOffset = insets.bottom + (isCompactHeight ? 10 : 14);
     const floatingControlsBottom =
         assignedOrders.length > 0

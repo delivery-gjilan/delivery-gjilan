@@ -606,6 +606,7 @@ describe('Settlement breakdown categorization logic', () => {
      *   - null ruleId + reason "Stock item…" → STOCK_REMITTANCE
      *   - null ruleId + reason "Driver tip…" → DRIVER_TIP
      *   - null ruleId + reason "Catalog product…" → CATALOG_REVENUE
+    *   - any reason "Direct call fixed payment…" → DIRECT_CALL_FIXED_FEE
      *   - null ruleId + other → AUTO_REMITTANCE (markup/surcharge)
      *   - ruleId + promotionId → PROMOTION_COST
      *   - ruleId + DELIVERY_PRICE type → DELIVERY_COMMISSION
@@ -624,6 +625,9 @@ describe('Settlement breakdown categorization logic', () => {
         const isStockRemittance = row.reason.startsWith('Stock item');
         const isDriverTip = row.reason.startsWith('Driver tip');
         const isCatalogRevenue = row.reason.startsWith('Catalog product');
+        const isDirectCallFixedFee = row.reason.startsWith('Direct call fixed payment');
+
+        if (isDirectCallFixedFee) return 'DIRECT_CALL_FIXED_FEE';
 
         if (!row.ruleId) {
             if (isStockRemittance) return 'STOCK_REMITTANCE';
@@ -697,6 +701,18 @@ describe('Settlement breakdown categorization logic', () => {
                 reason: 'Catalog product revenue (€12.00 adopted items)',
             }),
         ).toBe('CATALOG_REVENUE');
+    });
+
+    it('classifies direct-call fixed-payment reason as DIRECT_CALL_FIXED_FEE', () => {
+        expect(
+            categorize({
+                ruleId: 'rule-1',
+                promotionId: 'promo-1',
+                ruleType: 'DELIVERY_PRICE',
+                direction: 'PAYABLE',
+                reason: 'Direct call fixed payment: Driver payable on delivery fee (€1.00 fixed)',
+            }),
+        ).toBe('DIRECT_CALL_FIXED_FEE');
     });
 
     it('classifies rule with promotionId as PROMOTION_COST', () => {

@@ -1,7 +1,7 @@
 import type { QueryResolvers } from './../../../../generated/types.generated';
 import { GraphQLError } from 'graphql';
 import { eq, and, gte, lte, sql, isNull } from 'drizzle-orm';
-import { settlements, settlementRules, drivers as driversTable } from '@/database/schema';
+import { settlements, settlementRules, drivers as driversTable, promotions } from '@/database/schema';
 import { isPlatformAdmin } from '@/lib/utils/permissions';
 
 export const settlementBreakdown: NonNullable<QueryResolvers['settlementBreakdown']> = async (
@@ -59,13 +59,16 @@ export const settlementBreakdown: NonNullable<QueryResolvers['settlementBreakdow
             isStockRemittance: sql<boolean>`BOOL_OR(${settlements.reason} LIKE 'Stock item%')`,
             isDriverTip: sql<boolean>`BOOL_OR(${settlements.reason} LIKE 'Driver tip%')`,
             isCatalogRevenue: sql<boolean>`BOOL_OR(${settlements.reason} LIKE 'Catalog product%')`,
+            isDirectCallFixedFee: sql<boolean>`BOOL_OR(${settlements.reason} LIKE 'Direct call fixed payment%')`,
             // Grab rule info via left join
             ruleName: settlementRules.name,
             ruleType: settlementRules.type,
             promotionId: settlementRules.promotionId,
+            promotionCreatorType: promotions.creatorType,
         })
         .from(settlements)
         .leftJoin(settlementRules, eq(settlements.ruleId, settlementRules.id))
+        .leftJoin(promotions, eq(settlementRules.promotionId, promotions.id))
         .where(whereClause)
         .groupBy(
             settlements.ruleId,
@@ -73,9 +76,11 @@ export const settlementBreakdown: NonNullable<QueryResolvers['settlementBreakdow
             settlementRules.name,
             settlementRules.type,
             settlementRules.promotionId,
+            promotions.creatorType,
             sql`(${settlements.reason} LIKE 'Stock item%')`,
             sql`(${settlements.reason} LIKE 'Driver tip%')`,
             sql`(${settlements.reason} LIKE 'Catalog product%')`,
+            sql`(${settlements.reason} LIKE 'Direct call fixed payment%')`,
         );
 
     return rows.map((row) => {
@@ -92,14 +97,20 @@ export const settlementBreakdown: NonNullable<QueryResolvers['settlementBreakdow
             } else if (row.isCatalogRevenue) {
                 category = 'CATALOG_REVENUE';
                 label = 'Catalog Product Revenue';
+            } else if (row.isDirectCallFixedFee) {
+                category = 'DIRECT_CALL_FIXED_FEE';
+                label = 'Direct Call Fixed Payment';
             } else {
                 // Auto-remittances (markup, priority surcharge)
                 category = 'AUTO_REMITTANCE';
                 label = row.direction === 'RECEIVABLE' ? 'Markup & Surcharge' : 'Platform Payment';
             }
+        } else if (row.isDirectCallFixedFee) {
+            category = 'DIRECT_CALL_FIXED_FEE';
+            label = row.ruleName ?? 'Direct Call Fixed Payment';
         } else if (row.promotionId) {
             category = 'PROMOTION_COST';
-            label = row.ruleName ?? 'Promotion Cost';
+            label = row.ruleName ?? (row.promotionCreatorType === 'BUSINESS' ? 'Business Promotion Cost' : 'Promotion Cost');
         } else if (row.ruleType === 'DELIVERY_PRICE') {
             category = 'DELIVERY_COMMISSION';
             label = row.ruleName ?? 'Delivery Commission';

@@ -116,6 +116,22 @@ Rules can be targeted:
   - If `applies_to = SUBTOTAL` → base = `order.price` (the items total)
   - If `applies_to = DELIVERY_FEE` → base = `order.deliveryPrice`
 
+### Direct Dispatch Fixed Payment Configuration
+
+Direct dispatch orders (`order.channel = DIRECT_DISPATCH`) use the business fixed amount as `order.deliveryPrice` and generate delivery settlements from that value.
+
+- **Set fixed amount per business:** Admin Panel → Business edit (`directDispatchFixedAmount`).
+- **Set commission you take on that fixed amount:** Admin Panel → Financial → Settlement Rules.
+
+Recommended rule setup for per-business direct-call commission:
+
+1. Create a `DELIVERY_PRICE` rule.
+2. Set `entityType = DRIVER` and `direction = RECEIVABLE` (driver owes platform), or `entityType = BUSINESS` and `direction = RECEIVABLE` (business owes platform) based on your policy.
+3. Set `amountType` to `PERCENT` (or `FIXED`) and configure the amount.
+4. Scope it to that business (`business_id = <businessId>`, `promotion_id = null`).
+
+Runtime selection uses delivery-rule specificity: `business+promotion > promotion > business > global`. If no delivery rule matches, fallback uses the driver's `commissionPercentage` on `order.deliveryPrice`.
+
 ### Automatic Markup Remittance (Platform ↔ Driver)
 
 Besides rule-based settlements, the system now creates one automatic driver settlement when markup earnings exist on an order and a driver is assigned.
@@ -163,7 +179,7 @@ When an order is delivered, the `FinancialService.createOrderSettlements()` meth
 1. Acquire an order-scoped advisory transaction lock (`pg_advisory_xact_lock(hashtext(orderId))`)
 2. Check if settlements already exist for this order (idempotent guard under lock)
 2. SettlementCalculationEngine runs:
-   a. Collect business IDs from the order's products
+   a. Collect business IDs from the order's products, plus `order.businessId` (covers direct-dispatch orders without items)
    b. Collect promotion IDs from the order_promotions table
    c. Query all active rules that match:
       - Global rules (business_id IS NULL AND promotion_id IS NULL)
@@ -173,6 +189,8 @@ When an order is delivered, the `FinancialService.createOrderSettlements()` meth
       - Calculate amount (FIXED or PERCENT)
       - Skip DRIVER rules if no driver assigned
       - For global BUSINESS rules: create one settlement per business in the order
+      - Prefix reason with `Direct call fixed payment` for `DIRECT_DISPATCH + DELIVERY_PRICE`
+      - Prefix reason with `Business promotion adjustment` / `Platform promotion adjustment` for promotion-linked rules
    e. If a driver is assigned, order payment collection is CASH_TO_DRIVER, and markup earnings are positive:
       - Create automatic `DRIVER / RECEIVABLE` settlement for markup remittance
       - Set `rule_id` to null (system-generated entry)

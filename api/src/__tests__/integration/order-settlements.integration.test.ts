@@ -451,3 +451,62 @@ describe('settlement idempotency', () => {
         expect(settlements).toHaveLength(3);
     });
 });
+
+// ---------------------------------------------------------------------------
+// 14. Direct dispatch settlements
+// ---------------------------------------------------------------------------
+
+describe('direct dispatch settlement wiring', () => {
+    it('creates business+promo delivery settlements for DIRECT_DISPATCH orders without items', async () => {
+        const { order, items } = await h.insertDeliveredOrder({
+            items: [],
+            subtotal: 0,
+            markupAmount: 0,
+            deliveryPrice: 0,
+            payment: 'CASH_TO_DRIVER',
+            channel: 'DIRECT_DISPATCH',
+            promoRows: [
+                { promotionId: IDS.promoBizFree, appliesTo: 'DELIVERY', discountAmount: DELIVERY_PRICE },
+            ],
+        });
+
+        const settlements = await h.settle(order, items);
+
+        h.assertSettlements(settlements, [
+            { type: 'DRIVER', direction: 'PAYABLE', amount: 1.00, ruleId: IDS.ruleBizFreeDriverCmp },
+            { type: 'BUSINESS', direction: 'RECEIVABLE', amount: 1.00, ruleId: IDS.ruleBizFreeRecover },
+        ]);
+
+        expect(settlements.every((s) => (s.reason ?? '').startsWith('Direct call fixed payment:'))).toBe(true);
+    });
+
+    describe('fallback commission for direct dispatch fixed fee', () => {
+        beforeAll(async () => {
+            await h.setRuleActive(IDS.ruleGlobalDrv80, false);
+            await h.setDriverCommissionPercentage('25');
+        });
+
+        afterAll(async () => {
+            await h.setDriverCommissionPercentage('0');
+            await h.setRuleActive(IDS.ruleGlobalDrv80, true);
+        });
+
+        it('creates DIRECT_CALL fallback commission when no DELIVERY_PRICE rule matches', async () => {
+            const { order, items } = await h.insertDeliveredOrder({
+                items: [],
+                subtotal: 0,
+                markupAmount: 0,
+                deliveryPrice: 4,
+                payment: 'CASH_TO_DRIVER',
+                channel: 'DIRECT_DISPATCH',
+            });
+
+            const settlements = await h.settle(order, items);
+            h.assertSettlements(settlements, [
+                { type: 'DRIVER', direction: 'RECEIVABLE', amount: 1.00, ruleId: null },
+            ]);
+
+            expect(settlements[0]?.reason).toContain('Direct call fixed payment commission (25% of €4.00)');
+        });
+    });
+});
