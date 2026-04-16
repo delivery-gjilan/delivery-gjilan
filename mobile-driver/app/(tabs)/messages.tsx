@@ -200,10 +200,10 @@ export default function MessagesScreen() {
 
     const handleSend = async () => {
         const body = replyText.trim();
-        if (!body || !adminId || replying) return;
+        if (!body || replying) return;
         setReplyText('');
         try {
-            await reply({ variables: { adminId, body } });
+            await reply({ variables: { adminId: adminId ?? '', body } });
         } catch (error) {
             setReplyText(body);
             Alert.alert(t.common.error, error instanceof Error ? error.message : 'Failed to send message');
@@ -392,23 +392,23 @@ export default function MessagesScreen() {
                     />
                     <Pressable
                         onPress={handleSend}
-                        disabled={!replyText.trim() || replying || !adminId}
+                        disabled={!replyText.trim() || replying}
                         style={({ pressed }) => ({
                             width: 42,
                             height: 42,
                             borderRadius: 21,
-                            backgroundColor: !replyText.trim() || !adminId
+                            backgroundColor: !replyText.trim()
                                 ? theme.colors.border
                                 : theme.colors.primary,
                             alignItems: 'center',
                             justifyContent: 'center',
-                            opacity: pressed && (!replyText.trim() || !adminId) ? 0.5 : (pressed ? 0.8 : 1),
+                            opacity: pressed && !replyText.trim() ? 0.5 : (pressed ? 0.8 : 1),
                         })}
                     >
                         {replying ? (
-                            <ActivityIndicator size="small" color={!replyText.trim() || !adminId ? theme.colors.subtext : '#fff'} />
+                            <ActivityIndicator size="small" color={!replyText.trim() ? theme.colors.subtext : '#fff'} />
                         ) : (
-                            <Ionicons name="send" size={18} color={!replyText.trim() || !adminId ? theme.colors.subtext : '#fff'} />
+                            <Ionicons name="send" size={18} color={!replyText.trim() ? theme.colors.subtext : '#fff'} />
                         )}
                     </Pressable>
                 </View>

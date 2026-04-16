@@ -4,6 +4,8 @@ import { useRouter } from 'expo-router';
 import { useTranslations } from '@/hooks/useTranslations';
 import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
 import type { LanguageChoice } from '@/utils/types';
+import SuspendedAccountScreen from '@/components/SuspendedAccountScreen';
+import { useAuthStore } from '@/store/authStore';
 
 const C = {
     bg: '#09090B',
@@ -18,6 +20,11 @@ const C = {
 export default function AuthSelectionScreen() {
     const router = useRouter();
     const { t, languageChoice, setLanguageChoice } = useTranslations();
+    const user = useAuthStore((state) => state.user);
+
+    if (user?.isBanned) {
+        return <SuspendedAccountScreen />;
+    }
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>

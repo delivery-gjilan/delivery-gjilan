@@ -65,7 +65,7 @@ admin-panel/
 │   │   │   ├── businesses/
 │   │   │   │   ├── page.tsx         # Business CRUD list
 │   │   │   │   └── [id]/page.tsx    # Business detail + products
-│   │   │   ├── users/page.tsx       # Customer/user management
+│   │   │   ├── users/page.tsx       # Customer management with ban-status filters, required suspension reason capture, and unban cleanup of suspension metadata
 │   │   │   ├── promotions/page.tsx  # Promotion CRUD
 │   │   │   ├── promotions/analytics/page.tsx # Promotion usage/loss analytics
 │   │   │   ├── statistics/page.tsx  # Statistics (placeholder only)
@@ -234,6 +234,11 @@ The most complex page. Manages the full active + completed order pipeline.
 - STATUS_FLOW map drives "next status" button.
 - Approval modal for flagged orders (`FIRST_ORDER`, `HIGH_VALUE`, `OUT_OF_ZONE`). Suppressible via `[SUPPRESS_APPROVAL_MODAL]` marker in `adminNote`.
 - Trusted customer detection via `[TRUSTED_CUSTOMER]` adminNote marker, `isTrustedCustomer` field, or green `flagColor`.
+- Header search supports exact/partial order display ID lookup, exact order UUID lookup, and customer lookup by name/email/phone (plus direct-dispatch recipient name/phone).
+- Active tab data window is paginated (`limit=100`), completed tab data window is paginated (`limit=50`) with optional date-range filters; search is applied within the currently fetched window.
+- Active Orders uses a card-style layout for quick dispatch triage, while Completed remains table-oriented for historical scanning.
+- Active cards keep direct operator actions (profile jump, approve, next-status transition, cancel, driver assignment) without additional top-level triage filter strips.
+- Selected cards/rows open the same right-side order detail panel so support and dispatch operators keep a single deep-inspection surface.
 - Order cancellation uses shared `CancelOrderModal` with required reason, category tagging (`CUSTOMER_REQUEST`, `BUSINESS_ISSUE`, `DRIVER_ISSUE`, `LOGISTICS`, `SYSTEM`), quick-reason presets, and optional settlement toggles (`settleDriver`, `settleBusiness`) before calling `AdminCancelOrder`.
 - Cancellation reason rendering in order detail/table and cancelled-orders list parses the tag prefix and shows a category badge with clean reason text.
 - Inventory coverage modal showing stock vs. market fulfillment.
@@ -306,6 +311,13 @@ The most complex visual page. Full-screen Mapbox GL map with driver positions, o
 **GraphQL:** `USERS_QUERY` (includes `createdAt`, `totalOrders`, `signupStep`, `emailVerified`, `phoneVerified`), `GET_ORDERS` (lazy, loads on Orders tab), `USER_BEHAVIOR_QUERY` (lazy, super-admin only), 5 mutations (`createUser`, `updateUser`, `deleteUser`, `updateUserNote`, `banUser`). All mutations refetch — no cache updates.
 
 **Key features:** 5-color flag system with inline note editing. `isBanned` column blocks ordering (backend). `isTrustedCustomer` skips FIRST_ORDER and HIGH_VALUE approval. Ban/unban with confirmation. Search by name, email, or phone. Only CUSTOMER-role users shown (drivers managed separately). Signup date-based analytics and charting via `recharts` LineChart.
+
+**Support lookup flow (current behavior):**
+- Typical support path is `Orders` search -> open order detail or use customer quick action -> jump to `/dashboard/users` with selected customer and `Orders & Stats` pre-opened.
+- `Orders` cards and the order detail panel expose a direct customer profile jump action that carries `userId`, `tab=orders`, and focused order identifiers.
+- `Users` per-customer `Orders & Stats` includes in-list search by order display ID, order UUID, status, and business name.
+- User order details show both display order number and UUID, plus a one-click `Open in Orders` action that routes back to `/dashboard/orders` with order focus parameters.
+- `USERS_QUERY` is executed without `limit`/`offset` in the page, so customer lookup currently depends on client-side filtering over the full fetched user set.
 
 **New Implementation (Apr 2026):** Statistics tab added with full signup trend analysis, date-range and status filters, and user list filtering by signup cohort and order activity.
 
@@ -437,7 +449,7 @@ Business picker + `<CategoriesBlock>` + `<SubcategoriesBlock>`. **Note:** `GET_B
 
 **GraphQL:** 6 queries, 4 mutations, 4 subscriptions (driver/business thread channels + global driver/business broadcast channels).
 
-**Key features:** Two-panel chat UI. Thread list (288px) + message view. New thread picker via search modal. `alertType` (INFO/WARNING/URGENT) styled badge. Read receipts for admin-sent messages. Date separators. Real-time via subscriptions. Global incoming driver/business notifications use `adminAnyMessageReceived` and `adminAnyBusinessMessageReceived`, are mounted at shared admin/dashboard layout level (so they work across admin routes), and trigger immediate thread-list refetch; global toast copy explicitly labels source type (`Driver message` vs `Business message`) and sender identity (name plus business context when available); thread rows also include explicit source chips (`Driver` / `Business`) next to participant names. Per-thread subscriptions (`adminMessageReceived`, `adminBusinessMessageReceived`) continue to drive active chat panes. Thread list polls every 30s as fallback. De-duplicate message append. Global incoming notifications are toast-based (Sonner), not modal-based.
+**Key features:** Two-panel chat UI. Thread list (288px) + message view. New thread picker via search modal. `alertType` (INFO/WARNING/URGENT) styled badge. Read receipts for admin-sent messages. Date separators. Real-time via subscriptions. Global incoming driver/business notifications use `adminAnyMessageReceived` and `adminAnyBusinessMessageReceived`, are mounted at shared admin/dashboard layout level (so they work across admin routes), and trigger immediate thread-list refetch; notification UI is a centered modal queue (not toast) with source label (`Driver message` / `Business message`), sender identity (including business context when available), explicit dismiss/open actions, and safe timestamp fallback (`Unknown time`) when payload date parsing fails. Thread rows also include explicit source chips (`Driver` / `Business`) next to participant names. Per-thread subscriptions (`adminMessageReceived`, `adminBusinessMessageReceived`) continue to drive active chat panes. Thread list polls every 30s as fallback. De-duplicate message append.
 
 ### `/admin/financial/settlements` — Full Settlement Management
 

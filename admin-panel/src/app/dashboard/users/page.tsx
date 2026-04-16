@@ -2,6 +2,7 @@
 
 import { useState, FormEvent, useMemo, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@apollo/client/react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { USERS_QUERY, USER_BEHAVIOR_QUERY } from "@/graphql/operations/users/queries";
 import { UserRole } from "@/gql/graphql";
 import {
@@ -79,6 +80,7 @@ interface OrderBusinessItem {
 
 interface OrderItem {
     id: string;
+    displayId: string;
     orderPrice: number;
     deliveryPrice: number;
     orderDate: string;
@@ -196,11 +198,52 @@ function statusColor(s: string) {
     }
 }
 
+const BAN_REASON_MARKER = "[BAN_REASON]";
+
+function extractBanReason(note?: string | null): string | null {
+    if (!note) return null;
+    const line = note
+        .split("\n")
+        .map((part) => part.trim())
+        .find((part) => part.startsWith(BAN_REASON_MARKER));
+    if (!line) return null;
+    const reason = line.slice(BAN_REASON_MARKER.length).trim();
+    return reason || null;
+}
+
+function stripBanReason(note?: string | null): string {
+    if (!note) return "";
+    return note
+        .split("\n")
+        .filter((part) => !part.trim().startsWith(BAN_REASON_MARKER))
+        .join("\n")
+        .trim();
+}
+
+function buildNoteWithBanReason(note: string, banReason?: string | null): string | null {
+    const cleanNote = note.trim();
+    const cleanReason = banReason?.trim() || "";
+
+    if (!cleanNote && !cleanReason) return null;
+    if (!cleanReason) return cleanNote || null;
+    if (!cleanNote) return `${BAN_REASON_MARKER} ${cleanReason}`;
+    return `${cleanNote}\n${BAN_REASON_MARKER} ${cleanReason}`;
+}
+
 /* ---------------------------------------------------------
    Component
 --------------------------------------------------------- */
 
 export default function UsersPage() {
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const initialUserId = (searchParams.get("userId") || "").trim();
+    const initialTab = searchParams.get("tab") === "orders" ? "orders" : "overview";
+    const initialOrderId = (searchParams.get("orderId") || "").trim();
+    const initialDisplayId = (searchParams.get("displayId") || "").trim();
+    const initKey = `${initialUserId}|${initialTab}|${initialOrderId}|${initialDisplayId}`;
+    const consumedInitKeyRef = useRef<string | null>(null);
+
     const { admin } = useAuth();
     const isSuperAdmin = admin?.role === "SUPER_ADMIN";
 
@@ -238,8 +281,12 @@ export default function UsersPage() {
 
     /* --- search, debounce & pagination --- */
     const [searchTerm, setSearchTerm] = useState("");
+    const [banFilter, setBanFilter] = useState<"all" | "banned" | "active">("all");
     const [debouncedSearch, setDebouncedSearch] = useState("");
+    const [ordersSearchTerm, setOrdersSearchTerm] = useState("");
+    const [ordersDebouncedSearch, setOrdersDebouncedSearch] = useState("");
     const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const ordersDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const PAGE_SIZE = 20;
     const [formData, setFormData] = useState({
@@ -247,6 +294,7 @@ export default function UsersPage() {
     });
     const [formError, setFormError] = useState("");
     const [formSuccess, setFormSuccess] = useState("");
+    const [banReason, setBanReason] = useState("");
 
     /* --- derived: selected user from live data --- */
     const selectedUser = useMemo(() => {
@@ -277,15 +325,28 @@ export default function UsersPage() {
         return () => { if (debounceTimer.current) clearTimeout(debounceTimer.current); };
     }, [searchTerm]);
 
+    useEffect(() => {
+        if (ordersDebounceTimer.current) clearTimeout(ordersDebounceTimer.current);
+        ordersDebounceTimer.current = setTimeout(() => {
+            setOrdersDebouncedSearch(ordersSearchTerm.trim().toLowerCase());
+        }, 250);
+        return () => { if (ordersDebounceTimer.current) clearTimeout(ordersDebounceTimer.current); };
+    }, [ordersSearchTerm]);
+
     /* --- derived: filtered users & orders --- */
     const filteredUsers = useMemo(() => {
         const customers = data?.users?.filter((u) => u.role === "CUSTOMER") || [];
-        if (!debouncedSearch) return customers;
-        return customers.filter((u) => {
+        const byBanStatus = customers.filter((u) => {
+            if (banFilter === "banned") return Boolean(u.isBanned);
+            if (banFilter === "active") return !u.isBanned;
+            return true;
+        });
+        if (!debouncedSearch) return byBanStatus;
+        return byBanStatus.filter((u) => {
             const name = `${u.firstName} ${u.lastName}`.toLowerCase();
             return name.includes(debouncedSearch) || u.email.toLowerCase().includes(debouncedSearch) || (u.phoneNumber || "").toLowerCase().includes(debouncedSearch);
         });
-    }, [data?.users, debouncedSearch]);
+    }, [data?.users, debouncedSearch, banFilter]);
 
     const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
     const pagedUsers = useMemo(() => {
@@ -299,6 +360,50 @@ export default function UsersPage() {
             .filter((o) => o.user?.id === selectedUser.id)
             .sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
     }, [ordersData?.orders, selectedUser]);
+
+    const filteredUserOrders = useMemo(() => {
+        if (!ordersDebouncedSearch) return userOrders;
+        return userOrders.filter((order) => {
+            const status = (order.status || "").toLowerCase();
+            const businessNames = order.businesses.map((b) => b.business.name.toLowerCase()).join(" ");
+            return (
+                order.id.toLowerCase().includes(ordersDebouncedSearch)
+                || order.displayId.toLowerCase().includes(ordersDebouncedSearch)
+                || status.includes(ordersDebouncedSearch)
+                || businessNames.includes(ordersDebouncedSearch)
+            );
+        });
+    }, [ordersDebouncedSearch, userOrders]);
+
+    useEffect(() => {
+        if (!initialUserId) return;
+        if (!data?.users?.some((u) => u.id === initialUserId)) return;
+        if (consumedInitKeyRef.current === initKey) return;
+
+        setSelectedUserId(initialUserId);
+        setPanelTab(initialTab);
+        setMainView("list");
+        if (initialTab === "orders") {
+            setOrdersSearchTerm(initialDisplayId || initialOrderId);
+        }
+        consumedInitKeyRef.current = initKey;
+    }, [data?.users, initKey, initialDisplayId, initialOrderId, initialTab, initialUserId]);
+
+    useEffect(() => {
+        if (!initialOrderId && !initialDisplayId) return;
+        if (!selectedUser || panelTab !== "orders") return;
+        if (selectedOrder) return;
+
+        const lowerId = initialOrderId.toLowerCase();
+        const lowerDisplay = initialDisplayId.toLowerCase();
+        const target = filteredUserOrders.find((order) => {
+            if (initialOrderId && order.id.toLowerCase() === lowerId) return true;
+            if (initialDisplayId && order.displayId.toLowerCase() === lowerDisplay) return true;
+            return false;
+        });
+        if (!target) return;
+        setSelectedOrder(target);
+    }, [filteredUserOrders, initialDisplayId, initialOrderId, panelTab, selectedOrder, selectedUser]);
 
     /* --- statistics calculations --- */
     const getDateRangeStart = useCallback(() => {
@@ -376,6 +481,7 @@ export default function UsersPage() {
         setSelectedUserId(u.id);
         setPanelTab("overview");
         setIsEditingNote(false);
+        setOrdersSearchTerm("");
     }, []);
 
     const goToPage = useCallback((page: number) => {
@@ -389,7 +495,7 @@ export default function UsersPage() {
 
     const startEditNote = useCallback(() => {
         if (!selectedUser) return;
-        setNoteInput(selectedUser.adminNote || "");
+        setNoteInput(stripBanReason(selectedUser.adminNote));
         setSelectedFlag((selectedUser.flagColor as FlagColor) || "none");
         setIsEditingNote(true);
     }, [selectedUser]);
@@ -398,7 +504,8 @@ export default function UsersPage() {
 
     const saveNote = useCallback(async () => {
         if (!selectedUser) return;
-        const note = noteInput.trim() || null;
+        const existingBanReason = extractBanReason(selectedUser.adminNote);
+        const note = buildNoteWithBanReason(noteInput, existingBanReason);
         const color = note ? selectedFlag : null;
         try {
             await updateUserNote({ variables: { userId: selectedUser.id, note, flagColor: color } });
@@ -481,11 +588,40 @@ export default function UsersPage() {
     const confirmBan = async () => {
         if (!userToBan) return;
         const ban = !userToBan.isBanned;
+
+        if (ban && !banReason.trim()) {
+            toast.error("Ban reason is required");
+            return;
+        }
+
         try {
             await banUser({ variables: { userId: userToBan.id, banned: ban } });
+
+            if (ban) {
+                const existingNote = stripBanReason(userToBan.adminNote);
+                const noteWithReason = buildNoteWithBanReason(existingNote, banReason);
+                await updateUserNote({
+                    variables: {
+                        userId: userToBan.id,
+                        note: noteWithReason,
+                        flagColor: userToBan.flagColor || null,
+                    },
+                });
+            } else {
+                const existingNote = stripBanReason(userToBan.adminNote);
+                await updateUserNote({
+                    variables: {
+                        userId: userToBan.id,
+                        note: existingNote || null,
+                        flagColor: userToBan.flagColor || null,
+                    },
+                });
+            }
+
             toast.success(ban ? "User banned" : "User unbanned");
             setShowBanModal(false);
             setUserToBan(null);
+            setBanReason("");
         } catch (err) {
             toast.error(err instanceof Error ? err.message : "Failed");
         }
@@ -522,6 +658,18 @@ export default function UsersPage() {
                             </button>
                         )}
                     </div>
+                    <select
+                        value={banFilter}
+                        onChange={(e) => {
+                            setBanFilter(e.target.value as "all" | "banned" | "active");
+                            setCurrentPage(1);
+                        }}
+                        className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-violet-500/50"
+                    >
+                        <option value="all">All customers</option>
+                        <option value="banned">Banned only</option>
+                        <option value="active">Active only</option>
+                    </select>
                     {isSuperAdmin && (
                         <Button onClick={openCreateModal}>
                             <Plus size={15} />
@@ -836,11 +984,18 @@ export default function UsersPage() {
                                                     <span className={`text-xs font-semibold ${getFlag(selectedUser.flagColor).text}`}>
                                                         {getFlag(selectedUser.flagColor).label}
                                                     </span>
-                                                    <p className="text-sm text-zinc-300 mt-1">{selectedUser.adminNote}</p>
+                                                    <p className="text-sm text-zinc-300 mt-1">{stripBanReason(selectedUser.adminNote) || "No flag or note set for this customer."}</p>
                                                 </div>
                                             </div>
                                         ) : (
                                             <p className="text-sm text-zinc-500">No flag or note set for this customer.</p>
+                                        )}
+
+                                        {selectedUser.isBanned && extractBanReason(selectedUser.adminNote) && (
+                                            <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3">
+                                                <p className="text-xs font-semibold text-red-300">Suspension reason</p>
+                                                <p className="mt-1 text-sm text-red-100">{extractBanReason(selectedUser.adminNote)}</p>
+                                            </div>
                                         )}
                                     </div>
 
@@ -908,15 +1063,33 @@ export default function UsersPage() {
                                     <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 overflow-hidden">
                                         <div className="px-4 py-3 border-b border-zinc-800/60 flex items-center justify-between">
                                             <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-2">
-                                                <Package size={14} /> Orders ({userOrders.length})
+                                                <Package size={14} /> Orders ({filteredUserOrders.length})
                                             </h3>
+                                            <div className="relative w-64">
+                                                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+                                                <Input
+                                                    value={ordersSearchTerm}
+                                                    onChange={(e) => setOrdersSearchTerm(e.target.value)}
+                                                    placeholder="Search order #, ID, status, business"
+                                                    className="h-8 pl-8 pr-8 text-xs"
+                                                />
+                                                {ordersSearchTerm && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setOrdersSearchTerm("")}
+                                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                                                    >
+                                                        <X size={12} />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                         {ordersError && <p className="p-4 text-sm text-red-300">{ordersError.message}</p>}
                                         {ordersLoading ? (
                                             <p className="p-4 text-sm text-zinc-500">Loading ordersï¿½</p>
-                                        ) : userOrders.length ? (
+                                        ) : filteredUserOrders.length ? (
                                             <div className="divide-y divide-zinc-800/40 max-h-[400px] overflow-y-auto">
-                                                {userOrders.map((order) => (
+                                                {filteredUserOrders.map((order) => (
                                                     <button
                                                         key={order.id}
                                                         onClick={() => setSelectedOrder(order)}
@@ -924,6 +1097,7 @@ export default function UsersPage() {
                                                     >
                                                         <div className="min-w-0">
                                                             <div className="flex items-center gap-2">
+                                                                <span className="font-mono text-[11px] text-zinc-400">#{order.displayId}</span>
                                                                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] border ${statusColor(order.status)}`}>
                                                                     {order.status}
                                                                 </span>
@@ -939,7 +1113,7 @@ export default function UsersPage() {
                                                 ))}
                                             </div>
                                         ) : (
-                                            <p className="p-4 text-sm text-zinc-500">No orders found.</p>
+                                            <p className="p-4 text-sm text-zinc-500">{ordersDebouncedSearch ? "No orders match this search." : "No orders found."}</p>
                                         )}
                                     </div>
                                 </>
@@ -1157,7 +1331,7 @@ export default function UsersPage() {
 
             {/* Ban Modal */}
             {showBanModal && userToBan && (
-                <Modal isOpen={showBanModal} onClose={() => { setShowBanModal(false); setUserToBan(null); }} title={userToBan.isBanned ? "Unban Customer" : "Ban Customer"}>
+                <Modal isOpen={showBanModal} onClose={() => { setShowBanModal(false); setUserToBan(null); setBanReason(""); }} title={userToBan.isBanned ? "Unban Customer" : "Ban Customer"}>
                     <div className="space-y-4">
                         <div className={`${userToBan.isBanned ? "bg-emerald-900/20 border-emerald-800" : "bg-red-900/20 border-red-800"} border rounded-lg p-4 flex items-start gap-3`}>
                             {userToBan.isBanned
@@ -1173,12 +1347,26 @@ export default function UsersPage() {
                                 </p>
                             </div>
                         </div>
+
+                        {!userToBan.isBanned && (
+                            <div>
+                                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Suspension reason *</label>
+                                <textarea
+                                    value={banReason}
+                                    onChange={(e) => setBanReason(e.target.value)}
+                                    placeholder="Enter why this account is being suspended"
+                                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-violet-500/50 min-h-[100px] resize-y"
+                                    rows={4}
+                                />
+                            </div>
+                        )}
+
                         <div className="flex gap-3 justify-end">
-                            <Button type="button" onClick={() => { setShowBanModal(false); setUserToBan(null); }} variant="outline">Cancel</Button>
+                            <Button type="button" onClick={() => { setShowBanModal(false); setUserToBan(null); setBanReason(""); }} variant="outline">Cancel</Button>
                             <Button
                                 type="button"
                                 onClick={confirmBan}
-                                disabled={banning}
+                                disabled={banning || (!userToBan.isBanned && !banReason.trim())}
                                 variant={userToBan.isBanned ? "success" : "danger"}
                             >
                                 {banning ? (userToBan.isBanned ? "Unbanningâ€¦" : "Banningâ€¦") : (userToBan.isBanned ? "Unban" : "Ban")}
@@ -1194,7 +1382,9 @@ export default function UsersPage() {
                     <div className="space-y-5">
                         <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
                             <div>
-                                <div className="text-xs text-zinc-500">Order ID</div>
+                                <div className="text-xs text-zinc-500">Order #</div>
+                                <div className="font-mono text-sm text-zinc-100">{selectedOrder.displayId}</div>
+                                <div className="text-xs text-zinc-500 mt-2">Order ID</div>
                                 <div className="font-mono text-sm text-zinc-100">{selectedOrder.id}</div>
                                 <div className="text-xs text-zinc-500 mt-1">{formatDate(selectedOrder.orderDate)}</div>
                             </div>
@@ -1232,7 +1422,20 @@ export default function UsersPage() {
                             </div>
                         ))}
 
-                        <div className="flex justify-end">
+                        <div className="flex justify-end gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => {
+                                    const params = new URLSearchParams({
+                                        orderId: selectedOrder.id,
+                                        displayId: selectedOrder.displayId,
+                                    });
+                                    router.push(`/dashboard/orders?${params.toString()}`);
+                                }}
+                            >
+                                Open in Orders
+                            </Button>
                             <Button type="button" variant="outline" onClick={() => setSelectedOrder(null)}>Close</Button>
                         </div>
                     </div>

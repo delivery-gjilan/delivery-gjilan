@@ -355,6 +355,7 @@ ARCHITECTURE (A1)
 | `src/app/dashboard/layout.tsx` | B5, UI1 |
 | `src/app/admin/layout.tsx` | B5, UI1 |
 | `src/app/admin/messages/page.tsx` | O3 — tabbed Driver + Business messages merged page |
+| `src/components/dashboard/GlobalAdminMessageNotifications.tsx` | O3 — global admin message modal queue (driver/business) mounted via shared layouts |
 | `src/components/businesses/ProductsBlock.tsx` | UI1 |
 | `src/lib/auth-context.tsx` | B5 |
 | `src/lib/route-access.ts` | B5 |

@@ -198,10 +198,10 @@ export default function MessagesScreen() {
 
     const handleSend = async () => {
         const body = replyText.trim();
-        if (!body || !adminId || replying) return;
+        if (!body || replying) return;
         setReplyText('');
         try {
-            await reply({ variables: { adminId, body } });
+            await reply({ variables: { adminId: adminId ?? '', body } });
         } catch (error) {
             setReplyText(body);
             Alert.alert(t('common.error', 'Error'), error instanceof Error ? error.message : 'Failed to send message');
@@ -377,7 +377,7 @@ export default function MessagesScreen() {
                     />
                     <Pressable
                         onPress={handleSend}
-                        disabled={!replyText.trim() || replying || !adminId}
+                        disabled={!replyText.trim() || replying}
                         style={({ pressed }) => ({
                             width: 44,
                             height: 44,
@@ -385,7 +385,7 @@ export default function MessagesScreen() {
                             backgroundColor: COLORS.primary,
                             alignItems: 'center',
                             justifyContent: 'center',
-                            opacity: (!replyText.trim() || replying || !adminId) ? 0.4 : pressed ? 0.8 : 1,
+                            opacity: (!replyText.trim() || replying) ? 0.4 : pressed ? 0.8 : 1,
                         })}
                     >
                         <Ionicons name="send" size={18} color="#fff" />

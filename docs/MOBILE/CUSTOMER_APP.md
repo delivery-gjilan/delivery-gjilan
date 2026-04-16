@@ -85,7 +85,6 @@ index.tsx (Expo entry)
                  ├── useNotifications() → FCM token registration
                  ├── useActiveOrdersTracking() → order subscription + store sync
                  ├── useBackgroundLiveActivity() → iOS Live Activity updates
-                 ├── Suspended account check (`user.isBanned`) → full-screen support-contact blocker
                  ├── Store closed check (blocks only if closed on entry and no active orders)
                  └── Stack Navigator
                       ├── Global overlays: FloatingBars, Toast, SuccessModal,
@@ -97,7 +96,7 @@ index.tsx (Expo entry)
 1. Load token from SecureStore (iOS Keychain / Android Keystore)
 2. If no token → `/auth-selection`
 3. If token, run `Me` query
-4. On success with `isBanned === true` → `/auth-selection` (global suspended-account blocker is shown in root layout)
+4. On success with `isBanned === true` → `/auth-selection` (suspended-account blocker is rendered by `auth-selection.tsx`)
 5. On success with `signupStep === 'COMPLETED'` → `/(tabs)/home`
 6. On success with incomplete signup → `/signup` (resume)
 7. On network error → fall back to persisted user (don't clear token)

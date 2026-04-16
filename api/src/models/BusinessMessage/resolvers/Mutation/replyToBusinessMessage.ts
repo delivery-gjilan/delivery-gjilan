@@ -1,8 +1,20 @@
 import type { MutationResolvers } from './../../../../generated/types.generated';
 import { GraphQLError } from 'graphql';
 import logger from '@/lib/logger';
-import { businessMessages as businessMessagesTable } from '@/database/schema';
+import { businessMessages as businessMessagesTable, users as usersTable } from '@/database/schema';
 import { pubsub, publish, topics } from '@/lib/pubsub';
+import { and, asc, inArray, isNull } from 'drizzle-orm';
+
+async function resolveFallbackAdminId(db: any): Promise<string | null> {
+    const [admin] = await db
+        .select({ id: usersTable.id })
+        .from(usersTable)
+        .where(and(inArray(usersTable.role, ['SUPER_ADMIN', 'ADMIN']), isNull(usersTable.deletedAt)))
+        .orderBy(asc(usersTable.createdAt))
+        .limit(1);
+
+    return admin?.id ?? null;
+}
 
 export const replyToBusinessMessage: NonNullable<MutationResolvers['replyToBusinessMessage']> = async (
     _parent: unknown,
@@ -19,11 +31,18 @@ export const replyToBusinessMessage: NonNullable<MutationResolvers['replyToBusin
 
     if (!body.trim()) throw new GraphQLError('Message body cannot be empty');
 
+    const resolvedAdminId = adminId?.trim() || await resolveFallbackAdminId(db);
+    if (!resolvedAdminId) {
+        throw new GraphQLError('No admin available to receive this message', {
+            extensions: { code: 'SERVICE_UNAVAILABLE' },
+        });
+    }
+
     try {
         const [msg] = await db
             .insert(businessMessagesTable)
             .values({
-                adminId,
+                adminId: resolvedAdminId,
                 businessUserId: userData.userId,
                 senderRole: 'BUSINESS',
                 body: body.trim(),
@@ -43,7 +62,7 @@ export const replyToBusinessMessage: NonNullable<MutationResolvers['replyToBusin
         };
 
         // Real-time: push to admin's subscription
-        publish(pubsub, topics.adminBusinessMessage(adminId, userData.userId), payload);
+        publish(pubsub, topics.adminBusinessMessage(resolvedAdminId, userData.userId), payload);
         // Real-time: also push back to business user's own subscription (optimistic consistency)
         publish(pubsub, topics.businessMessage(userData.userId), payload);
         // Real-time: broadcast to all admins for global notifications

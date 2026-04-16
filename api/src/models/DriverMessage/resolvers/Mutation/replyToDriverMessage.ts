@@ -1,8 +1,20 @@
 import type   { MutationResolvers } from './../../../../generated/types.generated';
 import { GraphQLError } from 'graphql';
 import logger from '@/lib/logger';
-import { driverMessages as driverMessagesTable } from '@/database/schema';
+import { driverMessages as driverMessagesTable, users as usersTable } from '@/database/schema';
 import { pubsub, publish, topics } from '@/lib/pubsub';
+import { and, asc, inArray, isNull } from 'drizzle-orm';
+
+async function resolveFallbackAdminId(db: any): Promise<string | null> {
+    const [admin] = await db
+        .select({ id: usersTable.id })
+        .from(usersTable)
+        .where(and(inArray(usersTable.role, ['SUPER_ADMIN', 'ADMIN']), isNull(usersTable.deletedAt)))
+        .orderBy(asc(usersTable.createdAt))
+        .limit(1);
+
+    return admin?.id ?? null;
+}
 
 export const replyToDriverMessage: NonNullable<MutationResolvers['replyToDriverMessage']> = async (
     _parent: unknown,
@@ -17,11 +29,18 @@ export const replyToDriverMessage: NonNullable<MutationResolvers['replyToDriverM
 
     if (!body.trim()) throw new GraphQLError('Message body cannot be empty');
 
+    const resolvedAdminId = adminId?.trim() || await resolveFallbackAdminId(db);
+    if (!resolvedAdminId) {
+        throw new GraphQLError('No admin available to receive this message', {
+            extensions: { code: 'SERVICE_UNAVAILABLE' },
+        });
+    }
+
     try {
         const [msg] = await db
             .insert(driverMessagesTable)
             .values({
-                adminId,
+                adminId: resolvedAdminId,
                 driverId: userData.userId,
                 senderRole: 'DRIVER',
                 body: body.trim(),
@@ -41,7 +60,7 @@ export const replyToDriverMessage: NonNullable<MutationResolvers['replyToDriverM
         };
 
         // Real-time: push to admin's subscription
-        publish(pubsub, topics.adminMessage(adminId, userData.userId), payload);
+        publish(pubsub, topics.adminMessage(resolvedAdminId, userData.userId), payload);
         // Real-time: also push back to driver's own subscription (optimistic consistency)
         publish(pubsub, topics.driverMessage(userData.userId), payload);
         // Real-time: broadcast to all admins for global notifications

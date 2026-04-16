@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useMutation, useQuery, useLazyQuery } from "@apollo/client/react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Dropdown from "@/components/ui/Dropdown";
@@ -74,55 +75,6 @@ function CopyableId({ displayId }: { displayId: string }) {
     );
 }
 
-/* ----- Status filter rail ----- */
-type ActiveStatusFilter = "ALL" | OrderStatus;
-
-function StatusFilterRail({
-    statusCounts,
-    active,
-    onChange,
-}: {
-    statusCounts: Record<string, number>;
-    active: ActiveStatusFilter;
-    onChange: (s: ActiveStatusFilter) => void;
-}) {
-    const activeStatuses: OrderStatus[] = ["AWAITING_APPROVAL", "PENDING", "PREPARING", "READY", "OUT_FOR_DELIVERY"];
-    const total = activeStatuses.reduce((s, st) => s + (statusCounts[st] ?? 0), 0);
-    return (
-        <div className="w-44 shrink-0 border-r border-zinc-800 py-2 flex flex-col gap-0.5 overflow-y-auto">
-            <button
-                onClick={() => onChange("ALL")}
-                className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm transition-colors mx-1 ${active === "ALL" ? "bg-zinc-800 text-white" : "text-zinc-400 hover:text-white hover:bg-zinc-900"}`}
-            >
-                <span>All Active</span>
-                {total > 0 && <span className="text-xs bg-zinc-700 text-zinc-300 rounded-full px-1.5 py-0.5 min-w-[22px] text-center">{total}</span>}
-            </button>
-            {activeStatuses.map((st) => {
-                const count = statusCounts[st] ?? 0;
-                const colors = STATUS_COLORS[st];
-                const isActive = active === st;
-                return (
-                    <button
-                        key={st}
-                        onClick={() => onChange(st)}
-                        className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm transition-colors mx-1 ${isActive ? `${colors.bg} ${colors.text}` : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900"}`}
-                    >
-                        <span className="flex items-center gap-2 truncate">
-                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${colors.dot}`} />
-                            <span className="truncate text-xs">{STATUS_LABELS[st]}</span>
-                        </span>
-                        {count > 0 && (
-                            <span className={`text-xs rounded-full px-1.5 py-0.5 min-w-[22px] text-center shrink-0 ${isActive ? `${colors.bg} ${colors.text}` : "bg-zinc-800 text-zinc-400"}`}>
-                                {count}
-                            </span>
-                        )}
-                    </button>
-                );
-            })}
-        </div>
-    );
-}
-
 /* ---------------------------------------------------------
    PAGE
 --------------------------------------------------------- */
@@ -145,6 +97,13 @@ const getErrorMessage = (error: unknown, fallback: string): string => {
 };
 
 export default function OrdersPage() {
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const focusOrderIdParam = (searchParams.get("orderId") || "").trim();
+    const focusDisplayIdParam = (searchParams.get("displayId") || "").trim();
+    const focusKey = `${focusOrderIdParam}|${focusDisplayIdParam}`;
+    const consumedFocusKeyRef = useRef<string | null>(null);
+
     const [ordersPage, setOrdersPage] = useState(0);
     const [completedPage, setCompletedPage] = useState(0);
     const [completedStartDate, setCompletedStartDate] = useState<string>("");
@@ -177,7 +136,6 @@ export default function OrdersPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
     const [activeTab, setActiveTab] = useState<"active" | "completed">("active");
-    const [activeStatusFilter, setActiveStatusFilter] = useState<ActiveStatusFilter>("ALL");
     const [completedStatusFilter, setCompletedStatusFilter] = useState<CompletedStatusFilter>("ALL");
     const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
     const [assigningDriverOrderId, setAssigningDriverOrderId] = useState<string | null>(null);
@@ -274,18 +232,7 @@ export default function OrdersPage() {
         [filteredOrders]
     );
 
-    const statusCounts = useMemo(() => {
-        const counts: Record<string, number> = {};
-        for (const o of activeOrders) counts[o.status] = (counts[o.status] ?? 0) + 1;
-        return counts;
-    }, [activeOrders]);
-
-    const visibleActiveOrders = useMemo(() =>
-        activeStatusFilter === "ALL"
-            ? activeOrders
-            : activeOrders.filter(o => o.status === activeStatusFilter),
-        [activeOrders, activeStatusFilter]
-    );
+    const visibleActiveOrders = useMemo(() => activeOrders, [activeOrders]);
 
     /* ─── Auto approval modal ─── */
     useEffect(() => {
@@ -308,6 +255,46 @@ export default function OrdersPage() {
             : null,
         [selectedOrderId, normalizedOrders, completedOrders]
     );
+
+    useEffect(() => {
+        if (!focusOrderIdParam && !focusDisplayIdParam) return;
+        if (consumedFocusKeyRef.current === focusKey) return;
+
+        if (focusDisplayIdParam && searchQuery !== focusDisplayIdParam) {
+            setSearchQuery(focusDisplayIdParam);
+        } else if (!focusDisplayIdParam && focusOrderIdParam && searchQuery !== focusOrderIdParam) {
+            setSearchQuery(focusOrderIdParam);
+        }
+
+        const lowerFocusId = focusOrderIdParam.toLowerCase();
+        const lowerFocusDisplayId = focusDisplayIdParam.toLowerCase();
+        const matchOrder = (o: Order) => {
+            if (focusOrderIdParam && o.id.toLowerCase() === lowerFocusId) return true;
+            if (focusDisplayIdParam && o.displayId.toLowerCase() === lowerFocusDisplayId) return true;
+            return false;
+        };
+
+        const targetOrder = normalizedOrders.find(matchOrder) ?? completedOrders.find(matchOrder) ?? null;
+        if (!targetOrder) return;
+
+        setSelectedOrderId(targetOrder.id);
+        setActiveTab(targetOrder.status === "DELIVERED" || targetOrder.status === "CANCELLED" ? "completed" : "active");
+        if (isAdmin) {
+            fetchOrderCoverage({ variables: { orderId: targetOrder.id } });
+        }
+        consumedFocusKeyRef.current = focusKey;
+        router.replace("/dashboard/orders", { scroll: false });
+    }, [
+        completedOrders,
+        fetchOrderCoverage,
+        focusDisplayIdParam,
+        focusKey,
+        focusOrderIdParam,
+        isAdmin,
+        normalizedOrders,
+        router,
+        searchQuery,
+    ]);
 
     const filteredCompletedOrders = useMemo(() => {
         let result = completedOrders;
@@ -453,6 +440,16 @@ export default function OrdersPage() {
         if (isAdmin) fetchOrderCoverage({ variables: { orderId: order.id } });
     };
 
+    const openCustomerProfile = (userId: string, order: Order) => {
+        const params = new URLSearchParams({
+            userId,
+            tab: "orders",
+            orderId: order.id,
+            displayId: order.displayId,
+        });
+        router.push(`/dashboard/users?${params.toString()}`);
+    };
+
     /* ─── Loading ─── */
     if (loading) {
         return (
@@ -500,6 +497,7 @@ export default function OrdersPage() {
         onOpenApprovalModal: () => openApprovalModalForOrder(selectedOrder),
         onSetApprovalModalSuppression: setApprovalModalSuppressionForUser,
         onEditPrepTime: (o: Order) => { setEditPrepTimeOrder(o); setEditPrepTimeMinutes(String(o.preparationMinutes || 20)); },
+        onOpenCustomerProfile: openCustomerProfile,
     } : null;
 
     /* ─── Render ─── */
@@ -562,11 +560,9 @@ export default function OrdersPage() {
             {/* ════ ACTIVE ORDERS ════ */}
             {activeTab === "active" && (
                 <div className="flex flex-1 overflow-hidden">
-                    <StatusFilterRail statusCounts={statusCounts} active={activeStatusFilter} onChange={setActiveStatusFilter} />
-
                     <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col">
                         <div className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider mb-3">
-                            {activeStatusFilter === "ALL" ? "All Active Orders" : STATUS_LABELS[activeStatusFilter as OrderStatus]}
+                            All Active Orders
                             <span className="ml-2 text-zinc-600">({visibleActiveOrders.length})</span>
                         </div>
 
@@ -595,7 +591,6 @@ export default function OrdersPage() {
                                                 isSelected ? "border-violet-500/60 ring-1 ring-violet-500/20" : STATUS_COLORS[order.status].border
                                             }`}
                                         >
-                                            {/* Card header */}
                                             <div className="flex items-start justify-between mb-3">
                                                 <div>
                                                     <div onClick={(e) => e.stopPropagation()}>
@@ -613,7 +608,6 @@ export default function OrdersPage() {
                                                 <StatusBadge status={order.status} />
                                             </div>
 
-                                            {/* Approval badges */}
                                             {approvalReasons.length > 0 && (
                                                 <div className="flex flex-wrap items-center gap-1 mb-3">
                                                     {approvalReasons.includes("FIRST_ORDER") && (
@@ -628,7 +622,6 @@ export default function OrdersPage() {
                                                 </div>
                                             )}
 
-                                            {/* Customer + Business */}
                                             <div className="mb-3 pb-3 border-b border-zinc-800/60 space-y-1.5">
                                                 {order.channel === 'DIRECT_DISPATCH' ? (
                                                     <div className="flex items-center gap-2 flex-wrap">
@@ -640,12 +633,6 @@ export default function OrdersPage() {
                                                         {order.recipientName && order.recipientPhone && (
                                                             <span className="text-xs text-zinc-500">{order.recipientPhone}</span>
                                                         )}
-                                                        <span className="inline-flex items-center rounded-full bg-emerald-500/15 border border-emerald-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
-                                                            Driver cut €{Number(order.deliveryPrice ?? 0).toFixed(2)}
-                                                        </span>
-                                                        <span className="inline-flex items-center rounded-full bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-300">
-                                                            Collect {Number(order.cashToCollect ?? 0) > 0 ? `€${Number(order.cashToCollect).toFixed(2)}` : 'at pickup'}
-                                                        </span>
                                                     </div>
                                                 ) : order.user && (
                                                     <div className="flex items-center gap-2 flex-wrap">
@@ -660,6 +647,16 @@ export default function OrdersPage() {
                                                         {isTrustedCustomer(order.user) && (
                                                             <span className="inline-flex items-center rounded-full bg-emerald-500/15 border border-emerald-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">Trusted</span>
                                                         )}
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                openCustomerProfile(order.user!.id, order);
+                                                            }}
+                                                            className="inline-flex items-center gap-1 rounded-md border border-zinc-700 px-2 py-0.5 text-[10px] font-semibold text-zinc-300 hover:bg-zinc-800"
+                                                        >
+                                                            Profile <ArrowRight size={10} />
+                                                        </button>
                                                     </div>
                                                 )}
                                                 <div className="flex items-center gap-2">
@@ -668,33 +665,11 @@ export default function OrdersPage() {
                                                 </div>
                                             </div>
 
-                                            {/* Items */}
-                                            <div className="mb-3 space-y-0.5">
-                                                {getOrderBusinessesSafe(order).map((biz, idx) => (
-                                                    <div key={idx}>
-                                                        {getBusinessItemsSafe(biz).slice(0, 3).map((item, itemIdx) => (
-                                                            <div key={itemIdx}>
-                                                                <div className="text-sm text-zinc-400 flex items-center gap-2">
-                                                                    <span className="text-zinc-600">x{item.quantity}</span>
-                                                                    <span className="truncate">{item.name}</span>
-                                                                </div>
-                                                                {item.notes && <div className="text-xs text-zinc-500 italic ml-6 mt-0.5">Note: {item.notes}</div>}
-                                                            </div>
-                                                        ))}
-                                                        {getBusinessItemsSafe(biz).length > 3 && (
-                                                            <div className="text-xs text-zinc-600 ml-6">+{getBusinessItemsSafe(biz).length - 3} more</div>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                            </div>
-
-                                            {/* Address */}
                                             <div className="mb-3 flex items-start gap-2">
                                                 <MapPin size={14} className="text-zinc-600 mt-0.5 flex-shrink-0" />
                                                 <span className="text-xs text-zinc-500 line-clamp-1">{order.channel === 'DIRECT_DISPATCH' ? 'Dropoff given at pickup' : order.dropOffLocation.address}</span>
                                             </div>
 
-                                            {/* Driver notes */}
                                             {order.driverNotes && (
                                                 <div className="mb-3 flex items-start gap-2 bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2">
                                                     <MessageSquare size={14} className="text-blue-400 mt-0.5 flex-shrink-0" />
@@ -702,14 +677,12 @@ export default function OrdersPage() {
                                                 </div>
                                             )}
 
-                                            {/* Needs approval */}
                                             {order.needsApproval && (
                                                 <div className="mb-3 flex items-center gap-2 bg-rose-500/10 border border-rose-500/30 rounded-lg px-3 py-2">
                                                     <span className="text-rose-400 text-xs font-semibold">⚠ Awaiting approval — call customer before approving</span>
                                                 </div>
                                             )}
 
-                                            {/* Out of zone */}
                                             {order.locationFlagged && (
                                                 <div className="mb-3 flex items-center gap-2 bg-orange-500/10 border border-orange-500/30 rounded-lg px-3 py-2">
                                                     <MapPin size={13} className="text-orange-400 flex-shrink-0" />
@@ -717,7 +690,6 @@ export default function OrdersPage() {
                                                 </div>
                                             )}
 
-                                            {/* Inventory badge */}
                                             {order.inventoryPrice != null && order.inventoryPrice > 0 && (
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); setInventoryModalOrder(order); fetchOrderCoverage({ variables: { orderId: order.id } }); }}
@@ -729,7 +701,6 @@ export default function OrdersPage() {
                                                 </button>
                                             )}
 
-                                            {/* Prep time alert */}
                                             {(() => {
                                                 const alert = prepTimeAlerts.find(a => a.orderId === order.id);
                                                 if (!alert) return null;
@@ -742,7 +713,6 @@ export default function OrdersPage() {
                                                 );
                                             })()}
 
-                                            {/* Prep time */}
                                             {order.status === "PREPARING" && order.preparationMinutes && (
                                                 <div className="mb-3 flex items-center justify-between bg-violet-500/10 border border-violet-500/20 rounded-lg px-3 py-2">
                                                     <div className="flex items-center gap-2 text-violet-400 text-sm">
@@ -758,7 +728,6 @@ export default function OrdersPage() {
                                                 </div>
                                             )}
 
-                                            {/* Driver assignment */}
                                             {isSuperAdmin && (
                                                 <div className="mb-3" onClick={(e) => e.stopPropagation()}>
                                                     <Dropdown
@@ -771,7 +740,6 @@ export default function OrdersPage() {
                                                 </div>
                                             )}
 
-                                            {/* Card footer */}
                                             <div className="flex items-center justify-between pt-3 border-t border-zinc-800/60">
                                                 <div>
                                                     <div className="text-lg font-bold text-white">€{order.totalPrice.toFixed(2)}</div>
@@ -791,26 +759,6 @@ export default function OrdersPage() {
                                                             }`}>
                                                                 M {preview.netMargin >= 0 ? "+" : ""}€{preview.netMargin.toFixed(2)}
                                                             </span>
-                                                            {!preview.driverAssigned && (
-                                                                <span className="ml-1 inline-flex items-center rounded-full bg-zinc-500/15 border border-zinc-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-400">No driver</span>
-                                                            )}
-                                                            <div className="pointer-events-none absolute left-0 bottom-full z-[120] mb-2 rounded-md border border-zinc-700 bg-[#0a0a0d] p-2 text-left text-[11px] text-zinc-300 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 min-w-[200px]">
-                                                                <div className="font-semibold text-zinc-200 mb-1">Settlement breakdown</div>
-                                                                {preview.lineItems.map((item, i) => (
-                                                                    <div key={i} className="flex justify-between gap-2">
-                                                                        <span className="text-zinc-500 truncate">{item.reason}</span>
-                                                                        <span className={item.direction === "RECEIVABLE" ? "text-emerald-300" : "text-rose-300"}>
-                                                                            {item.direction === "RECEIVABLE" ? "+" : "-"}€{item.amount.toFixed(2)}
-                                                                        </span>
-                                                                    </div>
-                                                                ))}
-                                                                <div className="flex justify-between border-t border-zinc-700 mt-1 pt-1">
-                                                                    <span className="text-zinc-500">Net margin</span>
-                                                                    <span className={preview.netMargin >= 0 ? "text-emerald-300" : "text-rose-300"}>
-                                                                        {preview.netMargin >= 0 ? "+" : ""}€{preview.netMargin.toFixed(2)}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
                                                         </div>
                                                     )}
                                                 </div>

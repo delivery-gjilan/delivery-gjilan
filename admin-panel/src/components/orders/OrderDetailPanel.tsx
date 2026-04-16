@@ -80,6 +80,7 @@ export interface OrderDetailPanelProps {
     onOpenApprovalModal: () => void;
     onSetApprovalModalSuppression: (user: NonNullable<Order["user"]>, suppress: boolean) => void;
     onEditPrepTime: (order: Order) => void;
+    onOpenCustomerProfile: (userId: string, order: Order) => void;
 }
 
 export default function OrderDetailPanel({
@@ -101,6 +102,7 @@ export default function OrderDetailPanel({
     onOpenApprovalModal,
     onSetApprovalModalSuppression,
     onEditPrepTime,
+    onOpenCustomerProfile,
 }: OrderDetailPanelProps) {
     const isCompleted = order.status === "DELIVERED" || order.status === "CANCELLED";
     const businessList = getOrderBusinessesSafe(order);
@@ -222,6 +224,13 @@ export default function OrderDetailPanel({
                                         Trusted
                                     </span>
                                 )}
+                                <button
+                                    type="button"
+                                    onClick={() => onOpenCustomerProfile(order.user!.id, order)}
+                                    className="text-[11px] px-2 py-1 rounded-md border border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                                >
+                                    Open profile
+                                </button>
                                 {isAdmin && (
                                     <button
                                         type="button"

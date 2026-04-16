@@ -185,6 +185,43 @@ export function DeliverySlider({
                                 {customerPaymentAmount != null ? `€${customerPaymentAmount.toFixed(2)}` : 'Confirm amount'}
                             </Text>
                         </View>
+
+                        {/* Action buttons */}
+                        <View style={styles.actionButtons}>
+                            {pingUnlocked && (
+                                <Pressable style={styles.pingAgainBtn} onPress={onPingAgain}>
+                                    <Ionicons name="radio-button-on" size={14} color="#06b6d4" />
+                                    <Text style={styles.pingAgainText}>{s.ping_again}</Text>
+                                    {pingRemaining > 0 && <Text style={styles.pingTimer}>{fmtTime(pingRemaining)}</Text>}
+                                </Pressable>
+                            )}
+                            <Pressable
+                                style={[styles.cancelBtn, !cancelUnlocked && { opacity: 0.35 }]}
+                                disabled={!cancelUnlocked}
+                                onPress={() => setShowCancelSheet(true)}
+                            >
+                                <Ionicons name="close-outline" size={14} color="#f87171" />
+                                <Text style={styles.cancelBtnText}>{s.cancel_order}</Text>
+                                {cancelRemaining > 0 && <Text style={styles.cancelTimer}>{fmtTime(cancelRemaining)}</Text>}
+                            </Pressable>
+                        </View>
+
+                        {/* Delivery confirmation slider */}
+                        <View
+                            style={styles.track}
+                            onLayout={(e) => { trackWidth.current = e.nativeEvent.layout.width; }}
+                        >
+                            <Animated.View style={[styles.fill, { opacity: fillOpacity }]} />
+                            <Animated.Text style={[styles.trackLabel, { opacity: labelOpacity }]}>
+                                {s.slide_confirm}
+                            </Animated.Text>
+                            <Animated.View
+                                style={[styles.thumb, { transform: [{ translateX }] }]}
+                                {...deliveryPan.panHandlers}
+                            >
+                                <Ionicons name="checkmark" size={26} color="#fff" />
+                            </Animated.View>
+                        </View>
                     </>
                 ) : (
                     /* ── Cancel sheet ── */
@@ -347,8 +384,57 @@ const styles = StyleSheet.create({
         fontSize: 22,
         fontWeight: '900',
         letterSpacing: -0.4,
+    },    actionButtons: {
+        flexDirection: 'row',
+        gap: 10,
+        marginBottom: 16,
     },
-    itemsSection: {
+    pingAgainBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 8,
+        backgroundColor: 'rgba(6,182,212,0.12)',
+        borderWidth: 1,
+        borderColor: 'rgba(6,182,212,0.2)',
+    },
+    pingAgainText: {
+        color: '#06b6d4',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    pingTimer: {
+        color: 'rgba(6,182,212,0.6)',
+        fontSize: 10,
+        fontWeight: '600',
+    },
+    cancelBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 8,
+        backgroundColor: 'rgba(248,113,113,0.12)',
+        borderWidth: 1,
+        borderColor: 'rgba(248,113,113,0.2)',
+    },
+    cancelBtnText: {
+        color: '#f87171',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    cancelTimer: {
+        color: 'rgba(248,113,113,0.6)',
+        fontSize: 10,
+        fontWeight: '600',
+    },    itemsSection: {
         marginBottom: 12,
         backgroundColor: 'rgba(255,255,255,0.03)',
         borderRadius: 12,
