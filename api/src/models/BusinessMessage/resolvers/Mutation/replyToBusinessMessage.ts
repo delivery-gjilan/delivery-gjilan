@@ -46,6 +46,8 @@ export const replyToBusinessMessage: NonNullable<MutationResolvers['replyToBusin
         publish(pubsub, topics.adminBusinessMessage(adminId, userData.userId), payload);
         // Real-time: also push back to business user's own subscription (optimistic consistency)
         publish(pubsub, topics.businessMessage(userData.userId), payload);
+        // Real-time: broadcast to all admins for global notifications
+        publish(pubsub, topics.adminAnyBusinessMessage(), payload);
 
         return msg;
     } catch (err) {

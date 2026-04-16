@@ -388,13 +388,13 @@ export default function MessagesScreen() {
                                 : theme.colors.primary,
                             alignItems: 'center',
                             justifyContent: 'center',
-                            opacity: pressed ? 0.8 : 1,
+                            opacity: pressed && (!replyText.trim() || !adminId) ? 0.5 : (pressed ? 0.8 : 1),
                         })}
                     >
                         {replying ? (
-                            <ActivityIndicator size="small" color="#fff" />
+                            <ActivityIndicator size="small" color={!replyText.trim() || !adminId ? theme.colors.subtext : '#fff'} />
                         ) : (
-                            <Ionicons name="send" size={18} color="#fff" />
+                            <Ionicons name="send" size={18} color={!replyText.trim() || !adminId ? theme.colors.subtext : '#fff'} />
                         )}
                     </Pressable>
                 </View>

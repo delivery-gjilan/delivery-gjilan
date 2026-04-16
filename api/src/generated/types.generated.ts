@@ -3460,6 +3460,10 @@ export type SubmitPhoneNumberInput = {
 
 export type Subscription = {
   __typename?: 'Subscription';
+  /** Admin receives ANY business message in real-time (for global notifications) */
+  adminAnyBusinessMessageReceived: BusinessMessage;
+  /** Admin receives ANY driver message in real-time (for global notifications) */
+  adminAnyMessageReceived: DriverMessage;
   /** Admin receives replies from a specific business user in real-time */
   adminBusinessMessageReceived: BusinessMessage;
   /** Admin receives replies from a specific driver in real-time */
@@ -5896,6 +5900,8 @@ export type StoreStatusResolvers<ContextType = GraphQLContext, ParentType extend
 };
 
 export type SubscriptionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Subscription'] = ResolversParentTypes['Subscription']> = {
+  adminAnyBusinessMessageReceived?: SubscriptionResolver<ResolversTypes['BusinessMessage'], "adminAnyBusinessMessageReceived", ParentType, ContextType>;
+  adminAnyMessageReceived?: SubscriptionResolver<ResolversTypes['DriverMessage'], "adminAnyMessageReceived", ParentType, ContextType>;
   adminBusinessMessageReceived?: SubscriptionResolver<ResolversTypes['BusinessMessage'], "adminBusinessMessageReceived", ParentType, ContextType, RequireFields<SubscriptionadminBusinessMessageReceivedArgs, 'businessUserId'>>;
   adminMessageReceived?: SubscriptionResolver<ResolversTypes['DriverMessage'], "adminMessageReceived", ParentType, ContextType, RequireFields<SubscriptionadminMessageReceivedArgs, 'driverId'>>;
   adminPttSignal?: SubscriptionResolver<ResolversTypes['AdminPttSignal'], "adminPttSignal", ParentType, ContextType>;

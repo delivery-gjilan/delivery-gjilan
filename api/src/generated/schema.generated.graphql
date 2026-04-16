@@ -2332,6 +2332,16 @@ input SubmitPhoneNumberInput {
 }
 
 type Subscription {
+  """
+  Admin receives ANY business message in real-time (for global notifications)
+  """
+  adminAnyBusinessMessageReceived: BusinessMessage!
+
+  """
+  Admin receives ANY driver message in real-time (for global notifications)
+  """
+  adminAnyMessageReceived: DriverMessage!
+
   """Admin receives replies from a specific business user in real-time"""
   adminBusinessMessageReceived(businessUserId: ID!): BusinessMessage!
 

@@ -80,6 +80,8 @@ Important subscription families:
 - drivers list updates
 - per-order live driver tracking
 - store status updates
+- **admin message broadcasts** — `adminAnyMessageReceived` (all driver messages) and `adminAnyBusinessMessageReceived` (all business messages) provide global notification feeds to admins without polling or per-driver/per-business filtering. Published alongside targeted subscriptions when messages are created.
+- per-user message subscriptions (driver, business, admin)
 
 The current design is mostly invalidation plus refetch, not full event-sourced client state.
 

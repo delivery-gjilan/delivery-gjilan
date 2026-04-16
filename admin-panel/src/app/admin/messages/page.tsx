@@ -116,6 +116,54 @@ function groupByDate<T extends BaseMessage>(messages: T[]) {
     return grouped;
 }
 
+// ─── Global Message Notifications ──────────────────────────────────────────────
+
+function GlobalMessageNotifications() {
+    const seenIdsRef = useRef<Set<string>>(new Set());
+    const { data: driversData } = useQuery(DRIVERS_QUERY);
+    const { data: usersData } = useQuery(USERS_QUERY);
+
+    // Get all driver and business user names for notifications
+    const driverMap = new Map((driversData?.drivers ?? []).map(d => [d.id, `${d.firstName} ${d.lastName}`.trim() || d.email]));
+    const userMap = new Map((usersData?.users ?? []).filter(u => u.role === 'BUSINESS_OWNER' || u.role === 'BUSINESS_EMPLOYEE').map(u => [u.id, `${u.firstName} ${u.lastName}`.trim() || u.email]));
+
+    // Poll driver thread list every 5 seconds for new messages — subscriptions require specific driverId
+    useQuery(GET_DRIVER_MESSAGE_THREADS, {
+        pollInterval: 5000,
+        onCompleted: (data) => {
+            const threads = data?.driverMessageThreads ?? [];
+            for (const thread of threads) {
+                const msg = thread?.lastMessage;
+                if (!msg) continue;
+                if (msg.senderRole === 'DRIVER' && !seenIdsRef.current.has(msg.id)) {
+                    seenIdsRef.current.add(msg.id);
+                    const driverName = driverMap.get(thread?.driverId) || 'Unknown Driver';
+                    toast.info(`📞 ${driverName}: ${msg.body}`, { description: formatTime(msg.createdAt) });
+                }
+            }
+        },
+    });
+
+    // Poll business thread list every 5 seconds for new messages — subscriptions require specific businessUserId
+    useQuery(GET_BUSINESS_MESSAGE_THREADS, {
+        pollInterval: 5000,
+        onCompleted: (data) => {
+            const threads = data?.businessMessageThreads ?? [];
+            for (const thread of threads) {
+                const msg = thread?.lastMessage;
+                if (!msg) continue;
+                if (msg.senderRole === 'BUSINESS' && !seenIdsRef.current.has(msg.id)) {
+                    seenIdsRef.current.add(msg.id);
+                    const userName = userMap.get(thread?.businessUserId) || 'Unknown Business';
+                    toast.info(`🏪 ${userName}: ${msg.body}`, { description: formatTime(msg.createdAt) });
+                }
+            }
+        },
+    });
+
+    return null;
+}
+
 // ─── Driver panel ──────────────────────────────────────────────────────────────
 
 function DriverPanel() {
@@ -616,6 +664,9 @@ export default function MessagesPage() {
 
     return (
         <div className="flex flex-col h-full gap-0">
+            {/* Global notifications listener */}
+            <GlobalMessageNotifications />
+
             {/* Tab bar */}
             <div className="flex-shrink-0 flex border-b border-white/10 mb-0">
                 <button

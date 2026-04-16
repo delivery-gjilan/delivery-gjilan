@@ -52,4 +52,7 @@ extend type Subscription {
 
     """Admin receives replies from a specific business user in real-time"""
     adminBusinessMessageReceived(businessUserId: ID!): BusinessMessage! @skipAuth
+
+    """Admin receives ANY business message in real-time (for global notifications)"""
+    adminAnyBusinessMessageReceived: BusinessMessage! @skipAuth
 }

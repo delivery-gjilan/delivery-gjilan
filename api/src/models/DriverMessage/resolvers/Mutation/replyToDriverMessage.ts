@@ -44,6 +44,8 @@ export const replyToDriverMessage: NonNullable<MutationResolvers['replyToDriverM
         publish(pubsub, topics.adminMessage(adminId, userData.userId), payload);
         // Real-time: also push back to driver's own subscription (optimistic consistency)
         publish(pubsub, topics.driverMessage(userData.userId), payload);
+        // Real-time: broadcast to all admins for global notifications
+        publish(pubsub, topics.adminAnyMessage(), payload);
 
         return msg;
     } catch (err) {

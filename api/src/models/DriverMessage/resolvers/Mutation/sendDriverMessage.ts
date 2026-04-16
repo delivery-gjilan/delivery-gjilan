@@ -46,6 +46,8 @@ export const sendDriverMessage: NonNullable<MutationResolvers['sendDriverMessage
         publish(pubsub, topics.driverMessage(driverId), payload);
         // Real-time: push to admin's own subscription (keeps admin chat in sync across tabs)
         publish(pubsub, topics.adminMessage(userData.userId, driverId), payload);
+        // Real-time: broadcast to all admins for global notifications
+        publish(pubsub, topics.adminAnyMessage(), payload);
 
         // Push notification to driver
         notifyDriverNewAdminMessage(notificationService, driverId, body, alertType);

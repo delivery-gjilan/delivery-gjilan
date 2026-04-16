@@ -45,6 +45,8 @@ export const sendBusinessMessage: NonNullable<MutationResolvers['sendBusinessMes
         publish(pubsub, topics.businessMessage(businessUserId), payload);
         // Real-time: push to admin's own subscription (keeps admin chat in sync across tabs)
         publish(pubsub, topics.adminBusinessMessage(userData.userId, businessUserId), payload);
+        // Real-time: broadcast to all admins for global notifications
+        publish(pubsub, topics.adminAnyBusinessMessage(), payload);
 
         // Push notification to business user
         notifyBusinessUserNewAdminMessage(notificationService, businessUserId, body, alertType);
