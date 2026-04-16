@@ -4,6 +4,7 @@ import {
     Text,
     FlatList,
     TouchableOpacity,
+    Pressable,
     Alert,
     ActivityIndicator,
 } from "react-native";
@@ -17,7 +18,9 @@ import { useAuthStore } from "@/store/authStore";
 import { UPDATE_DRIVER_ONLINE_STATUS } from "@/graphql/operations/driverLocation";
 import { useStoreStatus } from "@/hooks/useStoreStatus";
 import { useSharedOrderAccept } from "@/hooks/GlobalOrderAcceptContext";
+import { useOrderAcceptStore } from "@/store/orderAcceptStore";
 import { useRouter } from "expo-router";
+import { OrderDetailSheet } from "@/components/OrderDetailSheet";
 import type { DriverOrder } from "@/utils/types";
 
 // ─── Order Card ──────────────────────────────────────────────────────────────
@@ -28,12 +31,14 @@ function OrderCard({
     order,
     variant,
     onAccept,
+    onOpenDetails,
     onNavigate,
     currentDriverId,
 }: {
     order: DriverOrder;
     variant: CardVariant;
     onAccept?: (id: string) => void;
+    onOpenDetails?: (order: DriverOrder) => void;
     onNavigate?: (order: DriverOrder) => void;
     currentDriverId: string | undefined;
 }) {
@@ -43,8 +48,18 @@ function OrderCard({
     const bizName = firstBusiness?.business?.name ?? "Business";
     const dropAddress = order.dropOffLocation?.address ?? "—";
     const driverEarning = (order.deliveryPrice ?? 0) + (order.driverTip ?? 0);
+    const orderPrice = Number((order as any).orderPrice ?? 0);
+    const inventoryPrice = Number((order as any).inventoryPrice ?? 0);
+    const businessPrice = Math.max(0, orderPrice - inventoryPrice);
+    const isDirectDispatch = order.channel === "DIRECT_DISPATCH";
+    const recipientLabel = order.recipientName ?? order.recipientPhone ?? null;
 
     const items = order.businesses?.flatMap((b) => b.items ?? []) ?? [];
+    const totalStockUnits = items.reduce((sum, item) => sum + (item.inventoryQuantity ?? 0), 0);
+    const totalMarketUnits = items.reduce(
+        (sum, item) => sum + Math.max(0, item.quantity - (item.inventoryQuantity ?? 0)),
+        0,
+    );
     const itemSummary = items
         .map((i) => `${i.quantity}× ${i.name}`)
         .slice(0, 3)
@@ -75,19 +90,25 @@ function OrderCard({
         order.status === "READY" ? "Ready"
         : order.status === "PREPARING" ? "Preparing"
         : order.status === "OUT_FOR_DELIVERY" ? "Out for delivery"
-        : order.status === "PICKED_UP" ? "Picked up"
         : order.status;
 
     return (
-        <View style={{
+        <Pressable
+            disabled={!onOpenDetails}
+            onPress={() => onOpenDetails?.(order)}
+            style={{
             marginHorizontal: 16,
             marginBottom: 12,
             borderRadius: 20,
             backgroundColor: theme.colors.card,
             borderWidth: 1,
-            borderColor: variant === "available" ? "#16a34a30" : theme.colors.border,
+            borderColor:
+                isDirectDispatch ? "#f9731640"
+                : variant === "available" ? "#16a34a30"
+                : theme.colors.border,
             overflow: "hidden",
         }}>
+            {isDirectDispatch && <View style={{ height: 4, backgroundColor: "#f97316" }} />}
             {/* Top bar */}
             <View style={{
                 flexDirection: "row",
@@ -101,6 +122,22 @@ function OrderCard({
                     <Text style={{ fontSize: 16, fontWeight: "800", color: theme.colors.text, flexShrink: 1 }}>
                         {bizName}
                     </Text>
+                    {isDirectDispatch && (
+                        <View style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 4,
+                            backgroundColor: "#fff7ed",
+                            borderColor: "#fdba74",
+                            borderWidth: 1,
+                            borderRadius: 999,
+                            paddingHorizontal: 8,
+                            paddingVertical: 3,
+                        }}>
+                            <Ionicons name="call" size={11} color="#f97316" />
+                            <Text style={{ fontSize: 10, fontWeight: "800", color: "#ea580c" }}>DIRECT CALL</Text>
+                        </View>
+                    )}
                     <View style={{
                         backgroundColor: "#f1f5f9",
                         borderRadius: 8,
@@ -120,12 +157,40 @@ function OrderCard({
                 </View>
             </View>
 
+            {isDirectDispatch && recipientLabel && (
+                <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#f97316" }} numberOfLines={1}>
+                        {recipientLabel}
+                    </Text>
+                </View>
+            )}
+
             {/* Items */}
             {itemSummary.length > 0 && (
                 <View style={{ paddingHorizontal: 16, paddingBottom: 10 }}>
                     <Text style={{ fontSize: 13, color: theme.colors.subtext }} numberOfLines={1}>
                         {itemSummary}{moreCount > 0 ? ` +${moreCount} more` : ""}
                     </Text>
+                </View>
+            )}
+
+            {(isDirectDispatch || totalStockUnits > 0 || businessPrice > 0) && (
+                <View style={{ flexDirection: "row", gap: 6, paddingHorizontal: 16, paddingBottom: 10, flexWrap: "wrap" }}>
+                    {totalStockUnits > 0 && (
+                        <View style={{ backgroundColor: "#f5f3ff", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 }}>
+                            <Text style={{ fontSize: 11, fontWeight: "700", color: "#7c3aed" }}>📦 {totalStockUnits} stock</Text>
+                        </View>
+                    )}
+                    {totalMarketUnits > 0 && totalStockUnits > 0 && (
+                        <View style={{ backgroundColor: "#eff6ff", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 }}>
+                            <Text style={{ fontSize: 11, fontWeight: "700", color: "#2563eb" }}>🛒 {totalMarketUnits} market</Text>
+                        </View>
+                    )}
+                    {businessPrice > 0 && (
+                        <View style={{ backgroundColor: "#fef2f2", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 }}>
+                            <Text style={{ fontSize: 11, fontWeight: "700", color: "#dc2626" }}>pay biz −€{businessPrice.toFixed(2)}</Text>
+                        </View>
+                    )}
                 </View>
             )}
 
@@ -150,6 +215,16 @@ function OrderCard({
                     {order.driverTip > 0 && (
                         <Text style={{ fontSize: 11, color: theme.colors.subtext }}>
                             incl. €{order.driverTip.toFixed(2)} tip
+                        </Text>
+                    )}
+                    {businessPrice > 0 && (
+                        <Text style={{ fontSize: 11, color: "#ef4444", fontWeight: "600" }}>
+                            pay biz −€{businessPrice.toFixed(2)}
+                        </Text>
+                    )}
+                    {variant === "available" && onOpenDetails && (
+                        <Text style={{ fontSize: 11, color: theme.colors.subtext }}>
+                            Tap card for full details
                         </Text>
                     )}
                 </View>
@@ -185,7 +260,7 @@ function OrderCard({
                         }}
                         activeOpacity={0.8}
                         style={{
-                            backgroundColor: "#3b82f6",
+                            backgroundColor: "#1f2937",
                             borderRadius: 14,
                             paddingVertical: 12,
                             paddingHorizontal: 22,
@@ -194,12 +269,12 @@ function OrderCard({
                             gap: 6,
                         }}
                     >
-                        <Ionicons name="navigate" size={15} color="#fff" />
-                        <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>Navigate</Text>
+                        <Ionicons name="eye-outline" size={15} color="#fff" />
+                        <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>Details</Text>
                     </TouchableOpacity>
                 )}
             </View>
-        </View>
+        </Pressable>
     );
 }
 
@@ -220,6 +295,7 @@ export default function Home() {
 
     const currentDriverId = user?.id;
     const [tab, setTab] = useState<TabFilter>("available");
+    const [selectedAssignedOrder, setSelectedAssignedOrder] = useState<DriverOrder | null>(null);
     const [updatingStatus, setUpdatingStatus] = useState(false);
     const [updateOnlineStatus] = useMutation(UPDATE_DRIVER_ONLINE_STATUS);
 
@@ -227,9 +303,16 @@ export default function Home() {
         assignedOrders,
         poolOrders,
         isOrdersBootstrapping,
-        handleAcceptAndNavigate,
         accepting,
     } = useSharedOrderAccept();
+
+    const openAcceptModal = useCallback((order: DriverOrder) => {
+        useOrderAcceptStore.getState().setPendingOrder(order, false);
+    }, []);
+
+    const openAssignedDetails = useCallback((order: DriverOrder) => {
+        setSelectedAssignedOrder(order);
+    }, []);
 
     const handleOnlineStatusChange = useCallback(async () => {
         const newStatus = !isOnline;
@@ -238,7 +321,7 @@ export default function Home() {
             setOnline(newStatus);
             const result = await updateOnlineStatus({ variables: { isOnline: newStatus } });
             const updatedUser = result.data?.updateDriverOnlineStatus;
-            if (updatedUser) setUser(updatedUser);
+            if (updatedUser) setUser(updatedUser as any);
             if (newStatus) setTab("available");
         } catch {
             setOnline(!newStatus);
@@ -390,8 +473,9 @@ export default function Home() {
                     <OrderCard
                         order={item}
                         variant={tab}
-                        onAccept={tab === "available" ? (id) => { void handleAcceptAndNavigate(id); } : undefined}
-                        onNavigate={tab === "assigned" ? handleNavigate : undefined}
+                        onAccept={tab === "available" ? (_id) => { openAcceptModal(item); } : undefined}
+                        onOpenDetails={tab === "available" ? openAcceptModal : openAssignedDetails}
+                        onNavigate={tab === "assigned" ? openAssignedDetails : undefined}
                         currentDriverId={currentDriverId}
                     />
                 )}
@@ -434,6 +518,26 @@ export default function Home() {
                     </View>
                 }
             />
+
+            {selectedAssignedOrder && (
+                <>
+                    <Pressable
+                        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.24)" }}
+                        onPress={() => setSelectedAssignedOrder(null)}
+                    />
+                    <OrderDetailSheet
+                        order={selectedAssignedOrder}
+                        routeInfo={null}
+                        previewRouteInfo={null}
+                        isAssignedToMe={true}
+                        onStartNavigation={() => {
+                            handleNavigate(selectedAssignedOrder);
+                            setSelectedAssignedOrder(null);
+                        }}
+                        onClose={() => setSelectedAssignedOrder(null)}
+                    />
+                </>
+            )}
         </SafeAreaView>
     );
 }

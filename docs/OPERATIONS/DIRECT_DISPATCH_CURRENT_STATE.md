@@ -28,6 +28,7 @@ Service: `api/src/services/DirectDispatchService.ts`
 
 - The mutation schedules early dispatch using the submitted preparation minutes.
 - When the order later becomes `READY`, the normal READY dispatch path still re-runs as needed.
+- Order GraphQL payload mapping includes `cashToCollect`, so order queries and subscriptions expose the configured collection amount to admin and driver clients.
 
 ### Availability Formula (current)
 
@@ -69,6 +70,7 @@ Background tolerance:
 
 - Driver order operations include `channel`, `recipientPhone`, `recipientName`.
 - Driver order operations include `cashToCollect`.
+- Live driver order updates (`allOrdersUpdated`) include `cashToCollect`, so the global order accept sheet keeps the customer-collection amount in sync while orders update in real time.
 - Direct-dispatch visuals:
   - `OrderAcceptSheet`: Direct Call badge + recipient label
   - `OrderPoolSheet`: orange accent + Direct Call badge

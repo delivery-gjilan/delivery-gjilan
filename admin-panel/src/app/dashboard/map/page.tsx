@@ -2133,6 +2133,14 @@ export default function MapPage() {
                       <span className="text-[9px] text-orange-300/70 truncate">{order.recipientPhone}</span>
                     </div>
                   )}
+                  {isDirectCall && (
+                    <div className="flex items-center gap-1 mt-0.5 pl-3">
+                      <span className="text-[9px] text-emerald-400/70 font-medium">💵</span>
+                      <span className="text-[9px] text-emerald-400/80 truncate">
+                        {Number(order.cashToCollect ?? 0) > 0 ? `Collect €${Number(order.cashToCollect).toFixed(2)}` : 'Collect: confirm at pickup'}
+                      </span>
+                    </div>
+                  )}
                   {order.channel !== "DIRECT_DISPATCH" && order.dropOffLocation?.address && (
                     <div className="flex items-center gap-1 mt-0.5 pl-3">
                       <span className="text-[9px] text-zinc-600">📍</span>
@@ -3277,6 +3285,15 @@ function BottomDetailPanel({
           <span>In status <span className="font-mono font-semibold text-zinc-200">{formatElapsed(statusElapsed)}</span></span>
           <span className="ml-auto text-base font-bold text-white">€{order.totalPrice?.toFixed(2) || '0.00'}</span>
         </div>
+        {order.channel === "DIRECT_DISPATCH" && (
+          <div className="flex items-center gap-1.5 mt-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+            <span className="text-emerald-400 text-sm">💵</span>
+            <span className="text-xs text-zinc-400">Cash to collect:</span>
+            <span className="text-xs font-semibold text-emerald-300 ml-auto">
+              {Number(order.cashToCollect ?? 0) > 0 ? `€${Number(order.cashToCollect).toFixed(2)}` : 'Confirm at pickup'}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* ── Scrollable body ── */}

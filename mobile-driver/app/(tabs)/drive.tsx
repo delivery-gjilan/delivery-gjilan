@@ -773,6 +773,7 @@ export default function MapScreen() {
                 const orderPrice = Number((order as any).orderPrice ?? 0);
                 const inventoryPrice = Number((order as any).inventoryPrice ?? 0);
                 const businessPrice = Math.max(0, orderPrice - inventoryPrice);
+                const cardCashToCollect = Number((order as any).cashToCollect ?? 0);
 
                 return (
                     <View style={[styles.singleCardWrap, { bottom: 12 + insets.bottom }]}>
@@ -858,6 +859,16 @@ export default function MapScreen() {
                                 {businessPrice > 0 && (
                                     <View style={styles.cardSignalPay}>
                                         <Text style={styles.cardSignalPayText}>pay biz −€{businessPrice.toFixed(2)}</Text>
+                                    </View>
+                                )}
+                                {isDirectDispatch && cardCashToCollect > 0 && (
+                                    <View style={[styles.cardSignalPay, { backgroundColor: '#10B98120' }]}>
+                                        <Text style={[styles.cardSignalPayText, { color: '#10B981' }]}>💵 collect €{cardCashToCollect.toFixed(2)}</Text>
+                                    </View>
+                                )}
+                                {isDirectDispatch && cardCashToCollect === 0 && (
+                                    <View style={[styles.cardSignalPay, { backgroundColor: '#9CA3AF20' }]}>
+                                        <Text style={[styles.cardSignalPayText, { color: '#9CA3AF' }]}>💵 confirm at pickup</Text>
                                     </View>
                                 )}
                             </View>

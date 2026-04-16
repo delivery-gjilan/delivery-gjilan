@@ -22,13 +22,8 @@ export default function TabLayout() {
     useEffect(() => {
         if (isNavigating && !isNavigationMinimized) {
             router.replace('/navigation' as any);
-        } else {
-            // Always open on the map tab at startup
-            router.replace('/(tabs)/drive' as any);
         }
-    // Only run on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [isNavigating, isNavigationMinimized, router]);
 
     const handleLogout = async () => {
         try {
@@ -42,6 +37,7 @@ export default function TabLayout() {
 
     return (
         <Tabs
+            initialRouteName="drive"
             screenOptions={{
                 headerShown: false,
                 tabBarStyle: {

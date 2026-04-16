@@ -153,6 +153,7 @@ export const ALL_ORDERS_UPDATED = graphql(`
             deliveryPrice
             totalPrice
             driverTip
+            cashToCollect
             dropOffLocation {
                 latitude
                 longitude
