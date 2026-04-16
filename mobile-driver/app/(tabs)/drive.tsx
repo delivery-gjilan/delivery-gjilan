@@ -18,6 +18,7 @@ import { useOrderAcceptStore } from '@/store/orderAcceptStore';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useSharedOrderAccept } from '@/hooks/GlobalOrderAcceptContext';
 import type { DriverOrder } from '@/utils/types';
+import { normalizeCoordinate } from '@/utils/locationValidation';
 import type { Feature, LineString } from 'geojson';
 
 /* â”€â”€â”€ Constants â”€â”€â”€ */
@@ -170,15 +171,21 @@ export default function MapScreen() {
             const bizLoc = focusedOrder.businesses?.[0]?.business?.location;
             const dropLoc = focusedOrder.dropOffLocation;
             const isDirectDispatch = focusedOrder.channel === 'DIRECT_DISPATCH';
-            if (!bizLoc) return;
+            const pickupCoord = normalizeCoordinate(bizLoc);
+            if (!pickupCoord) {
+                if (!cancelled) {
+                    setRouteCoords(null);
+                    setPreviewRouteCoords(null);
+                    setRouteInfo(null);
+                    setPreviewRouteInfo(null);
+                }
+                return;
+            }
 
             const driverCoord = { latitude: loc.latitude, longitude: loc.longitude };
-            const pickupCoord = { latitude: Number(bizLoc.latitude), longitude: Number(bizLoc.longitude) };
-            const dropoffCoord = dropLoc
-                ? { latitude: Number(dropLoc.latitude), longitude: Number(dropLoc.longitude) }
-                : null;
+            const dropoffCoord = normalizeCoordinate(dropLoc);
 
-            const canUseDropoff = Boolean(dropoffCoord) && !isDirectDispatch;
+            const canUseDropoff = !!dropoffCoord && !isDirectDispatch;
 
             if (focusedOrder.status === 'OUT_FOR_DELIVERY' && canUseDropoff && dropoffCoord) {
                 // Clear the pickupâ†’dropoff preview â€” not needed while delivering
@@ -252,7 +259,9 @@ export default function MapScreen() {
     const focusOrder = useCallback((order: DriverOrder) => {
         const bizLoc = order.businesses?.[0]?.business?.location;
         const dropLoc = order.dropOffLocation;
-        const canUseDropoff = order.channel !== 'DIRECT_DISPATCH' && !!dropLoc;
+        const pickupCoord = normalizeCoordinate(bizLoc);
+        const dropoffCoord = normalizeCoordinate(dropLoc);
+        const canUseDropoff = order.channel !== 'DIRECT_DISPATCH' && !!dropoffCoord;
 
         setFocusedOrderId(order.id);
 
@@ -265,24 +274,24 @@ export default function MapScreen() {
         const padBottom = BOTTOM_BAR_HEIGHT + 20;
 
         // OUT_FOR_DELIVERY: show driver + dropoff only
-        if (order.status === 'OUT_FOR_DELIVERY' && canUseDropoff && dropLoc && location) {
-            const lats = [Number(dropLoc.latitude), location.latitude];
-            const lngs = [Number(dropLoc.longitude), location.longitude];
+        if (order.status === 'OUT_FOR_DELIVERY' && canUseDropoff && dropoffCoord && location) {
+            const lats = [dropoffCoord.latitude, location.latitude];
+            const lngs = [dropoffCoord.longitude, location.longitude];
             const ne: [number, number] = [Math.max(...lngs) + 0.005, Math.max(...lats) + 0.005];
             const sw: [number, number] = [Math.min(...lngs) - 0.005, Math.min(...lats) - 0.005];
 
             cameraRef.current?.fitBounds(ne, sw, [padTop, 20, padBottom, 20], 1200);
-        } else if (bizLoc && canUseDropoff && dropLoc && location) {
+        } else if (pickupCoord && canUseDropoff && dropoffCoord && location) {
             // Not delivering yet: show driver + pickup + dropoff (3 points)
-            const lats = [location.latitude, Number(bizLoc.latitude), Number(dropLoc.latitude)];
-            const lngs = [location.longitude, Number(bizLoc.longitude), Number(dropLoc.longitude)];
+            const lats = [location.latitude, pickupCoord.latitude, dropoffCoord.latitude];
+            const lngs = [location.longitude, pickupCoord.longitude, dropoffCoord.longitude];
             const ne: [number, number] = [Math.max(...lngs) + 0.005, Math.max(...lats) + 0.005];
             const sw: [number, number] = [Math.min(...lngs) - 0.005, Math.min(...lats) - 0.005];
 
             cameraRef.current?.fitBounds(ne, sw, [padTop, 20, padBottom, 20], 1200);
-        } else if (bizLoc) {
+        } else if (pickupCoord) {
             cameraRef.current?.setCamera({
-                centerCoordinate: [Number(bizLoc.longitude), Number(bizLoc.latitude)],
+                centerCoordinate: [pickupCoord.longitude, pickupCoord.latitude],
                 zoomLevel: 15.5,
                 animationMode: 'flyTo',
                 animationDuration: 1200,
@@ -615,18 +624,21 @@ export default function MapScreen() {
                     const isFocused = order.id === focusedOrderId;
                     const bizLoc = order.businesses?.[0]?.business?.location;
                     const dropLoc = order.dropOffLocation;
+                    const pickupCoord = normalizeCoordinate(bizLoc);
+                    const dropoffCoord = normalizeCoordinate(dropLoc);
                     const biz = order.businesses?.[0]?.business;
                     const bizName = biz?.name ?? '?';
                     const bizImageUrl = (biz as any)?.imageUrl;
                     const isRestaurant = (biz as any)?.businessType === 'RESTAURANT';
+                    const isDirectDispatch = order.channel === 'DIRECT_DISPATCH';
 
                     return (
                         <React.Fragment key={order.id}>
                             {/* Only show pins for the focused order */}
-                            {isAssigned && isFocused && bizLoc && (
+                            {isAssigned && isFocused && pickupCoord && (
                                 <Mapbox.PointAnnotation
                                     id={`pickup-${order.id}`}
-                                    coordinate={[Number(bizLoc.longitude), Number(bizLoc.latitude)]}
+                                    coordinate={[pickupCoord.longitude, pickupCoord.latitude]}
                                     anchor={{ x: 0.5, y: 0.5 }}
                                     onSelected={() => focusOrder(order)}
                                 >
@@ -654,10 +666,10 @@ export default function MapScreen() {
                                 </Mapbox.PointAnnotation>
                             )}
 
-                            {isAssigned && isFocused && !isDirectDispatch && dropLoc && (
+                            {isAssigned && isFocused && !isDirectDispatch && dropoffCoord && (
                                 <Mapbox.PointAnnotation
                                     id={`dropoff-${order.id}`}
-                                    coordinate={[Number(dropLoc.longitude), Number(dropLoc.latitude)]}
+                                    coordinate={[dropoffCoord.longitude, dropoffCoord.latitude]}
                                     anchor={{ x: 0.5, y: 1 }}
                                     onSelected={() => focusOrder(order)}
                                 >

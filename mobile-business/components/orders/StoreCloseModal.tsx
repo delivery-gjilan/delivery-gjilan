@@ -56,9 +56,14 @@ export function StoreCloseModal({
                     </View>
 
                     <View className="p-5">
-                        <Text className="text-subtext text-sm mb-2">
-                            {t('orders.close_reason', 'Reason')}
-                        </Text>
+                        <View style={{ flexDirection: 'row', marginBottom: 8 }}>
+                            <Text className="text-subtext text-sm">
+                                {t('orders.close_reason', 'Reason')}
+                            </Text>
+                            <Text className="text-gray-600 text-sm ml-1">
+                                {t('common.optional', '(optional)')}
+                            </Text>
+                        </View>
                         <TextInput
                             value={reason}
                             onChangeText={onChangeReason}

@@ -7,6 +7,7 @@ import { useTranslations } from '@/hooks/useTranslations';
 import { useAuth } from '@/hooks/useAuth';
 import { useEffect, useRef } from 'react';
 import { useNavigationStore } from '@/store/navigationStore';
+import { isValidCoordinatePair } from '@/utils/locationValidation';
 
 export default function TabLayout() {
     const theme = useTheme();
@@ -16,6 +17,8 @@ export default function TabLayout() {
     const { logout } = useAuth();
     const isNavigating = useNavigationStore((s) => s.isNavigating);
     const isNavigationMinimized = useNavigationStore((s) => s.isNavigationMinimized);
+    const destination = useNavigationStore((s) => s.destination);
+    const stopNavigation = useNavigationStore((s) => s.stopNavigation);
 
     // Session restore: if the driver had an active navigation session before the
     // app was killed, send them back to the navigation screen on mount.
@@ -26,6 +29,14 @@ export default function TabLayout() {
     useEffect(() => {
         if (hasRestoredNavigationRef.current) return;
         hasRestoredNavigationRef.current = true;
+        if (
+            isNavigating &&
+            destination &&
+            !isValidCoordinatePair(destination.latitude, destination.longitude)
+        ) {
+            stopNavigation();
+            return;
+        }
         if (isNavigating && !isNavigationMinimized) {
             router.replace('/navigation' as any);
         }

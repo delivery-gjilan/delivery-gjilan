@@ -31,6 +31,7 @@ export const GET_BUSINESS_ORDERS = graphql(`
                     id
                     firstName
                     lastName
+                    phoneNumber
                 }
                 dropOffLocation {
                     address

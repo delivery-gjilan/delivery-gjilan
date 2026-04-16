@@ -179,9 +179,16 @@ export function DirectDispatchSheet({ visible, onClose, onCreated, activeOrders,
                             {/* Driver row */}
                             <View style={styles.activeOrderRow}>
                                 <Ionicons name="bicycle-outline" size={14} color={driverName ? '#34d399' : '#64748b'} style={styles.activeOrderIcon} />
-                                <Text style={[styles.activeOrderSubtext, { color: driverName ? '#e2e8f0' : '#64748b' }]}>
-                                    {driverName ?? (s.awaiting_driver ?? 'Awaiting driver...')}
-                                </Text>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={[styles.activeOrderSubtext, { color: driverName ? '#e2e8f0' : '#64748b', fontWeight: driverName ? '700' : '400' }]}>
+                                        {driverName ?? (s.awaiting_driver ?? 'Awaiting driver...')}
+                                    </Text>
+                                    {order.driver?.phoneNumber ? (
+                                        <Text style={[styles.activeOrderSubtext, { color: '#94a3b8', fontSize: 12 }]}>
+                                            {order.driver.phoneNumber}
+                                        </Text>
+                                    ) : null}
+                                </View>
                             </View>
 
                             {/* Address row */}

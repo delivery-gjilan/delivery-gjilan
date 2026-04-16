@@ -37,6 +37,7 @@ export interface Order {
     driver?: {
         firstName: string;
         lastName: string;
+        phoneNumber?: string | null;
     } | null;
     dropOffLocation?: {
         address: string;

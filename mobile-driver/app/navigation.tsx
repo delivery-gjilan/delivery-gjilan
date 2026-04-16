@@ -19,6 +19,7 @@ import type { AlertType } from '@/components/DriverMessageBanner';
 import { DRIVER_MESSAGE_RECEIVED_SUB } from '@/graphql/operations/driverMessages';
 import { useTranslations } from '@/hooks/useTranslations';
 import type { DriverOrder } from '@/utils/types';
+import { normalizeCoordinate } from '@/utils/locationValidation';
 import * as Haptics from 'expo-haptics';
 
 /* â”€â”€â”€ Screen constants â”€â”€â”€ */
@@ -204,24 +205,24 @@ export default function NavigationScreen() {
     /* â”€â”€ Build coordinates for MapboxNavigationView â”€â”€ */
     // Use the stored origin only â€” the Navigation SDK tracks GPS internally.
     // Feeding live GPS updates into coordinates causes the SDK to restart routing.
-    const currentOrigin = originLocation;
+    const currentOrigin = normalizeCoordinate(originLocation);
+    const normalizedDestination = normalizeCoordinate(destination);
     const coordinates = useMemo(() => {
-        if (!currentOrigin || !destination) return null;
+        if (!currentOrigin || !normalizedDestination) return null;
         return [
             { latitude: currentOrigin.latitude, longitude: currentOrigin.longitude },
-            { latitude: destination.latitude, longitude: destination.longitude },
+            { latitude: normalizedDestination.latitude, longitude: normalizedDestination.longitude },
         ];
-    }, [currentOrigin?.latitude, currentOrigin?.longitude, destination?.latitude, destination?.longitude]);
+    }, [currentOrigin?.latitude, currentOrigin?.longitude, normalizedDestination?.latitude, normalizedDestination?.longitude]);
 
-    /* ── Safety guard: clear persisted invalid destination (e.g. 0,0 from a DD order
-       without a dropoff location that crashed and was saved to AsyncStorage) ── */
-    const isDestinationInvalid = !!destination && destination.latitude === 0 && destination.longitude === 0;
+    /* ── Safety guard: clear invalid persisted or runtime navigation state before the native SDK mounts ── */
+    const hasInvalidNavigationState = (!!originLocation && !currentOrigin) || (!!destination && !normalizedDestination);
     useEffect(() => {
-        if (!isDestinationInvalid) return;
+        if (!hasInvalidNavigationState) return;
         stopNavigation();
         router.replace('/(tabs)/drive' as any);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isDestinationInvalid]);
+    }, [hasInvalidNavigationState]);
 
     /* â”€â”€ Store for feeding Navigation SDK location to heartbeat â”€â”€ */
     const setNavigationLocation = useNavigationLocationStore((state) => state.setLocation);

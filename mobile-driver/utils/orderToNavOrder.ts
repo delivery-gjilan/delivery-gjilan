@@ -1,5 +1,6 @@
 import type { NavigationOrder, NavigationPhase } from '@/store/navigationStore';
 import type { DriverOrder } from './types';
+import { normalizeCoordinate } from './locationValidation';
 
 /**
  * Maps a raw GraphQL order object to a NavigationOrder suitable for navigationStore.
@@ -7,29 +8,25 @@ import type { DriverOrder } from './types';
  */
 export function buildNavOrder(order: DriverOrder): NavigationOrder | null {
     const bizLoc = order.businesses?.[0]?.business?.location;
-    if (!bizLoc) return null;
+    const pickupCoord = normalizeCoordinate(bizLoc);
+    if (!pickupCoord) return null;
 
     const dropLoc = order.dropOffLocation;
 
     const pickup = {
-        latitude: Number(bizLoc.latitude),
-        longitude: Number(bizLoc.longitude),
+        latitude: pickupCoord.latitude,
+        longitude: pickupCoord.longitude,
         label: order.businesses?.[0]?.business?.name ?? 'Pickup',
     };
 
-    const dropoff = dropLoc
-                // Treat 0,0 as no dropoff — DD orders without a provided location default to lat=0, lng=0
-                ? (() => {
-                            const lat = Number(dropLoc.latitude);
-                            const lng = Number(dropLoc.longitude);
-                            if (lat === 0 && lng === 0) return null;
-                            return {
-                                    latitude: lat,
-                                    longitude: lng,
-                                    label: dropLoc.address || 'Drop-off',
-                            };
-                    })()
-                : null;
+    const dropoffCoord = normalizeCoordinate(dropLoc);
+    const dropoff = dropoffCoord
+        ? {
+              latitude: dropoffCoord.latitude,
+              longitude: dropoffCoord.longitude,
+              label: dropLoc?.address || 'Drop-off',
+          }
+        : null;
 
     const isDirectDispatch = order.channel === 'DIRECT_DISPATCH';
     const customerName = isDirectDispatch

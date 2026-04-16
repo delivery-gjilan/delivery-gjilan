@@ -2,7 +2,7 @@ import type { QueryResolvers } from './../../../../generated/types.generated';
 import { GraphQLError } from 'graphql';
 import logger from '@/lib/logger';
 import { businessMessages as businessMessagesTable } from '@/database/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 
 export const businessMessages: NonNullable<QueryResolvers['businessMessages']> = async (
     _parent: unknown,
@@ -20,10 +20,7 @@ export const businessMessages: NonNullable<QueryResolvers['businessMessages']> =
             .select()
             .from(businessMessagesTable)
             .where(
-                and(
-                    eq(businessMessagesTable.adminId, userData.userId),
-                    eq(businessMessagesTable.businessUserId, businessUserId),
-                ),
+                eq(businessMessagesTable.businessUserId, businessUserId),
             )
             .orderBy(desc(businessMessagesTable.createdAt))
             .limit(limit)
