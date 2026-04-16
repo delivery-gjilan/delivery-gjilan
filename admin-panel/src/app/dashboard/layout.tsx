@@ -12,6 +12,7 @@ import { canAccessAdminPanelPath } from "@/lib/route-access";
 import { AdminPttProvider } from "@/lib/hooks/useAdminPtt";
 import GlobalPttOverlay from "@/components/dashboard/GlobalPttOverlay";
 import GlobalAdminMessageNotifications from "@/components/dashboard/GlobalAdminMessageNotifications";
+import GlobalOrderAlerts from "@/components/dashboard/GlobalOrderAlerts";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -74,6 +75,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </main>
         </div>
         <GlobalAdminMessageNotifications />
+        <GlobalOrderAlerts />
         <GlobalPttOverlay />
       </div>
     </AdminPttProvider>

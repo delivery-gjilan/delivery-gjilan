@@ -758,6 +758,7 @@ export default function NavigationScreen() {
                 const fo = assignedOrders.find((o) => o.id === order?.id);
                 return (
                 <DeliverySlider
+                    order={fo ?? null}
                     customerName={order?.customerName ?? ''}
                     customerPhone={order?.customerPhone ?? null}
                     arrivedNotifSent={arrivedNotifSent}

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Sidebar from "@/components/dashboard/sidebar";
 import Topbar from "@/components/dashboard/topbar";
 import GlobalAdminMessageNotifications from "@/components/dashboard/GlobalAdminMessageNotifications";
+import GlobalOrderAlerts from "@/components/dashboard/GlobalOrderAlerts";
 import { useAuth } from "@/lib/auth-context";
 import { ReactNode } from "react";
 
@@ -52,6 +53,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         </main>
       </div>
       <GlobalAdminMessageNotifications />
+      <GlobalOrderAlerts />
     </div>
   );
 }

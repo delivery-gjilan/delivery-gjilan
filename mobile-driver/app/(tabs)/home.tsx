@@ -22,11 +22,8 @@ import { useOrderAcceptStore } from "@/store/orderAcceptStore";
 import { useRouter } from "expo-router";
 import { OrderDetailSheet } from "@/components/OrderDetailSheet";
 import type { DriverOrder } from "@/utils/types";
-import { LinearGradient } from "expo-linear-gradient";
 
 const UI = {
-    bgTop: "#1a1a2e",
-    bgBottom: "#0f3460",
     card: "#111827",
     cardBorder: "rgba(148,163,184,0.28)",
     text: "#E2E8F0",
@@ -464,21 +461,18 @@ export default function Home() {
     // ── Empty / loading states ──
     if (isOrdersBootstrapping) {
         return (
-            <LinearGradient colors={[UI.bgTop, UI.bgBottom]} style={{ flex: 1 }}>
-            <SafeAreaView style={{ flex: 1, backgroundColor: "transparent" }}>
+            <SafeAreaView style={{ flex: 1, backgroundColor: "#000" }}>
                 {ListHeader}
                 <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
                     <ActivityIndicator size="large" color={theme.colors.primary} />
                     <Text style={{ marginTop: 12, fontSize: 14, color: UI.subtext }}>{t.common.loading}</Text>
                 </View>
             </SafeAreaView>
-            </LinearGradient>
         );
     }
 
     return (
-        <LinearGradient colors={[UI.bgTop, UI.bgBottom]} style={{ flex: 1 }}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: "transparent" }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: "#000" }}>
             <FlatList
                 data={displayedOrders}
                 keyExtractor={(item) => item.id}
@@ -493,7 +487,6 @@ export default function Home() {
                     />
                 )}
                 ListHeaderComponent={ListHeader}
-                contentContainerStyle={{ paddingBottom: 32 }}
                 showsVerticalScrollIndicator={false}
                 ListEmptyComponent={
                     <View style={{ alignItems: "center", justifyContent: "center", paddingTop: 60, paddingHorizontal: 32 }}>
@@ -552,7 +545,6 @@ export default function Home() {
                 </>
             )}
         </SafeAreaView>
-        </LinearGradient>
     );
 }
 

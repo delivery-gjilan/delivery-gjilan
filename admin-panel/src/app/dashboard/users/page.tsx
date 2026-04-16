@@ -74,7 +74,7 @@ interface OrderBusinessItem {
         name: string;
         imageUrl?: string | null;
         quantity: number;
-        price: number;
+        unitPrice: number;
     }>;
 }
 
@@ -142,7 +142,7 @@ const FLAG_COLORS: {
     { value: "green",  label: "Trusted",  description: "Verified, skip approval",    dot: "bg-emerald-500", bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-400", ring: "ring-emerald-500" },
     { value: "yellow", label: "Watch",    description: "Minor concern",              dot: "bg-amber-400",   bg: "bg-amber-500/10",   border: "border-amber-500/30",   text: "text-amber-400",   ring: "ring-amber-400"   },
     { value: "orange", label: "Warning",  description: "Repeated issues",            dot: "bg-orange-500",  bg: "bg-orange-500/10",  border: "border-orange-500/30",  text: "text-orange-400",  ring: "ring-orange-500"  },
-    { value: "red",    label: "Critical", description: "Serious ï¿½ consider banning", dot: "bg-red-500",     bg: "bg-red-500/10",     border: "border-red-500/30",     text: "text-red-400",     ring: "ring-red-500"     },
+    { value: "red",    label: "Critical", description: "Serious - consider banning", dot: "bg-red-500",     bg: "bg-red-500/10",     border: "border-red-500/30",     text: "text-red-400",     ring: "ring-red-500"     },
 ];
 
 const FLAG_MAP = Object.fromEntries(FLAG_COLORS.map((f) => [f.value, f])) as Record<FlagColor, (typeof FLAG_COLORS)[number]>;
@@ -157,13 +157,13 @@ function initials(first: string, last: string) {
 }
 
 function formatDate(v?: string | null) {
-    if (!v) return "ï¿½";
+    if (!v) return "-";
     const d = new Date(v);
-    return Number.isNaN(d.getTime()) ? "ï¿½" : d.toLocaleString();
+    return Number.isNaN(d.getTime()) ? "-" : d.toLocaleString();
 }
 
 function formatCurrency(v?: number | null) {
-    if (v == null) return "ï¿½";
+    if (v == null) return "-";
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR", minimumFractionDigits: 2 }).format(v);
 }
 
@@ -182,11 +182,21 @@ function formatDuration(ms: number) {
 
 function orderDuration(o: OrderItem) {
     const s = new Date(o.orderDate).getTime();
-    if (Number.isNaN(s)) return "ï¿½";
+    if (Number.isNaN(s)) return "-";
     const e = o.status === "DELIVERED" ? new Date(o.updatedAt).getTime() : Date.now();
-    if (Number.isNaN(e)) return "ï¿½";
+    if (Number.isNaN(e)) return "-";
     return formatDuration(Math.max(0, e - s));
 }
+
+const ORDER_HISTORY_STATUSES = [
+    "AWAITING_APPROVAL",
+    "PENDING",
+    "PREPARING",
+    "READY",
+    "OUT_FOR_DELIVERY",
+    "DELIVERED",
+    "CANCELLED",
+] as const;
 
 function statusColor(s: string) {
     switch (s) {
@@ -243,6 +253,15 @@ export default function UsersPage() {
     const initialDisplayId = (searchParams.get("displayId") || "").trim();
     const initKey = `${initialUserId}|${initialTab}|${initialOrderId}|${initialDisplayId}`;
     const consumedInitKeyRef = useRef<string | null>(null);
+    const consumedOrderFocusKeyRef = useRef<string | null>(null);
+
+    const clearOrderFocusParams = useCallback(() => {
+        const nextParams = new URLSearchParams(searchParams.toString());
+        nextParams.delete("orderId");
+        nextParams.delete("displayId");
+        const query = nextParams.toString();
+        router.replace(query ? `/dashboard/users?${query}` : "/dashboard/users", { scroll: false });
+    }, [router, searchParams]);
 
     const { admin } = useAuth();
     const isSuperAdmin = admin?.role === "SUPER_ADMIN";
@@ -304,6 +323,7 @@ export default function UsersPage() {
 
     /* --- lazy queries for panel --- */
     const { data: ordersData, loading: ordersLoading, error: ordersError } = useQuery<OrdersResponse>(GET_ORDERS, {
+        variables: { limit: 500, statuses: [...ORDER_HISTORY_STATUSES] },
         skip: !selectedUser || panelTab !== "orders",
     });
 
@@ -392,6 +412,7 @@ export default function UsersPage() {
     useEffect(() => {
         if (!initialOrderId && !initialDisplayId) return;
         if (!selectedUser || panelTab !== "orders") return;
+        if (consumedOrderFocusKeyRef.current === initKey) return;
         if (selectedOrder) return;
 
         const lowerId = initialOrderId.toLowerCase();
@@ -403,7 +424,9 @@ export default function UsersPage() {
         });
         if (!target) return;
         setSelectedOrder(target);
-    }, [filteredUserOrders, initialDisplayId, initialOrderId, panelTab, selectedOrder, selectedUser]);
+        consumedOrderFocusKeyRef.current = initKey;
+        clearOrderFocusParams();
+    }, [clearOrderFocusParams, filteredUserOrders, initKey, initialDisplayId, initialOrderId, panelTab, selectedOrder, selectedUser]);
 
     /* --- statistics calculations --- */
     const getDateRangeStart = useCallback(() => {
@@ -649,7 +672,7 @@ export default function UsersPage() {
                         <input
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder="Search name, email, phoneï¿½"
+                            placeholder="Search name, email, phone..."
                             className="w-64 bg-zinc-900 border border-zinc-800 rounded-lg pl-9 pr-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-violet-500/50 focus:border-violet-500/50"
                         />
                         {searchTerm && (
@@ -960,7 +983,7 @@ export default function UsersPage() {
                                                     <textarea
                                                         value={noteInput}
                                                         onChange={(e) => setNoteInput(e.target.value)}
-                                                        placeholder="Add a note about this customerï¿½"
+                                                        placeholder="Add a note about this customer..."
                                                         className="w-full bg-zinc-800/60 border border-zinc-700 rounded-lg p-3 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-violet-500/50 min-h-[100px] resize-y"
                                                         rows={4}
                                                     />
@@ -1036,7 +1059,7 @@ export default function UsersPage() {
                                             </h3>
                                             {behaviorError && <p className="text-sm text-red-300">{behaviorError.message}</p>}
                                             {behaviorLoading ? (
-                                                <p className="text-sm text-zinc-500">Loadingï¿½</p>
+                                                <p className="text-sm text-zinc-500">Loading...</p>
                                             ) : behaviorData?.userBehavior ? (
                                                 <div className="grid grid-cols-3 gap-2">
                                                     {[
@@ -1086,7 +1109,7 @@ export default function UsersPage() {
                                         </div>
                                         {ordersError && <p className="p-4 text-sm text-red-300">{ordersError.message}</p>}
                                         {ordersLoading ? (
-                                            <p className="p-4 text-sm text-zinc-500">Loading ordersï¿½</p>
+                                            <p className="p-4 text-sm text-zinc-500">Loading orders...</p>
                                         ) : filteredUserOrders.length ? (
                                             <div className="divide-y divide-zinc-800/40 max-h-[400px] overflow-y-auto">
                                                 {filteredUserOrders.map((order) => (
@@ -1299,7 +1322,7 @@ export default function UsersPage() {
                         <div className="flex gap-3 justify-end pt-2">
                             <Button type="button" onClick={closeCreateModal} variant="outline">Cancel</Button>
                             <Button type="submit" disabled={creating || updating}>
-                                {(creating || updating) ? "Savingï¿½" : editingUser ? "Update" : "Create"}
+                                {(creating || updating) ? "Saving..." : editingUser ? "Update" : "Create"}
                             </Button>
                         </div>
                     </form>
@@ -1322,7 +1345,7 @@ export default function UsersPage() {
                         <div className="flex gap-3 justify-end">
                             <Button type="button" onClick={() => { setShowDeleteModal(false); setUserToDelete(null); }} variant="outline">Cancel</Button>
                             <Button type="button" onClick={confirmDelete} disabled={deleting} variant="danger">
-                                {deleting ? "Deletingï¿½" : "Delete"}
+                                {deleting ? "Deleting..." : "Delete"}
                             </Button>
                         </div>
                     </div>
@@ -1414,8 +1437,8 @@ export default function UsersPage() {
                                 <div className="divide-y divide-zinc-800/40">
                                     {b.items.map((item, j) => (
                                         <div key={j} className="flex items-center justify-between px-4 py-2.5 text-sm">
-                                            <div className="text-zinc-300">{item.name} <span className="text-zinc-500">Ã—{item.quantity}</span></div>
-                                            <div className="text-zinc-200">{formatCurrency(item.price * item.quantity)}</div>
+                                            <div className="text-zinc-300">{item.name} <span className="text-zinc-500">x{item.quantity}</span></div>
+                                            <div className="text-zinc-200">{formatCurrency(item.unitPrice * item.quantity)}</div>
                                         </div>
                                     ))}
                                 </div>

@@ -10,7 +10,6 @@ import {
     CANCEL_ORDER,
 } from '@/graphql/operations/orders';
 import { ALL_ORDERS_SUBSCRIPTION } from '@/graphql/operations/orders/subscriptions';
-import { playNewOrderAlert } from '@/lib/audio/orderAlert';
 import { toast } from 'sonner';
 import type {
     AllOrdersUpdatedSubscription,
@@ -186,7 +185,6 @@ export function useOrders(options: UseOrdersOptions = {}): UseOrdersResult {
             }
 
             if (shouldAlert) {
-                void playNewOrderAlert();
                 const inventoryOrders = newActiveOrders.filter((o) =>
                     (o as Record<string, unknown>).inventoryPrice != null && Number((o as Record<string, unknown>).inventoryPrice) > 0
                 );

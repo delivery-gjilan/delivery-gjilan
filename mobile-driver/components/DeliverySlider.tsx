@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, Animated, PanResponder, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -11,6 +11,7 @@ const PING_UNLOCK_S = 180;   // 3 min after I'm Here
 const CANCEL_UNLOCK_S = 600; // 10 min after arrival
 
 interface Props {
+    order: DriverOrder | null;
     customerName: string;
     customerPhone: string | null;
     arrivedNotifSent: boolean;
@@ -27,6 +28,7 @@ interface Props {
 }
 
 export function DeliverySlider({
+    order,
     customerName,
     customerPhone,
     arrivedNotifSent,
@@ -73,6 +75,17 @@ export function DeliverySlider({
     const pingRemaining   = arrivedNotifSent ? Math.max(0, PING_UNLOCK_S - elapsedSinceNotif) : PING_UNLOCK_S;
     const cancelRemaining = Math.max(0, CANCEL_UNLOCK_S - elapsedSinceArrival);
     const fmtTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    const breakdownItems = useMemo(
+        () => (order?.businesses ?? []).flatMap((b) => b.items.map((item) => ({
+            id: `${b.business.id}-${item.name}-${item.quantity}`,
+            name: item.name,
+            quantity: item.quantity,
+        }))),
+        [order],
+    );
+    const subtotal = Number(order?.orderPrice ?? 0);
+    const deliveryFee = Number(order?.deliveryPrice ?? 0);
+    const orderTotal = Number(order?.totalPrice ?? customerPaymentAmount ?? 0);
 
     const successOpacity = useRef(new Animated.Value(0)).current;
     const successScale   = useRef(new Animated.Value(0.4)).current;
@@ -185,6 +198,31 @@ export function DeliverySlider({
                                 {customerPaymentAmount != null ? `€${customerPaymentAmount.toFixed(2)}` : 'Confirm amount'}
                             </Text>
                         </View>
+
+                        {!!order && (
+                            <View style={styles.itemsSection}>
+                                <ScrollView style={{ maxHeight: 120 }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+                                    {breakdownItems.map((item) => (
+                                        <View key={item.id} style={styles.itemRow}>
+                                            <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+                                            <Text style={styles.itemQty}>x{item.quantity}</Text>
+                                        </View>
+                                    ))}
+                                </ScrollView>
+                                <View style={styles.pricingRow}>
+                                    <Text style={styles.pricingLabel}>{s.subtotal}</Text>
+                                    <Text style={styles.pricingValue}>€{subtotal.toFixed(2)}</Text>
+                                </View>
+                                <View style={styles.pricingRow}>
+                                    <Text style={styles.pricingLabel}>{s.delivery_fee}</Text>
+                                    <Text style={styles.pricingValue}>€{deliveryFee.toFixed(2)}</Text>
+                                </View>
+                                <View style={[styles.pricingRow, styles.pricingTotal]}>
+                                    <Text style={styles.pricingTotalLabel}>{s.total}</Text>
+                                    <Text style={styles.pricingTotalValue}>€{orderTotal.toFixed(2)}</Text>
+                                </View>
+                            </View>
+                        )}
 
                         {/* Action buttons */}
                         <View style={styles.actionButtons}>
@@ -434,7 +472,8 @@ const styles = StyleSheet.create({
         color: 'rgba(248,113,113,0.6)',
         fontSize: 10,
         fontWeight: '600',
-    },    itemsSection: {
+    },
+    itemsSection: {
         marginBottom: 12,
         backgroundColor: 'rgba(255,255,255,0.03)',
         borderRadius: 12,

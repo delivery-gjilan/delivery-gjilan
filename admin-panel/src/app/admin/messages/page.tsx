@@ -88,13 +88,32 @@ function alertStyle(tab: Tab, type: MessageAlertType) {
     return styles[MessageAlertType.Info] as AlertStyle;
 }
 
+function parseMessageDate(value: unknown): Date | null {
+    if (!value) return null;
+    const raw = String(value).trim();
+    if (!raw) return null;
+
+    // Backends may send either "YYYY-MM-DD HH:mm:ss" or ISO strings.
+    const normalized = raw.includes('T') ? raw : raw.replace(' ', 'T');
+    const d = new Date(normalized);
+    if (Number.isNaN(d.getTime())) return null;
+    return d;
+}
+
+function toTimestamp(value: unknown): number {
+    const d = parseMessageDate(value);
+    return d ? d.getTime() : 0;
+}
+
 function formatTime(iso: string) {
-    const d = new Date(iso.replace(' ', 'T'));
+    const d = parseMessageDate(iso);
+    if (!d) return 'Unknown time';
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 function formatDate(iso: string) {
-    const d = new Date(iso.replace(' ', 'T'));
+    const d = parseMessageDate(iso);
+    if (!d) return 'Unknown date';
     const today = new Date();
     if (d.toDateString() === today.toDateString()) return 'Today';
     const yesterday = new Date(today);
@@ -136,18 +155,15 @@ function DriverPanel() {
     const { data: qMessagesData, loading: messagesLoading } = useQuery(GET_DRIVER_MESSAGES, {
         variables: { driverId: selectedId || '', limit: 100 },
         skip: !selectedId,
+        fetchPolicy: 'cache-and-network',
+        notifyOnNetworkStatusChange: true,
     });
 
     useEffect(() => {
         const incoming = qMessagesData?.driverMessages ?? [];
-        if (incoming.length > 0) {
-            setMessages((prev) => {
-                const ids = new Set(prev.map((m) => m.id));
-                return [...prev, ...incoming.filter((m) => !ids.has(m.id))].sort(
-                    (a, b) => new Date(a.createdAt.replace(' ', 'T')).getTime() - new Date(b.createdAt.replace(' ', 'T')).getTime()
-                );
-            });
-        }
+        setMessages(
+            [...incoming].sort((a, b) => toTimestamp(a.createdAt) - toTimestamp(b.createdAt)),
+        );
     }, [qMessagesData]);
 
     const [sendMessage, { loading: sending }] = useMutation(SEND_DRIVER_MESSAGE, {
@@ -168,7 +184,10 @@ function DriverPanel() {
         onData: ({ data: sub }) => {
             const msg = sub.data?.adminMessageReceived as DriverMessage | undefined;
             if (!msg) return;
-            setMessages((prev) => prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]);
+            setMessages((prev) => {
+                if (prev.some((m) => m.id === msg.id)) return prev;
+                return [...prev, msg].sort((a, b) => toTimestamp(a.createdAt) - toTimestamp(b.createdAt));
+            });
             refetchThreads();
             if (msg.senderRole === 'DRIVER') toast.info(`${selectedName}: ${msg.body}`);
         },
@@ -299,6 +318,9 @@ function DriverPanel() {
 
                         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
                             {messagesLoading && <div className="text-center text-zinc-500 text-sm">Loading messages…</div>}
+                            {!messagesLoading && messages.length === 0 && (
+                                <div className="text-center text-zinc-500 text-sm py-8">No messages yet</div>
+                            )}
                             {groupByDate(messages).map((group) => (
                                 <div key={group.date}>
                                     <div className="flex items-center gap-2 my-3">
@@ -380,18 +402,15 @@ function BusinessPanel() {
     const { data: qMessagesData, loading: messagesLoading } = useQuery(GET_BUSINESS_MESSAGES, {
         variables: { businessUserId: selectedId || '', limit: 100 },
         skip: !selectedId,
+        fetchPolicy: 'cache-and-network',
+        notifyOnNetworkStatusChange: true,
     });
 
     useEffect(() => {
         const incoming = qMessagesData?.businessMessages ?? [];
-        if (incoming.length > 0) {
-            setMessages((prev) => {
-                const ids = new Set(prev.map((m) => m.id));
-                return [...prev, ...incoming.filter((m) => !ids.has(m.id))].sort(
-                    (a, b) => new Date(a.createdAt.replace(' ', 'T')).getTime() - new Date(b.createdAt.replace(' ', 'T')).getTime()
-                );
-            });
-        }
+        setMessages(
+            [...incoming].sort((a, b) => toTimestamp(a.createdAt) - toTimestamp(b.createdAt)),
+        );
     }, [qMessagesData]);
 
     const [sendMessage, { loading: sending }] = useMutation(SEND_BUSINESS_MESSAGE, {
@@ -412,7 +431,10 @@ function BusinessPanel() {
         onData: ({ data: sub }) => {
             const msg = sub.data?.adminBusinessMessageReceived as BusinessMessage | undefined;
             if (!msg) return;
-            setMessages((prev) => prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]);
+            setMessages((prev) => {
+                if (prev.some((m) => m.id === msg.id)) return prev;
+                return [...prev, msg].sort((a, b) => toTimestamp(a.createdAt) - toTimestamp(b.createdAt));
+            });
             refetchThreads();
             if (msg.senderRole === 'BUSINESS') toast.info(`${selectedName}: ${msg.body}`);
         },
@@ -554,6 +576,9 @@ function BusinessPanel() {
 
                         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
                             {messagesLoading && <div className="text-center text-zinc-500 text-sm">Loading messages…</div>}
+                            {!messagesLoading && messages.length === 0 && (
+                                <div className="text-center text-zinc-500 text-sm py-8">No messages yet</div>
+                            )}
                             {groupByDate(messages).map((group) => (
                                 <div key={group.date}>
                                     <div className="flex items-center gap-2 my-3">

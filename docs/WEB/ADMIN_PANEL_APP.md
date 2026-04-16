@@ -100,6 +100,7 @@ admin-panel/
 │   │   │   ├── sidebar.tsx          # Role-filtered navigation sidebar
 │   │   │   ├── topbar.tsx           # Store controls + user actions
 │   │   │   ├── GlobalPttOverlay.tsx # Floating PTT status indicator
+│   │   │   ├── GlobalOrderAlerts.tsx # Layout-level new-order beep listener
 │   │   │   └── PermissionSelector.tsx # Permission checkbox grid
 │   │   ├── businesses/
 │   │   │   ├── CategoriesBlock.tsx  # Category CRUD + drag reorder
@@ -123,7 +124,7 @@ admin-panel/
 │   │   ├── avatarUtils.ts           # Avatar initials + color hash
 │   │   ├── hooks/
 │   │   │   ├── useAdminPtt.tsx      # Agora PTT context + hooks
-│   │   │   ├── useOrders.ts         # Order query/subscription + alerts
+│   │   │   ├── useOrders.ts         # Order query/subscription + cache sync
 │   │   │   ├── useMapRealtimeData.ts # Driver/order/business realtime for map
 │   │   │   ├── useOrderRouteDistances.ts # Per-order Mapbox route calc
 │   │   │   ├── usePrepTimeAlerts.ts # Prep-time overrun alert hook
@@ -449,7 +450,7 @@ Business picker + `<CategoriesBlock>` + `<SubcategoriesBlock>`. **Note:** `GET_B
 
 **GraphQL:** 6 queries, 4 mutations, 4 subscriptions (driver/business thread channels + global driver/business broadcast channels).
 
-**Key features:** Two-panel chat UI. Thread list (288px) + message view. New thread picker via search modal. `alertType` (INFO/WARNING/URGENT) styled badge. Read receipts for admin-sent messages. Date separators. Real-time via subscriptions. Global incoming driver/business notifications use `adminAnyMessageReceived` and `adminAnyBusinessMessageReceived`, are mounted at shared admin/dashboard layout level (so they work across admin routes), and trigger immediate thread-list refetch; notification UI is a centered modal queue (not toast) with source label (`Driver message` / `Business message`), sender identity (including business context when available), explicit dismiss/open actions, and safe timestamp fallback (`Unknown time`) when payload date parsing fails. Thread rows also include explicit source chips (`Driver` / `Business`) next to participant names. Per-thread subscriptions (`adminMessageReceived`, `adminBusinessMessageReceived`) continue to drive active chat panes. Thread list polls every 30s as fallback. De-duplicate message append.
+**Key features:** Two-panel chat UI. Thread list (288px) + message view. New thread picker via search modal. `alertType` (INFO/WARNING/URGENT) styled badge. Read receipts for admin-sent messages. Date separators. Real-time via subscriptions. Global incoming driver/business notifications use `adminAnyMessageReceived` and `adminAnyBusinessMessageReceived`, are mounted at shared admin/dashboard layout level (so they work across admin routes), and trigger immediate thread-list refetch; notification UI is a centered modal queue (not toast) with source label (`Driver message` / `Business message`), sender identity (including business context when available), explicit dismiss/open actions, and safe timestamp fallback (`Unknown time`) when payload date parsing fails. Thread rows also include explicit source chips (`Driver` / `Business`) next to participant names. Per-thread subscriptions (`adminMessageReceived`, `adminBusinessMessageReceived`) continue to drive active chat panes. Thread list polls every 30s as fallback. Message panes replace state from thread query responses, show an explicit `No messages yet` empty state, and use safe `Unknown time` / `Unknown date` fallbacks when message timestamps cannot be parsed.
 
 ### `/admin/financial/settlements` — Full Settlement Management
 
@@ -515,7 +516,7 @@ Shows per-item fulfillment split (stock vs. market) for an order. Items categori
 | Hook | Purpose |
 |---|---|
 | `useAdminPtt` | Agora RTC context — admin PTT send + driver PTT receive via subscription; shared hook state is typed at the GraphQL boundary |
-| `useOrders` | Orders query + `ALL_ORDERS_SUBSCRIPTION`; new-order beep + toast; refetch cooldown; shared return shapes are typed from codegen |
+| `useOrders` | Orders query + `ALL_ORDERS_SUBSCRIPTION`; cache sync + stock-order toast + refetch cooldown; shared return shapes are typed from codegen |
 | `useMapRealtimeData` | Drivers + orders + businesses for map; subscription-primary, 30s polling fallback; `mergeDriversByTimestamp()`; shared realtime state is typed from codegen |
 | `useOrderRouteDistances` | Mapbox route calc per active order; recalc on >80m move or >60s elapsed |
 | `usePrepTimeAlerts` | Fires `PrepTimeAlert` when `preparationMinutes` increases on a PREPARING order; 10-min TTL auto-dismiss; subscription payload is typed |
@@ -523,6 +524,8 @@ Shows per-item fulfillment split (stock vs. market) for an order. Items categori
 | `useProducts` | Products + categories query for a business; flattened product list is normalized into a typed hook result |
 | `useProductCategories` | Category CRUD hooks |
 | `useProductSubcategories` | Subcategory CRUD hooks |
+
+`GlobalOrderAlerts` is mounted in both `dashboard` and `admin` layouts and owns the new-order beep playback via `ALL_ORDERS_SUBSCRIPTION`, so operators hear order alerts on every admin page.
 
 ---
 

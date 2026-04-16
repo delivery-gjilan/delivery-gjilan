@@ -10,7 +10,6 @@ import {
     GetOrdersDocument,
 } from '@/gql/graphql';
 import type { AllOrdersUpdatedSubscription, DriversQuery, GetOrdersQuery } from '@/gql/graphql';
-import { playNewOrderAlert } from '@/lib/audio/orderAlert';
 import { toast } from 'sonner';
 
 const SUBSCRIPTION_REFETCH_COOLDOWN_MS = 1500;
@@ -150,7 +149,6 @@ export function useMapRealtimeData() {
                 }
 
                 if (shouldAlert) {
-                    void playNewOrderAlert();
                     const inventoryOrders = newActiveOrders.filter((o) =>
                         (o as Record<string, unknown>).inventoryPrice != null && Number((o as Record<string, unknown>).inventoryPrice) > 0
                     );
