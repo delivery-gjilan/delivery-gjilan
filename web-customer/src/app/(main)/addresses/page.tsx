@@ -27,6 +27,7 @@ import {
 } from "@/graphql/operations/addresses";
 import dynamic from "next/dynamic";
 const AddressPickerMap = dynamic(() => import("@/components/checkout/AddressPickerMap"), { ssr: false });
+import type { GqlAddress } from "@/types/graphql";
 
 export default function AddressesPage() {
     const { user } = useAuth();
@@ -59,7 +60,7 @@ export default function AddressesPage() {
         address: string;
     } | null>(null);
 
-    const addresses = ((data as any)?.myAddresses ?? []) as any[];
+    const addresses = ((data as { myAddresses?: GqlAddress[] } | undefined)?.myAddresses ?? []);
 
     if (!user) {
         return (
@@ -91,7 +92,7 @@ export default function AddressesPage() {
         resetForm();
     };
 
-    const handleEdit = (addr: any) => {
+    const handleEdit = (addr: GqlAddress) => {
         setEditingId(addr.id);
         setAddressName(addr.addressName ?? "");
         setSelectedLocation({
@@ -180,7 +181,7 @@ export default function AddressesPage() {
                 </div>
             ) : (
                 <div className="space-y-2">
-                    {addresses.map((addr: any) => (
+                    {addresses.map((addr: GqlAddress) => (
                         <div
                             key={addr.id}
                             className={cn(

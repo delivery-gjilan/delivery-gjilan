@@ -9,6 +9,7 @@ import { useTranslations } from "@/localization";
 import { isPointInPolygon } from "@/lib/pointInPolygon";
 import { useQuery } from "@apollo/client/react";
 import { GET_SERVICE_ZONES } from "@/graphql/operations/serviceZone";
+import type { GqlDeliveryZone, MapboxFeature } from "@/types/graphql";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 const MAP_STYLE = "mapbox://styles/mapbox/streets-v12";
@@ -42,8 +43,8 @@ export default function AddressPickerMap({ onSelect, initialLocation }: AddressP
     // ── Zone data ─────────────────────────────────────────
     const { data: zonesData } = useQuery(GET_SERVICE_ZONES, { fetchPolicy: "cache-and-network" });
     const serviceZones = useMemo<Array<{ polygon: ZonePolygon }>>(() => {
-        const activeZones = ((zonesData as any)?.deliveryZones ?? []).filter((z: any) => z.isActive);
-        const svcZones = activeZones.filter((z: any) => z.isServiceZone === true);
+        const activeZones = ((zonesData as { deliveryZones?: GqlDeliveryZone[] } | undefined)?.deliveryZones ?? []).filter((z: GqlDeliveryZone) => z.isActive);
+        const svcZones = activeZones.filter((z: GqlDeliveryZone) => z.isServiceZone === true);
         return svcZones.length > 0 ? svcZones : activeZones;
     }, [zonesData]);
 
@@ -73,7 +74,7 @@ export default function AddressPickerMap({ onSelect, initialLocation }: AddressP
 
     // Search state
     const [searchQuery, setSearchQuery] = useState("");
-    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [searchResults, setSearchResults] = useState<MapboxFeature[]>([]);
     const [searching, setSearching] = useState(false);
     const [showResults, setShowResults] = useState(false);
 
@@ -141,7 +142,7 @@ export default function AddressPickerMap({ onSelect, initialLocation }: AddressP
         if (geocodeDebounceRef.current) clearTimeout(geocodeDebounceRef.current);
     }, []);
 
-    const handleMoveEnd = useCallback((e: any) => {
+    const handleMoveEnd = useCallback((e: { viewState: { latitude: number; longitude: number } }) => {
         const { latitude, longitude } = e.viewState;
 
         // Skip if position hasn't changed meaningfully
@@ -189,7 +190,7 @@ export default function AddressPickerMap({ onSelect, initialLocation }: AddressP
         }, 250);
     }, []);
 
-    const handleMapClick = useCallback((e: any) => {
+    const handleMapClick = useCallback((e: { lngLat: { lng: number; lat: number } }) => {
         const { lng, lat } = e.lngLat;
         mapRef.current?.flyTo({ center: [lng, lat], zoom: 16, duration: 400 });
     }, []);
@@ -289,7 +290,7 @@ export default function AddressPickerMap({ onSelect, initialLocation }: AddressP
         }, 350);
     }, [zoneBounds]);
 
-    const handleSelectResult = useCallback((feature: any) => {
+    const handleSelectResult = useCallback((feature: MapboxFeature) => {
         const [lng, lat] = feature.center;
         setPin({ latitude: lat, longitude: lng });
         setAddress(feature.place_name);
@@ -355,7 +356,7 @@ export default function AddressPickerMap({ onSelect, initialLocation }: AddressP
                             <Crosshair size={12} className="shrink-0" />
                             <span className="font-medium">{t("address.use_my_location")}</span>
                         </button>
-                        {searchResults.map((f: any) => (
+                        {searchResults.map((f: MapboxFeature) => (
                             <button
                                 key={f.id}
                                 onClick={() => handleSelectResult(f)}
@@ -364,8 +365,8 @@ export default function AddressPickerMap({ onSelect, initialLocation }: AddressP
                                 <MapPin size={12} className="shrink-0 text-[var(--muted)]" />
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm truncate">{f.text}</p>
-                                    {f.context?.length > 0 && (
-                                        <p className="text-xs text-[var(--muted)] truncate">{f.context.map((c: any) => c.text).join(", ")}</p>
+                                    {(f.context?.length ?? 0) > 0 && (
+                                        <p className="text-xs text-[var(--muted)] truncate">{f.context?.map((c: { text: string }) => c.text).join(", ")}</p>
                                     )}
                                 </div>
                             </button>

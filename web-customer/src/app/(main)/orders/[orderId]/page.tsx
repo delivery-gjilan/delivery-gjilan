@@ -86,11 +86,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
         : [];
 
     const canCancel = order?.status === "PENDING";
-    const isActive = ["AWAITING_APPROVAL", "PENDING", "PREPARING", "READY", "OUT_FOR_DELIVERY"].includes(
-        order?.status
+    const isActive = !!order?.status && ["AWAITING_APPROVAL", "PENDING", "PREPARING", "READY", "OUT_FOR_DELIVERY"].includes(
+        order.status
     );
     const canReview = order?.status === "DELIVERED" && !order?.reviewSubmitted && !reviewSent;
-    const showMap = isActive && ["READY", "OUT_FOR_DELIVERY"].includes(order?.status);
+    const showMap = isActive && ["READY", "OUT_FOR_DELIVERY"].includes(order?.status ?? "");
 
     const currentStepIndex = useMemo(
         () => (order ? STATUS_FLOW.indexOf(order.status) : -1),
@@ -174,12 +174,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
                 <div className="rounded-[var(--radius)] overflow-hidden border border-[var(--border)]">
                     <OrderTrackingMap
                         dropoff={{
-                            latitude: order.dropOffLocation?.latitude,
-                            longitude: order.dropOffLocation?.longitude,
+                            latitude: order.dropOffLocation?.latitude ?? order.dropOffLocation?.lat ?? 0,
+                            longitude: order.dropOffLocation?.longitude ?? order.dropOffLocation?.lng ?? 0,
                         }}
                         pickup={
                             order.pickupLocations?.[0]
-                                ? order.pickupLocations[0]
+                                ? { latitude: order.pickupLocations[0].latitude ?? order.pickupLocations[0].lat, longitude: order.pickupLocations[0].longitude ?? order.pickupLocations[0].lng }
                                 : order.businesses?.[0]?.business?.location
                                     ? {
                                         latitude: order.businesses[0].business.location.latitude,

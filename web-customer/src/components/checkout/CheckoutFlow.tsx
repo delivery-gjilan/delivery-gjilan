@@ -36,6 +36,7 @@ import dynamic from "next/dynamic";
 const AddressPickerMap = dynamic(() => import("@/components/checkout/AddressPickerMap"), { ssr: false });
 import { isPointInPolygon } from "@/lib/pointInPolygon";
 import { useOrderModalsStore } from "@/store/orderModalsStore";
+import type { GqlAddress, GqlDeliveryZone, GqlPromotion, GqlValidationResult, GqlOrder } from "@/types/graphql";
 
 type CheckoutStep = 1 | 2 | 3;
 
@@ -103,14 +104,14 @@ export function CheckoutFlow({ onClose, drawerMode = false }: CheckoutFlowProps)
     const [createOrderMutation, { loading: orderLoading }] = useMutation(CREATE_ORDER);
     const { showOrderSuccess, showAwaitingApproval } = useOrderModalsStore();
 
-    const savedAddresses = useMemo(
-        () => ((addressesData as any)?.myAddresses ?? []) as any[],
+    const savedAddresses = useMemo<GqlAddress[]>(
+        () => ((addressesData as { myAddresses?: GqlAddress[] } | undefined)?.myAddresses ?? []),
         [addressesData]
     );
 
     const effectiveServiceZones = useMemo(() => {
-        const activeZones = ((zonesData as any)?.deliveryZones ?? []).filter((z: any) => z.isActive);
-        const serviceZones = activeZones.filter((z: any) => z.isServiceZone === true);
+        const activeZones = ((zonesData as { deliveryZones?: GqlDeliveryZone[] } | undefined)?.deliveryZones ?? []).filter((z: GqlDeliveryZone) => z.isActive);
+        const serviceZones = activeZones.filter((z: GqlDeliveryZone) => z.isServiceZone === true);
         return (serviceZones.length > 0 ? serviceZones : activeZones) as Array<{ polygon: Array<{ lat: number; lng: number }> }>;
     }, [zonesData]);
 
@@ -124,9 +125,9 @@ export function CheckoutFlow({ onClose, drawerMode = false }: CheckoutFlowProps)
         [effectiveServiceZones]
     );
 
-    const minOrderAmount = Number((businessMinData as any)?.business?.minOrderAmount ?? 0);
+    const minOrderAmount = Number((businessMinData as { business?: { minOrderAmount?: number | null } } | undefined)?.business?.minOrderAmount ?? 0);
     const minimumMet = minOrderAmount <= 0 || subtotal >= minOrderAmount;
-    const prioritySurcharge = Number((surchargeData as any)?.prioritySurchargeAmount ?? 0);
+    const prioritySurcharge = Number((surchargeData as { prioritySurchargeAmount?: number | null } | undefined)?.prioritySurchargeAmount ?? 0);
 
     const cartContext = useMemo(
         () => ({
@@ -149,8 +150,8 @@ export function CheckoutFlow({ onClose, drawerMode = false }: CheckoutFlowProps)
         fetchPolicy: "cache-and-network",
     });
     const eligiblePromo = useMemo(() => {
-        const list = (applicableData as any)?.getApplicablePromotions ?? [];
-        return list.sort((a: any, b: any) => (b.priority || 0) - (a.priority || 0))[0] ?? null;
+        const list: GqlPromotion[] = (applicableData as { getApplicablePromotions?: GqlPromotion[] } | undefined)?.getApplicablePromotions ?? [];
+        return list.sort((a: GqlPromotion, b: GqlPromotion) => ((b.priority ?? 0) || 0) - ((a.priority ?? 0) || 0))[0] ?? null;
     }, [applicableData]);
 
     const effectiveDeliveryPrice = promoResult?.freeDeliveryApplied ? 0 : deliveryPrice;
@@ -170,7 +171,7 @@ export function CheckoutFlow({ onClose, drawerMode = false }: CheckoutFlowProps)
                         businessId: businessIds[0],
                     },
                 });
-                const price = (res.data as any)?.calculateDeliveryPrice?.price;
+                const price = (res.data as { calculateDeliveryPrice?: { price?: number } } | undefined)?.calculateDeliveryPrice?.price;
                 if (price != null) setDeliveryPrice(Number(price));
             } catch {
                 // keep default
@@ -198,7 +199,7 @@ export function CheckoutFlow({ onClose, drawerMode = false }: CheckoutFlowProps)
             const res = await validatePromotionsFn({
                 variables: { cart: cartContext, manualCode: couponCode.trim() },
             });
-            const result = (res.data as any)?.validatePromotions;
+            const result = (res.data as { validatePromotions?: GqlValidationResult } | undefined)?.validatePromotions;
             if (!result || (Array.isArray(result.promotions) && result.promotions.length === 0)) {
                 setPromoError(t("cart.invalid_code"));
                 return;
@@ -226,12 +227,12 @@ export function CheckoutFlow({ onClose, drawerMode = false }: CheckoutFlowProps)
     );
 
     const handleSelectSavedAddress = useCallback(
-        (addr: any) => {
+        (addr: GqlAddress) => {
             const loc: SelectedLocation = {
                 latitude: addr.latitude,
                 longitude: addr.longitude,
                 address: addr.displayName ?? addr.addressName ?? "",
-                label: addr.addressName,
+                label: addr.addressName ?? undefined,
                 addressId: addr.id,
             };
             const inZone = isLocationInZone(loc);
@@ -278,7 +279,7 @@ export function CheckoutFlow({ onClose, drawerMode = false }: CheckoutFlowProps)
                 },
             });
 
-            const order = (result.data as any)?.createOrder;
+            const order = (result.data as { createOrder?: GqlOrder } | undefined)?.createOrder;
             if (order) {
                 clearCart();
                 onClose();
@@ -289,8 +290,8 @@ export function CheckoutFlow({ onClose, drawerMode = false }: CheckoutFlowProps)
                     showOrderSuccess(order.id);
                 }
             }
-        } catch (err: any) {
-            setOrderError(err.message ?? t("common.error"));
+        } catch (err: unknown) {
+            setOrderError(err instanceof Error ? err.message : t("common.error"));
         }
     }, [
         selectedLocation, items, effectiveDeliveryPrice, finalTotal, promoResult,
@@ -475,7 +476,7 @@ export function CheckoutFlow({ onClose, drawerMode = false }: CheckoutFlowProps)
                         {savedAddresses.length > 0 && (
                             <div className="space-y-2">
                                 <h3 className="text-sm font-semibold text-[var(--foreground)]">{t("address.saved_addresses")}</h3>
-                                {savedAddresses.map((addr: any) => {
+                                {savedAddresses.map((addr: GqlAddress) => {
                                     const inZone =
                                         effectiveServiceZones.length === 0 ||
                                         effectiveServiceZones.some((z) =>

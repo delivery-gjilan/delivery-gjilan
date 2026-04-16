@@ -13,6 +13,7 @@ const ActiveOrderModal = dynamic(
     { ssr: false }
 );
 import { useOrderModalsStore } from "@/store/orderModalsStore";
+import type { GqlOrder } from "@/types/graphql";
 
 const ACTIVE_STATUSES = ["AWAITING_APPROVAL", "PENDING", "PREPARING", "READY", "OUT_FOR_DELIVERY"];
 
@@ -27,10 +28,10 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof
 const HIDDEN_ON = ["/orders", "/checkout", "/login", "/signup", "/profile"];
 
 type UserOrdersUpdatedSubscriptionData = {
-    userOrdersUpdated?: any[] | null;
+    userOrdersUpdated?: GqlOrder[] | null;
 };
 
-function extractOrders(data: any): any[] {
+function extractOrders(data: { orders?: GqlOrder[] | { orders?: GqlOrder[] } | null } | undefined): GqlOrder[] {
     const payload = data?.orders;
     if (Array.isArray(payload)) return payload;
     if (Array.isArray(payload?.orders)) return payload.orders;
@@ -41,7 +42,7 @@ export function ActiveOrderBanner() {
     const { isAuthenticated } = useAuth();
     const { t } = useTranslations();
     const pathname = usePathname();
-    const [activeOrders, setActiveOrders] = useState<any[]>([]);
+    const [activeOrders, setActiveOrders] = useState<GqlOrder[]>([]);
     const [modalOpen, setModalOpen] = useState(false);
     const { showOrderDelivered, showAwaitingApproval } = useOrderModalsStore();
     const isFirstLoadRef = useRef(true);
@@ -64,17 +65,17 @@ export function ActiveOrderBanner() {
     });
 
     useEffect(() => {
-        const subOrders: any[] | null = Array.isArray(subData?.userOrdersUpdated)
+        const subOrders: GqlOrder[] | null = Array.isArray(subData?.userOrdersUpdated)
             ? subData.userOrdersUpdated
             : null;
-        const source = subOrders ?? extractOrders(queryData);
-        const active = source.filter((o: any) => ACTIVE_STATUSES.includes(o?.status));
+        const source = subOrders ?? extractOrders(queryData as Parameters<typeof extractOrders>[0]);
+        const active = source.filter((o: GqlOrder) => ACTIVE_STATUSES.includes(o?.status));
 
         // Detect orders that transitioned to DELIVERED (were active, now gone or delivered)
         // Skip on first load to avoid triggering for historical orders already delivered
         if (!isFirstLoadRef.current && source.length > 0) {
             prevOrderIdsRef.current.forEach((prevId) => {
-                const found = source.find((o: any) => o.id === prevId);
+                const found = source.find((o: GqlOrder) => o.id === prevId);
                 if (found?.status === "DELIVERED") {
                     showOrderDelivered(prevId);
                 }
@@ -83,7 +84,7 @@ export function ActiveOrderBanner() {
         isFirstLoadRef.current = false;
 
         // Detect new AWAITING_APPROVAL orders and show modal for them
-        active.forEach((o: any) => {
+        active.forEach((o: GqlOrder) => {
             if (o.status === "AWAITING_APPROVAL" && !promptedAwaitingRef.current.has(o.id)) {
                 promptedAwaitingRef.current.add(o.id);
                 const reasons: string[] = Array.isArray(o.approvalReasons) ? o.approvalReasons : [];
@@ -92,7 +93,7 @@ export function ActiveOrderBanner() {
         });
 
         // Update previous active IDs
-        prevOrderIdsRef.current = new Set(active.map((o: any) => o.id));
+        prevOrderIdsRef.current = new Set(active.map((o: GqlOrder) => o.id));
 
         setActiveOrders((prev) => {
             if (prev.length === active.length && prev[0]?.id === active[0]?.id && prev[0]?.status === active[0]?.status) {

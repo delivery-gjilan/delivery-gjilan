@@ -69,12 +69,12 @@ export default function ProfilePage() {
     }
 
     const ordersPayload = (ordersData as { orders?: GqlOrder[] | { orders?: GqlOrder[] } } | undefined)?.orders;
-    const allOrders: GqlOrder[] = Array.isArray(ordersPayload)
-        ? ordersPayload
-        : ordersPayload && typeof ordersPayload === "object" && "orders" in ordersPayload && Array.isArray(ordersPayload.orders)
+    const allOrders: GqlOrder[] = ordersPayload && 'orders' in ordersPayload &&Array.isArray(ordersPayload?.orders)
         ? ordersPayload.orders
+        : Array.isArray(ordersPayload)
+        ? ordersPayload
         : [];
-    const activeOrders = allOrders.filter((o: any) => ACTIVE_STATUSES.includes(o.status));
+    const activeOrders = allOrders.filter((o: GqlOrder) => ACTIVE_STATUSES.includes(o.status));
     const ordersSubtitle = ordersLoading
         ? "..."
         : ordersError

@@ -21,9 +21,9 @@ import {
     CheckCheck,
 } from "lucide-react";
 import { GET_ORDER, CANCEL_ORDER } from "@/graphql/operations/orders";
-import type { GqlOrder, GqlOrderItem, GqlOrderPromotion } from "@/types/graphql";
 import { ORDER_STATUS_UPDATED, ORDER_DRIVER_LIVE_TRACKING } from "@/graphql/operations/orders";
 import dynamic from "next/dynamic";
+import type { GqlOrder, GqlOrderItem, GqlDriverLiveTracking, GqlOrderPromotion } from "@/types/graphql";
 const OrderTrackingMap = dynamic(() => import("@/components/orders/OrderTrackingMap"), {
     ssr: false,
     loading: () => (
@@ -139,7 +139,7 @@ export function ActiveOrderModal({ orderId, onClose }: ActiveOrderModalProps) {
         skip: !user || !showTracking,
     });
 
-    const liveTracking = (trackingData as any)?.orderDriverLiveTracking;
+    const liveTracking = (trackingData as { orderDriverLiveTracking?: GqlDriverLiveTracking } | undefined)?.orderDriverLiveTracking;
 
     // ETA
     const etaFromDriver = useEtaCountdown(
@@ -178,16 +178,20 @@ export function ActiveOrderModal({ orderId, onClose }: ActiveOrderModalProps) {
     const StatusIcon = meta.icon;
     const businessName = order?.businesses?.[0]?.business?.name ?? "";
     const businessImageUrl = order?.businesses?.[0]?.business?.imageUrl ?? null;
-    const businessLocation = order?.pickupLocations?.[0] ?? order?.businesses?.[0]?.business?.location ?? null;
+    const businessLocation = order?.pickupLocations?.[0]
+        ? { latitude: order.pickupLocations[0].latitude ?? order.pickupLocations[0].lat, longitude: order.pickupLocations[0].longitude ?? order.pickupLocations[0].lng }
+        : order?.businesses?.[0]?.business?.location ?? null;
     const dropoff = order?.dropOffLocation ?? null;
     const driver = order?.driver ?? null;
     const driverLoc = liveTracking
         ? { latitude: liveTracking.latitude, longitude: liveTracking.longitude }
-        : driver?.driverLocation ?? null;
+        : driver?.driverLocation
+            ? { latitude: driver.driverLocation.lat, longitude: driver.driverLocation.lng }
+            : null;
 
     const orderItems = useMemo(() =>
         Array.isArray(order?.businesses)
-            ? order.businesses.flatMap((b: any) => (Array.isArray(b?.items) ? b.items : []))
+            ? order.businesses.flatMap((b: GqlOrder["businesses"][number]) => (Array.isArray(b?.items) ? b.items : []))
             : [],
         [order]
     );
@@ -215,7 +219,7 @@ export function ActiveOrderModal({ orderId, onClose }: ActiveOrderModalProps) {
             <div className="relative flex-1 min-h-0 pointer-events-auto bg-[#0a0a1a]">
                 {dropoff && (
                     <OrderTrackingMap
-                        dropoff={dropoff}
+                        dropoff={{ latitude: dropoff.latitude ?? dropoff.lat, longitude: dropoff.longitude ?? dropoff.lng }}
                         pickup={businessLocation}
                         driverLocation={showTracking ? driverLoc : null}
                         driver={driver}
@@ -396,9 +400,9 @@ export function ActiveOrderModal({ orderId, onClose }: ActiveOrderModalProps) {
                                     )}
                                     <div className="flex-1 min-w-0">
                                         <p className="text-[13px] font-medium truncate">{item.name}</p>
-                                        {item.childItems?.length > 0 && (
+                                        {(item.childItems?.length ?? 0) > 0 && (
                                             <p className="text-[10px] text-[var(--muted)] truncate">
-                                                {item.childItems.map((c: any) => c.name).join(", ")}
+                                                {item.childItems!.map((c: { name: string }) => c.name).join(", ")}
                                             </p>
                                         )}
                                     </div>

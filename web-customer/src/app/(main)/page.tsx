@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { useMemo } from "react";
 import { useHydratedBusinesses } from "@/hooks/useHydratedBusinesses";
 import { useSearchStore } from "@/store/searchStore";
+import type { GqlBusiness, GqlBanner } from "@/types/graphql";
 
 export default function HomePage() {
     const { t } = useTranslations();
@@ -21,8 +22,8 @@ export default function HomePage() {
         variables: { displayContext: "HOME" },
     });
 
-    const featured = (featuredData as any)?.featuredBusinesses ?? [];
-    const banners = (bannersData as any)?.getActiveBanners ?? [];
+    const featured = (featuredData as { featuredBusinesses?: GqlBusiness[] } | undefined)?.featuredBusinesses ?? [];
+    const banners = (bannersData as { getActiveBanners?: GqlBanner[] } | undefined)?.getActiveBanners ?? [];
     const fallbackBanners = [
         {
             id: "template-banner-1",
@@ -48,7 +49,7 @@ export default function HomePage() {
     const filteredBusinesses = useMemo(() => {
         if (!searchQuery) return [...businesses];
         const q = searchQuery.toLowerCase();
-        return (businesses as any[]).filter(
+        return (businesses as GqlBusiness[]).filter(
             (b) => b.name?.toLowerCase().includes(q) || b.description?.toLowerCase().includes(q)
         );
     }, [businesses, searchQuery]);
@@ -65,7 +66,7 @@ export default function HomePage() {
                         {t("home.popular_now")}
                     </h2>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        {featured.slice(0, 6).map((biz: any, i: number) => (
+                        {featured.slice(0, 6).map((biz: GqlBusiness, i: number) => (
                             <BusinessCard key={biz.id} business={biz} priority={i === 0} />
                         ))}
                     </div>
@@ -97,7 +98,7 @@ export default function HomePage() {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        {filteredBusinesses.map((biz: any, i: number) => (
+                        {filteredBusinesses.map((biz: GqlBusiness, i: number) => (
                             <BusinessCard key={biz.id} business={biz} priority={i === 0} />
                         ))}
                     </div>

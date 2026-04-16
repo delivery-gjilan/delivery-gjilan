@@ -8,8 +8,8 @@ import { formatPrice, cn } from "@/lib/utils";
 import Image from "next/image";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { X, Plus, Minus } from "lucide-react";
-import { Skeleton } from "@/components/ui/Skeleton"; //asdkoment
-import { GqlVariant } from "@/types/graphql";
+import { Skeleton } from "@/components/ui/Skeleton";
+import type { GqlProduct, GqlVariant, GqlOption, GqlOptionGroup } from "@/types/graphql";
 
 interface Props {
     productId: string | null;
@@ -32,7 +32,7 @@ export function ProductOptionsModal({ productId, businessId, businessName, onClo
         fetchPolicy: "cache-first",
     });
 
-    const product = (data as any)?.product;
+    const product = (data as { product?: GqlProduct } | undefined)?.product;
 
     // Reset state when product changes
     useEffect(() => {
@@ -61,7 +61,7 @@ export function ProductOptionsModal({ productId, businessId, businessName, onClo
 
     const selectedVariant = useMemo(() => {
         if (!product?.variants?.length || !selectedVariantId) return null;
-        return product.variants.find((v: any) => v.id === selectedVariantId) ?? null;
+        return product.variants.find((v: GqlVariant) => v.id === selectedVariantId) ?? null;
     }, [product, selectedVariantId]);
 
     const basePrice = useMemo(() => {
@@ -78,8 +78,8 @@ export function ProductOptionsModal({ productId, businessId, businessName, onClo
         for (const group of product.optionGroups) {
             const selected = selectedOptions[group.id] ?? [];
             for (const optId of selected) {
-                const opt = group.options?.find((o: any) => o.id === optId);
-                if (opt?.extraPrice) total += parseFloat(opt.extraPrice);
+                const opt = group.options?.find((o: GqlOption) => o.id === optId);
+                if (opt?.extraPrice) total += Number(opt.extraPrice);
             }
         }
         return total;
@@ -116,7 +116,7 @@ export function ProductOptionsModal({ productId, businessId, businessName, onClo
         for (const group of product.optionGroups ?? []) {
             const selected = selectedOptions[group.id] ?? [];
             for (const optId of selected) {
-                const opt = group.options?.find((o: any) => o.id === optId);
+                const opt = group.options?.find((o: GqlOption) => o.id === optId);
                 if (opt) {
                     optionsList.push({
                         optionGroupId: group.id,
@@ -260,7 +260,7 @@ export function ProductOptionsModal({ productId, businessId, businessName, onClo
                                 )}
 
                                 {/* Option Groups */}
-                                {product.optionGroups?.map((group: any) => {
+                                {product.optionGroups?.map((group: GqlOptionGroup) => {
                                     const selected = selectedOptions[group.id] ?? [];
                                     const isRequired = (group.minSelections ?? 0) > 0;
                                     const isSingle = group.maxSelections === 1;
@@ -284,7 +284,7 @@ export function ProductOptionsModal({ productId, businessId, businessName, onClo
                                                 )}
                                             </div>
                                             <div className="space-y-2">
-                                                {group.options?.map((opt: any) => {
+                                                {group.options?.map((opt: GqlOption) => {
                                                     const isChecked = selected.includes(opt.id);
                                                     const extraPrice = Number(opt.extraPrice ?? 0);
                                                     return (

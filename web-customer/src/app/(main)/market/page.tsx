@@ -150,7 +150,7 @@ export default function MarketPage() {
         fetchPolicy: "cache-first",
     });
     const marketBusiness = useMemo(() => {
-        const list: any[] = (bizData as any)?.businesses ?? [];
+        const list: GqlBusiness[] = (bizData as { businesses?: GqlBusiness[] } | undefined)?.businesses ?? [];
         return list.find((b) => b.businessType === "MARKET") ?? null;
     }, [bizData]);
     const marketId = marketBusiness?.id ?? "";
@@ -172,9 +172,9 @@ export default function MarketPage() {
         fetchPolicy: "cache-first",
     });
 
-    const allProducts: any[] = useMemo(() => (productsData as any)?.products ?? [], [productsData]);
-    const categories: any[] = useMemo(() => (categoriesData as any)?.productCategories ?? [], [categoriesData]);
-    const subcategories: any[] = useMemo(() => (subcategoriesData as any)?.productSubcategoriesByBusiness ?? [], [subcategoriesData]);
+    const allProducts: GqlProduct[] = useMemo(() => (productsData as { products?: GqlProduct[] } | undefined)?.products ?? [], [productsData]);
+    const categories: GqlProductCategory[] = useMemo(() => (categoriesData as { productCategories?: GqlProductCategory[] } | undefined)?.productCategories ?? [], [categoriesData]);
+    const subcategories: GqlProductSubcategory[] = useMemo(() => (subcategoriesData as { productSubcategoriesByBusiness?: GqlProductSubcategory[] } | undefined)?.productSubcategoriesByBusiness ?? [], [subcategoriesData]);
 
     // Auto-select first category
     const effectiveCategoryId = useMemo(() => {
@@ -190,7 +190,7 @@ export default function MarketPage() {
 
     // Products for active category
     const categoryProducts = useMemo(
-        () => allProducts.filter((p: any) => (p.product?.categoryId ?? p.categoryId) === effectiveCategoryId),
+        () => allProducts.filter((p: GqlProduct) => (p.product?.categoryId ?? p.categoryId) === effectiveCategoryId),
         [allProducts, effectiveCategoryId]
     );
 
@@ -198,23 +198,23 @@ export default function MarketPage() {
     const visibleProducts = useMemo(() => {
         let list = categoryProducts;
         if (activeSubcategoryId) {
-            list = list.filter((p: any) => (p.product?.subcategoryId ?? p.subcategoryId) === activeSubcategoryId);
+            list = list.filter((p: GqlProduct) => (p.product?.subcategoryId ?? p.subcategoryId) === activeSubcategoryId);
         }
         if (search.trim()) {
             const q = search.toLowerCase();
-            list = list.filter((p: any) => {
+            list = list.filter((p: GqlProduct) => {
                 const raw = p.product ?? p;
                 return raw.name?.toLowerCase().includes(q) || raw.description?.toLowerCase().includes(q);
             });
         }
-        return list.sort((a: any, b: any) => (a.product?.sortOrder ?? 0) - (b.product?.sortOrder ?? 0));
+        return list.sort((a: GqlProduct, b: GqlProduct) => (a.product?.sortOrder ?? 0) - (b.product?.sortOrder ?? 0));
     }, [categoryProducts, activeSubcategoryId, search]);
 
     // Search across all products
     const searchResults = useMemo(() => {
         if (!search.trim()) return null;
         const q = search.toLowerCase();
-        return allProducts.filter((p: any) => {
+        return allProducts.filter((p: GqlProduct) => {
             const raw = p.product ?? p;
             return raw.name?.toLowerCase().includes(q) || raw.description?.toLowerCase().includes(q);
         });
@@ -340,8 +340,8 @@ export default function MarketPage() {
                         </p>
                     )}
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                        {displayProducts.map((p: any) => {
-                            const raw = p.product ?? p;
+                        {displayProducts.map((p: GqlProduct) => {
+                            const raw = (p.product ?? p) as GqlProduct;
                             return (
                                 <MarketProductCard
                                     key={raw.id}
