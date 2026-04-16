@@ -277,6 +277,8 @@ export function OrderInspectSheet({
         return null;
     }, [handleMarkPickedUp, isAssigned, markingPickedUp, onMarkPickedUp, order.status]);
 
+    const primaryDisabled = primaryAction.loading || markingPickedUp || (isAvailable && takenByOther);
+
     return (
         <Animated.View style={[styles.root, { transform: [{ translateY: slideY }] }]}>
             <View
@@ -482,7 +484,7 @@ export function OrderInspectSheet({
 
                     <View style={styles.actionsRow}>
                         <Animated.View style={isAvailable ? { transform: [{ scale: acceptPulse }] } : undefined}>
-                            <Pressable onPress={primaryAction.onPress} disabled={primaryAction.loading || markingPickedUp} style={[...primaryAction.style, (primaryAction.loading || markingPickedUp) && { opacity: 0.6 }]}>
+                            <Pressable onPress={primaryAction.onPress} disabled={primaryDisabled} style={[...primaryAction.style, primaryDisabled && { opacity: 0.6 }]}>
                                 {primaryAction.loading ? (
                                     <ActivityIndicator size={18} color="#fff" />
                                 ) : (

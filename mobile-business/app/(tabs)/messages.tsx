@@ -234,12 +234,19 @@ export default function MessagesScreen() {
     const renderItem = ({ item }: { item: ListItem }) => {
         if (item.type === 'date') {
             return (
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 12, paddingHorizontal: 16 }}>
-                    <View style={{ flex: 1, height: 1, backgroundColor: COLORS.border }} />
-                    <Text style={{ color: COLORS.subtext, fontSize: 11, marginHorizontal: 8, fontWeight: '600' }}>
-                        {item.label}
-                    </Text>
-                    <View style={{ flex: 1, height: 1, backgroundColor: COLORS.border }} />
+                <View style={{ alignItems: 'center', marginVertical: 14 }}>
+                    <View style={{
+                        backgroundColor: '#18181b',
+                        borderRadius: 999,
+                        borderWidth: 1,
+                        borderColor: COLORS.border,
+                        paddingHorizontal: 12,
+                        paddingVertical: 5,
+                    }}>
+                        <Text style={{ color: COLORS.subtext, fontSize: 11, fontWeight: '700' }}>
+                            {item.label}
+                        </Text>
+                    </View>
                 </View>
             );
         }
@@ -252,33 +259,79 @@ export default function MessagesScreen() {
             <View
                 style={{
                     paddingHorizontal: 16,
-                    marginBottom: 8,
+                    marginBottom: 10,
                     alignItems: isBusiness ? 'flex-end' : 'flex-start',
                 }}
             >
-                <View
-                    style={{
-                        maxWidth: '78%',
-                        borderRadius: 18,
-                        borderWidth: 1,
-                        backgroundColor: isBusiness ? COLORS.card : alertCfg.bg,
-                        borderColor: isBusiness ? COLORS.border : alertCfg.border,
-                        paddingHorizontal: 14,
-                        paddingVertical: 10,
-                    }}
-                >
+                <View style={{
+                    width: '100%',
+                    flexDirection: isBusiness ? 'row-reverse' : 'row',
+                    alignItems: 'flex-end',
+                    gap: 8,
+                }}>
                     {!isBusiness && (
-                        <Text style={{ color: alertCfg.labelColor, fontSize: 10, fontWeight: '700', marginBottom: 3 }}>
-                            {alertCfg.labelText}
-                        </Text>
+                        <View style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: 14,
+                            backgroundColor: alertCfg.labelColor,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginBottom: 2,
+                        }}>
+                            <Ionicons name="megaphone" size={13} color="#fff" />
+                        </View>
                     )}
-                    <Text style={{ color: COLORS.text, fontSize: 14, lineHeight: 20 }}>{msg.body}</Text>
-                    <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 4, gap: 4 }}>
-                        <Text style={{ color: COLORS.subtext, fontSize: 10 }}>{formatTime(msg.createdAt)}</Text>
-                        {!isBusiness && msg.readAt && (
-                            <Text style={{ color: COLORS.primary, fontSize: 10 }}>✓ Read</Text>
+
+                    <View
+                        style={{
+                            maxWidth: '82%',
+                            borderRadius: 20,
+                            borderBottomRightRadius: isBusiness ? 8 : 20,
+                            borderBottomLeftRadius: isBusiness ? 20 : 8,
+                            borderWidth: isBusiness ? 0 : 1,
+                            backgroundColor: isBusiness ? COLORS.primary : alertCfg.bg,
+                            borderColor: isBusiness ? 'transparent' : alertCfg.border,
+                            paddingHorizontal: 14,
+                            paddingVertical: 11,
+                            shadowColor: '#000',
+                            shadowOpacity: 0.2,
+                            shadowRadius: 8,
+                            shadowOffset: { width: 0, height: 3 },
+                            elevation: 2,
+                        }}
+                    >
+                        {!isBusiness && (
+                            <Text style={{ color: alertCfg.labelColor, fontSize: 10, fontWeight: '800', marginBottom: 4, letterSpacing: 0.5 }}>
+                                {alertCfg.labelText}
+                            </Text>
                         )}
+
+                        <Text style={{ color: isBusiness ? '#ffffff' : COLORS.text, fontSize: 14, lineHeight: 20 }}>{msg.body}</Text>
+
+                        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 5, gap: 5 }}>
+                            <Text style={{ color: isBusiness ? 'rgba(255,255,255,0.75)' : COLORS.subtext, fontSize: 10 }}>{formatTime(msg.createdAt)}</Text>
+                            {!isBusiness && msg.readAt && (
+                                <Text style={{ color: COLORS.primary, fontSize: 10, fontWeight: '700' }}>✓</Text>
+                            )}
+                        </View>
                     </View>
+
+                    {isBusiness && (
+                        <View style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: 14,
+                            backgroundColor: '#18181b',
+                            borderWidth: 1,
+                            borderColor: COLORS.border,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginBottom: 2,
+                        }}>
+                            <Ionicons name="storefront" size={13} color={COLORS.subtext} />
+                        </View>
+                    )}
                 </View>
             </View>
         );
@@ -299,9 +352,14 @@ export default function MessagesScreen() {
                 }}
             >
                 <Ionicons name="chatbubbles-outline" size={22} color={COLORS.primary} />
-                <Text style={{ fontSize: 18, fontWeight: '700', color: COLORS.text, flex: 1 }}>
-                    {t('tabs.messages', 'Messages')}
-                </Text>
+                <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 18, fontWeight: '800', color: COLORS.text }}>
+                        {t('tabs.messages', 'Messages')}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: COLORS.subtext, marginTop: 1 }}>
+                        {t('messages.empty', 'No messages yet. Your admin will reach out here.')}
+                    </Text>
+                </View>
                 {messages.length > 0 && (
                     <Pressable
                         onPress={handleClearChat}
@@ -334,7 +392,8 @@ export default function MessagesScreen() {
                         data={listItems}
                         keyExtractor={(item) => item.key}
                         renderItem={renderItem}
-                        contentContainerStyle={{ paddingVertical: 12 }}
+                        contentContainerStyle={{ paddingVertical: 12, paddingBottom: 20 }}
+                        keyboardShouldPersistTaps="handled"
                         onLayout={scrollToBottom}
                     />
                 )}
@@ -342,54 +401,59 @@ export default function MessagesScreen() {
                 {/* Reply input */}
                 <View
                     style={{
-                        paddingHorizontal: 16,
-                        paddingVertical: 12,
+                        paddingHorizontal: 14,
+                        paddingTop: 8,
+                        paddingBottom: 12,
                         borderTopWidth: 1,
                         borderTopColor: COLORS.border,
                         backgroundColor: COLORS.bg,
+                    }}
+                >
+                    <View style={{
                         flexDirection: 'row',
                         alignItems: 'flex-end',
                         gap: 10,
-                    }}
-                >
-                    <TextInput
-                        value={replyText}
-                        onChangeText={setReplyText}
-                        placeholder={t('messages.reply_placeholder', 'Reply…')}
-                        placeholderTextColor={COLORS.subtext}
-                        multiline
-                        autoCorrect={false}
-                        spellCheck={false}
-                        autoCapitalize="none"
-                        style={{
-                            flex: 1,
-                            backgroundColor: COLORS.card,
-                            borderRadius: 20,
-                            borderWidth: 1,
-                            borderColor: COLORS.border,
-                            paddingHorizontal: 14,
-                            paddingTop: 10,
-                            paddingBottom: 10,
-                            color: COLORS.text,
-                            fontSize: 14,
-                            maxHeight: 100,
-                        }}
-                    />
-                    <Pressable
-                        onPress={handleSend}
-                        disabled={!replyText.trim() || replying}
-                        style={({ pressed }) => ({
-                            width: 44,
-                            height: 44,
-                            borderRadius: 22,
-                            backgroundColor: COLORS.primary,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            opacity: (!replyText.trim() || replying) ? 0.4 : pressed ? 0.8 : 1,
-                        })}
-                    >
-                        <Ionicons name="send" size={18} color="#fff" />
-                    </Pressable>
+                        borderWidth: 1,
+                        borderColor: COLORS.border,
+                        backgroundColor: '#18181b',
+                        borderRadius: 24,
+                        paddingHorizontal: 10,
+                        paddingVertical: 8,
+                    }}>
+                        <TextInput
+                            value={replyText}
+                            onChangeText={setReplyText}
+                            placeholder={t('messages.reply_placeholder', 'Reply…')}
+                            placeholderTextColor={COLORS.subtext}
+                            multiline
+                            autoCorrect={false}
+                            spellCheck={false}
+                            autoCapitalize="none"
+                            style={{
+                                flex: 1,
+                                color: COLORS.text,
+                                fontSize: 14,
+                                maxHeight: 100,
+                                paddingHorizontal: 6,
+                                paddingVertical: 6,
+                            }}
+                        />
+                        <Pressable
+                            onPress={handleSend}
+                            disabled={!replyText.trim() || replying}
+                            style={({ pressed }) => ({
+                                width: 38,
+                                height: 38,
+                                borderRadius: 19,
+                                backgroundColor: COLORS.primary,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                opacity: (!replyText.trim() || replying) ? 0.4 : pressed ? 0.8 : 1,
+                            })}
+                        >
+                            <Ionicons name="paper-plane" size={16} color="#fff" />
+                        </Pressable>
+                    </View>
                 </View>
             </KeyboardAvoidingView>
         </SafeAreaView>

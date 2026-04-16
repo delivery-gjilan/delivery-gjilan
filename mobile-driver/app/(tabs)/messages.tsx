@@ -47,11 +47,23 @@ interface DriverMessage {
     createdAt: string;
 }
 
-const ALERT_CONFIG: Record<AlertType, { bg: string; border: string; textColor: string; labelColor: string; labelKey: 'type_message' | 'type_warning' | 'type_urgent' }> = {
-    INFO: { bg: '#1e3a5f22', border: '#3b82f644', textColor: '#93c5fd', labelColor: '#60a5fa', labelKey: 'type_message' },
-    WARNING: { bg: '#451a0322', border: '#f59e0b44', textColor: '#fcd34d', labelColor: '#f59e0b', labelKey: 'type_warning' },
-    URGENT: { bg: '#450a0a22', border: '#ef444444', textColor: '#fca5a5', labelColor: '#ef4444', labelKey: 'type_urgent' },
-};
+type AlertConfig = { bg: string; border: string; textColor: string; labelColor: string; labelKey: 'type_message' | 'type_warning' | 'type_urgent' };
+
+function getAlertConfig(isDark: boolean): Record<AlertType, AlertConfig> {
+    if (isDark) {
+        return {
+            INFO: { bg: '#1e3a5f22', border: '#3b82f644', textColor: '#93c5fd', labelColor: '#60a5fa', labelKey: 'type_message' },
+            WARNING: { bg: '#451a0322', border: '#f59e0b44', textColor: '#fcd34d', labelColor: '#f59e0b', labelKey: 'type_warning' },
+            URGENT: { bg: '#450a0a22', border: '#ef444444', textColor: '#fca5a5', labelColor: '#ef4444', labelKey: 'type_urgent' },
+        };
+    }
+
+    return {
+        INFO: { bg: '#e0f2fe', border: '#7dd3fc', textColor: '#0c4a6e', labelColor: '#0369a1', labelKey: 'type_message' },
+        WARNING: { bg: '#fffbeb', border: '#fcd34d', textColor: '#92400e', labelColor: '#b45309', labelKey: 'type_warning' },
+        URGENT: { bg: '#fef2f2', border: '#fca5a5', textColor: '#991b1b', labelColor: '#b91c1c', labelKey: 'type_urgent' },
+    };
+}
 
 /** Parses both ISO-8601 and PostgreSQL's "2026-03-24 10:30:00+00" format safely on iOS */
 function parseDate(value: string | null | undefined): Date {
@@ -98,6 +110,8 @@ function buildListItems(messages: DriverMessage[]): ListItem[] {
 
 export default function MessagesScreen() {
     const theme = useTheme();
+    const isDark = theme.colors.background === '#000000';
+    const ALERT_CONFIG = React.useMemo(() => getAlertConfig(isDark), [isDark]);
     const { t } = useTranslations();
     const router = useRouter();
     const [extraMessages, setExtraMessages] = useState<DriverMessage[]>([]);
@@ -243,12 +257,19 @@ export default function MessagesScreen() {
     const renderItem = ({ item }: { item: ListItem }) => {
         if (item.type === 'date') {
             return (
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 12, paddingHorizontal: 16 }}>
-                    <View style={{ flex: 1, height: 1, backgroundColor: theme.colors.border }} />
-                    <Text style={{ color: theme.colors.subtext, fontSize: 11, marginHorizontal: 8, fontWeight: '600' }}>
+                <View style={{ alignItems: 'center', marginVertical: 14 }}>
+                    <View style={{
+                        backgroundColor: theme.colors.card,
+                        borderRadius: 999,
+                        borderWidth: 1,
+                        borderColor: theme.colors.border,
+                        paddingHorizontal: 12,
+                        paddingVertical: 5,
+                    }}>
+                        <Text style={{ color: theme.colors.subtext, fontSize: 11, fontWeight: '700' }}>
                         {resolveDateLabel(item.label)}
-                    </Text>
-                    <View style={{ flex: 1, height: 1, backgroundColor: theme.colors.border }} />
+                        </Text>
+                    </View>
                 </View>
             );
         }
@@ -256,42 +277,88 @@ export default function MessagesScreen() {
         const { message: msg } = item;
         const isDriver = msg.senderRole === 'DRIVER';
         const alertCfg = ALERT_CONFIG[msg.alertType] ?? ALERT_CONFIG.INFO;
+        const bubbleBg = isDriver ? theme.colors.primary : alertCfg.bg;
+        const bubbleBorder = isDriver ? 'transparent' : alertCfg.border;
+        const bubbleText = isDriver ? '#ffffff' : theme.colors.text;
+        const metaText = isDriver ? 'rgba(255,255,255,0.75)' : theme.colors.subtext;
 
         return (
             <View
                 style={{
                     paddingHorizontal: 16,
-                    marginBottom: 8,
+                    marginBottom: 10,
                     alignItems: isDriver ? 'flex-end' : 'flex-start',
                 }}
             >
-                <View
-                    style={{
-                        maxWidth: '78%',
-                        borderRadius: 18,
-                        borderWidth: 1,
-                        backgroundColor: isDriver
-                            ? theme.colors.card
-                            : alertCfg.bg,
-                        borderColor: isDriver
-                            ? theme.colors.border
-                            : alertCfg.border,
-                        paddingHorizontal: 14,
-                        paddingVertical: 10,
-                    }}
-                >
+                <View style={{
+                    width: '100%',
+                    flexDirection: isDriver ? 'row-reverse' : 'row',
+                    alignItems: 'flex-end',
+                    gap: 8,
+                }}>
                     {!isDriver && (
-                        <Text style={{ color: alertCfg.labelColor, fontSize: 10, fontWeight: '700', marginBottom: 3 }}>
-                            {t.messages[alertCfg.labelKey]}
-                        </Text>
+                        <View style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: 14,
+                            backgroundColor: alertCfg.labelColor,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginBottom: 2,
+                        }}>
+                            <Ionicons name="megaphone" size={13} color="#fff" />
+                        </View>
                     )}
-                    <Text style={{ color: theme.colors.text, fontSize: 14, lineHeight: 20 }}>{msg.body}</Text>
-                    <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 4, gap: 4 }}>
-                        <Text style={{ color: theme.colors.subtext, fontSize: 10 }}>{formatTime(msg.createdAt)}</Text>
-                        {!isDriver && msg.readAt && (
-                            <Text style={{ color: '#6366f1', fontSize: 10 }}>✓ Read</Text>
+
+                    <View
+                        style={{
+                            maxWidth: '82%',
+                            borderRadius: 20,
+                            borderBottomRightRadius: isDriver ? 8 : 20,
+                            borderBottomLeftRadius: isDriver ? 20 : 8,
+                            borderWidth: isDriver ? 0 : 1,
+                            backgroundColor: bubbleBg,
+                            borderColor: bubbleBorder,
+                            paddingHorizontal: 14,
+                            paddingVertical: 11,
+                            shadowColor: '#000',
+                            shadowOpacity: isDark ? 0.18 : 0.08,
+                            shadowRadius: 8,
+                            shadowOffset: { width: 0, height: 3 },
+                            elevation: 2,
+                        }}
+                    >
+                        {!isDriver && (
+                            <Text style={{ color: alertCfg.labelColor, fontSize: 10, fontWeight: '800', marginBottom: 4, letterSpacing: 0.5 }}>
+                                {t.messages[alertCfg.labelKey]}
+                            </Text>
                         )}
+
+                        <Text style={{ color: bubbleText, fontSize: 14, lineHeight: 20 }}>{msg.body}</Text>
+
+                        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 5, gap: 5 }}>
+                            <Text style={{ color: metaText, fontSize: 10 }}>{formatTime(msg.createdAt)}</Text>
+                            {!isDriver && msg.readAt && (
+                                <Text style={{ color: theme.colors.primary, fontSize: 10, fontWeight: '700' }}>✓</Text>
+                            )}
+                        </View>
                     </View>
+
+                    {isDriver && (
+                        <View style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: 14,
+                            backgroundColor: theme.colors.card,
+                            borderWidth: 1,
+                            borderColor: theme.colors.border,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginBottom: 2,
+                        }}>
+                            <Ionicons name="person" size={13} color={theme.colors.subtext} />
+                        </View>
+                    )}
                 </View>
             </View>
         );
@@ -302,8 +369,8 @@ export default function MessagesScreen() {
             {/* Header */}
             <View
                 style={{
-                    paddingHorizontal: 20,
-                    paddingVertical: 14,
+                    paddingHorizontal: 18,
+                    paddingVertical: 12,
                     borderBottomWidth: 1,
                     borderBottomColor: theme.colors.border,
                     flexDirection: 'row',
@@ -314,8 +381,27 @@ export default function MessagesScreen() {
                 <Pressable onPress={() => router.back()} hitSlop={12}>
                     <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
                 </Pressable>
-                <Ionicons name="chatbubbles-outline" size={22} color={theme.colors.primary} />
-                <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text, flex: 1 }}>{t.tabs.messages}</Text>
+
+                <View style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 17,
+                    backgroundColor: theme.colors.card,
+                    borderWidth: 1,
+                    borderColor: theme.colors.border,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                }}>
+                    <Ionicons name="chatbubbles-outline" size={18} color={theme.colors.primary} />
+                </View>
+
+                <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 17, fontWeight: '800', color: theme.colors.text }}>{t.tabs.messages}</Text>
+                    <Text style={{ fontSize: 11, color: theme.colors.subtext, marginTop: 1 }}>
+                        {t.messages.no_messages_sub}
+                    </Text>
+                </View>
+
                 {messages.length > 0 && (
                     <Pressable
                         onPress={handleClearChat}
@@ -338,9 +424,24 @@ export default function MessagesScreen() {
                     </View>
                 ) : messages.length === 0 ? (
                     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
-                        <Ionicons name="chatbubble-outline" size={48} color={theme.colors.subtext} style={{ marginBottom: 12 }} />
-                        <Text style={{ color: theme.colors.subtext, fontSize: 14, textAlign: 'center' }}>
-                            {t.messages.no_messages_title}{'\n'}{t.messages.no_messages_sub}
+                        <View style={{
+                            width: 64,
+                            height: 64,
+                            borderRadius: 32,
+                            backgroundColor: theme.colors.card,
+                            borderWidth: 1,
+                            borderColor: theme.colors.border,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginBottom: 14,
+                        }}>
+                            <Ionicons name="chatbubble-ellipses-outline" size={32} color={theme.colors.subtext} />
+                        </View>
+                        <Text style={{ color: theme.colors.text, fontSize: 15, fontWeight: '700', textAlign: 'center', marginBottom: 4 }}>
+                            {t.messages.no_messages_title}
+                        </Text>
+                        <Text style={{ color: theme.colors.subtext, fontSize: 13, textAlign: 'center' }}>
+                            {t.messages.no_messages_sub}
                         </Text>
                     </View>
                 ) : (
@@ -349,7 +450,8 @@ export default function MessagesScreen() {
                         data={listItems}
                         keyExtractor={(item) => item.key}
                         renderItem={renderItem}
-                        contentContainerStyle={{ paddingVertical: 12 }}
+                        contentContainerStyle={{ paddingVertical: 12, paddingBottom: 20 }}
+                        keyboardShouldPersistTaps="handled"
                         onLayout={scrollToBottom}
                     />
                 )}
@@ -357,60 +459,63 @@ export default function MessagesScreen() {
                 {/* Reply input */}
                 <View
                     style={{
-                        paddingHorizontal: 16,
-                        paddingVertical: 12,
+                        paddingHorizontal: 14,
+                        paddingTop: 8,
+                        paddingBottom: 12,
                         borderTopWidth: 1,
                         borderTopColor: theme.colors.border,
                         backgroundColor: theme.colors.background,
+                    }}
+                >
+                    <View style={{
                         flexDirection: 'row',
                         alignItems: 'flex-end',
                         gap: 10,
-                    }}
-                >
-                    <TextInput
-                        value={replyText}
-                        onChangeText={setReplyText}
-                        placeholder={t.messages.placeholder}
-                        placeholderTextColor={theme.colors.subtext}
-                        multiline
-                        autoCorrect={false}
-                        spellCheck={false}
-                        autoCapitalize="none"
-                        style={{
-                            flex: 1,
-                            backgroundColor: theme.colors.card,
-                            borderRadius: 20,
-                            borderWidth: 1,
-                            borderColor: theme.colors.border,
-                            paddingHorizontal: 14,
-                            paddingTop: 10,
-                            paddingBottom: 10,
-                            color: theme.colors.text,
-                            fontSize: 14,
-                            maxHeight: 100,
-                        }}
-                    />
-                    <Pressable
-                        onPress={handleSend}
-                        disabled={!replyText.trim() || replying}
-                        style={({ pressed }) => ({
-                            width: 42,
-                            height: 42,
-                            borderRadius: 21,
-                            backgroundColor: !replyText.trim()
-                                ? theme.colors.border
-                                : theme.colors.primary,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            opacity: pressed && !replyText.trim() ? 0.5 : (pressed ? 0.8 : 1),
-                        })}
-                    >
-                        {replying ? (
-                            <ActivityIndicator size="small" color={!replyText.trim() ? theme.colors.subtext : '#fff'} />
-                        ) : (
-                            <Ionicons name="send" size={18} color={!replyText.trim() ? theme.colors.subtext : '#fff'} />
-                        )}
-                    </Pressable>
+                        borderWidth: 1,
+                        borderColor: theme.colors.border,
+                        backgroundColor: theme.colors.card,
+                        borderRadius: 24,
+                        paddingHorizontal: 10,
+                        paddingVertical: 8,
+                    }}>
+                        <TextInput
+                            value={replyText}
+                            onChangeText={setReplyText}
+                            placeholder={t.messages.placeholder}
+                            placeholderTextColor={theme.colors.subtext}
+                            multiline
+                            autoCorrect={false}
+                            spellCheck={false}
+                            autoCapitalize="none"
+                            style={{
+                                flex: 1,
+                                color: theme.colors.text,
+                                fontSize: 14,
+                                maxHeight: 100,
+                                paddingHorizontal: 6,
+                                paddingVertical: 6,
+                            }}
+                        />
+                        <Pressable
+                            onPress={handleSend}
+                            disabled={!replyText.trim() || replying}
+                            style={({ pressed }) => ({
+                                width: 38,
+                                height: 38,
+                                borderRadius: 19,
+                                backgroundColor: !replyText.trim() ? theme.colors.border : theme.colors.primary,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                opacity: pressed ? 0.8 : 1,
+                            })}
+                        >
+                            {replying ? (
+                                <ActivityIndicator size="small" color={!replyText.trim() ? theme.colors.subtext : '#fff'} />
+                            ) : (
+                                <Ionicons name="paper-plane" size={16} color={!replyText.trim() ? theme.colors.subtext : '#fff'} />
+                            )}
+                        </Pressable>
+                    </View>
                 </View>
             </KeyboardAvoidingView>
         </SafeAreaView>

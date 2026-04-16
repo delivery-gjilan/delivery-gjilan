@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMutation } from '@apollo/client/react';
 import { MARK_DRIVER_MESSAGES_READ_DRIVER } from '@/graphql/operations/driverMessages';
+import { useTheme } from '@/hooks/useTheme';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -67,11 +68,19 @@ const ALERT_CONFIG: Record<AlertType, {
 };
 
 export default function DriverMessageBanner({ senderName, body, alertType, adminId, onDismiss }: DriverMessageBannerProps) {
+    const theme = useTheme();
+    const isDark = theme.colors.background === '#000000';
     const router = useRouter();
     const scale = useSharedValue(0.82);
     const opacity = useSharedValue(0);
     const backdropOpacity = useSharedValue(0);
     const config = ALERT_CONFIG[alertType] ?? ALERT_CONFIG.INFO;
+    const surfaceBg = isDark ? config.bg : '#ffffff';
+    const closeBg = isDark ? 'rgba(255,255,255,0.07)' : '#f3f4f6';
+    const closeColor = isDark ? '#6b7280' : '#6b7280';
+    const bodyText = isDark ? '#f3f4f6' : '#111827';
+    const hintMuted = isDark ? '#6b7280' : '#6b7280';
+    const backdrop = isDark ? 'rgba(0,0,0,0.65)' : 'rgba(0,0,0,0.35)';
     const [markRead] = useMutation(MARK_DRIVER_MESSAGES_READ_DRIVER);
 
     const backdropStyle = useAnimatedStyle(() => ({
@@ -131,7 +140,7 @@ export default function DriverMessageBanner({ senderName, body, alertType, admin
                     left: 0,
                     right: 0,
                     bottom: 0,
-                    backgroundColor: 'rgba(0,0,0,0.65)',
+                    backgroundColor: backdrop,
                 }, backdropStyle]}
             />
 
@@ -142,7 +151,7 @@ export default function DriverMessageBanner({ senderName, body, alertType, admin
                     overflow: 'hidden',
                     borderWidth: 1.5,
                     borderColor: config.border,
-                    backgroundColor: config.bg,
+                    backgroundColor: surfaceBg,
                     shadowColor: config.accent,
                     shadowOpacity: 0.45,
                     shadowRadius: 32,
@@ -180,18 +189,18 @@ export default function DriverMessageBanner({ senderName, body, alertType, admin
                                         width: 28,
                                         height: 28,
                                         borderRadius: 8,
-                                        backgroundColor: 'rgba(255,255,255,0.07)',
+                                        backgroundColor: closeBg,
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                     }}
                                 >
-                                    <Ionicons name="close" size={16} color="#6b7280" />
+                                    <Ionicons name="close" size={16} color={closeColor} />
                                 </View>
                             </Pressable>
                         </View>
 
                         <Text
-                            style={{ color: '#f3f4f6', fontSize: 22, fontWeight: '600', lineHeight: 32 }}
+                            style={{ color: bodyText, fontSize: 22, fontWeight: '600', lineHeight: 32 }}
                             numberOfLines={8}
                         >
                             {body}
@@ -212,7 +221,7 @@ export default function DriverMessageBanner({ senderName, body, alertType, admin
                             </View>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                 <Ionicons name="close-circle-outline" size={14} color="#6b7280" />
-                                <Text style={{ color: '#6b7280', fontSize: 12, fontWeight: '500' }}>Tap outside to close</Text>
+                                <Text style={{ color: hintMuted, fontSize: 12, fontWeight: '500' }}>Tap outside to close</Text>
                             </View>
                         </View>
                     </View>

@@ -217,6 +217,7 @@ Operational control panel: PTT, shift driver management, notification campaigns,
 - Query: `GET_DRIVERS`
 - Mutation: `ADMIN_SET_SHIFT_DRIVERS`
 - PTT managed via `useAdminPtt(selectedDriverIds, channelName, onChannelReset)` hook
+- `useAdminPtt` snapshots selected driver IDs at `startTalking()` and reuses that active target set for `STOPPED` and `MUTE/UNMUTE` signals, so changing chip selection mid-session does not leave previously-targeted drivers stuck in the old channel.
 
 **UI Sections:**
 
@@ -430,6 +431,11 @@ Theme preference persistence.
 
 Bidirectional push-to-talk between admin and drivers via Agora RTC. See [PTT Architecture](#ptt-architecture).
 
+Current safety behavior:
+- Start session captures a stable `activeDriverIds` set.
+- Stop/mute/unmute signals are emitted to that same active set (fallback to current selection only when no active set exists).
+- Driver-receive channel joins now validate negative Agora join return codes and surface a hook error instead of silently continuing.
+
 ### `useAppSetup` — App Initialization Orchestrator
 
 Composes `useSyncTheme`, `useAuthInitialization`, and `useInitializeTranslation`. Returns `{ ready: boolean }` (true when translations are loaded).
@@ -618,8 +624,10 @@ The admin app uses `react-native-agora` for bidirectional PTT with drivers. See 
 Admin startTalking()
   → getAgoraRtcCredentials(Publisher)
   → ensureSendEngine()
+  → defensive leaveChannel(sendEngine) when a stale session exists
   → joinChannel(sendEngine, channelName)
-  → ADMIN_SEND_PTT_SIGNAL(STARTED, driverIds)
+  → snapshot activeDriverIds for this session
+  → ADMIN_SEND_PTT_SIGNAL(STARTED, activeDriverIds)
 
 Driver talks
   → ADMIN_PTT_SIGNAL subscription fires (action: STARTED)
@@ -629,12 +637,14 @@ Driver talks
   → isDriverTalking = true (via onRemoteAudioStateChanged)
 
 Admin stopTalking()
-  → ADMIN_SEND_PTT_SIGNAL(STOPPED, driverIds)
+  → ADMIN_SEND_PTT_SIGNAL(STOPPED, activeDriverIds)
   → leaveChannel(sendEngine)
   → onChannelReset() → regenerates channelName
 ```
 
 **Two independent engine instances:** publisher (admin speaking) + subscriber (admin listening to drivers)  
+**Session target stability:** `activeDriverIds` snapshot is reused for STOP/MUTE/UNMUTE so mid-session chip changes do not retarget an active channel.  
+**Simultaneous talk handling:** supported via independent send/receive engines; admin can broadcast while receiving a driver channel in parallel.  
 **`AdminPttSignal` subscription:** Global subscription in `useAdminPtt` — reacts to driver PTT actions  
 **Channel naming:** `admin-driver-ptt-<timestamp>` — regenerated after each session via `onChannelReset` callback  
 **Shift drivers:** `ADMIN_SET_SHIFT_DRIVERS` mutation limits which drivers receive PTT signals

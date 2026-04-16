@@ -5,8 +5,6 @@ import { GET_AGORA_RTC_CREDENTIALS, ADMIN_SEND_PTT_SIGNAL, ADMIN_PTT_SIGNAL_SUBS
 import type { AgoraRtcCredentials, QueryGetAgoraRtcCredentialsArgs } from '@/gql/graphql';
 import { AgoraRtcRole } from '@/gql/graphql';
 
-type PttAction = 'STARTED' | 'STOPPED' | 'MUTE' | 'UNMUTE';
-
 const loadAgora = async () => {
     const agoraModule: any = await import('react-native-agora');
     return agoraModule;
@@ -21,11 +19,13 @@ export function useAdminPtt(selectedDriverIds: string[], channelName: string, on
 
     const [getRtcCredentials] = useLazyQuery<{ getAgoraRtcCredentials: AgoraRtcCredentials }, QueryGetAgoraRtcCredentialsArgs>(GET_AGORA_RTC_CREDENTIALS, { fetchPolicy: 'no-cache' });
     const [sendPttSignal] = useMutation(ADMIN_SEND_PTT_SIGNAL);
+    const activeDriverIdsRef = useRef<string[]>([]);
 
     // ─── Publisher engine (admin → drivers) ───
     const sendEngineRef = useRef<any>(null);
     const sendChannelRef = useRef<string | null>(null);
     const sendEventHandlerRef = useRef<any>(null);
+    const sendTransitionRef = useRef(false);
 
     // ─── Subscriber engine (driver → admin) ───
     const recvEngineRef = useRef<any>(null);
@@ -55,14 +55,24 @@ export function useAdminPtt(selectedDriverIds: string[], channelName: string, on
     };
 
     const startTalking = useCallback(async () => {
-        if (isTalking || selectedDriverIds.length === 0) return;
+        if (sendTransitionRef.current || isTalking || selectedDriverIds.length === 0) return;
+        sendTransitionRef.current = true;
         setPttError('');
+        const targetDriverIds = [...selectedDriverIds];
         try {
             const result = await getRtcCredentials({ variables: { channelName, role: AgoraRtcRole.Publisher } });
             const creds = result.data?.getAgoraRtcCredentials;
             if (!creds) throw new Error('Failed to get Agora credentials');
 
             const engine = await ensureSendEngine(creds.appId);
+
+            // Defensive leave: recover from stale joined state before re-joining.
+            if (sendChannelRef.current || isTalking) {
+                try { await engine.leaveChannel(); } catch { /* no-op */ }
+                sendChannelRef.current = null;
+                setIsTalking(false);
+            }
+
             const joinResult = await engine.joinChannel(creds.token, creds.channelName, creds.uid, {
                 autoSubscribeAudio: false,
                 publishMicrophoneTrack: true,
@@ -72,8 +82,9 @@ export function useAdminPtt(selectedDriverIds: string[], channelName: string, on
             }
             sendChannelRef.current = channelName;
             setIsTalking(true);
+            activeDriverIdsRef.current = targetDriverIds;
 
-            await sendPttSignal({ variables: { driverIds: selectedDriverIds, channelName, action: 'STARTED', muted: false } });
+            await sendPttSignal({ variables: { driverIds: targetDriverIds, channelName, action: 'STARTED', muted: false } });
         } catch (err: unknown) {
             console.warn('[PTT-Admin-Send] Failed to start', err);
             setPttError((err as Error)?.message || 'Failed to start PTT');
@@ -81,32 +92,43 @@ export function useAdminPtt(selectedDriverIds: string[], channelName: string, on
                 try { await sendEngineRef.current.leaveChannel(); } catch { /* no-op */ }
             }
             sendChannelRef.current = null;
+            activeDriverIdsRef.current = [];
             setIsTalking(false);
+        } finally {
+            sendTransitionRef.current = false;
         }
     }, [isTalking, selectedDriverIds, channelName, getRtcCredentials, sendPttSignal]);
 
     const stopTalking = useCallback(async () => {
+        if (sendTransitionRef.current) return;
+        sendTransitionRef.current = true;
         if (!sendChannelRef.current) {
             setIsTalking(false);
+            activeDriverIdsRef.current = [];
+            sendTransitionRef.current = false;
             return;
         }
         const ch = sendChannelRef.current;
+        const targetDriverIds = activeDriverIdsRef.current.length > 0 ? activeDriverIdsRef.current : selectedDriverIds;
         try {
-            await sendPttSignal({ variables: { driverIds: selectedDriverIds, channelName: ch, action: 'STOPPED' } });
+            await sendPttSignal({ variables: { driverIds: targetDriverIds, channelName: ch, action: 'STOPPED' } });
         } catch { /* best effort */ }
         try {
             if (sendEngineRef.current) await sendEngineRef.current.leaveChannel();
         } catch { /* no-op */ }
         sendChannelRef.current = null;
+        activeDriverIdsRef.current = [];
         setIsTalking(false);
         onChannelReset();
+        sendTransitionRef.current = false;
     }, [selectedDriverIds, sendPttSignal, onChannelReset]);
 
     const muteDrivers = useCallback(async (muted: boolean) => {
         if (!sendChannelRef.current) return;
+        const targetDriverIds = activeDriverIdsRef.current.length > 0 ? activeDriverIdsRef.current : selectedDriverIds;
         try {
             await sendPttSignal({
-                variables: { driverIds: selectedDriverIds, channelName: sendChannelRef.current, action: muted ? 'MUTE' : 'UNMUTE', muted },
+                variables: { driverIds: targetDriverIds, channelName: sendChannelRef.current, action: muted ? 'MUTE' : 'UNMUTE', muted },
             });
         } catch (err: unknown) {
             setPttError((err as Error)?.message || 'Failed to send mute signal');
@@ -156,10 +178,13 @@ export function useAdminPtt(selectedDriverIds: string[], channelName: string, on
             const creds = result.data?.getAgoraRtcCredentials;
             if (!creds) return;
             const engine = await ensureRecvEngine(creds.appId);
-            await engine.joinChannel(creds.token, creds.channelName, creds.uid, {
+            const joinResult = await engine.joinChannel(creds.token, creds.channelName, creds.uid, {
                 autoSubscribeAudio: true,
                 publishMicrophoneTrack: false,
             });
+            if (typeof joinResult === 'number' && joinResult < 0) {
+                throw new Error(`Agora joinChannel failed: ${joinResult}`);
+            }
             await engine.muteAllRemoteAudioStreams(false);
             await engine.adjustPlaybackSignalVolume(100);
             await engine.setDefaultAudioRouteToSpeakerphone(true);
@@ -215,6 +240,7 @@ export function useAdminPtt(selectedDriverIds: string[], channelName: string, on
                     try { sendEngineRef.current.leaveChannel(); } catch { /* no-op */ }
                     sendChannelRef.current = null;
                 }
+                activeDriverIdsRef.current = [];
                 sendEngineRef.current.release();
                 sendEngineRef.current = null;
             }

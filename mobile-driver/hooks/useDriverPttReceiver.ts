@@ -28,6 +28,7 @@ export function useDriverPttReceiver() {
   const sendEngineRef = useRef<any>(null);
   const sendChannelRef = useRef<string | null>(null);
   const sendEventHandlerRef = useRef<any>(null);
+  const sendTransitionRef = useRef(false);
 
   const loadAgora = async () => {
     const agoraModule: any = await import('react-native-agora');
@@ -215,7 +216,8 @@ export function useDriverPttReceiver() {
   };
 
   const startTalking = useCallback(async () => {
-    if (isTalking || !driverId) return;
+    if (sendTransitionRef.current || isTalking || !driverId) return;
+    sendTransitionRef.current = true;
     setPttError('');
 
     const channelName = `driver-ptt-${driverId}-${Date.now()}`;
@@ -232,6 +234,13 @@ export function useDriverPttReceiver() {
       if (!creds) throw new Error('Failed to get Agora credentials');
 
       const engine = await ensureSendEngine(creds.appId);
+
+      // Defensive leave: recover from stale joined state before re-joining.
+      if (sendChannelRef.current || isTalking) {
+        try { await engine.leaveChannel(); } catch { /* no-op */ }
+        sendChannelRef.current = null;
+        setIsTalking(false);
+      }
 
       const joinResult = await engine.joinChannel(creds.token, creds.channelName, creds.uid, {
         autoSubscribeAudio: false,
@@ -254,12 +263,17 @@ export function useDriverPttReceiver() {
       }
       sendChannelRef.current = null;
       setIsTalking(false);
+    } finally {
+      sendTransitionRef.current = false;
     }
   }, [isTalking, driverId, getRtcCredentials, sendPttSignal]);
 
   const stopTalking = useCallback(async () => {
+    if (sendTransitionRef.current) return;
+    sendTransitionRef.current = true;
     if (!sendChannelRef.current) {
       setIsTalking(false);
+      sendTransitionRef.current = false;
       return;
     }
 
@@ -281,6 +295,7 @@ export function useDriverPttReceiver() {
 
     sendChannelRef.current = null;
     setIsTalking(false);
+    sendTransitionRef.current = false;
   }, [sendPttSignal]);
 
   // ═══════════════ CLEANUP ═══════════════
