@@ -36,7 +36,7 @@ vi.mock('@/services/driverServices.init', () => ({
     })),
 }));
 
-function makeContext(role: string = 'BUSINESS_OWNER') {
+function makeContext(role: string = 'BUSINESS_OWNER', orderStatus: 'PREPARING' | 'READY' = 'PREPARING') {
     return {
         db: {},
         userData: {
@@ -46,7 +46,8 @@ function makeContext(role: string = 'BUSINESS_OWNER') {
         },
         orderService: {
             orderRepository: {},
-            getOrderById: vi.fn(async (id: string) => ({ id, status: 'PREPARING' })),
+            getOrderById: vi.fn(async (id: string) => ({ id, status: orderStatus })),
+            publishAllOrders: vi.fn(async () => undefined),
         },
         notificationService: {},
     } as any;
@@ -78,6 +79,7 @@ describe('createDirectDispatchOrder resolver', () => {
                 recipientPhone: '+38344111222',
                 recipientName: 'Customer',
                 driverNotes: 'Ring once',
+                cashToCollect: null,
             },
             'business-user-1',
         );
@@ -105,5 +107,31 @@ describe('createDirectDispatchOrder resolver', () => {
         expect(mockedDeps.createOrder).toHaveBeenCalledTimes(1);
         expect(context.orderService.getOrderById).toHaveBeenCalledWith('direct-order-1');
         expect(result).toEqual({ id: 'direct-order-1', status: 'PREPARING' });
+    });
+
+    it('returns a READY order immediately when preparation time is zero', async () => {
+        const context = makeContext('BUSINESS_OWNER', 'READY');
+
+        const result = await createDirectDispatchOrder(
+            null as any,
+            {
+                input: {
+                    dropOffLocation: { latitude: 42.46, longitude: 21.47, address: 'Gjilan' },
+                    preparationMinutes: 0,
+                    recipientPhone: '+38344111222',
+                },
+            },
+            context,
+        );
+
+        expect(mockedDeps.createOrder).toHaveBeenCalledWith(
+            expect.objectContaining({
+                preparationMinutes: 0,
+                recipientPhone: '+38344111222',
+            }),
+            'business-user-1',
+        );
+        expect(mockedDeps.scheduleEarlyDispatch).toHaveBeenCalledWith('direct-order-1', 0, context.notificationService);
+        expect(result).toEqual({ id: 'direct-order-1', status: 'READY' });
     });
 });

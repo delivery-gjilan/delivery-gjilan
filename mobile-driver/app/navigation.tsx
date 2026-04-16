@@ -146,6 +146,9 @@ export default function NavigationScreen() {
         if (driverOrder.driverTakeHomePreview != null) return Number(driverOrder.driverTakeHomePreview);
 
         const deliveryFeeAmount = Number(driverOrder.deliveryPrice ?? 0);
+        if (driverOrder.channel === 'DIRECT_DISPATCH') {
+            return deliveryFeeAmount;
+        }
         const commissionAmount = deliveryFeeAmount * (Math.max(0, commissionPct) / 100);
         return Math.max(0, deliveryFeeAmount - commissionAmount);
     }, [commissionPct]);

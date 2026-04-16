@@ -57,7 +57,7 @@ Direct Dispatch creates normal `orders` rows with `channel = DIRECT_DISPATCH` in
   - validates per-business `directDispatchFixedAmount > 0`
   - `createOrder(input, requestingUserId)` inserts the order
   - uses business-level `directDispatchFixedAmount` as order `deliveryPrice`
-  - creates the order in `PREPARING` with `preparationMinutes` and `estimatedReadyAt`
+  - creates the order in `READY` immediately when `preparationMinutes = 0`; otherwise creates it in `PREPARING` with `preparationMinutes` and `estimatedReadyAt`
 
 ---
 

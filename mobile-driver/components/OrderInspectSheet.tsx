@@ -233,11 +233,14 @@ export function OrderInspectSheet({
         }
     }, [onMarkPickedUp]);
 
-    // Driver take for this card follows delivery-fee minus platform commission.
+    // Driver take for this card prefers settlement-engine preview; DD fallback must
+    // not reuse generic per-driver commission math.
     const commissionPct = Number(metricsData?.myDriverMetrics?.commissionPercentage ?? 0);
     const deliveryFeeAmount = Number(order.deliveryPrice ?? 0);
     const commissionAmount = deliveryFeeAmount * (Math.max(0, commissionPct) / 100);
-    const fallbackNetEarnings = Math.max(0, deliveryFeeAmount - commissionAmount);
+    const fallbackNetEarnings = isDirectDispatch
+        ? deliveryFeeAmount
+        : Math.max(0, deliveryFeeAmount - commissionAmount);
     const netEarnings = Number(order.driverTakeHomePreview ?? fallbackNetEarnings);
 
     const primaryAction = useMemo(() => {

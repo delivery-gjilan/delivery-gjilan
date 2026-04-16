@@ -134,6 +134,7 @@ export class DirectDispatchService {
         }
 
         const now = new Date();
+        const isReadyImmediately = input.preparationMinutes === 0;
         const estimatedReadyAt = new Date(now.getTime() + input.preparationMinutes * 60_000);
 
         const displayId = this.generateDisplayId();
@@ -155,10 +156,11 @@ export class DirectDispatchService {
                 prioritySurcharge: 0,
                 driverTip: 0,
                 paymentCollection: 'CASH_TO_DRIVER',
-                status: 'PREPARING',
+                status: isReadyImmediately ? 'READY' : 'PREPARING',
                 preparationMinutes: input.preparationMinutes,
-                preparingAt: now.toISOString(),
+                preparingAt: isReadyImmediately ? null : now.toISOString(),
                 estimatedReadyAt: estimatedReadyAt.toISOString(),
+                readyAt: isReadyImmediately ? now.toISOString() : null,
                     dropoffLat: input.dropOffLocation?.latitude ?? 0,
                     dropoffLng: input.dropOffLocation?.longitude ?? 0,
                     dropoffAddress: input.dropOffLocation?.address ?? '',
@@ -173,6 +175,7 @@ export class DirectDispatchService {
                 displayId,
                 businessId: input.businessId,
                 preparationMinutes: input.preparationMinutes,
+                initialStatus: isReadyImmediately ? 'READY' : 'PREPARING',
                 recipientPhone: input.recipientPhone,
                 fixedAmount,
             },

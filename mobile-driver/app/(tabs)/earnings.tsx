@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useQuery, useMutation, useLazyQuery } from '@apollo/client/react';
+import { useAuthStore } from '@/store/authStore';
 import {
     GET_MY_SETTLEMENTS,
     GET_DRIVER_CASH_SUMMARY,
@@ -16,15 +17,28 @@ import {
     RESPOND_TO_SETTLEMENT_REQUEST,
     GET_DRIVER_ORDER_FINANCIALS,
 } from '@/graphql/operations/driver';
-import type { GetMySettlementsQuery, GetMyDriverSettlementRequestsQuery, GetSettlementBreakdownQuery } from '@/gql/graphql';
+import { GET_ORDERS } from '@/graphql/operations/orders';
+import { SettlementStatus } from '@/gql/graphql';
+import type { GetMySettlementsQuery, GetSettlementBreakdownQuery, GetOrdersQuery } from '@/gql/graphql';
 import { format, startOfDay, startOfMonth, startOfWeek, subMonths } from 'date-fns';
 
 type Settlement = GetMySettlementsQuery['settlements'][number];
 type BreakdownItem = GetSettlementBreakdownQuery['settlementBreakdown'][number];
+type DeliveredOrder = GetOrdersQuery['orders']['orders'][number];
+type SettlementOrderGroup = {
+    orderId: string;
+    orderDisplayId: string | null;
+    order: Settlement['order'];
+    settlements: Settlement[];
+    totalReceivable: number;
+    totalPayable: number;
+    latestCreatedAt: string;
+};
 
 type Period = 'today' | 'week' | 'month' | 'last_month' | 'all';
 
 const SETTLEMENT_PAGE_SIZE = 10000;
+const UNSETTLED_STATUS = SettlementStatus.Pending;
 
 function getPeriodDates(period: Period): { startDate?: string; endDate?: string } {
     const now = new Date();
@@ -64,15 +78,22 @@ function formatDateTime(dateStr?: string | null) {
     try { return format(new Date(dateStr), 'MMM d, HH:mm'); } catch { return '—'; }
 }
 
+function isUnsettledStatus(status?: SettlementStatus | null) {
+    return status === SettlementStatus.Pending
+        || status === SettlementStatus.Overdue
+        || status === SettlementStatus.Disputed;
+}
+
 export default function EarningsScreen() {
     const theme = useTheme();
     const { t } = useTranslations();
+    const user = useAuthStore((state) => state.user);
     const [period, setPeriod] = useState<Period>('all');
     const [refreshing, setRefreshing] = useState(false);
     const [disputeModalRequestId, setDisputeModalRequestId] = useState<string | null>(null);
     const [rejectReason, setRejectReason] = useState('');
     const [respondingId, setRespondingId] = useState<string | null>(null);
-    const [selectedSettlementOrder, setSelectedSettlementOrder] = useState<{ orderId: string; orderDisplayId: string | null; order: Settlement['order']; settlements: Settlement[]; totalReceivable: number; totalPayable: number; latestCreatedAt: string } | null>(null);
+    const [selectedSettlementOrder, setSelectedSettlementOrder] = useState<SettlementOrderGroup | null>(null);
     const [allSettlements, setAllSettlements] = useState<Settlement[]>([]);
     const [settlementOffset, setSettlementOffset] = useState(0);
     const [hasMoreSettlements, setHasMoreSettlements] = useState(true);
@@ -101,13 +122,13 @@ export default function EarningsScreen() {
 
     const { data: breakdownData, loading: breakdownLoading, refetch: refetchBreakdown } = useQuery(
         GET_SETTLEMENT_BREAKDOWN,
-        { variables: { startDate, endDate }, fetchPolicy: 'network-only' },
+        { variables: { isSettled: false, startDate, endDate }, fetchPolicy: 'network-only' },
     );
 
     const { data: settlementsData, loading: settlementsLoading, refetch: refetchSettlements, fetchMore: fetchMoreSettlements } = useQuery(
         GET_MY_SETTLEMENTS,
         {
-            variables: { startDate, endDate, limit: SETTLEMENT_PAGE_SIZE, offset: 0 },
+            variables: { status: UNSETTLED_STATUS, startDate, endDate, limit: SETTLEMENT_PAGE_SIZE, offset: 0 },
             fetchPolicy: 'network-only',
             onCompleted: (data) => {
                 const rows = data?.settlements ?? [];
@@ -122,6 +143,10 @@ export default function EarningsScreen() {
         GET_MY_SETTLEMENT_REQUESTS,
         { variables: { status: 'PENDING', limit: 20 }, fetchPolicy: 'network-only' },
     );
+
+    const { data: ordersData, loading: ordersLoading, refetch: refetchOrders } = useQuery(GET_ORDERS, {
+        fetchPolicy: 'cache-and-network',
+    });
 
     const [respondToRequest] = useMutation(RESPOND_TO_SETTLEMENT_REQUEST);
 
@@ -144,18 +169,26 @@ export default function EarningsScreen() {
     const breakdownItems = breakdownData?.settlementBreakdown ?? [];
     const settlements = allSettlements;
     const pendingRequests = requestsData?.settlementRequests ?? [];
+    const unsettledSettlements = useMemo(
+        () => settlements.filter((settlement) => isUnsettledStatus(settlement.status)),
+        [settlements],
+    );
+    const settlementOrderIds = useMemo(
+        () => new Set(settlements.map((settlement) => String(settlement.order?.id ?? settlement.id))),
+        [settlements],
+    );
 
     // Group settlements by direction for the list
     const groupedSettlements = useMemo(() => {
-        const receivable = settlements.filter((s) => s.direction === 'RECEIVABLE' && s.status === 'PENDING');
-        const payable = settlements.filter((s) => s.direction === 'PAYABLE' && s.status === 'PENDING');
+        const receivable = unsettledSettlements.filter((s) => s.direction === 'RECEIVABLE');
+        const payable = unsettledSettlements.filter((s) => s.direction === 'PAYABLE');
         return { receivable, payable };
-    }, [settlements]);
+    }, [unsettledSettlements]);
 
     const settlementOrders = useMemo(() => {
-        const byOrder = new Map<string, { orderId: string; orderDisplayId: string | null; order: Settlement['order']; settlements: Settlement[]; totalReceivable: number; totalPayable: number; latestCreatedAt: string }>();
+        const byOrder = new Map<string, SettlementOrderGroup>();
 
-        settlements.forEach((settlement) => {
+        unsettledSettlements.forEach((settlement) => {
             const orderId = String(settlement.order?.id ?? settlement.id);
             const existing = byOrder.get(orderId);
             if (existing) {
@@ -182,12 +215,22 @@ export default function EarningsScreen() {
         return Array.from(byOrder.values()).sort(
             (a, b) => new Date(b.latestCreatedAt).getTime() - new Date(a.latestCreatedAt).getTime(),
         );
-    }, [settlements]);
+    }, [unsettledSettlements]);
+
+    const buildDeliveredOrderGroup = useCallback((order: DeliveredOrder): SettlementOrderGroup => ({
+        orderId: order.id,
+        orderDisplayId: order.displayId ?? null,
+        order: order as unknown as Settlement['order'],
+        settlements: [],
+        totalReceivable: 0,
+        totalPayable: 0,
+        latestCreatedAt: order.orderDate,
+    }), []);
 
     // Group category-filtered settlements by order
     const categoryOrders = useMemo(() => {
         const byOrder = new Map<string, { orderId: string; orderDisplayId: string | null; order: Settlement['order']; settlements: Settlement[]; totalReceivable: number; totalPayable: number; latestCreatedAt: string }>();
-        categorySettlements.forEach((settlement) => {
+        categorySettlements.filter((settlement) => isUnsettledStatus(settlement.status)).forEach((settlement) => {
             const orderId = String(settlement.order?.id ?? settlement.id);
             const existing = byOrder.get(orderId);
             if (existing) {
@@ -214,7 +257,16 @@ export default function EarningsScreen() {
         const cfg = getCategoryConfig(item.category, item.direction);
         setSelectedCategory({ category: item.category, label: item.label, color: cfg.color, direction: item.direction });
         setCategorySettlements([]);
-        fetchCategorySettlements({ variables: { category: item.category, direction: item.direction, startDate, endDate, limit: 10000 } });
+        fetchCategorySettlements({
+            variables: {
+                status: UNSETTLED_STATUS,
+                category: item.category,
+                direction: item.direction,
+                startDate,
+                endDate,
+                limit: 10000,
+            },
+        });
     }, [fetchCategorySettlements, startDate, endDate]);
 
     const handleLoadMoreSettlements = useCallback(async () => {
@@ -222,7 +274,7 @@ export default function EarningsScreen() {
         setLoadingMore(true);
         try {
             const result = await fetchMoreSettlements({
-                variables: { startDate, endDate, limit: SETTLEMENT_PAGE_SIZE, offset: settlementOffset },
+                variables: { status: UNSETTLED_STATUS, startDate, endDate, limit: SETTLEMENT_PAGE_SIZE, offset: settlementOffset },
             });
             const rows = result.data?.settlements ?? [];
             setAllSettlements(prev => [...prev, ...rows]);
@@ -235,9 +287,39 @@ export default function EarningsScreen() {
 
     const onRefresh = async () => {
         setRefreshing(true);
-        await Promise.all([refetchCash(), refetchBreakdown(), refetchSettlements(), refetchRequests()]);
+        await Promise.all([refetchCash(), refetchBreakdown(), refetchSettlements(), refetchRequests(), refetchOrders()]);
         setRefreshing(false);
     };
+
+    const deliveredOrders = useMemo(() => {
+        const rows = ordersData?.orders?.orders ?? [];
+        return rows
+            .filter((order) => order.status === 'DELIVERED')
+            .filter((order) => !user?.id || order.driver?.id === user.id)
+            .filter((order) => (!startDate || new Date(order.orderDate) >= new Date(startDate)) && (!endDate || new Date(order.orderDate) <= new Date(endDate)))
+            .sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
+    }, [ordersData, user?.id, startDate, endDate]);
+
+    const unsettledDeliveredOrders = useMemo(() => {
+        return deliveredOrders.filter((order) => !settlementOrderIds.has(order.id));
+    }, [deliveredOrders, settlementOrderIds]);
+
+    const visibleOrderEntries = useMemo(() => {
+        return [
+            ...settlementOrders.map((orderGroup) => ({
+                kind: 'settlement' as const,
+                sortDate: orderGroup.order?.orderDate ?? orderGroup.latestCreatedAt,
+                orderGroup,
+            })),
+            ...unsettledDeliveredOrders.map((order) => ({
+                kind: 'delivered' as const,
+                sortDate: order.orderDate,
+                order,
+            })),
+        ].sort((a, b) => new Date(b.sortDate).getTime() - new Date(a.sortDate).getTime());
+    }, [settlementOrders, unsettledDeliveredOrders]);
+
+    const visibleOrderCount = settlementOrders.length + unsettledDeliveredOrders.length;
 
     // ── Settlement request handlers ──
     const handleAccept = async (requestId: string) => {
@@ -728,26 +810,118 @@ export default function EarningsScreen() {
                     <View style={es.sectionHeader}>
                         <View style={[es.sectionDot, { backgroundColor: theme.colors.primary }]} />
                         <Text style={[es.sectionTitle, { color: theme.colors.text }]}>
-                            {t.earnings.deliveries_list}
+                            {t.earnings.delivered_orders ?? t.earnings.deliveries_list ?? 'Delivered Orders'}
                         </Text>
-                        {settlementOrders.length > 0 && (
+                        {visibleOrderCount > 0 && (
                             <Text style={[es.sectionCount, { color: theme.colors.subtext }]}>
-                                {settlementOrders.length}
+                                {visibleOrderCount}
                             </Text>
                         )}
                     </View>
 
-                    {settlementsLoading ? (
+                    {settlementsLoading || ordersLoading ? (
                         <ActivityIndicator color={theme.colors.primary} style={{ marginTop: 16 }} />
-                    ) : settlementOrders.length === 0 ? (
-                        <View style={es.emptyState}>
-                            <Text style={es.emptyEmoji}>💰</Text>
-                            <Text style={[es.emptyTitle, { color: theme.colors.text }]}>{t.earnings.no_earnings_title}</Text>
-                            <Text style={[es.emptySub, { color: theme.colors.subtext }]}>{t.earnings.no_earnings_sub}</Text>
-                        </View>
+                    ) : visibleOrderCount === 0 ? (
+                            <View style={es.emptyState}>
+                                <Text style={es.emptyEmoji}>💰</Text>
+                                <Text style={[es.emptyTitle, { color: theme.colors.text }]}>{t.earnings.no_earnings_title}</Text>
+                                <Text style={[es.emptySub, { color: theme.colors.subtext }]}>{t.earnings.no_earnings_sub}</Text>
+                            </View>
                     ) : (
                         <View style={{ gap: 10, marginTop: 12 }}>
-                            {settlementOrders.map((orderGroup) => {
+                            {visibleOrderEntries.map((entry) => {
+                                if (entry.kind === 'delivered') {
+                                    const order = entry.order;
+                                    const businessNames = order.businesses?.map((b) => b.business?.name).filter(Boolean).join(', ') ?? '—';
+                                    const takeHome = Number(order.driverTakeHomePreview ?? 0);
+                                    const tip = Number(order.driverTip ?? 0);
+                                    return (
+                                        <Pressable
+                                            key={order.id}
+                                            onPress={() => {
+                                                setHighlightCategory(null);
+                                                setSelectedSettlementOrder(buildDeliveredOrderGroup(order));
+                                                fetchFinancials({ variables: { orderId: order.id } });
+                                            }}
+                                            style={[es.historyCard, {
+                                                backgroundColor: theme.colors.card,
+                                                borderColor: theme.colors.border,
+                                            }]}
+                                        >
+                                            <View style={es.historyTopRow}>
+                                                <View style={[es.historyTag, { backgroundColor: theme.colors.primary + '18' }]}>
+                                                    <View style={[es.historyTagDot, { backgroundColor: theme.colors.primary }]} />
+                                                    <Text style={[es.historyTagText, { color: theme.colors.primary }]}>#{order.displayId ?? order.id.slice(-6)}</Text>
+                                                </View>
+                                                <Text style={[es.historyAmount, { color: takeHome >= 0 ? theme.colors.income : '#f59e0b' }]}>
+                                                    {takeHome >= 0 ? '+' : '-'}{formatCurrency(Math.abs(takeHome))}
+                                                </Text>
+                                            </View>
+
+                                            <Text style={[es.historyReason, { color: theme.colors.text }]} numberOfLines={2}>
+                                                {t.earnings.delivery_completed ?? 'Delivered order'}
+                                            </Text>
+
+                                            <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+                                                <View style={{ backgroundColor: '#3b82f618', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                                                    <Text style={{ fontSize: 10, color: theme.colors.subtext }}>
+                                                        {t.earnings.status ?? 'Status'}
+                                                    </Text>
+                                                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#3b82f6' }}>
+                                                        {t.earnings.awaiting_settlement ?? 'Awaiting settlement'}
+                                                    </Text>
+                                                </View>
+                                                <View style={{ backgroundColor: theme.colors.income + '18', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                                                    <Text style={{ fontSize: 10, color: theme.colors.subtext }}>
+                                                        {t.earnings.take_home ?? 'Take-home'}
+                                                    </Text>
+                                                    <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.income }}>
+                                                        {formatCurrency(takeHome)}
+                                                    </Text>
+                                                </View>
+                                                {tip > 0 && (
+                                                    <View style={{ backgroundColor: '#22c55e18', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                                                        <Text style={{ fontSize: 10, color: theme.colors.subtext }}>
+                                                            {t.earnings.tip_label ?? 'Tip'}
+                                                        </Text>
+                                                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#22c55e' }}>
+                                                            +{formatCurrency(tip)}
+                                                        </Text>
+                                                    </View>
+                                                )}
+                                            </View>
+
+                                            <View style={es.historyMeta}>
+                                                <View style={es.historyMetaRow}>
+                                                    <Ionicons name="storefront-outline" size={12} color={theme.colors.subtext} />
+                                                    <Text style={[es.historyMetaText, { color: theme.colors.subtext }]} numberOfLines={1}>
+                                                        {businessNames}
+                                                    </Text>
+                                                </View>
+                                                <View style={es.historyMetaRow}>
+                                                    <Ionicons name="location-outline" size={12} color={theme.colors.subtext} />
+                                                    <Text style={[es.historyMetaText, { color: theme.colors.subtext }]} numberOfLines={1}>
+                                                        {order.dropOffLocation?.address ?? '—'}
+                                                    </Text>
+                                                </View>
+                                            </View>
+
+                                            <View style={es.historyFooter}>
+                                                <Text style={[es.historyDate, { color: theme.colors.subtext }]}>
+                                                    {formatDateTime(order.orderDate)}
+                                                </Text>
+                                                <View style={[es.historyStatus, { backgroundColor: '#22c55e18' }]}>
+                                                    <View style={[es.historyStatusDot, { backgroundColor: '#22c55e' }]} />
+                                                    <Text style={[es.historyStatusText, { color: '#22c55e' }]}>
+                                                        {t.earnings.delivered ?? 'Delivered'}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                        </Pressable>
+                                    );
+                                }
+
+                                const orderGroup = entry.orderGroup;
                                 const settlementsForOrder = orderGroup.settlements;
                                 const firstSettlement = settlementsForOrder[0];
                                 const businessNames = firstSettlement?.order?.businesses?.map((b) => b.business?.name).filter(Boolean).join(", ") ?? "—";
@@ -771,7 +945,6 @@ export default function EarningsScreen() {
                                         backgroundColor: theme.colors.card,
                                         borderColor: hasPending ? theme.colors.border : theme.colors.income + "25",
                                     }]}>
-                                        {/* Top row: tag + amount */}
                                         <View style={es.historyTopRow}>
                                             <View style={[es.historyTag, { backgroundColor: theme.colors.primary + "18" }]}>
                                                 <View style={[es.historyTagDot, { backgroundColor: theme.colors.primary }]} />
@@ -782,7 +955,6 @@ export default function EarningsScreen() {
                                             </Text>
                                         </View>
 
-                                        {/* Reason / explanation */}
                                         <Text style={[es.historyReason, { color: theme.colors.text }]} numberOfLines={2}>
                                             {lineCount} settlement line{lineCount === 1 ? '' : 's'}
                                         </Text>
@@ -790,7 +962,7 @@ export default function EarningsScreen() {
                                         <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
                                             <View style={{ backgroundColor: '#f59e0b18', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
                                                 <Text style={{ fontSize: 10, color: theme.colors.subtext }}>
-                                                    Commission
+                                                    {t.earnings.commission ?? 'Commission'}
                                                 </Text>
                                                 <Text style={{ fontSize: 12, fontWeight: '700', color: '#f59e0b' }}>
                                                     -{formatCurrency(commissionAmount)}
@@ -798,7 +970,7 @@ export default function EarningsScreen() {
                                             </View>
                                             <View style={{ backgroundColor: theme.colors.income + '18', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
                                                 <Text style={{ fontSize: 10, color: theme.colors.subtext }}>
-                                                    Platform pays
+                                                    {t.earnings.platform_owes_you ?? 'Platform pays'}
                                                 </Text>
                                                 <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.income }}>
                                                     +{formatCurrency(payoutAmount)}
@@ -806,7 +978,6 @@ export default function EarningsScreen() {
                                             </View>
                                         </View>
 
-                                        {/* Category tags */}
                                         {(() => {
                                             const catMap = new Map<string, string>();
                                             settlementsForOrder.forEach((s) => {
@@ -827,7 +998,6 @@ export default function EarningsScreen() {
                                             );
                                         })()}
 
-                                        {/* Business & address */}
                                         <View style={es.historyMeta}>
                                             <View style={es.historyMetaRow}>
                                                 <Ionicons name="storefront-outline" size={12} color={theme.colors.subtext} />
@@ -843,10 +1013,9 @@ export default function EarningsScreen() {
                                             </View>
                                         </View>
 
-                                        {/* Footer: date + status */}
                                         <View style={es.historyFooter}>
                                             <Text style={[es.historyDate, { color: theme.colors.subtext }]}>
-                                                {formatDateTime(orderGroup.latestCreatedAt)}
+                                                {formatDateTime(orderGroup.order?.orderDate ?? orderGroup.latestCreatedAt)}
                                             </Text>
                                             <View style={[es.historyStatus, {
                                                 backgroundColor: hasPending ? "#f59e0b18" : theme.colors.income + "18",
@@ -1000,6 +1169,7 @@ export default function EarningsScreen() {
                         const settlementsForOrder = selectedSettlementOrder.settlements ?? [];
                         const fin = financialsData?.driverOrderFinancials;
                         const ord = financialsData?.order;
+                        const hasSettlementLines = settlementsForOrder.length > 0;
                         const totalReceivable = settlementsForOrder
                             .filter((line) => line.direction === 'RECEIVABLE')
                             .reduce((sum: number, line) => sum + Number(line.amount ?? 0), 0);
@@ -1007,7 +1177,9 @@ export default function EarningsScreen() {
                             .filter((line) => line.direction === 'PAYABLE')
                             .reduce((sum: number, line) => sum + Number(line.amount ?? 0), 0);
                         const netAmount = totalPayable - totalReceivable;
-                        const amountColor = netAmount >= 0 ? theme.colors.income : '#f59e0b';
+                        const previewNetAmount = Number(fin?.driverNetEarnings ?? 0);
+                        const displayNetAmount = hasSettlementLines ? netAmount : previewNetAmount;
+                        const amountColor = displayNetAmount >= 0 ? theme.colors.income : '#f59e0b';
                         const isCash = (fin?.paymentCollection ?? ord?.paymentCollection) === "CASH_TO_DRIVER";
 
                         return (
@@ -1057,7 +1229,7 @@ export default function EarningsScreen() {
                                                         </Text>
                                                     </View>
                                                     <Text style={[es.historyAmount, { color: amountColor }]}>
-                                                        {netAmount >= 0 ? '+' : '-'}{formatCurrency(Math.abs(netAmount))}
+                                                        {displayNetAmount >= 0 ? '+' : '-'}{formatCurrency(Math.abs(displayNetAmount))}
                                                     </Text>
                                                 </View>
                                                 <View style={es.detailRow}>
@@ -1065,12 +1237,24 @@ export default function EarningsScreen() {
                                                         {t.earnings.status ?? "Status"}
                                                     </Text>
                                                     <View style={[es.methodBadge, {
-                                                        backgroundColor: settlementsForOrder.some((line) => line.status !== 'PAID') ? '#f59e0b18' : theme.colors.income + '18',
+                                                        backgroundColor: !hasSettlementLines
+                                                            ? '#3b82f618'
+                                                            : settlementsForOrder.some((line) => line.status !== 'PAID')
+                                                                ? '#f59e0b18'
+                                                                : theme.colors.income + '18',
                                                     }]}>
                                                         <Text style={[es.methodBadgeText, {
-                                                            color: settlementsForOrder.some((line) => line.status !== 'PAID') ? '#f59e0b' : theme.colors.income,
+                                                            color: !hasSettlementLines
+                                                                ? '#3b82f6'
+                                                                : settlementsForOrder.some((line) => line.status !== 'PAID')
+                                                                    ? '#f59e0b'
+                                                                    : theme.colors.income,
                                                         }]}>
-                                                            {settlementsForOrder.some((line) => line.status !== 'PAID') ? t.earnings.pending : t.earnings.paid}
+                                                            {!hasSettlementLines
+                                                                ? (t.earnings.delivered ?? 'Delivered')
+                                                                : settlementsForOrder.some((line) => line.status !== 'PAID')
+                                                                    ? t.earnings.pending
+                                                                    : t.earnings.paid}
                                                         </Text>
                                                     </View>
                                                 </View>
@@ -1081,7 +1265,7 @@ export default function EarningsScreen() {
                                                 <Text style={[es.detailSectionTitle, { color: theme.colors.text }]}>
                                                     {t.earnings.settlement_breakdown ?? "Settlement Breakdown"}
                                                 </Text>
-                                                {settlementsForOrder.map((line) => {
+                                                {hasSettlementLines ? settlementsForOrder.map((line) => {
                                                     const lineIsPayable = line.direction === 'PAYABLE';
                                                     const lineTag = getSettlementTag(line);
                                                     const lineCategory = getLineCategory(line);
@@ -1097,7 +1281,7 @@ export default function EarningsScreen() {
                                                             borderRadius: 8,
                                                             borderLeftWidth: 3,
                                                             borderLeftColor: highlightColor,
-                                                        }]}>
+                                                        }]}> 
                                                             <View style={{ flex: 1, gap: 2 }}>
                                                                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                                                                     <View style={[es.historyTagDot, { backgroundColor: lineTag.color }]} />
@@ -1116,14 +1300,43 @@ export default function EarningsScreen() {
                                                             </Text>
                                                         </View>
                                                     );
-                                                })}
+                                                }) : (
+                                                    <>
+                                                        <View style={es.detailRow}>
+                                                            <Text style={[es.detailLabel, { color: theme.colors.subtext }]}>
+                                                                {t.earnings.cash_collected ?? 'Cash collected'}
+                                                            </Text>
+                                                            <Text style={[es.detailValue, { color: theme.colors.text }]}>
+                                                                {formatCurrency(Number(fin?.amountToCollectFromCustomer ?? 0))}
+                                                            </Text>
+                                                        </View>
+                                                        <View style={es.detailRow}>
+                                                            <Text style={[es.detailLabel, { color: theme.colors.subtext }]}>
+                                                                {t.earnings.cat_markup ?? 'Markup'} / {t.earnings.commission ?? 'Commission'}
+                                                            </Text>
+                                                            <Text style={[es.detailValue, { color: '#f59e0b' }]}>
+                                                                -{formatCurrency(Number(fin?.amountToRemitToPlatform ?? 0))}
+                                                            </Text>
+                                                        </View>
+                                                        {Number(fin?.driverTip ?? 0) > 0 && (
+                                                            <View style={es.detailRow}>
+                                                                <Text style={[es.detailLabel, { color: theme.colors.subtext }]}>
+                                                                    {t.earnings.tip_label ?? 'Tip'}
+                                                                </Text>
+                                                                <Text style={[es.detailValue, { color: theme.colors.income }]}>
+                                                                    +{formatCurrency(Number(fin?.driverTip ?? 0))}
+                                                                </Text>
+                                                            </View>
+                                                        )}
+                                                    </>
+                                                )}
                                                 <View style={[es.detailDivider, { backgroundColor: theme.colors.border }]} />
                                                 <View style={es.detailRow}>
                                                     <Text style={[es.detailLabel, { color: theme.colors.text, fontWeight: "700" }]}>
                                                         {t.earnings.net ?? "Net"}
                                                     </Text>
                                                     <Text style={[es.detailValue, { color: amountColor, fontWeight: "800", fontSize: 15 }]}>
-                                                        {netAmount >= 0 ? '+' : '-'}{formatCurrency(Math.abs(netAmount))}
+                                                        {displayNetAmount >= 0 ? '+' : '-'}{formatCurrency(Math.abs(displayNetAmount))}
                                                     </Text>
                                                 </View>
                                             </View>

@@ -450,6 +450,7 @@ export default function MessagesScreen() {
                         data={listItems}
                         keyExtractor={(item) => item.key}
                         renderItem={renderItem}
+                        style={{ flex: 1 }}
                         contentContainerStyle={{ paddingVertical: 12, paddingBottom: 20 }}
                         keyboardShouldPersistTaps="handled"
                         onLayout={scrollToBottom}

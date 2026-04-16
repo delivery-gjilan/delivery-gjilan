@@ -31,6 +31,7 @@ import { GET_BUSINESS_ORDERS, GET_BUSINESS_ORDER_REVIEWS } from '@/graphql/order
 import { GET_BUSINESS_PRODUCTS } from '@/graphql/products';
 import { useAuthStore } from '@/store/authStore';
 import { useTranslation } from '@/hooks/useTranslation';
+import { SettlementStatus } from '@/gql/graphql';
 import type { GetMyBusinessSettlementsQuery, GetBusinessSettlementBreakdownQuery } from '@/gql/graphql';
 
 type Settlement = GetMyBusinessSettlementsQuery['settlements'][number];
@@ -119,6 +120,12 @@ function formatDateTime(dateStr?: string | null) {
     }
 }
 
+function isUnsettledStatus(status?: SettlementStatus | null) {
+    return status === SettlementStatus.Pending
+        || status === SettlementStatus.Overdue
+        || status === SettlementStatus.Disputed;
+}
+
 type SettlementOrderItem = GetMyBusinessSettlementsQuery['settlements'][number]['order'] extends infer O
     ? NonNullable<O> extends { businesses: Array<{ items: Array<infer I> }> } ? I : never
     : never;
@@ -193,7 +200,7 @@ export default function FinancesScreen() {
 
     const { data: ordersData, loading: ordersLoading, refetch: refetchOrders } = useQuery(GET_BUSINESS_ORDERS, {
         pollInterval: 60000,
-        skip: financeTab !== 'stats',
+        skip: !businessId,
     });
 
     const { data: productsData, refetch: refetchProducts } = useQuery(GET_BUSINESS_PRODUCTS, {
@@ -224,6 +231,17 @@ export default function FinancesScreen() {
     }, [statsOrders, statsFilter]);
 
     const statsDelivered = useMemo(() => statsFilteredOrders.filter((o) => o.status === 'DELIVERED'), [statsFilteredOrders]);
+
+    const buildDeliveredOrderGroup = useCallback((order: typeof statsOrders[number]): SettlementOrderGroup => ({
+        orderId: order.id,
+        orderDisplayId: order.displayId ?? order.id.slice(-6),
+        order: order as unknown as BusinessSettlement['order'],
+        settlements: [],
+        totalGross: calculateBusinessSubtotal((((order.businesses ?? []).find((entry) => entry.business?.id === businessId)?.items ?? []) as SettlementOrderItem[])),
+        totalReceivable: 0,
+        totalPayable: 0,
+        latestCreatedAt: order.orderDate,
+    }), [businessId]);
 
     const statsKPIs = useMemo(() => {
         const revenue = statsDelivered.reduce((sum, o) => {
@@ -326,6 +344,13 @@ export default function FinancesScreen() {
 
     const { startDate, endDate } = getPeriodDates(period, lastPaidDate, customStart, customEnd);
 
+    const deliveredOrders = useMemo(() => {
+        return [...statsOrders]
+            .filter((order) => order.status === 'DELIVERED')
+            .filter((order) => (!startDate || new Date(order.orderDate) >= new Date(startDate)) && (!endDate || new Date(order.orderDate) <= new Date(endDate)))
+            .sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
+    }, [statsOrders, startDate, endDate]);
+
     const {
         data: summaryData,
         loading: summaryLoading,
@@ -364,7 +389,7 @@ export default function FinancesScreen() {
         loading: breakdownLoading,
         refetch: refetchBreakdown,
     } = useQuery(GET_BUSINESS_SETTLEMENT_BREAKDOWN, {
-        variables: { businessId, startDate, endDate },
+        variables: { businessId, isSettled: false, startDate, endDate },
         skip: !businessId,
         fetchPolicy: 'network-only',
     });
@@ -372,6 +397,14 @@ export default function FinancesScreen() {
     const summary = summaryData?.settlementSummary;
     const settlements = allSettlements;
     const breakdownItems = breakdownData?.settlementBreakdown ?? [];
+    const unsettledSettlements = useMemo(
+        () => settlements.filter((settlement) => isUnsettledStatus(settlement.status)),
+        [settlements],
+    );
+    const settlementOrderIds = useMemo(
+        () => new Set(settlements.map((settlement) => String(settlement.order?.id ?? settlement.id))),
+        [settlements],
+    );
 
     // ── Category drill-down query ──
     const [fetchCategorySettlements, { loading: categoryLoading }] = useLazyQuery(
@@ -457,7 +490,7 @@ export default function FinancesScreen() {
     // Group category-filtered settlements by order
     const categoryOrders = useMemo(() => {
         const byOrder = new Map<string, { orderId: string; displayId: string | null; settlement: Settlement; settlements: Settlement[]; totalAmount: number; latestCreatedAt: string }>();
-        categorySettlements.forEach((s) => {
+        categorySettlements.filter((settlement) => isUnsettledStatus(settlement.status)).forEach((s) => {
             const orderId = String(s.order?.id ?? s.id);
             const existing = byOrder.get(orderId);
             if (existing) {
@@ -484,20 +517,14 @@ export default function FinancesScreen() {
         setCategorySettlements([]);
         fetchCategorySettlements({ variables: { businessId, direction: item.direction, category: item.category, startDate, endDate, limit: 10000, offset: 0 } });
     }, [fetchCategorySettlements, businessId, startDate, endDate]);
-    // Compute revenue generated & commission owed from settlement rows
+    // Keep summary cards aligned with the unsettled orders list shown on this tab.
     const computed = useMemo(() => {
-        let totalGross = 0;
+        const totalGross = settlementOrders.reduce((sum, orderGroup) => sum + orderGroup.totalGross, 0)
+            + unsettledDeliveredOrders.reduce((sum, order) => sum + buildDeliveredOrderGroup(order).totalGross, 0);
         let pendingOwed = 0;
         let hasPartiallyPaid = false;
 
-        settlements.forEach((s) => {
-            const businessOrder = (s.order?.businesses ?? []).find(
-                (entry) => entry?.business?.id === businessId,
-            );
-            const items = businessOrder?.items ?? [];
-            const gross = calculateBusinessSubtotal(items);
-            totalGross += gross;
-
+        unsettledSettlements.forEach((s) => {
             if (s.direction === 'RECEIVABLE') {
                 if (s.status === 'PENDING' || s.status === 'OVERDUE') {
                     pendingOwed += Number(s.amount ?? 0);
@@ -510,9 +537,9 @@ export default function FinancesScreen() {
         });
 
         return { totalGross, pendingOwed, hasPartiallyPaid };
-    }, [settlements, businessId]);
+    }, [buildDeliveredOrderGroup, settlementOrders, unsettledDeliveredOrders, unsettledSettlements]);
 
-    const filteredSettlements = useMemo(() => settlements, [settlements]);
+    const filteredSettlements = useMemo(() => unsettledSettlements, [unsettledSettlements]);
 
     // Group settlements by order
     const settlementOrders = useMemo(() => {
@@ -551,6 +578,27 @@ export default function FinancesScreen() {
             (a, b) => new Date(b.latestCreatedAt).getTime() - new Date(a.latestCreatedAt).getTime(),
         );
     }, [filteredSettlements, businessId]);
+
+    const unsettledDeliveredOrders = useMemo(() => {
+        return deliveredOrders.filter((order) => !settlementOrderIds.has(order.id));
+    }, [deliveredOrders, settlementOrderIds]);
+
+    const visibleOrderEntries = useMemo(() => {
+        return [
+            ...settlementOrders.map((orderGroup) => ({
+                kind: 'settlement' as const,
+                sortDate: orderGroup.order?.orderDate ?? orderGroup.latestCreatedAt,
+                orderGroup,
+            })),
+            ...unsettledDeliveredOrders.map((order) => ({
+                kind: 'delivered' as const,
+                sortDate: order.orderDate,
+                order,
+            })),
+        ].sort((a, b) => new Date(b.sortDate).getTime() - new Date(a.sortDate).getTime());
+    }, [settlementOrders, unsettledDeliveredOrders]);
+
+    const visibleOrderCount = settlementOrders.length + unsettledDeliveredOrders.length;
 
     const handleLoadMoreSettlements = useCallback(async () => {
         if (!hasMoreSettlements || settlementsLoading || loadingMore) return;
@@ -677,8 +725,8 @@ export default function FinancesScreen() {
             {/* ── Tab Switcher ── */}
             <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4, gap: 8 }}>
                 {([
-                    { key: 'stats' as const, label: t('finances.tab_stats', 'Statistics'), icon: 'bar-chart' as const },
                     { key: 'settlements' as const, label: t('finances.tab_settlements', 'Settlements'), icon: 'cash-outline' as const },
+                    { key: 'stats' as const, label: t('finances.tab_stats', 'Statistics'), icon: 'bar-chart' as const },
                 ] as const).map((tab) => (
                     <TouchableOpacity
                         key={tab.key}
@@ -1340,43 +1388,106 @@ export default function FinancesScreen() {
                         }}
                     >
                         <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>
-                            {t('finances.settlements', 'Settlements')}
+                            {t('finances.delivered_orders', 'Delivered Orders')}
                         </Text>
-                        {settlementOrders.length > 0 && (
+                        {visibleOrderCount > 0 && (
                             <Text style={{ fontSize: 12, color: '#6b7280' }}>
-                                {settlementOrders.length}{' '}
-                                {settlementOrders.length === 1 ? t('finances.order', 'order') : t('finances.orders', 'orders')}
+                                {visibleOrderCount}{' '}
+                                {visibleOrderCount === 1 ? t('finances.order', 'order') : t('finances.orders', 'orders')}
                             </Text>
                         )}
                     </View>
 
-                    {settlementsLoading ? (
+                    {settlementsLoading || ordersLoading ? (
                         <ActivityIndicator color="#7C3AED" style={{ marginTop: 16 }} />
-                    ) : settlementOrders.length === 0 ? (
-                        <View
-                            style={{
-                                alignItems: 'center',
-                                paddingVertical: 48,
-                                borderRadius: 20,
-                                backgroundColor: '#1a2233',
-                                borderWidth: 1,
-                                borderColor: '#263145',
-                            }}
-                        >
-                            <Text
-                                style={{ fontSize: 15, fontWeight: '600', color: '#fff' }}
+                    ) : visibleOrderCount === 0 ? (
+                            <View
+                                style={{
+                                    alignItems: 'center',
+                                    paddingVertical: 48,
+                                    borderRadius: 20,
+                                    backgroundColor: '#1a2233',
+                                    borderWidth: 1,
+                                    borderColor: '#263145',
+                                }}
                             >
-                                No settlements found
-                            </Text>
-                            <Text
-                                style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}
-                            >
-                                Try a different period or filter.
-                            </Text>
-                        </View>
+                                <Text
+                                    style={{ fontSize: 15, fontWeight: '600', color: '#fff' }}
+                                >
+                                    No delivered orders found
+                                </Text>
+                                <Text
+                                    style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}
+                                >
+                                    Try a different period or filter.
+                                </Text>
+                            </View>
                     ) : (
                         <View style={{ gap: 8 }}>
-                            {settlementOrders.map((orderGroup) => {
+                            {visibleOrderEntries.map((entry) => {
+                                if (entry.kind === 'delivered') {
+                                    const order = entry.order;
+                                    const businessChunk = (order.businesses ?? []).find((entry) => entry.business?.id === businessId);
+                                    const grossRevenue = calculateBusinessSubtotal(businessChunk?.items ?? []);
+                                    return (
+                                        <Pressable
+                                            key={order.id}
+                                            onPress={() => {
+                                                setHighlightCategory(null);
+                                                setSelectedSettlementOrder(buildDeliveredOrderGroup(order));
+                                            }}
+                                            style={{
+                                                borderRadius: 16,
+                                                padding: 14,
+                                                borderWidth: 1,
+                                                backgroundColor: '#1a2233',
+                                                borderColor: '#263145',
+                                            }}
+                                        >
+                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                                <View style={{ backgroundColor: '#7C3AED18', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                                    <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#7C3AED' }} />
+                                                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#7C3AED', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                                                        #{order.displayId ?? order.id.slice(-6)}
+                                                    </Text>
+                                                </View>
+                                                <Text style={{ fontSize: 17, fontWeight: '800', color: '#22c55e' }}>
+                                                    {formatCurrency(grossRevenue)}
+                                                </Text>
+                                            </View>
+
+                                            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+                                                <View style={{ backgroundColor: '#3b82f618', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                                                    <Text style={{ fontSize: 9, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.4 }}>Status</Text>
+                                                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#3b82f6' }}>
+                                                        {t('finances.awaiting_settlement', 'Awaiting settlement')}
+                                                    </Text>
+                                                </View>
+                                                <View style={{ backgroundColor: '#7C3AED12', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                                                    <Text style={{ fontSize: 9, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.4 }}>Revenue</Text>
+                                                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#e2e8f0' }}>{formatCurrency(grossRevenue)}</Text>
+                                                </View>
+                                            </View>
+
+                                            <View style={{ gap: 6 }}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                    <Ionicons name="location-outline" size={12} color="#94a3b8" />
+                                                    <Text style={{ color: '#94a3b8', fontSize: 12, flex: 1 }} numberOfLines={1}>
+                                                        {order.dropOffLocation?.address ?? '—'}
+                                                    </Text>
+                                                </View>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                    <Ionicons name="time-outline" size={12} color="#94a3b8" />
+                                                    <Text style={{ color: '#94a3b8', fontSize: 12 }}>
+                                                        {formatDateTime(order.orderDate)}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                        </Pressable>
+                                    );
+                                }
+
+                                const orderGroup = entry.orderGroup;
                                 const netAmount = orderGroup.totalPayable - orderGroup.totalReceivable;
                                 const hasPending = orderGroup.settlements.some((s) => s.status !== 'PAID');
                                 const catMap = new Map<string, string>();
@@ -1394,7 +1505,6 @@ export default function FinancesScreen() {
                                             borderColor: hasPending ? '#263145' : '#22c55e25',
                                         }}
                                     >
-                                        {/* Top row: #order + net amount */}
                                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                                 <View style={{ backgroundColor: '#7C3AED18', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
@@ -1412,25 +1522,23 @@ export default function FinancesScreen() {
                                             </Text>
                                         </View>
 
-                                        {/* Revenue / Commission chips */}
                                         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
                                             <View style={{ backgroundColor: '#7C3AED12', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
-                                                <Text style={{ fontSize: 9, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.4 }}>Revenue</Text>
+                                                <Text style={{ fontSize: 9, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.4 }}>{t('finances.revenue', 'Revenue')}</Text>
                                                 <Text style={{ fontSize: 12, fontWeight: '700', color: '#e2e8f0' }}>{formatCurrency(orderGroup.totalGross)}</Text>
                                             </View>
                                             <View style={{ backgroundColor: '#f59e0b12', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
-                                                <Text style={{ fontSize: 9, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.4 }}>Owed</Text>
+                                                <Text style={{ fontSize: 9, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.4 }}>{t('finances.owed', 'Owed')}</Text>
                                                 <Text style={{ fontSize: 12, fontWeight: '700', color: '#f59e0b' }}>-{formatCurrency(orderGroup.totalReceivable)}</Text>
                                             </View>
                                             {orderGroup.totalPayable > 0 && (
                                                 <View style={{ backgroundColor: '#22c55e12', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
-                                                    <Text style={{ fontSize: 9, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.4 }}>Payout</Text>
+                                                    <Text style={{ fontSize: 9, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.4 }}>{t('finances.payout', 'Payout')}</Text>
                                                     <Text style={{ fontSize: 12, fontWeight: '700', color: '#22c55e' }}>+{formatCurrency(orderGroup.totalPayable)}</Text>
                                                 </View>
                                             )}
                                         </View>
 
-                                        {/* Category tags */}
                                         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
                                             {Array.from(catMap.entries()).map(([cat, dir]) => {
                                                 const color = getCategoryColor(cat, dir);
@@ -1442,7 +1550,6 @@ export default function FinancesScreen() {
                                             })}
                                         </View>
 
-                                        {/* Footer: date + status */}
                                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                                             <Text style={{ fontSize: 11, color: '#6b7280' }}>
                                                 {formatDateTime(orderGroup.order?.orderDate ?? orderGroup.latestCreatedAt)}
@@ -1759,6 +1866,7 @@ export default function FinancesScreen() {
                             if (!og) return null;
 
                             const settlementsForOrder = og.settlements ?? [];
+                            const hasSettlementLines = settlementsForOrder.length > 0;
                             const businessOrder = (og.order?.businesses ?? []).find(
                                 (e) => e?.business?.id === businessId,
                             );
@@ -1795,12 +1903,12 @@ export default function FinancesScreen() {
                                             paddingHorizontal: 12,
                                             paddingVertical: 6,
                                             borderRadius: 10,
-                                            backgroundColor: netAmount >= 0 ? '#22c55e20' : '#ef444420',
+                                            backgroundColor: hasSettlementLines ? (netAmount >= 0 ? '#22c55e20' : '#ef444420') : '#3b82f620',
                                             borderWidth: 1,
-                                            borderColor: netAmount >= 0 ? '#22c55e40' : '#ef444440',
+                                            borderColor: hasSettlementLines ? (netAmount >= 0 ? '#22c55e40' : '#ef444440') : '#3b82f640',
                                         }}>
-                                            <Text style={{ fontSize: 11, fontWeight: '700', color: netAmount >= 0 ? '#22c55e' : '#ef4444' }}>
-                                                {netAmount >= 0 ? 'NET PAYOUT' : 'OWES PLATFORM'}
+                                            <Text style={{ fontSize: 11, fontWeight: '700', color: hasSettlementLines ? (netAmount >= 0 ? '#22c55e' : '#ef4444') : '#3b82f6' }}>
+                                                {hasSettlementLines ? (netAmount >= 0 ? 'NET PAYOUT' : 'OWES PLATFORM') : 'DELIVERED ORDER'}
                                             </Text>
                                         </View>
                                     </View>
@@ -1819,8 +1927,8 @@ export default function FinancesScreen() {
                                             backgroundColor: '#1a2233', borderWidth: 1, borderColor: '#263145',
                                         }}>
                                             <Text style={{ fontSize: 9, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.6 }}>Status</Text>
-                                            <Text style={{ fontSize: 12, fontWeight: '600', color: settlementsForOrder.some((l: any) => l.status !== 'PAID') ? '#f59e0b' : '#22c55e' }}>
-                                                {settlementsForOrder.some((l: any) => l.status !== 'PAID') ? 'Pending' : 'Paid'}
+                                            <Text style={{ fontSize: 12, fontWeight: '600', color: !hasSettlementLines ? '#3b82f6' : settlementsForOrder.some((l: any) => l.status !== 'PAID') ? '#f59e0b' : '#22c55e' }}>
+                                                {!hasSettlementLines ? 'Delivered' : settlementsForOrder.some((l: any) => l.status !== 'PAID') ? 'Pending' : 'Paid'}
                                             </Text>
                                         </View>
                                         {settlementsForOrder[0]?.paymentMethod && (
@@ -1854,57 +1962,67 @@ export default function FinancesScreen() {
                                         Settlement Breakdown
                                     </Text>
                                     <View style={{ borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: '#263145', marginBottom: 16 }}>
-                                        {settlementsForOrder.map((line: any, i: number) => {
-                                            const isPayable = line.direction === 'PAYABLE';
-                                            const rawReason = line.reason ?? '';
-                                            const reasonMatch = rawReason.match(/\((.+)\)/);
-                                            const lineLabel = reasonMatch
-                                                ? reasonMatch[1]
-                                                : (rawReason || line.rule?.name || (isPayable ? 'Payout' : 'Commission'));
-                                            const lineCategory = getLineCategory(line);
-                                            const explainText = getCategoryDescription(lineCategory);
-                                            const isHighlighted = highlightCategory != null && lineCategory === highlightCategory;
-                                            const hlColor = isHighlighted ? getCategoryColor(highlightCategory, line.direction) : null;
-                                            return (
-                                                <View key={line.id} style={{
+                                        {hasSettlementLines ? (
+                                            <>
+                                                {settlementsForOrder.map((line: any, i: number) => {
+                                                    const isPayable = line.direction === 'PAYABLE';
+                                                    const rawReason = line.reason ?? '';
+                                                    const reasonMatch = rawReason.match(/\((.+)\)/);
+                                                    const lineLabel = reasonMatch
+                                                        ? reasonMatch[1]
+                                                        : (rawReason || line.rule?.name || (isPayable ? 'Payout' : 'Commission'));
+                                                    const lineCategory = getLineCategory(line);
+                                                    const explainText = getCategoryDescription(lineCategory);
+                                                    const isHighlighted = highlightCategory != null && lineCategory === highlightCategory;
+                                                    const hlColor = isHighlighted ? getCategoryColor(highlightCategory, line.direction) : null;
+                                                    return (
+                                                        <View key={line.id} style={{
+                                                            flexDirection: 'row',
+                                                            alignItems: 'flex-start',
+                                                            justifyContent: 'space-between',
+                                                            paddingHorizontal: 14,
+                                                            paddingVertical: 11,
+                                                            backgroundColor: isHighlighted ? (hlColor + '18') : (i % 2 === 0 ? '#0d1421' : '#0a0f1a'),
+                                                            borderLeftWidth: isHighlighted ? 3 : 0,
+                                                            borderLeftColor: isHighlighted ? hlColor : 'transparent',
+                                                        }}>
+                                                            <View style={{ flex: 1, gap: 2, marginRight: 8 }}>
+                                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isPayable ? '#22c55e' : '#ef4444', flexShrink: 0 }} />
+                                                                    <Text style={{ fontSize: 13, color: isHighlighted ? '#e2e8f0' : '#9ca3af', fontWeight: isHighlighted ? '600' : '400', flex: 1 }} numberOfLines={2}>{lineLabel}</Text>
+                                                                </View>
+                                                                {explainText ? (
+                                                                    <Text style={{ fontSize: 11, color: '#6b7280', paddingLeft: 16, lineHeight: 15 }}>{explainText}</Text>
+                                                                ) : null}
+                                                            </View>
+                                                            <Text style={{ fontSize: 13, fontWeight: '700', color: isPayable ? '#22c55e' : '#ef4444' }}>
+                                                                {isPayable ? '+' : '-'}{formatCurrency(Number(line.amount ?? 0))}
+                                                            </Text>
+                                                        </View>
+                                                    );
+                                                })}
+                                                <View style={{
                                                     flexDirection: 'row',
-                                                    alignItems: 'flex-start',
                                                     justifyContent: 'space-between',
                                                     paddingHorizontal: 14,
                                                     paddingVertical: 11,
-                                                    backgroundColor: isHighlighted ? (hlColor + '18') : (i % 2 === 0 ? '#0d1421' : '#0a0f1a'),
-                                                    borderLeftWidth: isHighlighted ? 3 : 0,
-                                                    borderLeftColor: isHighlighted ? hlColor : 'transparent',
+                                                    borderTopWidth: 1,
+                                                    borderTopColor: '#263145',
+                                                    backgroundColor: '#0d1421',
                                                 }}>
-                                                    <View style={{ flex: 1, gap: 2, marginRight: 8 }}>
-                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                                            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isPayable ? '#22c55e' : '#ef4444', flexShrink: 0 }} />
-                                                            <Text style={{ fontSize: 13, color: isHighlighted ? '#e2e8f0' : '#9ca3af', fontWeight: isHighlighted ? '600' : '400', flex: 1 }} numberOfLines={2}>{lineLabel}</Text>
-                                                        </View>
-                                                        {explainText ? (
-                                                            <Text style={{ fontSize: 11, color: '#6b7280', paddingLeft: 16, lineHeight: 15 }}>{explainText}</Text>
-                                                        ) : null}
-                                                    </View>
-                                                    <Text style={{ fontSize: 13, fontWeight: '700', color: isPayable ? '#22c55e' : '#ef4444' }}>
-                                                        {isPayable ? '+' : '-'}{formatCurrency(Number(line.amount ?? 0))}
+                                                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>Net</Text>
+                                                    <Text style={{ fontSize: 15, fontWeight: '800', color: netAmount >= 0 ? '#22c55e' : '#ef4444' }}>
+                                                        {netAmount >= 0 ? '+' : ''}{formatCurrency(netAmount)}
                                                     </Text>
                                                 </View>
-                                            );
-                                        })}
-                                        <View style={{
-                                            flexDirection: 'row',
-                                            justifyContent: 'space-between',
-                                            paddingHorizontal: 14,
-                                            paddingVertical: 11,
-                                            borderTopWidth: 1,
-                                            borderTopColor: '#263145',
-                                            backgroundColor: '#0d1421',
-                                        }}>
-                                            <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>Net</Text>
-                                            <Text style={{ fontSize: 15, fontWeight: '800', color: netAmount >= 0 ? '#22c55e' : '#ef4444' }}>
-                                                {netAmount >= 0 ? '+' : ''}{formatCurrency(netAmount)}
-                                            </Text>
-                                        </View>
+                                            </>
+                                        ) : (
+                                            <View style={{ paddingHorizontal: 14, paddingVertical: 16, backgroundColor: '#0d1421' }}>
+                                                <Text style={{ fontSize: 13, color: '#94a3b8', lineHeight: 19 }}>
+                                                    Settlement lines will appear here once the order is included in a settlement cycle.
+                                                </Text>
+                                            </View>
+                                        )}
                                     </View>
 
                                     {/* Items */}
@@ -1977,8 +2095,8 @@ export default function FinancesScreen() {
                                                 ? { label: 'Delivery discount', value: `−${formatCurrency(deliveryDiscounts)}`, color: '#22c55e' }
                                                 : null,
                                             { label: 'Order total', value: formatCurrency(Number(og.order?.totalPrice ?? 0)), color: '#fff', bold: true },
-                                            { label: 'Platform commission', value: `−${formatCurrency(og.totalReceivable)}`, color: '#f59e0b', bold: false },
-                                            { label: 'Net', value: `${netAmount >= 0 ? '+' : ''}${formatCurrency(netAmount)}`, color: netAmount >= 0 ? '#22c55e' : '#ef4444', bold: true },
+                                            hasSettlementLines ? { label: 'Platform commission', value: `−${formatCurrency(og.totalReceivable)}`, color: '#f59e0b', bold: false } : null,
+                                            hasSettlementLines ? { label: 'Net', value: `${netAmount >= 0 ? '+' : ''}${formatCurrency(netAmount)}`, color: netAmount >= 0 ? '#22c55e' : '#ef4444', bold: true } : null,
                                         ].filter(Boolean).map((row: any, i: number) => (
                                             <View key={i} style={{
                                                 flexDirection: 'row',

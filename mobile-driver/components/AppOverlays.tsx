@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -59,7 +59,6 @@ export function AppOverlays() {
         takenByOther,
         networkReady,
         assignedOrders,
-        availableOrders,
         poolOrders,
         handleAcceptOrder,
         handleSkipOrder,
@@ -86,32 +85,18 @@ export function AppOverlays() {
         return () => clearTimeout(t);
     }, [acceptError]);
 
-    // Auto-dismiss "taken by other" after a visible dwell and surface the next best order.
+    // Auto-dismiss "taken by other" after 2 seconds.
+    const dismissTakenByOther = useCallback(() => {
+        const store = useOrderAcceptStore.getState();
+        store.setTakenByOther(false);
+        store.setPendingOrder(null);
+    }, []);
+
     useEffect(() => {
         if (!takenByOther) return;
-        const takenOrderId = useOrderAcceptStore.getState().pendingOrder?.id ?? null;
-        const t = setTimeout(() => {
-            const store = useOrderAcceptStore.getState();
-            if (!store.takenByOther) return;
-
-            // If the pending order changed meanwhile, do not override user/app flow.
-            if ((store.pendingOrder?.id ?? null) !== takenOrderId) {
-                store.setTakenByOther(false);
-                return;
-            }
-
-            store.setTakenByOther(false);
-
-            const nextOrder = availableOrders.find((o) => o.id !== takenOrderId) ?? null;
-            if (isOnline && nextOrder && !store.accepting) {
-                store.setPendingOrder(nextOrder, true);
-                return;
-            }
-
-            store.setPendingOrder(null);
-        }, 6000);
+        const t = setTimeout(dismissTakenByOther, 2000);
         return () => clearTimeout(t);
-    }, [takenByOther, availableOrders, isOnline]);
+    }, [takenByOther, dismissTakenByOther]);
 
     const [incomingMessage, setIncomingMessage] = useState<IncomingMessage | null>(null);
     useSubscription(DRIVER_MESSAGE_RECEIVED_SUB, {
@@ -180,22 +165,28 @@ export function AppOverlays() {
                 </View>
             )}
 
-            {/* Taken by another driver toast */}
+            {/* Taken by another driver toast — tap anywhere on it to dismiss */}
             {isAuthenticated && takenByOther && (
-                <View style={{
-                    position: 'absolute', bottom: 118, left: 16, right: 16, zIndex: 71,
-                    backgroundColor: '#111827', borderRadius: 12, padding: 14,
-                    borderWidth: 1, borderColor: 'rgba(251,191,36,0.35)',
-                    flexDirection: 'row', alignItems: 'center', gap: 10,
-                }}>
+                <Pressable
+                    onPress={dismissTakenByOther}
+                    style={{
+                        position: 'absolute', bottom: 118, left: 16, right: 16, zIndex: 71,
+                        backgroundColor: '#111827', borderRadius: 12, padding: 14,
+                        borderWidth: 1, borderColor: 'rgba(251,191,36,0.35)',
+                        flexDirection: 'row', alignItems: 'center', gap: 10,
+                    }}
+                >
                     <Ionicons name="flash" size={18} color="#fbbf24" />
                     <View style={{ flex: 1 }}>
                         <Text style={{ color: '#fde68a', fontSize: 13, fontWeight: '700' }}>Order was accepted by another driver</Text>
-                        <Text style={{ color: '#fef3c7', fontSize: 12 }} numberOfLines={1}>
-                            {pendingOrder?.orderNumber ? `Order #${pendingOrder.orderNumber}. Checking next available order.` : 'Checking next available order.'}
-                        </Text>
+                        {pendingOrder?.orderNumber ? (
+                            <Text style={{ color: '#fef3c7', fontSize: 12 }} numberOfLines={1}>
+                                Order #{pendingOrder.orderNumber}
+                            </Text>
+                        ) : null}
                     </View>
-                </View>
+                    <Ionicons name="close" size={16} color="#fbbf24" />
+                </Pressable>
             )}
 
             {/* Order accept sheet + dismiss backdrop */}
