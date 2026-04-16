@@ -40,7 +40,7 @@ interface BusinessMessage {
 }
 
 const COLORS = {
-    bg: '#0f172a',
+    bg: '#09090b',
     card: '#1e293b',
     border: '#334155',
     text: '#f1f5f9',

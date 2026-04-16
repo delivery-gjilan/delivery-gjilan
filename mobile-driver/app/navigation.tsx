@@ -213,6 +213,16 @@ export default function NavigationScreen() {
         ];
     }, [currentOrigin?.latitude, currentOrigin?.longitude, destination?.latitude, destination?.longitude]);
 
+    /* ── Safety guard: clear persisted invalid destination (e.g. 0,0 from a DD order
+       without a dropoff location that crashed and was saved to AsyncStorage) ── */
+    const isDestinationInvalid = !!destination && destination.latitude === 0 && destination.longitude === 0;
+    useEffect(() => {
+        if (!isDestinationInvalid) return;
+        stopNavigation();
+        router.replace('/(tabs)/drive' as any);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isDestinationInvalid]);
+
     /* â”€â”€ Store for feeding Navigation SDK location to heartbeat â”€â”€ */
     const setNavigationLocation = useNavigationLocationStore((state) => state.setLocation);
     const clearNavigationLocation = useNavigationLocationStore((state) => state.clearLocation);

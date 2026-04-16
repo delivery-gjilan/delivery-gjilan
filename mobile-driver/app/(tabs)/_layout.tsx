@@ -5,7 +5,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useAuth } from '@/hooks/useAuth';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigationStore } from '@/store/navigationStore';
 
 export default function TabLayout() {
@@ -17,13 +17,20 @@ export default function TabLayout() {
     const isNavigating = useNavigationStore((s) => s.isNavigating);
     const isNavigationMinimized = useNavigationStore((s) => s.isNavigationMinimized);
 
-    // If the driver had an active navigation session before the app was killed,
-    // restore them to the navigation screen immediately on mount.
+    // Session restore: if the driver had an active navigation session before the
+    // app was killed, send them back to the navigation screen on mount.
+    // IMPORTANT: use a ref guard so this only fires once at mount, never when
+    // isNavigating changes at runtime (e.g. after Accept & Navigate) — otherwise
+    // it would double-navigate and cause a crash.
+    const hasRestoredNavigationRef = useRef(false);
     useEffect(() => {
+        if (hasRestoredNavigationRef.current) return;
+        hasRestoredNavigationRef.current = true;
         if (isNavigating && !isNavigationMinimized) {
             router.replace('/navigation' as any);
         }
-    }, [isNavigating, isNavigationMinimized, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleLogout = async () => {
         try {

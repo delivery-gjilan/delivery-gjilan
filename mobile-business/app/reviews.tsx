@@ -198,7 +198,7 @@ export default function ReviewsScreen() {
     };
 
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#0F172A' }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#09090b' }}>
             {/* Header */}
             <View
                 style={{

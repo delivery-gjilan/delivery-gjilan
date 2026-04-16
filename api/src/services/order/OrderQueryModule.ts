@@ -4,7 +4,7 @@ import {
     products as productsTable,
     settlements as settlementsTable,
 } from '@/database/schema';
-import { and, eq, inArray, ne, exists, sql } from 'drizzle-orm';
+import { and, eq, inArray, ne, exists, sql, or } from 'drizzle-orm';
 import type { Order, OrderStatus, OrderPaymentCollection } from '@/generated/types.generated';
 import logger from '@/lib/logger';
 import type { OrderServiceDeps } from './types';
@@ -222,24 +222,29 @@ export class OrderQueryModule {
     async getOrdersByBusinessId(businessId: string): Promise<Order[]> {
         try {
             const db = this.deps.db;
-            // Single query: EXISTS subquery replaces the 2-step orderIds fetch + order fetch.
+            // Query returns:
+            // 1. DIRECT_DISPATCH orders created by this business (via businessId)
+            // 2. PLATFORM orders with items from this business
             const dbOrders = await db
                 .select()
                 .from(ordersTable)
                 .where(
                     and(
                         ne(ordersTable.status, 'AWAITING_APPROVAL'),
-                        exists(
-                            db
-                                .select({ _: sql`1` })
-                                .from(orderItemsTable)
-                                .innerJoin(productsTable, eq(orderItemsTable.productId, productsTable.id))
-                                .where(
-                                    and(
-                                        eq(orderItemsTable.orderId, ordersTable.id),
-                                        eq(productsTable.businessId, businessId),
+                        or(
+                            eq(ordersTable.businessId, businessId), // DIRECT_DISPATCH orders
+                            exists(
+                                db
+                                    .select({ _: sql`1` })
+                                    .from(orderItemsTable)
+                                    .innerJoin(productsTable, eq(orderItemsTable.productId, productsTable.id))
+                                    .where(
+                                        and(
+                                            eq(orderItemsTable.orderId, ordersTable.id),
+                                            eq(productsTable.businessId, businessId),
+                                        ),
                                     ),
-                                ),
+                            ),
                         ),
                     ),
                 )

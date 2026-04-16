@@ -18,12 +18,18 @@ export function buildNavOrder(order: DriverOrder): NavigationOrder | null {
     };
 
     const dropoff = dropLoc
-        ? {
-              latitude: Number(dropLoc.latitude),
-              longitude: Number(dropLoc.longitude),
-              label: dropLoc.address ?? 'Drop-off',
-          }
-        : null;
+                // Treat 0,0 as no dropoff — DD orders without a provided location default to lat=0, lng=0
+                ? (() => {
+                            const lat = Number(dropLoc.latitude);
+                            const lng = Number(dropLoc.longitude);
+                            if (lat === 0 && lng === 0) return null;
+                            return {
+                                    latitude: lat,
+                                    longitude: lng,
+                                    label: dropLoc.address || 'Drop-off',
+                            };
+                    })()
+                : null;
 
     const isDirectDispatch = order.channel === 'DIRECT_DISPATCH';
     const customerName = isDirectDispatch

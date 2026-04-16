@@ -283,6 +283,14 @@ export default function OrdersScreen() {
         Boolean(storeStatusData?.getStoreStatus?.directDispatchEnabled) &&
         Boolean(businessOps?.directDispatchEnabled);
 
+    const activeDirectDispatchOrders = useMemo(() => {
+        return (data?.orders?.orders as unknown as Order[] | undefined ?? []).filter(
+            (o: any) =>
+                o.channel === 'DIRECT_DISPATCH' &&
+                UPCOMING_ORDER_STATUSES.includes(o.status),
+        ) as Order[];
+    }, [data?.orders?.orders]);
+
     useSubscription<StoreStatusSubscriptionPayload>(STORE_STATUS_UPDATED, {
         onData: ({ data: subscriptionData }) => {
             const updated = subscriptionData.data?.storeStatusUpdated;
@@ -315,10 +323,11 @@ export default function OrdersScreen() {
     });
 
     useEffect(() => {
-        if (!directDispatchEnabled && showDispatchSheet) {
+        // Only auto-close the sheet if the feature is disabled AND there are no active DD orders to show
+        if (!directDispatchEnabled && showDispatchSheet && activeDirectDispatchOrders.length === 0) {
             setShowDispatchSheet(false);
         }
-    }, [directDispatchEnabled, showDispatchSheet]);
+    }, [directDispatchEnabled, showDispatchSheet, activeDirectDispatchOrders.length]);
 
     // ── Order lists ──
     const _allOrders = (data?.orders?.orders as unknown as Order[]) || [];
@@ -599,6 +608,7 @@ export default function OrdersScreen() {
                     isStoreClosed={isStoreClosed}
                     avgPrepTime={avgPrepTime}
                     directDispatchEnabled={directDispatchEnabled}
+                    hasActiveDirectDispatchOrders={activeDirectDispatchOrders.length > 0}
                     controlsDisabled={updatingBusinessOps}
                     onSelect={setStatusFilter}
                     onToggleStore={() => {
@@ -610,7 +620,7 @@ export default function OrdersScreen() {
                     }}
                     onEditPrepTime={() => dispatch({ type: 'OPEN_PREP_MODAL', time: avgPrepTime })}
                     onOpenDirectDispatch={() => {
-                        if (!directDispatchEnabled) return;
+                        if (!directDispatchEnabled && activeDirectDispatchOrders.length === 0) return;
                         setShowDispatchSheet(true);
                     }}
                 />
@@ -817,6 +827,8 @@ export default function OrdersScreen() {
                 visible={showDispatchSheet}
                 onClose={() => setShowDispatchSheet(false)}
                 onCreated={() => refetch()}
+                activeOrders={activeDirectDispatchOrders}
+                dispatchEnabled={directDispatchEnabled}
                 t={t}
             />
 

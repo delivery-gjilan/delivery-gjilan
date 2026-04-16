@@ -80,18 +80,29 @@ No pending unassigned order subtraction is applied.
 ## mobile-business
 
 ### FAB Visibility
-The request-driver FAB appears only when:
-1. `storeSettings.directDispatchEnabled = true`
-2. `business.directDispatchEnabled = true`
+The request-driver FAB appears when:
+1. `storeSettings.directDispatchEnabled = true` AND `business.directDispatchEnabled = true` (feature enabled), **OR**
+2. There are active (non-completed) `DIRECT_DISPATCH` orders for the business (allows viewing active orders even when feature is disabled)
 
 ### Direct Dispatch Sheet
 `mobile-business/components/orders/DirectDispatchSheet.tsx`
 
-- Checks `directDispatchAvailability` on open
-- Shows free-driver status banner
-- Collects recipient phone/name, preparation minutes, address, driver notes
-- Does not expose the fixed amount in the request modal
+Full-page modal (`presentationStyle="fullScreen"`) with two modes:
+
+**No active direct call orders (feature enabled):**
+- Shows the new-request form directly (no tabs)
+- Checks `directDispatchAvailability`, shows free-driver status banner
+- Collects recipient phone/name, preparation minutes, cash to collect, driver notes
+- Does not expose the fixed amount
 - Submits `createDirectDispatchOrder`
+
+**Active direct call orders present:**
+- Shows a tab bar: **Active Orders** | **New Request** (if feature enabled)
+- **Active Orders tab**: Each order card shows status badge, `#displayId`, recipient phone + name, driver name (or "Awaiting driver..."), drop-off address, driver notes, delivery fee
+- **New Request tab**: same form as above
+- If feature is disabled but active orders remain: only the Active Orders tab is shown; a "New requests paused" amber banner replaces the New Request tab
+
+**Props:** `visible`, `onClose`, `onCreated`, `activeOrders: Order[]`, `dispatchEnabled: boolean`, `t`
 
 ### Active Order Visibility
 `OUT_FOR_DELIVERY` direct-dispatch orders remain in the upcoming/active order list so the business can continue operational follow-up without a navigation flow.

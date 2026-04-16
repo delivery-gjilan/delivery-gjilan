@@ -13,6 +13,7 @@ interface StatusRailProps {
     isStoreClosed: boolean;
     avgPrepTime: number;
     directDispatchEnabled?: boolean;
+    hasActiveDirectDispatchOrders?: boolean;
     controlsDisabled?: boolean;
     onSelect: (status: StatusFilter) => void;
     onToggleStore: () => void;
@@ -29,6 +30,7 @@ export function StatusRail({
     isStoreClosed,
     avgPrepTime,
     directDispatchEnabled = false,
+    hasActiveDirectDispatchOrders = false,
     controlsDisabled = false,
     onSelect,
     onToggleStore,
@@ -71,7 +73,7 @@ export function StatusRail({
             style={{
                 width: 88,
                 flexShrink: 0,
-                backgroundColor: '#0f172a',
+                backgroundColor: '#09090b',
                 borderRightWidth: 1,
                 borderRightColor: 'rgba(255,255,255,0.06)',
                 paddingTop: 8,
@@ -254,7 +256,7 @@ export function StatusRail({
                     </Text>
                 </TouchableOpacity>
 
-                {directDispatchEnabled ? (
+                {directDispatchEnabled || hasActiveDirectDispatchOrders ? (
                     <TouchableOpacity
                         onPress={onOpenDirectDispatch}
                         disabled={controlsDisabled}

@@ -36,7 +36,7 @@ export function ProductImagesModal({ order, businessId, onClose, onRemoveItem }:
             >
                 <Pressable
                     style={{
-                        backgroundColor: '#0f172a',
+                        backgroundColor: '#09090b',
                         borderTopLeftRadius: 28,
                         borderTopRightRadius: 28,
                         maxHeight: '88%',
@@ -93,11 +93,11 @@ export function ProductImagesModal({ order, businessId, onClose, onRemoveItem }:
                                 {item.imageUrl ? (
                                     <Image
                                         source={{ uri: item.imageUrl }}
-                                        style={{ width: 80, height: 80, borderRadius: 14, backgroundColor: '#0f172a', marginRight: 14, flexShrink: 0 }}
+                                        style={{ width: 80, height: 80, borderRadius: 14, backgroundColor: '#09090b', marginRight: 14, flexShrink: 0 }}
                                         resizeMode="cover"
                                     />
                                 ) : (
-                                    <View style={{ width: 80, height: 80, borderRadius: 14, backgroundColor: '#0f172a', marginRight: 14, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' }}>
+                                    <View style={{ width: 80, height: 80, borderRadius: 14, backgroundColor: '#09090b', marginRight: 14, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' }}>
                                         <Ionicons name="image-outline" size={28} color="#334155" />
                                     </View>
                                 )}

@@ -51,7 +51,7 @@ export function RemoveItemModal({
                 onPress={onClose}
             >
                 <Pressable
-                    style={{ backgroundColor: '#0f172a', borderRadius: 20, padding: 20, width: '100%', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}
+                    style={{ backgroundColor: '#09090b', borderRadius: 20, padding: 20, width: '100%', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}
                     onPress={(e) => e.stopPropagation()}
                 >
                     <Text style={{ color: '#f1f5f9', fontSize: 17, fontWeight: '700', marginBottom: 6 }}>Remove item?</Text>

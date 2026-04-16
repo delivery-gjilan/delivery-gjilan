@@ -129,8 +129,8 @@ export class DirectDispatchService {
             throw new Error('Direct dispatch fixed amount is not configured for this business.');
         }
 
-        if (!Number.isInteger(input.preparationMinutes) || input.preparationMinutes < 1 || input.preparationMinutes > 180) {
-            throw new Error('Preparation time must be between 1 and 180 minutes.');
+        if (!Number.isInteger(input.preparationMinutes) || input.preparationMinutes < 0 || input.preparationMinutes > 180) {
+            throw new Error('Preparation time must be between 0 and 180 minutes.');
         }
 
         const now = new Date();

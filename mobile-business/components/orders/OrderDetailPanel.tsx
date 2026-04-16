@@ -49,7 +49,7 @@ function PanelContent({
     const businessOrder = order.businesses.find((b) => b.business.id === businessId);
     if (!businessOrder) {
         return (
-            <View style={{ flex: 1, backgroundColor: '#0f172a' }}>
+            <View style={{ flex: 1, backgroundColor: '#09090b' }}>
                 <View
                     style={{
                         flexDirection: 'row',
@@ -138,7 +138,7 @@ function PanelContent({
     };
 
     return (
-        <View style={{ flex: 1, backgroundColor: '#0f172a' }}>
+        <View style={{ flex: 1, backgroundColor: '#09090b' }}>
             {/* Panel header */}
             <View
                 style={{
@@ -477,7 +477,7 @@ export function OrderDetailPanel(props: OrderDetailPanelProps) {
 
                 <Pressable
                     style={{
-                        backgroundColor: '#0f172a',
+                        backgroundColor: '#09090b',
                         maxHeight: '88%',
                         borderTopLeftRadius: 28,
                         borderTopRightRadius: 28,
@@ -488,7 +488,7 @@ export function OrderDetailPanel(props: OrderDetailPanelProps) {
                     onPress={(e) => e.stopPropagation()}
                 >
                     {/* Handle bar */}
-                    <View style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 2, backgroundColor: '#0f172a' }}>
+                    <View style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 2, backgroundColor: '#09090b' }}>
                         <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)' }} />
                     </View>
                     <PanelContent {...props} />

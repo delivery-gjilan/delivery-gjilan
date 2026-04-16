@@ -310,11 +310,12 @@ export default function MapScreen() {
         setMarkingPickedUpIds(prev => new Set(prev).add(targetId));
         try {
             await updateOrderStatus({ variables: { id: targetId, status: 'OUT_FOR_DELIVERY' as any } });
-            // Immediately launch turn-by-turn navigation to dropoff
             const order = allMapOrders.find((o) => o.id === targetId);
             if (order && location) {
                 const navOrder = buildNavOrder(order);
-                if (navOrder) {
+                // Only navigate if there's a real dropoff — DD orders without a provided
+                // dropoff have dropoff=null (lat/lng were 0,0 in DB). Stay on drive tab for those.
+                if (navOrder && navOrder.dropoff) {
                     startNavigation(
                         { ...navOrder, status: 'OUT_FOR_DELIVERY' },
                         'to_dropoff',
