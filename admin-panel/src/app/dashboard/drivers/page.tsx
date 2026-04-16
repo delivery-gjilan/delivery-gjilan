@@ -9,6 +9,7 @@ import {
     ADMIN_UPDATE_DRIVER_SETTINGS_MUTATION,
     UPDATE_USER_MUTATION,
 } from "@/graphql/operations/users/mutations";
+import BulkCommissionModal from "@/components/drivers/BulkCommissionModal";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
@@ -182,6 +183,7 @@ export default function DriversPage() {
 
     /* --- modals --- */
     const [showCreateModal, setShowCreateModal] = useState(false);
+    const [showBulkCommissionModal, setShowBulkCommissionModal] = useState(false);
     const [createForm, setCreateForm] = useState({
         email: "",
         password: "",
@@ -383,10 +385,16 @@ export default function DriversPage() {
                         )}
                     </div>
                     {isSuperAdmin && (
-                        <Button onClick={() => setShowCreateModal(true)}>
-                            <Plus size={15} />
-                            New Driver
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <Button variant="outline" onClick={() => setShowBulkCommissionModal(true)}>
+                                <Percent size={15} />
+                                Set Commission
+                            </Button>
+                            <Button onClick={() => setShowCreateModal(true)}>
+                                <Plus size={15} />
+                                New Driver
+                            </Button>
+                        </div>
                     )}
                 </div>
             </div>
@@ -869,6 +877,14 @@ export default function DriversPage() {
                     </div>
                 </Modal>
             )}
+
+            {/* Bulk Commission Modal */}
+            <BulkCommissionModal
+                isOpen={showBulkCommissionModal}
+                onClose={() => setShowBulkCommissionModal(false)}
+                drivers={drivers}
+                onSuccess={() => refetch()}
+            />
         </div>
     );
 }

@@ -1130,6 +1130,11 @@ enum MessageAlertType {
 
 type Mutation {
   addUserAddress(input: AddUserAddressInput!): UserAddress!
+
+  """
+  Admin mutation to bulk update commission percentage for multiple drivers
+  """
+  adminBulkUpdateDriverCommissions(commissionPercentage: Float!, driverIds: [ID!]!): [User!]!
   adminCancelOrder(id: ID!, reason: String!, settleBusiness: Boolean, settleDriver: Boolean): Order!
 
   """Admin sends push-to-talk signaling state to one or multiple drivers"""

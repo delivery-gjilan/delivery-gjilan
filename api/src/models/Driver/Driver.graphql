@@ -230,6 +230,12 @@ extend type Mutation {
         ownVehicleBonusAmount: Float
     ): User!
 
+    """Admin mutation to bulk update commission percentage for multiple drivers"""
+    adminBulkUpdateDriverCommissions(
+        driverIds: [ID!]!
+        commissionPercentage: Float!
+    ): [User!]!
+
     """Driver battery telemetry update (recommended every 5-10 minutes)"""
     driverUpdateBatteryStatus(level: Int!, optIn: Boolean!, isCharging: Boolean): DriverConnection!
 

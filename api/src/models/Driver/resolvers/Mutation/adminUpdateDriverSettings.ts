@@ -21,10 +21,10 @@ export const adminUpdateDriverSettings: NonNullable<MutationResolvers['adminUpda
 
     const updates: Record<string, unknown> = {};
     if (commissionPercentage !== null && commissionPercentage !== undefined) {
-        updates.commissionPercentage = String(commissionPercentage);
+        updates.commissionPercentage = commissionPercentage;
     }
     if (maxActiveOrders !== null && maxActiveOrders !== undefined) {
-        updates.maxActiveOrders = String(maxActiveOrders);
+        updates.maxActiveOrders = maxActiveOrders;
     }
     if (hasOwnVehicle !== null && hasOwnVehicle !== undefined) {
         updates.hasOwnVehicle = hasOwnVehicle;
@@ -33,12 +33,14 @@ export const adminUpdateDriverSettings: NonNullable<MutationResolvers['adminUpda
         updates.vehicleType = vehicleType;
     }
     if (ownVehicleBonusAmount !== null && ownVehicleBonusAmount !== undefined) {
-        updates.ownVehicleBonusAmount = String(ownVehicleBonusAmount);
+        updates.ownVehicleBonusAmount = ownVehicleBonusAmount;
     }
 
     if (Object.keys(updates).length > 0) {
         await db.update(driversTable).set(updates).where(eq(driversTable.userId, driverId));
     }
 
-    return user as any;
+    // Fetch the updated driver data
+    const updatedUser = await authService.getUserById(driverId);
+    return updatedUser as any;
 };

@@ -440,6 +440,20 @@ export default function FinancesScreen() {
         return map[category] ?? '';
     };
 
+    const getCategoryShortLabel = (category: string): string => {
+        const map: Record<string, string> = {
+            AUTO_REMITTANCE: 'Markup',
+            STOCK_REMITTANCE: 'Stock',
+            DELIVERY_COMMISSION: 'Delivery',
+            DIRECT_CALL_FIXED_FEE: 'Direct Call',
+            PLATFORM_COMMISSION: 'Commission',
+            PROMOTION_COST: 'Promo',
+            DRIVER_TIP: 'Tip',
+            CATALOG_REVENUE: 'Catalog',
+        };
+        return map[category] ?? category;
+    };
+
     // Group category-filtered settlements by order
     const categoryOrders = useMemo(() => {
         const byOrder = new Map<string, { orderId: string; displayId: string | null; settlement: Settlement; settlements: Settlement[]; totalAmount: number; latestCreatedAt: string }>();
@@ -1361,158 +1375,88 @@ export default function FinancesScreen() {
                             </Text>
                         </View>
                     ) : (
-                        <View
-                            style={{
-                                borderRadius: 16,
-                                borderWidth: 1,
-                                borderColor: '#263145',
-                                overflow: 'hidden',
-                            }}
-                        >
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                                <View>
-                                    {/* Table header */}
-                                    <View
+                        <View style={{ gap: 8 }}>
+                            {settlementOrders.map((orderGroup) => {
+                                const netAmount = orderGroup.totalPayable - orderGroup.totalReceivable;
+                                const hasPending = orderGroup.settlements.some((s) => s.status !== 'PAID');
+                                const catMap = new Map<string, string>();
+                                orderGroup.settlements.forEach((s) => {
+                                    const cat = getLineCategory(s);
+                                    if (!catMap.has(cat)) catMap.set(cat, s.direction ?? '');
+                                });
+                                return (
+                                    <Pressable
+                                        key={orderGroup.orderId}
+                                        onPress={() => { setHighlightCategory(null); setSelectedSettlementOrder(orderGroup); }}
                                         style={{
-                                            flexDirection: 'row',
-                                            borderBottomWidth: 1,
-                                            borderBottomColor: '#263145',
-                                            backgroundColor: '#111827',
+                                            borderRadius: 16, padding: 14, borderWidth: 1,
+                                            backgroundColor: '#1a2233',
+                                            borderColor: hasPending ? '#263145' : '#22c55e25',
                                         }}
                                     >
-                                        {[
-                                            { label: 'Order', w: 100 },
-                                            { label: 'Date', w: 150 },
-                                            { label: 'Revenue', w: 100, right: true },
-                                            { label: 'Commission', w: 110, right: true },
-                                            { label: 'Net', w: 100, right: true },
-                                        ].map((col) => (
-                                            <Text
-                                                key={col.label}
-                                                style={{
-                                                    width: col.w,
-                                                    paddingHorizontal: 12,
-                                                    paddingVertical: 10,
-                                                    fontSize: 10,
-                                                    fontWeight: '700',
-                                                    color: '#6b7280',
-                                                    textTransform: 'uppercase',
-                                                    letterSpacing: 0.6,
-                                                    textAlign: col.right ? 'right' : 'left',
-                                                }}
-                                            >
-                                                {col.label}
-                                            </Text>
-                                        ))}
-                                    </View>
-
-                                    {/* Table rows — grouped by order */}
-                                    {settlementOrders.map((orderGroup, idx) => {
-                                        const netAmount = orderGroup.totalPayable - orderGroup.totalReceivable;
-                                        const hasPayable = orderGroup.totalPayable > 0;
-                                        const rowBg = hasPayable
-                                            ? '#071a0f'
-                                            : idx % 2 === 0 ? '#0d1421' : '#0a0f1a';
-
-                                        return (
-                                            <Pressable
-                                                key={orderGroup.orderId}
-                                                onPress={() => { setHighlightCategory(null); setSelectedSettlementOrder(orderGroup); }}
-                                                style={{
-                                                    flexDirection: 'row',
-                                                    borderBottomWidth: 1,
-                                                    borderBottomColor: '#1a2233',
-                                                    backgroundColor: rowBg,
-                                                    borderLeftWidth: hasPayable ? 3 : 0,
-                                                    borderLeftColor: '#22c55e',
-                                                }}
-                                            >
-                                                {/* Order */}
-                                                <View
-                                                    style={{
-                                                        width: 100,
-                                                        paddingHorizontal: 12,
-                                                        paddingVertical: 12,
-                                                    }}
-                                                >
-                                                    <Text
-                                                        style={{
-                                                            fontSize: 12,
-                                                            fontWeight: '700',
-                                                            color: '#fff',
-                                                        }}
-                                                    >
+                                        {/* Top row: #order + net amount */}
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                <View style={{ backgroundColor: '#7C3AED18', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                                    <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#7C3AED' }} />
+                                                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#7C3AED', textTransform: 'uppercase', letterSpacing: 0.4 }}>
                                                         #{orderGroup.orderDisplayId}
                                                     </Text>
-                                                    {orderGroup.settlements.length > 1 && (
-                                                        <Text style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>
-                                                            {orderGroup.settlements.length} lines
-                                                        </Text>
-                                                    )}
                                                 </View>
-
-                                                {/* Date */}
-                                                <Text
-                                                    style={{
-                                                        width: 150,
-                                                        paddingHorizontal: 12,
-                                                        paddingVertical: 12,
-                                                        fontSize: 11,
-                                                        color: '#6b7280',
-                                                    }}
-                                                >
-                                                    {formatDateTime(
-                                                        orderGroup.order?.orderDate ?? orderGroup.latestCreatedAt,
-                                                    )}
+                                                <Text style={{ fontSize: 10, color: '#6b7280' }}>
+                                                    {orderGroup.settlements.length} line{orderGroup.settlements.length === 1 ? '' : 's'}
                                                 </Text>
+                                            </View>
+                                            <Text style={{ fontSize: 17, fontWeight: '800', color: netAmount >= 0 ? '#22c55e' : '#ef4444' }}>
+                                                {netAmount >= 0 ? '+' : ''}{formatCurrency(netAmount)}
+                                            </Text>
+                                        </View>
 
-                                                {/* Revenue */}
-                                                <Text
-                                                    style={{
-                                                        width: 100,
-                                                        paddingHorizontal: 12,
-                                                        paddingVertical: 12,
-                                                        fontSize: 12,
-                                                        color: '#e2e8f0',
-                                                        textAlign: 'right',
-                                                    }}
-                                                >
-                                                    {formatCurrency(orderGroup.totalGross)}
-                                                </Text>
+                                        {/* Revenue / Commission chips */}
+                                        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+                                            <View style={{ backgroundColor: '#7C3AED12', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                                                <Text style={{ fontSize: 9, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.4 }}>Revenue</Text>
+                                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#e2e8f0' }}>{formatCurrency(orderGroup.totalGross)}</Text>
+                                            </View>
+                                            <View style={{ backgroundColor: '#f59e0b12', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                                                <Text style={{ fontSize: 9, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.4 }}>Owed</Text>
+                                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#f59e0b' }}>-{formatCurrency(orderGroup.totalReceivable)}</Text>
+                                            </View>
+                                            {orderGroup.totalPayable > 0 && (
+                                                <View style={{ backgroundColor: '#22c55e12', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                                                    <Text style={{ fontSize: 9, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.4 }}>Payout</Text>
+                                                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#22c55e' }}>+{formatCurrency(orderGroup.totalPayable)}</Text>
+                                                </View>
+                                            )}
+                                        </View>
 
-                                                {/* Commission */}
-                                                <Text
-                                                    style={{
-                                                        width: 110,
-                                                        paddingHorizontal: 12,
-                                                        paddingVertical: 12,
-                                                        fontSize: 12,
-                                                        color: '#f59e0b',
-                                                        textAlign: 'right',
-                                                    }}
-                                                >
-                                                    {formatCurrency(orderGroup.totalReceivable)}
-                                                </Text>
+                                        {/* Category tags */}
+                                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+                                            {Array.from(catMap.entries()).map(([cat, dir]) => {
+                                                const color = getCategoryColor(cat, dir);
+                                                return (
+                                                    <View key={cat} style={{ backgroundColor: color + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                                                        <Text style={{ fontSize: 10, fontWeight: '600', color }}>{getCategoryShortLabel(cat)}</Text>
+                                                    </View>
+                                                );
+                                            })}
+                                        </View>
 
-                                                {/* Net */}
-                                                <Text
-                                                    style={{
-                                                        width: 100,
-                                                        paddingHorizontal: 12,
-                                                        paddingVertical: 12,
-                                                        fontSize: 12,
-                                                        fontWeight: '700',
-                                                        color: netAmount >= 0 ? '#22c55e' : '#ef4444',
-                                                        textAlign: 'right',
-                                                    }}
-                                                >
-                                                    {netAmount >= 0 ? '+' : ''}{formatCurrency(netAmount)}
+                                        {/* Footer: date + status */}
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <Text style={{ fontSize: 11, color: '#6b7280' }}>
+                                                {formatDateTime(orderGroup.order?.orderDate ?? orderGroup.latestCreatedAt)}
+                                            </Text>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2, backgroundColor: hasPending ? '#f59e0b18' : '#22c55e18' }}>
+                                                <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: hasPending ? '#f59e0b' : '#22c55e' }} />
+                                                <Text style={{ fontSize: 11, fontWeight: '700', color: hasPending ? '#f59e0b' : '#22c55e' }}>
+                                                    {hasPending ? t('finances.pending', 'Pending') : t('finances.paid', 'Paid')}
                                                 </Text>
-                                            </Pressable>
-                                        );
-                                    })}
-                                </View>
-                            </ScrollView>
+                                            </View>
+                                        </View>
+                                    </Pressable>
+                                );
+                            })}
                         </View>
                     )}
 
@@ -1890,6 +1834,21 @@ export default function FinancesScreen() {
                                         )}
                                     </View>
 
+                                    {/* Focused-by banner */}
+                                    {highlightCategory !== null && (
+                                        <View style={{
+                                            flexDirection: 'row', alignItems: 'center', gap: 8,
+                                            borderRadius: 10, padding: 10, marginBottom: 12,
+                                            backgroundColor: getCategoryColor(highlightCategory, '') + '18',
+                                            borderWidth: 1, borderColor: getCategoryColor(highlightCategory, '') + '40',
+                                        }}>
+                                            <Ionicons name={getCategoryIcon(highlightCategory) as any} size={14} color={getCategoryColor(highlightCategory, '')} />
+                                            <Text style={{ fontSize: 12, fontWeight: '600', flex: 1, color: getCategoryColor(highlightCategory, '') }}>
+                                                {getCategoryShortLabel(highlightCategory)} · matching lines are highlighted below
+                                            </Text>
+                                        </View>
+                                    )}
+
                                     {/* Settlement Breakdown */}
                                     <Text style={{ fontSize: 13, fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>
                                         Settlement Breakdown
@@ -1897,15 +1856,19 @@ export default function FinancesScreen() {
                                     <View style={{ borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: '#263145', marginBottom: 16 }}>
                                         {settlementsForOrder.map((line: any, i: number) => {
                                             const isPayable = line.direction === 'PAYABLE';
-                                            const lineLabel = line.rule?.category
-                                                ? `${line.rule.category}${line.rule.subcategory ? ` · ${line.rule.subcategory}` : ''}`
-                                                : (isPayable ? 'Payout' : 'Commission');
+                                            const rawReason = line.reason ?? '';
+                                            const reasonMatch = rawReason.match(/\((.+)\)/);
+                                            const lineLabel = reasonMatch
+                                                ? reasonMatch[1]
+                                                : (rawReason || line.rule?.name || (isPayable ? 'Payout' : 'Commission'));
                                             const lineCategory = getLineCategory(line);
+                                            const explainText = getCategoryDescription(lineCategory);
                                             const isHighlighted = highlightCategory != null && lineCategory === highlightCategory;
                                             const hlColor = isHighlighted ? getCategoryColor(highlightCategory, line.direction) : null;
                                             return (
                                                 <View key={line.id} style={{
                                                     flexDirection: 'row',
+                                                    alignItems: 'flex-start',
                                                     justifyContent: 'space-between',
                                                     paddingHorizontal: 14,
                                                     paddingVertical: 11,
@@ -1913,9 +1876,14 @@ export default function FinancesScreen() {
                                                     borderLeftWidth: isHighlighted ? 3 : 0,
                                                     borderLeftColor: isHighlighted ? hlColor : 'transparent',
                                                 }}>
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-                                                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isPayable ? '#22c55e' : '#ef4444' }} />
-                                                        <Text style={{ fontSize: 13, color: isHighlighted ? '#e2e8f0' : '#6b7280', fontWeight: isHighlighted ? '600' : '400', flex: 1 }} numberOfLines={1}>{lineLabel}</Text>
+                                                    <View style={{ flex: 1, gap: 2, marginRight: 8 }}>
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isPayable ? '#22c55e' : '#ef4444', flexShrink: 0 }} />
+                                                            <Text style={{ fontSize: 13, color: isHighlighted ? '#e2e8f0' : '#9ca3af', fontWeight: isHighlighted ? '600' : '400', flex: 1 }} numberOfLines={2}>{lineLabel}</Text>
+                                                        </View>
+                                                        {explainText ? (
+                                                            <Text style={{ fontSize: 11, color: '#6b7280', paddingLeft: 16, lineHeight: 15 }}>{explainText}</Text>
+                                                        ) : null}
                                                     </View>
                                                     <Text style={{ fontSize: 13, fontWeight: '700', color: isPayable ? '#22c55e' : '#ef4444' }}>
                                                         {isPayable ? '+' : '-'}{formatCurrency(Number(line.amount ?? 0))}

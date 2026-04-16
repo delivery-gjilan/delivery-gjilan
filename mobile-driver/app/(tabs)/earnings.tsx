@@ -1034,6 +1034,19 @@ export default function EarningsScreen() {
                                         <ActivityIndicator color={theme.colors.primary} style={{ marginVertical: 24 }} />
                                     ) : (
                                         <>
+                                            {/* ── Focused-by banner ── */}
+                                            {highlightCategory !== null && (() => {
+                                                const hCfg = getCategoryConfig(highlightCategory, '');
+                                                return (
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, padding: 10, backgroundColor: hCfg.color + '18', borderWidth: 1, borderColor: hCfg.color + '40' }}>
+                                                        <Ionicons name={hCfg.icon as any} size={14} color={hCfg.color} />
+                                                        <Text style={{ fontSize: 12, color: hCfg.color, fontWeight: '600', flex: 1 }}>
+                                                            {getCategoryLabel(highlightCategory)} · matching lines are highlighted below
+                                                        </Text>
+                                                    </View>
+                                                );
+                                            })()}
+
                                             {/* ── Settlement summary ── */}
                                             <View style={[es.detailSection, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
                                                 <View style={es.detailRow}>
@@ -1072,10 +1085,11 @@ export default function EarningsScreen() {
                                                     const lineIsPayable = line.direction === 'PAYABLE';
                                                     const lineTag = getSettlementTag(line);
                                                     const lineCategory = getLineCategory(line);
+                                                    const lineCfg = getCategoryConfig(lineCategory, line.direction);
                                                     const isHighlighted = highlightCategory != null && lineCategory === highlightCategory;
                                                     const highlightColor = isHighlighted ? (getCategoryConfig(highlightCategory, line.direction).color) : null;
                                                     return (
-                                                        <View key={line.id} style={[es.detailRow, isHighlighted && {
+                                                        <View key={line.id} style={[es.detailRow, { alignItems: 'flex-start' }, isHighlighted && {
                                                             backgroundColor: highlightColor + "12",
                                                             marginHorizontal: -8,
                                                             paddingHorizontal: 8,
@@ -1084,11 +1098,18 @@ export default function EarningsScreen() {
                                                             borderLeftWidth: 3,
                                                             borderLeftColor: highlightColor,
                                                         }]}>
-                                                            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1 }}>
-                                                                <View style={[es.historyTagDot, { backgroundColor: lineTag.color }]} />
-                                                                <Text style={[es.detailLabel, { color: isHighlighted ? theme.colors.text : theme.colors.subtext, flex: 1, fontWeight: isHighlighted ? "600" : "400" }]} numberOfLines={1}>
-                                                                    {getSettlementLabel(line)}
-                                                                </Text>
+                                                            <View style={{ flex: 1, gap: 2 }}>
+                                                                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                                                                    <View style={[es.historyTagDot, { backgroundColor: lineTag.color }]} />
+                                                                    <Text style={[es.detailLabel, { color: isHighlighted ? theme.colors.text : theme.colors.subtext, flex: 1, fontWeight: isHighlighted ? "600" : "400" }]} numberOfLines={2}>
+                                                                        {getSettlementLabel(line)}
+                                                                    </Text>
+                                                                </View>
+                                                                {lineCfg.explain ? (
+                                                                    <Text style={{ fontSize: 10, color: theme.colors.subtext, paddingLeft: 16, lineHeight: 14 }}>
+                                                                        {lineCfg.explain}
+                                                                    </Text>
+                                                                ) : null}
                                                             </View>
                                                             <Text style={[es.detailValue, { color: lineIsPayable ? theme.colors.income : lineTag.color, fontWeight: "700" }]}>
                                                                 {lineIsPayable ? '+' : '-'}{formatCurrency(Number(line.amount ?? 0))}

@@ -1124,6 +1124,8 @@ export type MessageAlertType =
 export type Mutation = {
   __typename?: 'Mutation';
   addUserAddress: UserAddress;
+  /** Admin mutation to bulk update commission percentage for multiple drivers */
+  adminBulkUpdateDriverCommissions: Array<User>;
   adminCancelOrder: Order;
   /** Admin sends push-to-talk signaling state to one or multiple drivers */
   adminSendPttSignal: Scalars['Boolean']['output'];
@@ -1296,6 +1298,12 @@ export type Mutation = {
 
 export type MutationaddUserAddressArgs = {
   input: AddUserAddressInput;
+};
+
+
+export type MutationadminBulkUpdateDriverCommissionsArgs = {
+  commissionPercentage: Scalars['Float']['input'];
+  driverIds: Array<Scalars['ID']['input']>;
 };
 
 
@@ -4951,6 +4959,7 @@ export type MessageAlertTypeResolvers = EnumResolverSignature<{ INFO?: any, URGE
 
 export type MutationResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Mutation'] = ResolversParentTypes['Mutation']> = {
   addUserAddress?: Resolver<ResolversTypes['UserAddress'], ParentType, ContextType, RequireFields<MutationaddUserAddressArgs, 'input'>>;
+  adminBulkUpdateDriverCommissions?: Resolver<Array<ResolversTypes['User']>, ParentType, ContextType, RequireFields<MutationadminBulkUpdateDriverCommissionsArgs, 'commissionPercentage' | 'driverIds'>>;
   adminCancelOrder?: Resolver<ResolversTypes['Order'], ParentType, ContextType, RequireFields<MutationadminCancelOrderArgs, 'id' | 'reason'>>;
   adminSendPttSignal?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationadminSendPttSignalArgs, 'action' | 'channelName' | 'driverIds'>>;
   adminSetDriverConnectionStatus?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationadminSetDriverConnectionStatusArgs, 'driverId' | 'status'>>;
