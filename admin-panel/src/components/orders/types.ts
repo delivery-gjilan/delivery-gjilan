@@ -135,6 +135,7 @@ export interface Order {
     adminNote?: string | null;
     needsApproval?: boolean | null;
     locationFlagged?: boolean | null;
+    cashToCollect?: number | null;
     inventoryPrice?: number | null;
     approvalReasons?: ApprovalReason[] | null;
     settlementPreview?: OrderSettlementPreview | null;
