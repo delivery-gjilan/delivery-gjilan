@@ -25,12 +25,14 @@ export function OrderDetailSheet({
 }: Props) {
     const effectiveRouteInfo = order.status === 'OUT_FOR_DELIVERY' ? routeInfo : previewRouteInfo ?? routeInfo;
 
+    const isDirectDispatch = order.channel === 'DIRECT_DISPATCH';
+
     return (
         <OrderInspectSheet
             mode="assigned"
             order={order}
             onClose={onClose}
-            onNavigate={onStartNavigation}
+            onNavigate={isDirectDispatch ? undefined : onStartNavigation}
             onMarkPickedUp={isAssignedToMe ? onMarkPickedUp : undefined}
             onHeightChange={onHeightChange}
             routeInfo={effectiveRouteInfo}

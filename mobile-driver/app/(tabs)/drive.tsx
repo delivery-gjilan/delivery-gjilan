@@ -520,7 +520,7 @@ export default function MapScreen() {
                         order={focusedOrder}
                         isExpanded={showOrderDetails}
                         onToggle={() => setShowOrderDetails((prev) => !prev)}
-                        onNavigate={() => handleNavigationPress(focusedOrder)}
+                        onNavigate={focusedOrder.channel !== 'DIRECT_DISPATCH' ? () => handleNavigationPress(focusedOrder) : undefined}
                     />
                 </View>
             )}

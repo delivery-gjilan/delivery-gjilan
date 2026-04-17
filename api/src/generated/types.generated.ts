@@ -518,6 +518,8 @@ export type CreateDeliveryZoneInput = {
 };
 
 export type CreateDirectDispatchOrderInput = {
+  /** Super-admin override: target business ID. Ignored for business users (their own businessId is used). */
+  businessId?: InputMaybe<Scalars['ID']['input']>;
   /** Cash amount the driver should collect from the customer. Null if unknown at dispatch time. */
   cashToCollect?: InputMaybe<Scalars['Float']['input']>;
   /** Optional notes for the driver. */

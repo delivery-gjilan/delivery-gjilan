@@ -314,6 +314,8 @@ input CreateDirectDispatchOrderInput {
     driverNotes: String
     """Cash amount the driver should collect from the customer. Null if unknown at dispatch time."""
     cashToCollect: Float
+    """Super-admin override: target business ID. Ignored for business users (their own businessId is used)."""
+    businessId: ID
 }
 
 type DirectDispatchAvailability {

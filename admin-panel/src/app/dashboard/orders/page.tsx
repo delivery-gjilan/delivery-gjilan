@@ -11,10 +11,11 @@ import { useOrders, useUpdateOrderStatus } from "@/lib/hooks/useOrders";
 import { usePrepTimeAlerts, type PrepTimeAlert } from "@/lib/hooks/usePrepTimeAlerts";
 import { useAuth } from "@/lib/auth-context";
 import { getMarginSeverity } from "@/lib/constants/orderHelpers";
-import { ASSIGN_DRIVER_TO_ORDER, CREATE_TEST_ORDER, START_PREPARING, UPDATE_PREPARATION_TIME, ADMIN_CANCEL_ORDER, APPROVE_ORDER, REMOVE_ORDER_ITEM } from "@/graphql/operations/orders";
+import { ASSIGN_DRIVER_TO_ORDER, CREATE_TEST_ORDER, CREATE_DIRECT_DISPATCH_ORDER, START_PREPARING, UPDATE_PREPARATION_TIME, ADMIN_CANCEL_ORDER, APPROVE_ORDER, REMOVE_ORDER_ITEM } from "@/graphql/operations/orders";
 import { GRANT_FREE_DELIVERY } from "@/graphql/operations/promotions/mutations";
 import { UPDATE_USER_NOTE_MUTATION } from "@/graphql/operations/users/mutations";
 import { DRIVERS_QUERY } from "@/graphql/operations/users/queries";
+import { GET_BUSINESSES_LIST } from "@/graphql/operations/banners/businessProducts";
 import { GET_ORDER_COVERAGE } from "@/graphql/operations/inventory/queries";
 import { DEDUCT_ORDER_STOCK } from "@/graphql/operations/inventory/mutations";
 import InventoryCoverageModal from "@/components/inventory/InventoryCoverageModal";
@@ -119,8 +120,10 @@ export default function OrdersPage() {
     const { update: updateStatus, loading: updateLoading } = useUpdateOrderStatus();
     const { admin } = useAuth();
     const { data: driversData } = useQuery<DriversQuery>(DRIVERS_QUERY, { pollInterval: 10000 });
+    const { data: businessesData } = useQuery(GET_BUSINESSES_LIST);
     const [assignDriver] = useMutation(ASSIGN_DRIVER_TO_ORDER);
     const [createTestOrder, { loading: creatingTestOrder }] = useMutation(CREATE_TEST_ORDER);
+    const [createDirectDispatchOrderMut, { loading: creatingDD }] = useMutation(CREATE_DIRECT_DISPATCH_ORDER);
     const [startPreparingMut, { loading: startPreparingLoading }] = useMutation(START_PREPARING, { refetchQueries: ["GetOrders"] });
     const [updatePrepTimeMut] = useMutation(UPDATE_PREPARATION_TIME, { refetchQueries: ["GetOrders"] });
     const [adminCancelOrderMut, { loading: cancellingOrder }] = useMutation(ADMIN_CANCEL_ORDER, { refetchQueries: ["GetOrders"] });
@@ -162,6 +165,15 @@ export default function OrdersPage() {
     const [removeItemDialog, setRemoveItemDialog] = useState<{ orderId: string; itemId: string; itemName: string; itemQuantity: number } | null>(null);
     const [removeItemReason, setRemoveItemReason] = useState<string>("");
     const [removeItemQuantity, setRemoveItemQuantity] = useState<number>(1);
+
+    /* ─── Mock Direct Call modal ─── */
+    const [ddModalOpen, setDdModalOpen] = useState(false);
+    const [ddBusinessId, setDdBusinessId] = useState("");
+    const [ddPhone, setDdPhone] = useState("");
+    const [ddName, setDdName] = useState("");
+    const [ddNotes, setDdNotes] = useState("");
+    const [ddCash, setDdCash] = useState("");
+    const [ddPrepMinutes, setDdPrepMinutes] = useState("15");
 
     /* ─── Role ─── */
     const isSuperAdmin = admin?.role === "SUPER_ADMIN";
@@ -440,6 +452,32 @@ export default function OrdersPage() {
         if (isAdmin) fetchOrderCoverage({ variables: { orderId: order.id } });
     };
 
+    const handleCreateDirectDispatch = async () => {
+        const phone = ddPhone.trim();
+        if (!phone) { toast.warning("Recipient phone is required."); return; }
+        if (!ddBusinessId) { toast.warning("Please select a business."); return; }
+        const minutes = parseInt(ddPrepMinutes, 10);
+        if (!minutes || minutes < 1) { toast.warning("Enter a valid preparation time."); return; }
+        try {
+            await createDirectDispatchOrderMut({
+                variables: {
+                    input: {
+                        businessId: ddBusinessId,
+                        recipientPhone: phone,
+                        recipientName: ddName.trim() || undefined,
+                        driverNotes: ddNotes.trim() || undefined,
+                        cashToCollect: ddCash ? parseFloat(ddCash) : undefined,
+                        preparationMinutes: minutes,
+                    },
+                },
+                refetchQueries: ["GetOrders"],
+            });
+            toast.success("Direct Call order created!");
+            setDdModalOpen(false);
+            setDdPhone(""); setDdName(""); setDdNotes(""); setDdCash(""); setDdPrepMinutes("15"); setDdBusinessId("");
+        } catch (err) { toast.error(getErrorMessage(err, "Failed to create Direct Call order")); }
+    };
+
     const openCustomerProfile = (userId: string, order: Order) => {
         const params = new URLSearchParams({
             userId,
@@ -541,18 +579,28 @@ export default function OrdersPage() {
                 </div>
                 <div className="flex items-center gap-2">
                     {isSuperAdmin && (
-                        <Button
-                            size="sm"
-                            onClick={async () => {
-                                try { await createTestOrder({ refetchQueries: ["GetOrders"] }); }
-                                catch (err) { toast.error(getErrorMessage(err, "Failed to create test order")); }
-                            }}
-                            disabled={creatingTestOrder}
-                            className="flex items-center gap-2 border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
-                        >
-                            <Plus size={14} />
-                            {creatingTestOrder ? "Creating..." : "Mock Order"}
-                        </Button>
+                        <>
+                            <Button
+                                size="sm"
+                                onClick={async () => {
+                                    try { await createTestOrder({ refetchQueries: ["GetOrders"] }); }
+                                    catch (err) { toast.error(getErrorMessage(err, "Failed to create test order")); }
+                                }}
+                                disabled={creatingTestOrder}
+                                className="flex items-center gap-2 border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                            >
+                                <Plus size={14} />
+                                {creatingTestOrder ? "Creating..." : "Mock Order"}
+                            </Button>
+                            <Button
+                                size="sm"
+                                onClick={() => setDdModalOpen(true)}
+                                className="flex items-center gap-2 border-orange-500/30 text-orange-400 hover:bg-orange-500/10"
+                            >
+                                <Phone size={14} />
+                                Mock Direct Call
+                            </Button>
+                        </>
                     )}
                 </div>
             </div>
@@ -1204,6 +1252,78 @@ export default function OrdersPage() {
                         </div>
                     </div>
                 )}
+            </Modal>
+
+            {/* ════ MOCK DIRECT CALL MODAL ════ */}
+            <Modal isOpen={ddModalOpen} onClose={() => setDdModalOpen(false)} title="Create Mock Direct Call Order">
+                <div className="space-y-4">
+                    <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-3 text-xs text-orange-300">
+                        Creates a DIRECT_DISPATCH order for the selected business. A free driver will be auto-dispatched.
+                    </div>
+                    <div>
+                        <label className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium block mb-1">Business *</label>
+                        <Dropdown
+                            value={ddBusinessId}
+                            onChange={(v) => setDdBusinessId(v as string)}
+                            options={[
+                                { value: "", label: "Select a business..." },
+                                ...(businessesData?.businesses ?? []).map((b: { id: string; name: string }) => ({ value: b.id, label: b.name })),
+                            ]}
+                        />
+                    </div>
+                    <div>
+                        <label className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium block mb-1">Recipient Phone *</label>
+                        <Input
+                            value={ddPhone}
+                            onChange={(e) => setDdPhone(e.target.value)}
+                            placeholder="+38344..."
+                        />
+                    </div>
+                    <div>
+                        <label className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium block mb-1">Recipient Name</label>
+                        <Input
+                            value={ddName}
+                            onChange={(e) => setDdName(e.target.value)}
+                            placeholder="Optional"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium block mb-1">Prep Minutes *</label>
+                        <Input
+                            type="number"
+                            value={ddPrepMinutes}
+                            onChange={(e) => setDdPrepMinutes(e.target.value)}
+                            placeholder="15"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium block mb-1">Cash to Collect (€)</label>
+                        <Input
+                            type="number"
+                            value={ddCash}
+                            onChange={(e) => setDdCash(e.target.value)}
+                            placeholder="Optional"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium block mb-1">Driver Notes</label>
+                        <Input
+                            value={ddNotes}
+                            onChange={(e) => setDdNotes(e.target.value)}
+                            placeholder="Optional instructions for driver"
+                        />
+                    </div>
+                    <div className="flex gap-3 pt-2">
+                        <Button variant="secondary" onClick={() => setDdModalOpen(false)}>Cancel</Button>
+                        <Button
+                            onClick={handleCreateDirectDispatch}
+                            disabled={creatingDD || !ddPhone.trim() || !ddBusinessId}
+                            className="flex-1 border-orange-500/30 text-orange-400 hover:bg-orange-500/10"
+                        >
+                            {creatingDD ? "Creating..." : "Create Direct Call Order"}
+                        </Button>
+                    </div>
+                </div>
             </Modal>
         </div>
     );

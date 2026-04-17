@@ -38,7 +38,6 @@ type SettlementOrderGroup = {
 type Period = 'today' | 'week' | 'month' | 'last_month' | 'all';
 
 const SETTLEMENT_PAGE_SIZE = 10000;
-const UNSETTLED_STATUS = SettlementStatus.Pending;
 
 function getPeriodDates(period: Period): { startDate?: string; endDate?: string } {
     const now = new Date();
@@ -101,7 +100,7 @@ export default function EarningsScreen() {
 
     // ── Category drill-down state ──
     const [selectedCategory, setSelectedCategory] = useState<{ category: string; label: string; color: string; direction: string } | null>(null);
-    const [categorySettlements, setCategorySettlements] = useState<Settlement[]>([]);
+    // categorySettlements derived from useLazyQuery tuple data (no separate state)
     const [highlightCategory, setHighlightCategory] = useState<string | null>(null);
 
     const PERIODS: { key: Period; label: string }[] = [
@@ -128,7 +127,7 @@ export default function EarningsScreen() {
     const { data: settlementsData, loading: settlementsLoading, refetch: refetchSettlements, fetchMore: fetchMoreSettlements } = useQuery(
         GET_MY_SETTLEMENTS,
         {
-            variables: { status: UNSETTLED_STATUS, startDate, endDate, limit: SETTLEMENT_PAGE_SIZE, offset: 0 },
+            variables: { startDate, endDate, limit: SETTLEMENT_PAGE_SIZE, offset: 0 },
             fetchPolicy: 'network-only',
             onCompleted: (data) => {
                 const rows = data?.settlements ?? [];
@@ -155,15 +154,11 @@ export default function EarningsScreen() {
         { fetchPolicy: 'network-only' },
     );
 
-    const [fetchCategorySettlements, { loading: categoryLoading }] = useLazyQuery(
+    const [fetchCategorySettlements, { loading: categoryLoading, data: categoryData }] = useLazyQuery(
         GET_MY_SETTLEMENTS,
-        {
-            fetchPolicy: 'network-only',
-            onCompleted: (data) => {
-                setCategorySettlements(data?.settlements ?? []);
-            },
-        },
+        { fetchPolicy: 'network-only' },
     );
+    const categorySettlements = categoryData?.settlements ?? [];
 
     const cash = cashData?.driverCashSummary;
     const breakdownItems = breakdownData?.settlementBreakdown ?? [];
@@ -256,10 +251,8 @@ export default function EarningsScreen() {
     const handleCategoryPress = useCallback((item: BreakdownItem) => {
         const cfg = getCategoryConfig(item.category, item.direction);
         setSelectedCategory({ category: item.category, label: item.label, color: cfg.color, direction: item.direction });
-        setCategorySettlements([]);
         fetchCategorySettlements({
             variables: {
-                status: UNSETTLED_STATUS,
                 category: item.category,
                 direction: item.direction,
                 startDate,
@@ -274,7 +267,7 @@ export default function EarningsScreen() {
         setLoadingMore(true);
         try {
             const result = await fetchMoreSettlements({
-                variables: { status: UNSETTLED_STATUS, startDate, endDate, limit: SETTLEMENT_PAGE_SIZE, offset: settlementOffset },
+                variables: { startDate, endDate, limit: SETTLEMENT_PAGE_SIZE, offset: settlementOffset },
             });
             const rows = result.data?.settlements ?? [];
             setAllSettlements(prev => [...prev, ...rows]);

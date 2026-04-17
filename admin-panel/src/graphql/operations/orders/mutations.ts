@@ -168,6 +168,32 @@ export const CREATE_TEST_ORDER = graphql(`
     }
 `);
 
+export const CREATE_DIRECT_DISPATCH_ORDER = graphql(`
+    mutation CreateDirectDispatchOrder($input: CreateDirectDispatchOrderInput!) {
+        createDirectDispatchOrder(input: $input) {
+            id
+            displayId
+            status
+            channel
+            recipientPhone
+            recipientName
+            orderDate
+            businesses {
+                business {
+                    id
+                    name
+                }
+                items {
+                    productId
+                    name
+                    quantity
+                    unitPrice
+                }
+            }
+        }
+    }
+`);
+
 export const REMOVE_ORDER_ITEM = graphql(`
     mutation RemoveOrderItem($orderId: ID!, $orderItemId: ID!, $reason: String!, $quantity: Int) {
         removeOrderItem(orderId: $orderId, orderItemId: $orderItemId, reason: $reason, quantity: $quantity) {

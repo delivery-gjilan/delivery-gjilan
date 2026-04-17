@@ -190,7 +190,7 @@ export default function FinancesScreen() {
 
     // ── Category drill-down state ──
     const [selectedCategory, setSelectedCategory] = useState<{ category: string; label: string; color: string; direction: string } | null>(null);
-    const [categorySettlements, setCategorySettlements] = useState<Settlement[]>([]);
+    // categorySettlements is derived from the lazy query data (no separate state to avoid stale-closure issues)
     const [highlightCategory, setHighlightCategory] = useState<string | null>(null);
 
     const businessId = user?.businessId ?? '';
@@ -389,7 +389,13 @@ export default function FinancesScreen() {
         loading: breakdownLoading,
         refetch: refetchBreakdown,
     } = useQuery(GET_BUSINESS_SETTLEMENT_BREAKDOWN, {
-        variables: { businessId, isSettled: false, startDate, endDate },
+        // Always since last settlement so the owed/due figure reflects the current cycle,
+        // not a filtered window the user may have selected.
+        variables: {
+            businessId,
+            isSettled: false,
+            startDate: lastPaidDate ? new Date(new Date(lastPaidDate).getTime() + 1).toISOString() : undefined,
+        },
         skip: !businessId,
         fetchPolicy: 'network-only',
     });
@@ -407,15 +413,11 @@ export default function FinancesScreen() {
     );
 
     // ── Category drill-down query ──
-    const [fetchCategorySettlements, { loading: categoryLoading }] = useLazyQuery(
+    const [fetchCategorySettlements, { loading: categoryLoading, data: categoryData }] = useLazyQuery(
         GET_MY_BUSINESS_SETTLEMENTS,
-        {
-            fetchPolicy: 'network-only',
-            onCompleted: (data) => {
-                setCategorySettlements(data?.settlements ?? []);
-            },
-        },
+        { fetchPolicy: 'network-only' },
     );
+    const categorySettlements = categoryData?.settlements ?? [];
 
     // Map a settlement line to its computed category (mirrors backend logic)
     const getLineCategory = (s: Settlement): string => {
@@ -514,30 +516,8 @@ export default function FinancesScreen() {
     const handleCategoryPress = useCallback((item: BreakdownItem) => {
         const color = getCategoryColor(item.category, item.direction);
         setSelectedCategory({ category: item.category, label: item.label, color, direction: item.direction });
-        setCategorySettlements([]);
         fetchCategorySettlements({ variables: { businessId, direction: item.direction, category: item.category, startDate, endDate, limit: 10000, offset: 0 } });
     }, [fetchCategorySettlements, businessId, startDate, endDate]);
-    // Keep summary cards aligned with the unsettled orders list shown on this tab.
-    const computed = useMemo(() => {
-        const totalGross = settlementOrders.reduce((sum, orderGroup) => sum + orderGroup.totalGross, 0)
-            + unsettledDeliveredOrders.reduce((sum, order) => sum + buildDeliveredOrderGroup(order).totalGross, 0);
-        let pendingOwed = 0;
-        let hasPartiallyPaid = false;
-
-        unsettledSettlements.forEach((s) => {
-            if (s.direction === 'RECEIVABLE') {
-                if (s.status === 'PENDING' || s.status === 'OVERDUE') {
-                    pendingOwed += Number(s.amount ?? 0);
-                }
-                if (s.status === 'PARTIALLY_PAID') {
-                    hasPartiallyPaid = true;
-                    pendingOwed += Number(s.amount ?? 0);
-                }
-            }
-        });
-
-        return { totalGross, pendingOwed, hasPartiallyPaid };
-    }, [buildDeliveredOrderGroup, settlementOrders, unsettledDeliveredOrders, unsettledSettlements]);
 
     const filteredSettlements = useMemo(() => unsettledSettlements, [unsettledSettlements]);
 
@@ -582,6 +562,24 @@ export default function FinancesScreen() {
     const unsettledDeliveredOrders = useMemo(() => {
         return deliveredOrders.filter((order) => !settlementOrderIds.has(order.id));
     }, [deliveredOrders, settlementOrderIds]);
+
+    // Keep summary cards aligned with the unsettled orders list shown on this tab.
+    const computed = useMemo(() => {
+        const totalGross = settlementOrders.reduce((sum, orderGroup) => sum + orderGroup.totalGross, 0)
+            + unsettledDeliveredOrders.reduce((sum, order) => sum + buildDeliveredOrderGroup(order).totalGross, 0);
+
+        // Net from the business perspective (always all-time unsettled, ignores period filter):
+        //   RECEIVABLE = business owes platform (commission, markup, etc.)
+        //   PAYABLE    = platform owes business (catalog revenue, delivery payouts, etc.)
+        //   netOwed > 0 → business owes platform
+        //   netOwed < 0 → platform owes business
+        const netOwed = breakdownItems.reduce((sum, item) => {
+            const amount = item.totalAmount;
+            return item.direction === 'RECEIVABLE' ? sum + amount : sum - amount;
+        }, 0);
+
+        return { totalGross, netOwed };
+    }, [buildDeliveredOrderGroup, settlementOrders, unsettledDeliveredOrders, breakdownItems]);
 
     const visibleOrderEntries = useMemo(() => {
         return [
@@ -965,15 +963,15 @@ export default function FinancesScreen() {
                                 </Text>
                             </View>
 
-                            {/* Owed to Platform */}
+                            {/* Owed to Platform / Due to Business */}
                             <View
                                 style={{
                                     flex: 1,
                                     borderRadius: 20,
                                     padding: 18,
-                                    backgroundColor: '#1a0a0a',
+                                    backgroundColor: computed.netOwed > 0 ? '#1a0a0a' : '#0a1a0a',
                                     borderWidth: 1,
-                                    borderColor: '#3b1212',
+                                    borderColor: computed.netOwed > 0 ? '#3b1212' : '#12311c',
                                 }}
                             >
                                 <Text
@@ -981,27 +979,29 @@ export default function FinancesScreen() {
                                         fontSize: 10,
                                         fontWeight: '700',
                                         letterSpacing: 1,
-                                        color: '#ef4444',
+                                        color: computed.netOwed > 0 ? '#ef4444' : '#22c55e',
                                         textTransform: 'uppercase',
                                     }}
                                 >
-                                    {t('finances.owed', 'Owed')}
+                                    {computed.netOwed > 0
+                                        ? t('finances.owed', 'Owed')
+                                        : t('finances.due_to_you', 'Due to you')}
                                 </Text>
                                 <Text
                                     style={{
                                         fontSize: 26,
                                         fontWeight: '800',
-                                        color: computed.pendingOwed > 0 ? '#ef4444' : '#22c55e',
+                                        color: computed.netOwed > 0 ? '#ef4444' : '#22c55e',
                                         marginTop: 6,
                                     }}
                                 >
-                                    {formatCurrency(computed.pendingOwed)}
+                                    {formatCurrency(Math.abs(computed.netOwed))}
                                 </Text>
-                                {computed.hasPartiallyPaid && (
-                                    <Text style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>
-                                        {t('finances.includes_partial', 'Includes partial balance')}
-                                    </Text>
-                                )}
+                                <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+                                    {computed.netOwed > 0
+                                        ? t('finances.net_owed_hint', 'After deducting payouts')
+                                        : t('finances.net_due_hint', 'Platform owes you this')}
+                                </Text>
                             </View>
                         </View>
                     )}
@@ -1047,82 +1047,167 @@ export default function FinancesScreen() {
                     </ScrollView>
                 </View>
 
-                {/* ── Settlement Breakdown ── */}
+                {/* ── Settlement Flow Panel ── */}
                 {!breakdownLoading && breakdownItems.length > 0 && (
                     <View className="px-5 mt-5">
-                        <Text
-                            style={{
-                                fontSize: 14,
-                                fontWeight: '700',
-                                color: '#fff',
-                                marginBottom: 10,
-                            }}
-                        >
-                            {t('finances.breakdown_title', 'Cost Breakdown')}
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff', marginBottom: 12 }}>
+                            {t('finances.breakdown_title', 'Settlement Breakdown')}
                         </Text>
-                        <View style={{ gap: 8 }}>
-                            {breakdownItems.map((item, idx) => {
-                                const isReceivable = item.direction === 'RECEIVABLE';
-                                const color = getCategoryColor(item.category, item.direction);
-                                return (
-                                    <Pressable
-                                        key={`${item.category}-${idx}`}
-                                        onPress={() => handleCategoryPress(item)}
-                                        style={{
-                                            flexDirection: 'row',
-                                            alignItems: 'center',
-                                            justifyContent: 'space-between',
-                                            borderRadius: 16,
-                                            padding: 14,
-                                            backgroundColor: '#1a2233',
-                                            borderWidth: 1,
-                                            borderColor: '#263145',
-                                        }}
-                                    >
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 10 }}>
-                                            <View
-                                                style={{
-                                                    width: 28,
-                                                    height: 28,
-                                                    borderRadius: 8,
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    backgroundColor: color + '18',
-                                                }}
-                                            >
-                                                <Ionicons name={getCategoryIcon(item.category) as any} size={14} color={color} />
-                                            </View>
-                                            <View style={{ flex: 1 }}>
-                                                <Text
-                                                    style={{
-                                                        fontSize: 13,
-                                                        fontWeight: '600',
-                                                        color: '#e2e8f0',
-                                                    }}
-                                                    numberOfLines={1}
-                                                >
-                                                    {item.label}
-                                                </Text>
-                                                <Text style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }} numberOfLines={1}>
-                                                    {getCategoryDescription(item.category)}
-                                                </Text>
-                                                <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
-                                                    {item.count} {item.count === 1 ? t('finances.record', 'record') : t('finances.records', 'records')} · {t('finances.view_orders', 'View Orders')} ›
-                                                </Text>
-                                            </View>
+
+                        {/* STEP 1: Gross Revenue */}
+                        <View style={{ borderRadius: 18, padding: 16, backgroundColor: '#7C3AED10', borderWidth: 1, borderColor: '#7C3AED35' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                <View style={{ width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#7C3AED25' }}>
+                                    <Ionicons name="storefront-outline" size={16} color="#7C3AED" />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 1, color: '#7C3AED', textTransform: 'uppercase' }}>
+                                        {t('finances.step_revenue', 'GROSS REVENUE')}
+                                    </Text>
+                                    <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>
+                                        {t('finances.step_revenue_hint', 'Total subtotal from delivered orders')}
+                                    </Text>
+                                </View>
+                                <Text style={{ fontSize: 20, fontWeight: '800', color: '#7C3AED' }}>
+                                    {formatCurrency(computed.totalGross)}
+                                </Text>
+                            </View>
+                            <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 6 }}>
+                                {settlementOrders.length} {settlementOrders.length === 1 ? t('finances.order', 'order') : t('finances.orders', 'orders')}
+                            </Text>
+                        </View>
+
+                        {/* DEDUCTIONS: business owes platform (RECEIVABLE direction) */}
+                        {breakdownItems.filter(i => i.direction === 'RECEIVABLE').length > 0 && (
+                            <>
+                                <View style={{ alignItems: 'center', paddingVertical: 2, gap: 0 }}>
+                                    <View style={{ width: 1, height: 10, backgroundColor: '#263145' }} />
+                                    <Ionicons name="arrow-down" size={14} color="#4b5563" />
+                                    <View style={{ width: 1, height: 10, backgroundColor: '#263145' }} />
+                                </View>
+                                <View style={{ borderRadius: 18, padding: 16, backgroundColor: '#ef444408', borderWidth: 1, borderColor: '#ef444425' }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                                        <View style={{ width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ef444418' }}>
+                                            <Ionicons name="remove-circle-outline" size={16} color="#ef4444" />
                                         </View>
-                                        <Text
-                                            style={{
-                                                fontSize: 15,
-                                                fontWeight: '700',
-                                                color,
-                                            }}
-                                        >
-                                            {isReceivable ? '-' : '+'}{formatCurrency(item.totalAmount)}
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 1, color: '#ef4444', textTransform: 'uppercase' }}>
+                                                {t('finances.step_deductions', 'DEDUCTIONS')}
+                                            </Text>
+                                            <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>
+                                                {t('finances.step_deductions_hint', 'Amounts owed to the platform')}
+                                            </Text>
+                                        </View>
+                                        <Text style={{ fontSize: 16, fontWeight: '700', color: '#ef4444' }}>
+                                            -{formatCurrency(breakdownItems.filter(i => i.direction === 'RECEIVABLE').reduce((s, i) => s + i.totalAmount, 0))}
                                         </Text>
-                                    </Pressable>
-                                );
-                            })}
+                                    </View>
+                                    {breakdownItems.filter(i => i.direction === 'RECEIVABLE').map((item, idx, arr) => {
+                                        const color = getCategoryColor(item.category, item.direction);
+                                        return (
+                                            <Pressable key={`${item.category}-${idx}`} onPress={() => handleCategoryPress(item)}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 }}>
+                                                    <View style={{ width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: color + '15' }}>
+                                                        <Ionicons name={getCategoryIcon(item.category) as any} size={13} color={color} />
+                                                    </View>
+                                                    <View style={{ flex: 1 }}>
+                                                        <Text style={{ fontSize: 13, fontWeight: '600', color: '#e2e8f0' }} numberOfLines={1}>{item.label}</Text>
+                                                        <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>
+                                                            {item.count} {item.count === 1 ? t('finances.record', 'record') : t('finances.records', 'records')} · {t('finances.view_orders', 'View Orders')} ›
+                                                        </Text>
+                                                    </View>
+                                                    <Text style={{ fontSize: 14, fontWeight: '700', color }}>-{formatCurrency(item.totalAmount)}</Text>
+                                                </View>
+                                                {idx < arr.length - 1 && <View style={{ height: 1, backgroundColor: '#1e2d42', marginLeft: 36 }} />}
+                                            </Pressable>
+                                        );
+                                    })}
+                                </View>
+                            </>
+                        )}
+
+                        {/* ADDITIONS: platform owes business (PAYABLE direction) */}
+                        {breakdownItems.filter(i => i.direction === 'PAYABLE').length > 0 && (
+                            <>
+                                <View style={{ alignItems: 'center', paddingVertical: 2, gap: 0 }}>
+                                    <View style={{ width: 1, height: 10, backgroundColor: '#263145' }} />
+                                    <Ionicons name="arrow-down" size={14} color="#4b5563" />
+                                    <View style={{ width: 1, height: 10, backgroundColor: '#263145' }} />
+                                </View>
+                                <View style={{ borderRadius: 18, padding: 16, backgroundColor: '#22c55e08', borderWidth: 1, borderColor: '#22c55e25' }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                                        <View style={{ width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#22c55e18' }}>
+                                            <Ionicons name="add-circle-outline" size={16} color="#22c55e" />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 1, color: '#22c55e', textTransform: 'uppercase' }}>
+                                                {t('finances.step_additions', 'PLATFORM PAYS YOU')}
+                                            </Text>
+                                            <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>
+                                                {t('finances.step_additions_hint', 'Amounts the platform owes you')}
+                                            </Text>
+                                        </View>
+                                        <Text style={{ fontSize: 16, fontWeight: '700', color: '#22c55e' }}>
+                                            +{formatCurrency(breakdownItems.filter(i => i.direction === 'PAYABLE').reduce((s, i) => s + i.totalAmount, 0))}
+                                        </Text>
+                                    </View>
+                                    {breakdownItems.filter(i => i.direction === 'PAYABLE').map((item, idx, arr) => {
+                                        const color = getCategoryColor(item.category, item.direction);
+                                        return (
+                                            <Pressable key={`${item.category}-${idx}`} onPress={() => handleCategoryPress(item)}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 }}>
+                                                    <View style={{ width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: color + '15' }}>
+                                                        <Ionicons name={getCategoryIcon(item.category) as any} size={13} color={color} />
+                                                    </View>
+                                                    <View style={{ flex: 1 }}>
+                                                        <Text style={{ fontSize: 13, fontWeight: '600', color: '#e2e8f0' }} numberOfLines={1}>{item.label}</Text>
+                                                        <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>
+                                                            {item.count} {item.count === 1 ? t('finances.record', 'record') : t('finances.records', 'records')} · {t('finances.view_orders', 'View Orders')} ›
+                                                        </Text>
+                                                    </View>
+                                                    <Text style={{ fontSize: 14, fontWeight: '700', color }}>+{formatCurrency(item.totalAmount)}</Text>
+                                                </View>
+                                                {idx < arr.length - 1 && <View style={{ height: 1, backgroundColor: '#1e2d42', marginLeft: 36 }} />}
+                                            </Pressable>
+                                        );
+                                    })}
+                                </View>
+                            </>
+                        )}
+
+                        {/* Net Settlement Result */}
+                        <View style={{ alignItems: 'center', paddingVertical: 2, gap: 0 }}>
+                            <View style={{ width: 1, height: 10, backgroundColor: '#263145' }} />
+                            <Ionicons name="arrow-down" size={14} color="#4b5563" />
+                            <View style={{ width: 1, height: 10, backgroundColor: '#263145' }} />
+                        </View>
+                        <View style={{
+                            borderRadius: 18,
+                            padding: 18,
+                            backgroundColor: computed.netOwed > 0 ? '#ef444410' : '#22c55e10',
+                            borderWidth: 1,
+                            borderColor: computed.netOwed > 0 ? '#ef444440' : '#22c55e40',
+                        }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                <View style={{ width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: (computed.netOwed > 0 ? '#ef4444' : '#22c55e') + '25' }}>
+                                    <Ionicons name="wallet-outline" size={16} color={computed.netOwed > 0 ? '#ef4444' : '#22c55e'} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 1, color: computed.netOwed > 0 ? '#ef4444' : '#22c55e', textTransform: 'uppercase' }}>
+                                        {computed.netOwed > 0
+                                            ? t('finances.net_owed', 'NET OWED TO PLATFORM')
+                                            : t('finances.net_due', 'NET DUE TO YOU')}
+                                    </Text>
+                                    <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>
+                                        {computed.netOwed > 0
+                                            ? t('finances.net_owed_hint2', 'You need to pay this to settle')
+                                            : t('finances.net_due_hint2', 'Platform will pay you this amount')}
+                                    </Text>
+                                </View>
+                            </View>
+                            <Text style={{ fontSize: 30, fontWeight: '800', color: computed.netOwed > 0 ? '#ef4444' : '#22c55e', marginTop: 10 }}>
+                                {formatCurrency(Math.abs(computed.netOwed))}
+                            </Text>
                         </View>
                     </View>
                 )}
@@ -1371,11 +1456,7 @@ export default function FinancesScreen() {
                             <Text style={{ fontSize: 13, fontWeight: '600', color: '#fff' }}>
                                 {formatDateTime(lastPaidDate)}
                             </Text>
-                            {computed.hasPartiallyPaid && (
-                                <Text style={{ fontSize: 11, color: '#f59e0b', marginTop: 2 }}>
-                                    Previous settlement was partially paid · outstanding balance included in Owed
-                                </Text>
-                            )}
+
                         </View>
                     )}
 

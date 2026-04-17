@@ -14,23 +14,36 @@ export const createDirectDispatchOrder: NonNullable<MutationResolvers['createDir
     context,
 ) => {
     const { db, userData, orderService, notificationService } = context;
-    const { userId, role, businessId } = userData;
+    const { userId, role, businessId: userBusinessId } = userData;
 
-    // Only business owners/employees can create direct dispatch orders
-    if (!role || !businessId) {
-        throw new GraphQLError('Only business users can create direct dispatch orders', {
-            extensions: { code: 'FORBIDDEN' },
-        });
-    }
+    // Super admins can create a DD order for any business by passing businessId in input
+    const isSuperAdmin = role === 'SUPER_ADMIN';
 
-    if (role !== 'BUSINESS_OWNER' && role !== 'BUSINESS_EMPLOYEE') {
-        throw new GraphQLError('Only business users can create direct dispatch orders', {
-            extensions: { code: 'FORBIDDEN' },
-        });
+    if (!isSuperAdmin) {
+        // Only business owners/employees can create direct dispatch orders
+        if (!role || !userBusinessId) {
+            throw new GraphQLError('Only business users can create direct dispatch orders', {
+                extensions: { code: 'FORBIDDEN' },
+            });
+        }
+
+        if (role !== 'BUSINESS_OWNER' && role !== 'BUSINESS_EMPLOYEE') {
+            throw new GraphQLError('Only business users can create direct dispatch orders', {
+                extensions: { code: 'FORBIDDEN' },
+            });
+        }
     }
 
     if (!userId) {
         throw new GraphQLError('Unauthorized', { extensions: { code: 'UNAUTHORIZED' } });
+    }
+
+    const businessId = isSuperAdmin
+        ? (input.businessId ?? userBusinessId)
+        : userBusinessId;
+
+    if (!businessId) {
+        throw new GraphQLError('businessId is required', { extensions: { code: 'BAD_REQUEST' } });
     }
 
     const driverRepo = new DriverRepository(db);

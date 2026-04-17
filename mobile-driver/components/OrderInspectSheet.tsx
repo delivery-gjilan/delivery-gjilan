@@ -255,8 +255,20 @@ export function OrderInspectSheet({
             };
         }
 
+        // Direct dispatch orders have no drop-off location — navigate CTA is not applicable.
+        if (isDirectDispatch) {
+            return {
+                label: 'Done',
+                icon: 'checkmark',
+                onPress: onClose,
+                style: [styles.primaryBtn, styles.primaryBtnAssigned],
+                textStyle: styles.primaryBtnText,
+                loading: false,
+            };
+        }
+
         return {
-            label: (!isDirectDispatch && order.status === 'OUT_FOR_DELIVERY') ? 'Continue to drop-off' : 'Continue to pickup',
+            label: order.status === 'OUT_FOR_DELIVERY' ? 'Continue to drop-off' : 'Continue to pickup',
             icon: 'navigate-outline',
             onPress: () => onNavigate?.(),
             style: [styles.primaryBtn, styles.primaryBtnAssigned],
