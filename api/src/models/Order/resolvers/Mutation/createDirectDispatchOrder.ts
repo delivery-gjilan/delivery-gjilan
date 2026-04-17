@@ -50,18 +50,25 @@ export const createDirectDispatchOrder: NonNullable<MutationResolvers['createDir
     const orderRepo = orderService.orderRepository;
     const service = new DirectDispatchService(db, driverRepo, orderRepo);
 
-    const dbOrder = await service.createOrder(
-        {
-            businessId,
-            dropOffLocation: input.dropOffLocation ?? null,
-            preparationMinutes: input.preparationMinutes,
-            recipientPhone: input.recipientPhone,
-            recipientName: input.recipientName ?? null,
-            driverNotes: input.driverNotes ?? null,
-            cashToCollect: input.cashToCollect ?? null,
-        },
-        userId,
-    );
+    let dbOrder;
+    try {
+        dbOrder = await service.createOrder(
+            {
+                businessId,
+                dropOffLocation: input.dropOffLocation ?? null,
+                preparationMinutes: input.preparationMinutes,
+                recipientPhone: input.recipientPhone,
+                recipientName: input.recipientName ?? null,
+                driverNotes: input.driverNotes ?? null,
+                cashToCollect: input.cashToCollect ?? null,
+            },
+            userId,
+        );
+    } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to create direct dispatch order';
+        log.warn({ err, businessId, userId }, 'directDispatch:create:rejected');
+        throw new GraphQLError(message, { extensions: { code: 'BAD_USER_INPUT' } });
+    }
 
     // Schedule early dispatch based on preparation time for the direct-call order.
     try {

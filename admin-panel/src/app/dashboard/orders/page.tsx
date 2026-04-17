@@ -168,7 +168,6 @@ export default function OrdersPage() {
 
     /* ─── Mock Direct Call modal ─── */
     const [ddModalOpen, setDdModalOpen] = useState(false);
-    const [ddBusinessId, setDdBusinessId] = useState("");
     const [ddPhone, setDdPhone] = useState("");
     const [ddName, setDdName] = useState("");
     const [ddNotes, setDdNotes] = useState("");
@@ -196,6 +195,12 @@ export default function OrdersPage() {
 
     /* ─── Drivers ─── */
     const drivers = useMemo(() => driversData?.drivers ?? [], [driversData]);
+    const cimaBusinessId = useMemo(() => {
+        const businesses = businessesData?.businesses ?? [];
+        const cima = businesses.find((b: { id: string; name: string }) => b.name.toLowerCase().includes("cima"));
+        return cima?.id ?? "";
+    }, [businessesData]);
+
     const driverOptions = useMemo(() => [
         { value: "", label: "Unassigned" },
         ...drivers.map((driver) => ({ value: driver.id, label: `${driver.firstName} ${driver.lastName}` })),
@@ -455,14 +460,14 @@ export default function OrdersPage() {
     const handleCreateDirectDispatch = async () => {
         const phone = ddPhone.trim();
         if (!phone) { toast.warning("Recipient phone is required."); return; }
-        if (!ddBusinessId) { toast.warning("Please select a business."); return; }
+        if (!cimaBusinessId) { toast.warning("Cima business was not found."); return; }
         const minutes = parseInt(ddPrepMinutes, 10);
         if (!minutes || minutes < 1) { toast.warning("Enter a valid preparation time."); return; }
         try {
             await createDirectDispatchOrderMut({
                 variables: {
                     input: {
-                        businessId: ddBusinessId,
+                        businessId: cimaBusinessId,
                         recipientPhone: phone,
                         recipientName: ddName.trim() || undefined,
                         driverNotes: ddNotes.trim() || undefined,
@@ -474,7 +479,7 @@ export default function OrdersPage() {
             });
             toast.success("Direct Call order created!");
             setDdModalOpen(false);
-            setDdPhone(""); setDdName(""); setDdNotes(""); setDdCash(""); setDdPrepMinutes("15"); setDdBusinessId("");
+            setDdPhone(""); setDdName(""); setDdNotes(""); setDdCash(""); setDdPrepMinutes("15");
         } catch (err) { toast.error(getErrorMessage(err, "Failed to create Direct Call order")); }
     };
 
@@ -1258,18 +1263,11 @@ export default function OrdersPage() {
             <Modal isOpen={ddModalOpen} onClose={() => setDdModalOpen(false)} title="Create Mock Direct Call Order">
                 <div className="space-y-4">
                     <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-3 text-xs text-orange-300">
-                        Creates a DIRECT_DISPATCH order for the selected business. A free driver will be auto-dispatched.
+                        Creates a DIRECT_DISPATCH order for Cima. A free driver will be auto-dispatched.
                     </div>
                     <div>
-                        <label className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium block mb-1">Business *</label>
-                        <Dropdown
-                            value={ddBusinessId}
-                            onChange={(v) => setDdBusinessId(v as string)}
-                            options={[
-                                { value: "", label: "Select a business..." },
-                                ...(businessesData?.businesses ?? []).map((b: { id: string; name: string }) => ({ value: b.id, label: b.name })),
-                            ]}
-                        />
+                        <label className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium block mb-1">Business</label>
+                        <div className="rounded-lg border border-zinc-700 bg-zinc-900/70 px-3 py-2 text-sm text-zinc-200">Cima</div>
                     </div>
                     <div>
                         <label className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium block mb-1">Recipient Phone *</label>
@@ -1317,7 +1315,7 @@ export default function OrdersPage() {
                         <Button variant="secondary" onClick={() => setDdModalOpen(false)}>Cancel</Button>
                         <Button
                             onClick={handleCreateDirectDispatch}
-                            disabled={creatingDD || !ddPhone.trim() || !ddBusinessId}
+                            disabled={creatingDD || !ddPhone.trim() || !cimaBusinessId}
                             className="flex-1 border-orange-500/30 text-orange-400 hover:bg-orange-500/10"
                         >
                             {creatingDD ? "Creating..." : "Create Direct Call Order"}
