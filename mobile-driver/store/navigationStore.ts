@@ -14,6 +14,7 @@ export interface NavigationDestination {
 export interface NavigationOrder {
     id: string;
     status: string;
+    channel?: 'DIRECT_DISPATCH' | 'PLATFORM';
     businessName: string;
     customerName: string;
     customerPhone: string | null;

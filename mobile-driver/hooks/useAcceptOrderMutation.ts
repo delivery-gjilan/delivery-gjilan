@@ -89,6 +89,11 @@ export function useAcceptOrderMutation({
         if (!order) return;
 
         await executeAcceptMutation(orderId, () => {
+            if (order.channel === 'DIRECT_DISPATCH') {
+                router.push('/(tabs)/drive' as any);
+                return;
+            }
+
             const loc =
                 useNavigationLocationStore.getState().location ??
                 useNavigationLocationStore.getState().lastKnownCoords;

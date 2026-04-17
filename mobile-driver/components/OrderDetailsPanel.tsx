@@ -1,7 +1,6 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '@/hooks/useTheme';
 import type { DriverOrder } from '@/utils/types';
 
 interface Props {
@@ -17,16 +16,12 @@ export function OrderDetailsPanel({
     onToggle,
     onNavigate,
 }: Props) {
-    const theme = useTheme();
     const isDirectDispatch = order.channel === 'DIRECT_DISPATCH';
     const bizName = order.businesses?.[0]?.business?.name ?? 'Business';
-    const recipientLabel = order.recipientName ?? order.recipientPhone ?? '—';
+    const recipientLabel = order.recipientName ?? order.recipientPhone ?? null;
     const netEarnings = Number(order.driverTakeHomePreview ?? 0);
-
     const allItems = (order.businesses ?? []).flatMap((b) => b.items ?? []);
     const itemCount = allItems.length;
-    const totalStockUnits = allItems.reduce((sum, it) => sum + (it.inventoryQuantity ?? 0), 0);
-    const totalMarketUnits = allItems.reduce((sum, it) => sum + Math.max(0, it.quantity - (it.inventoryQuantity ?? 0)), 0);
 
     const statusColor =
         order.status === 'READY' ? '#22c55e'
@@ -37,305 +32,277 @@ export function OrderDetailsPanel({
     const statusLabel =
         order.status === 'READY' ? 'Ready'
         : order.status === 'PREPARING' ? 'Preparing'
-        : order.status === 'OUT_FOR_DELIVERY' ? 'Out for delivery'
+        : order.status === 'OUT_FOR_DELIVERY' ? 'Delivering'
         : order.status;
 
     return (
         <View style={[styles.container, isDirectDispatch && styles.containerDD]}>
-            {/* Collapsed Header - Always Visible */}
-            <Pressable
-                onPress={onToggle}
-                style={[styles.header, isDirectDispatch && styles.headerDD]}
-            >
-                <View style={styles.headerLeft}>
-                    <View style={[styles.statusIndicator, { backgroundColor: statusColor }]} />
-                    <View style={{ flex: 1 }}>
-                        <Text style={styles.businessName} numberOfLines={1}>
-                            {bizName}
-                        </Text>
-                        <View style={styles.headerSubtitle}>
-                            <Text style={styles.headerSubtitleText} numberOfLines={1}>
-                                {itemCount > 0 ? `${itemCount} item${itemCount !== 1 ? 's' : ''}` : 'No items'}
-                                {' · '}
-                                €{netEarnings.toFixed(2)}
-                            </Text>
-                        </View>
-                    </View>
-                </View>
-                <Ionicons
-                    name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                    size={20}
-                    color={isDirectDispatch ? '#f97316' : theme.colors.subtext}
-                />
-            </Pressable>
+            {/* Left status accent bar */}
+            <View style={[styles.accentBar, { backgroundColor: statusColor }]} />
 
-            {/* Expanded Details */}
-            {isExpanded && (
-                <View style={styles.expandedContent}>
-                    <View style={styles.section}>
-                        <Text style={styles.sectionLabel}>FROM BUSINESS</Text>
-                        <Text style={styles.pickupName} numberOfLines={1}>{bizName}</Text>
-                        <Text style={styles.status} numberOfLines={1}>
-                            {statusLabel}
-                            {order.estimatedReadyAt && order.status === 'PREPARING' && (
-                                <Text>
-                                    {' · Ready in '}
-                                    {Math.ceil(
-                                        (new Date(order.estimatedReadyAt).getTime() - Date.now()) / 60000,
-                                    )}
-                                    {' min'}
-                                </Text>
+            <View style={styles.inner}>
+                {/* Main row — always visible */}
+                <Pressable style={styles.mainRow} onPress={onToggle}>
+                    <View style={styles.infoBlock}>
+                        <View style={styles.bizRow}>
+                            <Text style={styles.bizName} numberOfLines={1}>{bizName}</Text>
+                            {isDirectDispatch && (
+                                <View style={styles.ddChip}>
+                                    <Ionicons name="call" size={9} color="#fff" />
+                                    <Text style={styles.ddChipText}>Direct</Text>
+                                </View>
                             )}
-                        </Text>
-                    </View>
-
-                    <View style={styles.section}>
-                        <Text style={styles.sectionLabel}>DELIVERY TO</Text>
-                        <Text style={styles.recipientName} numberOfLines={1}>{recipientLabel}</Text>
-                        {order.dropOffLocation?.address && (
-                            <Text style={styles.address} numberOfLines={1}>
-                                📍 {order.dropOffLocation.address.split(',')[0]}
+                        </View>
+                        {recipientLabel ? (
+                            <Text style={styles.subText} numberOfLines={1}>{recipientLabel}</Text>
+                        ) : (
+                            <Text style={styles.subText} numberOfLines={1}>
+                                {statusLabel}{itemCount > 0 ? ` · ${itemCount} item${itemCount !== 1 ? 's' : ''}` : ''}
                             </Text>
                         )}
                     </View>
 
-                    {itemCount > 0 && (
-                        <View style={styles.section}>
-                            <Text style={styles.sectionLabel}>CONTENTS</Text>
-                            {allItems.slice(0, 3).map((item, idx) => {
-                                const fromStock = item.inventoryQuantity ?? 0;
-                                const fromMarket = Math.max(0, item.quantity - fromStock);
-                                return (
-                                    <View key={idx} style={styles.itemLine}>
-                                        <Text style={styles.itemName} numberOfLines={1}>
-                                            {item.name}
-                                        </Text>
-                                        <View style={styles.itemBadges}>
-                                            {fromStock > 0 && (
-                                                <Text style={styles.itemBadge}>📦 ×{fromStock}</Text>
-                                            )}
-                                            {fromMarket > 0 && (
-                                                <Text style={styles.itemBadge}>🛒 ×{fromMarket}</Text>
-                                            )}
-                                        </View>
-                                    </View>
-                                );
-                            })}
-                            {itemCount > 3 && (
-                                <Text style={styles.itemsMore}>+{itemCount - 3} more items</Text>
-                            )}
+                    <View style={styles.rightBlock}>
+                        <View style={styles.earningsChip}>
+                            <Text style={styles.earningsText}>€{netEarnings.toFixed(2)}</Text>
                         </View>
-                    )}
-
-                    <View style={[styles.section, styles.financialSection]}>
-                        <Text style={styles.sectionLabel}>YOUR EARNINGS</Text>
-                        <View style={[styles.earningsRow, styles.netRow]}>
-                            <Text style={styles.netLabel}>You Keep:</Text>
-                            <Text style={styles.netAmount}>€{netEarnings.toFixed(2)}</Text>
-                        </View>
+                        <Ionicons
+                            name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                            size={15}
+                            color="#475569"
+                        />
                     </View>
+                </Pressable>
 
-                    {onNavigate && (
-                        <Pressable
-                            onPress={onNavigate}
-                            style={[styles.navigateBtn, isDirectDispatch && styles.navigateBtnDD]}
-                        >
-                            <Ionicons
-                                name="navigate-outline"
-                                size={18}
-                                color="#fff"
-                            />
-                            <Text style={styles.navigateBtnText}>Navigate</Text>
-                        </Pressable>
-                    )}
-                </View>
-            )}
+                {/* Expanded content */}
+                {isExpanded && (
+                    <View style={styles.expandedContent}>
+                        <View style={styles.expandedTopRow}>
+                            <View style={[styles.statusPill, { backgroundColor: statusColor + '18', borderColor: statusColor + '35' }]}>
+                                <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+                                <Text style={[styles.statusPillText, { color: statusColor }]}>{statusLabel}</Text>
+                            </View>
+                            {order.estimatedReadyAt && order.status === 'PREPARING' && (() => {
+                                const mins = Math.ceil((new Date(order.estimatedReadyAt).getTime() - Date.now()) / 60000);
+                                return (
+                                    <Text style={styles.etaText}>
+                                        {mins > 0 ? `Ready in ${mins} min` : 'Almost ready'}
+                                    </Text>
+                                );
+                            })()}
+                        </View>
+
+                        {order.dropOffLocation?.address && (
+                            <View style={styles.detailRow}>
+                                <Ionicons name="location-outline" size={12} color="#475569" />
+                                <Text style={styles.detailText} numberOfLines={1}>
+                                    {order.dropOffLocation.address.split(',')[0]}
+                                </Text>
+                            </View>
+                        )}
+
+                        {itemCount > 0 && (
+                            <View style={styles.itemsList}>
+                                {allItems.slice(0, 5).map((item, idx) => (
+                                    <View key={idx} style={styles.itemsListRow}>
+                                        {(item as any).imageUrl ? (
+                                            <Image source={{ uri: (item as any).imageUrl }} style={styles.itemThumb} />
+                                        ) : (
+                                            <View style={styles.itemThumbFallback}>
+                                                <Text style={styles.itemThumbText}>{item.name.charAt(0).toUpperCase()}</Text>
+                                            </View>
+                                        )}
+                                        <Text style={styles.itemsListName} numberOfLines={1}>{item.name}</Text>
+                                        <Text style={styles.itemsListQty}>×{item.quantity}</Text>
+                                    </View>
+                                ))}
+                                {itemCount > 5 && (
+                                    <Text style={styles.itemsMore}>+{itemCount - 5} more items</Text>
+                                )}
+                            </View>
+                        )}
+                    </View>
+                )}
+            </View>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
-        backgroundColor: 'rgba(15,23,42,0.95)',
+        backgroundColor: 'rgba(10,14,26,0.90)',
         borderRadius: 14,
         borderWidth: 1,
-        borderColor: 'rgba(148,163,184,0.28)',
+        borderColor: 'rgba(255,255,255,0.09)',
         marginBottom: 10,
         overflow: 'hidden',
+        flexDirection: 'row',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.30,
+        shadowRadius: 10,
+        elevation: 8,
     },
     containerDD: {
-        borderColor: 'rgba(0,157,224,0.42)',
-        backgroundColor: 'rgba(0,109,163,0.2)',
+        borderColor: 'rgba(249,115,22,0.28)',
+        backgroundColor: 'rgba(18,10,4,0.92)',
     },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        backgroundColor: 'rgba(26,26,46,0.7)',
+    accentBar: {
+        width: 4,
+        borderTopLeftRadius: 14,
+        borderBottomLeftRadius: 14,
     },
-    headerDD: {
-        backgroundColor: 'rgba(0,157,224,0.18)',
-    },
-    headerLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
+    inner: {
         flex: 1,
     },
-    statusIndicator: {
-        width: 10,
-        height: 10,
+    mainRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        gap: 10,
+    },
+    infoBlock: {
+        flex: 1,
+        gap: 3,
+    },
+    bizRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    bizName: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#e2e8f0',
+        flex: 1,
+    },
+    ddChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: '#F97316',
+        borderRadius: 999,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+    },
+    ddChipText: {
+        fontSize: 8,
+        fontWeight: '800',
+        color: '#fff',
+    },
+    subText: {
+        fontSize: 11,
+        color: '#64748b',
+    },
+    rightBlock: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        flexShrink: 0,
+    },
+    earningsChip: {
+        backgroundColor: 'rgba(22,163,74,0.18)',
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderWidth: 1,
+        borderColor: 'rgba(34,197,94,0.28)',
+    },
+    earningsText: {
+        fontSize: 12,
+        fontWeight: '800',
+        color: '#22c55e',
+    },
+    expandedContent: {
+        paddingHorizontal: 12,
+        paddingBottom: 12,
+        paddingTop: 2,
+        gap: 7,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255,255,255,0.06)',
+    },
+    expandedTopRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    statusPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderWidth: 1,
+    },
+    statusDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+    },
+    statusPillText: {
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    etaText: {
+        fontSize: 11,
+        color: '#64748b',
+        fontWeight: '500',
+    },
+    detailRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    detailText: {
+        fontSize: 12,
+        color: '#64748b',
+        flex: 1,
+    },
+    itemsList: {
+        gap: 5,
+        marginTop: 2,
+    },
+    itemsListRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    itemThumb: {
+        width: 26,
+        height: 26,
         borderRadius: 5,
         flexShrink: 0,
     },
-    businessName: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: '#E2E8F0',
-    },
-    headerSubtitle: {
-        marginTop: 3,
-    },
-    headerSubtitleText: {
-        fontSize: 12,
-        color: '#94A3B8',
-    },
-    expandedContent: {
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(148,163,184,0.2)',
-    },
-    section: {
-        marginBottom: 10,
-    },
-    sectionLabel: {
-        fontSize: 10,
-        fontWeight: '800',
-        color: '#64748B',
-        textTransform: 'uppercase',
-        letterSpacing: 0.4,
-        marginBottom: 4,
-    },
-    pickupName: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: '#E2E8F0',
-    },
-    recipientName: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: '#E2E8F0',
-    },
-    status: {
-        fontSize: 12,
-        color: '#94A3B8',
-        marginTop: 2,
-    },
-    address: {
-        fontSize: 12,
-        color: '#94A3B8',
-        marginTop: 2,
-    },
-    itemLine: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
+    itemThumbFallback: {
+        width: 26,
+        height: 26,
+        borderRadius: 5,
+        backgroundColor: 'rgba(255,255,255,0.06)',
         alignItems: 'center',
-        paddingVertical: 4,
-        paddingHorizontal: 8,
-        marginVertical: 2,
-        backgroundColor: 'rgba(30,41,59,0.55)',
-        borderRadius: 6,
+        justifyContent: 'center',
+        flexShrink: 0,
     },
-    itemName: {
+    itemThumbText: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#475569',
+    },
+    itemsListName: {
         fontSize: 12,
-        color: '#CBD5E1',
+        color: '#94a3b8',
         flex: 1,
     },
-    itemBadges: {
-        flexDirection: 'row',
-        gap: 4,
-    },
-    itemBadge: {
+    itemsListQty: {
         fontSize: 11,
         fontWeight: '600',
-        color: '#94A3B8',
+        color: '#475569',
     },
     itemsMore: {
-        fontSize: 11,
-        color: '#64748B',
-        marginTop: 4,
+        fontSize: 10,
+        color: '#475569',
         textAlign: 'center',
-    },
-    financialSection: {
-        backgroundColor: 'rgba(12,18,33,0.72)',
-        borderRadius: 8,
-        paddingHorizontal: 10,
-        paddingVertical: 10,
-        borderWidth: 1,
-        borderColor: 'rgba(0,157,224,0.25)',
-        marginBottom: 0,
-    },
-    earningsRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 4,
-    },
-    earningsLabel: {
-        fontSize: 12,
-        color: '#94A3B8',
-    },
-    earningsAmount: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: '#22c55e',
-    },
-    deductionLabel: {
-        fontSize: 12,
-        color: '#94A3B8',
-    },
-    deductionAmount: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: '#ef4444',
-    },
-    netRow: {
-        paddingTop: 6,
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(148,163,184,0.2)',
-    },
-    netLabel: {
-        fontSize: 13,
-        fontWeight: '800',
-        color: '#15803d',
-    },
-    netAmount: {
-        fontSize: 16,
-        fontWeight: '900',
-        color: '#22c55e',
-    },
-    navigateBtn: {
-        backgroundColor: '#006da3',
-        borderRadius: 10,
-        paddingVertical: 10,
-        paddingHorizontal: 14,
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        gap: 8,
-        borderWidth: 1,
-        borderColor: 'rgba(0,157,224,0.4)',
-        marginTop: 10,
-    },
-    navigateBtnDD: {
-        backgroundColor: '#3a0ca3',
-    },
-    navigateBtnText: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: '#fff',
+        marginTop: 2,
     },
 });

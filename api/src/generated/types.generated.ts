@@ -806,6 +806,8 @@ export type DriverCashSummary = {
   __typename?: 'DriverCashSummary';
   /** Total cash collected from delivered CASH_TO_DRIVER orders (totalPrice - businessPrice). */
   cashCollected: Scalars['Float']['output'];
+  /** Date of the last paid settlement for this driver. Null if no settlements have been paid yet. */
+  lastPaidDate?: Maybe<Scalars['Date']['output']>;
   /** Net settlement balance: platformOwesYou - youOwePlatform. */
   netSettlement: Scalars['Float']['output'];
   /** Sum of unsettled PAYABLE settlements (platform owes driver). */
@@ -4765,6 +4767,7 @@ export type DriverBasicInfoResolvers<ContextType = GraphQLContext, ParentType ex
 
 export type DriverCashSummaryResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['DriverCashSummary'] = ResolversParentTypes['DriverCashSummary']> = {
   cashCollected?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  lastPaidDate?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
   netSettlement?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   platformOwesYou?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   takeHome?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;

@@ -145,6 +145,8 @@ type DriverCashSummary {
     netSettlement: Float!
     """Cash driver keeps after all settlements: cashCollected + netSettlement."""
     takeHome: Float!
+    """Date of the last paid settlement for this driver. Null if no settlements have been paid yet."""
+    lastPaidDate: Date
 }
 
 """Grouped settlement totals by category."""

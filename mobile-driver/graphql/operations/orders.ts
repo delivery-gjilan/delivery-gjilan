@@ -1,4 +1,4 @@
-import { graphql } from '@/gql';
+﻿import { graphql } from '@/gql';
 
 export const GET_ORDERS = graphql(`
     query GetOrders {
@@ -39,6 +39,7 @@ export const GET_ORDERS = graphql(`
                     }
                     items {
                         name
+                        imageUrl
                         quantity
                         notes
                         inventoryQuantity
@@ -93,6 +94,7 @@ export const GET_ORDER = graphql(`
                 }
                 items {
                     name
+                    imageUrl
                     quantity
                     notes
                     inventoryQuantity
@@ -175,6 +177,7 @@ export const ALL_ORDERS_UPDATED = graphql(`
                 }
                 items {
                     name
+                    imageUrl
                     quantity
                     notes
                     inventoryQuantity

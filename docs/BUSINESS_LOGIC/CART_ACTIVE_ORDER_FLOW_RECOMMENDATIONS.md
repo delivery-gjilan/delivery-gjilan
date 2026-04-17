@@ -8,6 +8,14 @@
 Date: 2026-03-13
 Scope: mobile-customer cart add/update/checkout flow, active-order tracking flow, floating banners behavior
 
+## Current behavior snapshot
+
+- API create-order enforces one active order per customer globally (any non-terminal status blocks a second order).
+- API create-order enforces single-business per order; mixed-business payloads are rejected.
+- In practical terms, a customer cannot keep one active business order and one active market order at the same time.
+- Cart add-item validation only enforces one restaurant business in cart; non-restaurant items are not blocked at add-time by that rule.
+- Because order submission is single-business + single-active-order enforced on API, server-side rules remain the final authority.
+
 ## 1) End-to-end flow: add to cart -> checkout -> active order banner
 
 ### A. Add/increment/decrement cart items

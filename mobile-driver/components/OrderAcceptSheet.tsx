@@ -11,6 +11,7 @@ interface Props {
     autoCountdown?: boolean;
     onHeightChange?: (h: number) => void;
     takenByOther?: boolean;
+    hasActiveOrder?: boolean;
 }
 
 export function OrderAcceptSheet({
@@ -22,6 +23,7 @@ export function OrderAcceptSheet({
     autoCountdown = true,
     onHeightChange,
     takenByOther = false,
+    hasActiveOrder = false,
 }: Props) {
     return (
         <OrderInspectSheet
@@ -34,6 +36,7 @@ export function OrderAcceptSheet({
             autoCountdown={autoCountdown}
             onHeightChange={onHeightChange}
             takenByOther={takenByOther}
+            hasActiveOrder={hasActiveOrder}
         />
     );
 }

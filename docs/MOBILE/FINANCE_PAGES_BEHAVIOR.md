@@ -1,7 +1,23 @@
 # Finance Pages — Deep Behavior Reference
 
-> Covers **mobile-driver** `app/(tabs)/earnings.tsx` and **mobile-business** `app/(tabs)/finances.tsx`.
+> Covers **mobile-driver** `app/(tabs)/earnings.tsx`, **mobile-driver** `app/(tabs)/orders.tsx`, **mobile-business** `app/(tabs)/finances.tsx`, and **mobile-business** `app/(tabs)/orders.tsx`.
 > Read alongside `docs/BUSINESS_LOGIC/SETTLEMENTS_AND_PROMOTIONS.md` for the engine details.
+
+---
+
+## Architecture: Tab Split
+
+The financial section of each app is split into two tabs:
+
+| App | Tab | Purpose |
+|-----|-----|---------|
+| Driver | **Earnings** | Settlement accounting: cash flow waterfall, deduction groups, settlement request handling |
+| Driver | **Orders** | Delivered order history with period filter and per-order detail |
+| Business | **Finances** | Settlement accounting: revenue waterfall, deduction/payout groups, settlement request handling |
+| Business | **Orders** | Delivered order history with period filter and per-order detail |
+
+The Orders tabs show order-level data (what was delivered, revenue, customer, address).  
+The Earnings/Finances tabs show settlement-level data (deductions, payouts, current cycle debt).
 
 ---
 
@@ -66,9 +82,8 @@ Categories are inferred at query time by `SettlementRepository.buildCategoryCond
 | `GET_SETTLEMENT_BREAKDOWN` | isSettled=false, startDate, endDate | Per-category unsettled breakdown chips |
 | `GET_MY_SETTLEMENTS` | startDate, endDate, limit=10000 | Full settlement list (filtered to unsettled in UI) |
 | `GET_MY_SETTLEMENT_REQUESTS` | status=PENDING, limit=20 | Pending admin settlement requests |
-| `GET_ORDERS` | — | Driver's delivered orders (for "awaiting settlement" fallback rows) |
 
-All queries use `fetchPolicy: 'network-only'`.
+All queries use `fetchPolicy: 'network-only'`. The `GET_ORDERS` query was removed from earnings.tsx — order history is now in the Orders tab.
 
 ### Period selector
 

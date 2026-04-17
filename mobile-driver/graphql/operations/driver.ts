@@ -83,6 +83,7 @@ export const GET_DRIVER_CASH_SUMMARY = graphql(`
             platformOwesYou
             netSettlement
             takeHome
+            lastPaidDate
         }
     }
 `);

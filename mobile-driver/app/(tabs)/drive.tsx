@@ -441,6 +441,8 @@ export default function MapScreen() {
     const handleStartNavigation = useCallback((targetOrder?: DriverOrder) => {
         const order = targetOrder ?? focusedOrder;
         if (!order || !location) return;
+        // Direct-call orders should not open turn-by-turn navigation.
+        if (order.channel === 'DIRECT_DISPATCH') return;
         const navOrder = buildNavOrder(order);
         if (!navOrder) return;
 
@@ -474,6 +476,7 @@ export default function MapScreen() {
     const handleNavigationPress = useCallback((targetOrder?: DriverOrder) => {
         const order = targetOrder ?? focusedOrder;
         if (!order || !location) return;
+        if (order.channel === 'DIRECT_DISPATCH') return;
 
         // If admin hasn't enabled the Google Maps picker, go straight to in-app nav
         if (!googleMapsNavEnabled) {
@@ -846,13 +849,14 @@ export default function MapScreen() {
                             </View>
                         )}
 
-                        {/* Header: avatar + biz name/address + earnings */}
+                        {/* Header: avatar + [biz + status + eta in one line] + earnings */}
                         <View style={styles.cardHeader}>
                             <View style={[styles.cardAvatar, { backgroundColor: statusColor }]}>
                                 <Text style={styles.cardAvatarText}>{initial}</Text>
                             </View>
                             <View style={styles.cardHeaderInfo}>
-                                <View style={styles.cardBizRow}>
+                                {/* Main info row: biz name + direct badge + status + ETA */}
+                                <View style={styles.cardMainRow}>
                                     <Text style={styles.cardBizName} numberOfLines={1}>{bizName}</Text>
                                     {isDirectDispatch && (
                                         <View style={styles.cardDirectBadge}>
@@ -860,7 +864,25 @@ export default function MapScreen() {
                                             <Text style={styles.cardDirectBadgeText}>Direct Call</Text>
                                         </View>
                                     )}
+                                    <View style={[styles.cardStatusBadge, { backgroundColor: statusColor + '28' }]}>
+                                        <View style={[styles.cardStatusDot, { backgroundColor: statusColor }]} />
+                                        <Text style={[styles.cardStatusText, { color: statusColor }]}>
+                                            {STATUS_LABELS[order.status] ?? order.status}
+                                        </Text>
+                                    </View>
+                                    {routeInfo && focusedOrderId === order.id ? (
+                                        <Text style={styles.cardEtaText} numberOfLines={1}>
+                                            {order.status === 'OUT_FOR_DELIVERY'
+                                                ? t.drive.min_to_drop.replace('{{min}}', String(Math.ceil(routeInfo.durationMin)))
+                                                : t.drive.min_to_pickup.replace('{{min}}', String(Math.ceil(routeInfo.durationMin)))}
+                                        </Text>
+                                    ) : isPreparing && prepMinsLeft !== null ? (
+                                        <Text style={styles.cardEtaText} numberOfLines={1}>
+                                            {prepMinsLeft === 0 ? t.drive.almost_ready : t.drive.ready_min.replace('{{min}}', String(prepMinsLeft))}
+                                        </Text>
+                                    ) : null}
                                 </View>
+                                {/* Sub-line: recipient or drop address */}
                                 {recipientLabel ? (
                                     <Text style={[styles.cardAddress, isDirectDispatch && styles.cardRecipient]} numberOfLines={1}>{recipientLabel}</Text>
                                 ) : shortDrop ? (
@@ -872,36 +894,16 @@ export default function MapScreen() {
                             </View>
                         </View>
 
-                        {/* Status + ETA row */}
-                        <View style={styles.cardMidRow}>
-                            <View style={[styles.cardStatusBadge, { backgroundColor: statusColor + '28' }]}>
-                                <View style={[styles.cardStatusDot, { backgroundColor: statusColor }]} />
-                                <Text style={[styles.cardStatusText, { color: statusColor }]}>
-                                    {STATUS_LABELS[order.status] ?? order.status}
-                                </Text>
-                            </View>
-                            {routeInfo && focusedOrderId === order.id && (
-                                <Text style={styles.cardEtaText}>
-                                    {order.status === 'OUT_FOR_DELIVERY'
-                                        ? t.drive.min_to_drop.replace('{{min}}', String(Math.ceil(routeInfo.durationMin)))
-                                        : t.drive.min_to_pickup.replace('{{min}}', String(Math.ceil(routeInfo.durationMin)))}
-                                </Text>
-                            )}
-                            {isPreparing && prepMinsLeft !== null && (
-                                <Text style={styles.cardEtaText}>
-                                    {prepMinsLeft === 0 ? t.drive.almost_ready : t.drive.ready_min.replace('{{min}}', String(prepMinsLeft))}
-                                </Text>
-                            )}
-                            {total > 1 && (
-                                <Text style={styles.cardSwipeHint}>{t.drive.swipe_hint}</Text>
-                            )}
-                        </View>
+                        {/* Multi-order swipe hint */}
+                        {total > 1 && (
+                            <Text style={styles.cardSwipeHint}>{t.drive.swipe_hint}</Text>
+                        )}
 
                         {(isDirectDispatch || totalStockUnits > 0) && (
                             <View style={styles.cardSignalRow}>
                                 {totalStockUnits > 0 && (
                                     <View style={styles.cardSignalStock}>
-                                        <Text style={styles.cardSignalStockText}>📦 {totalStockUnits} stock</Text>
+                                        <Text style={styles.cardSignalStockText}>📦 Contains inventory items</Text>
                                     </View>
                                 )}
                                 {isDirectDispatch && cardCashToCollect > 0 && (
@@ -917,56 +919,25 @@ export default function MapScreen() {
                             </View>
                         )}
 
-                        {/* Fulfillment guide — visible when order has stock items */}
-                        {(() => {
-                            const stockItems = allItems.filter((it) => (it.inventoryQuantity ?? 0) > 0);
-                            if (stockItems.length === 0) return null;
-
-                            const totalMarketUnits = allItems.reduce((sum, it) => sum + Math.max(0, it.quantity - (it.inventoryQuantity ?? 0)), 0);
-
-                            return (
-                                <View style={styles.fulfillmentGuide}>
-                                    <View style={styles.fulfillmentTitleRow}>
-                                        <Ionicons name="cube-outline" size={12} color="#7c3aed" />
-                                        <Text style={styles.fulfillmentTitle}>Fulfillment guide</Text>
-                                    </View>
-
-                                    {/* Per-item rows */}
-                                    {stockItems.map((it, i: number) => {
-                                        const fromStock = it.inventoryQuantity ?? 0;
-                                        const fromMarket = Math.max(0, it.quantity - fromStock);
-                                        return (
-                                            <View key={i} style={styles.fulfillmentItemRow}>
-                                                <Text style={styles.fulfillmentItemName} numberOfLines={1}>{it.name}</Text>
-                                                <View style={styles.fulfillmentItemBadges}>
-                                                    {fromStock > 0 && (
-                                                        <View style={styles.fulfillmentStockBadge}>
-                                                            <Text style={styles.fulfillmentStockBadgeText}>📦 ×{fromStock}</Text>
-                                                        </View>
-                                                    )}
-                                                    {fromMarket > 0 && (
-                                                        <View style={styles.fulfillmentMarketBadge}>
-                                                            <Text style={styles.fulfillmentMarketBadgeText}>🛒 ×{fromMarket}</Text>
-                                                        </View>
-                                                    )}
-                                                </View>
-                                            </View>
-                                        );
-                                    })}
-
-                                    {/* Summary footer */}
-                                    <View style={styles.fulfillmentFooter}>
-                                        <Text style={styles.fulfillmentFooterText}>
-                                            {`${totalStockUnits} from stock`}
-                                            {totalMarketUnits > 0 ? `  ·  ${totalMarketUnits} from market` : ''}
-                                        </Text>
-                                    </View>
-                                </View>
-                            );
-                        })()}
-
                         {/* Primary CTA */}
-                        {isReady ? (
+                        {isDirectDispatch ? (
+                            isReady ? (
+                                <Pressable
+                                    style={[styles.cardCta, { backgroundColor: '#16a34a' }]}
+                                    onPress={() => handleMarkPickedUp(order.id)}
+                                    disabled={isPickingUp}
+                                >
+                                    {isPickingUp ? (
+                                        <ActivityIndicator size={16} color="#fff" />
+                                    ) : (
+                                        <>
+                                            <Ionicons name="checkmark-circle" size={18} color="#fff" />
+                                            <Text style={styles.cardCtaText}>{t.drive.arrived}</Text>
+                                        </>
+                                    )}
+                                </Pressable>
+                            ) : null
+                        ) : isReady ? (
                             <View style={styles.cardCtaRow}>
                                 <Pressable
                                     style={[styles.cardCta, styles.cardCtaHalf, { backgroundColor: '#4f46e5' }]}
@@ -1234,17 +1205,17 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(255,255,255,0.06)',
     },
     singleCard: {
-        backgroundColor: 'rgba(10,12,24,0.93)',
-        borderRadius: 20,
+        backgroundColor: 'rgba(12,16,30,0.90)',
+        borderRadius: 18,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-        padding: 14,
-        gap: 10,
+        borderColor: 'rgba(255,255,255,0.08)',
+        padding: 12,
+        gap: 8,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.55,
-        shadowRadius: 16,
-        elevation: 16,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.45,
+        shadowRadius: 14,
+        elevation: 14,
     },
     /* â”€â”€ Dot pager â”€â”€ */
     dotPager: {
@@ -1295,25 +1266,32 @@ const styles = StyleSheet.create({
     cardHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 9,
-        paddingRight: 50,
+        gap: 8,
+        paddingRight: 44,
     },
     cardAvatar: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 30,
+        height: 30,
+        borderRadius: 15,
         alignItems: 'center',
         justifyContent: 'center',
         flexShrink: 0,
     },
     cardAvatarText: {
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: '800',
         color: '#fff',
     },
     cardHeaderInfo: {
         flex: 1,
-        gap: 2,
+        gap: 3,
+    },
+    cardMainRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        flexWrap: 'nowrap',
+        overflow: 'hidden',
     },
     cardBizRow: {
         flexDirection: 'row',
@@ -1321,9 +1299,10 @@ const styles = StyleSheet.create({
         gap: 6,
     },
     cardBizName: {
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: '700',
         color: '#f1f5f9',
+        flexShrink: 1,
     },
     cardDirectBadge: {
         flexDirection: 'row',
@@ -1349,16 +1328,18 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     cardEarningsBadge: {
-        backgroundColor: 'rgba(0,109,163,0.3)',
+        backgroundColor: 'rgba(22,163,74,0.18)',
         borderRadius: 8,
         paddingHorizontal: 8,
         paddingVertical: 3,
         flexShrink: 0,
+        borderWidth: 1,
+        borderColor: 'rgba(34,197,94,0.28)',
     },
     cardEarningsText: {
         fontSize: 13,
-        fontWeight: '700',
-        color: '#67e8f9',
+        fontWeight: '800',
+        color: '#22c55e',
     },
     cardMidRow: {
         flexDirection: 'row',
@@ -1428,8 +1409,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 7,
-        borderRadius: 12,
-        paddingVertical: 12,
+        borderRadius: 10,
+        paddingVertical: 10,
     },
     cardCtaRow: {
         flexDirection: 'row',
@@ -1440,7 +1421,7 @@ const styles = StyleSheet.create({
     },
     cardCtaText: {
         color: '#fff',
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: '700',
     },
 

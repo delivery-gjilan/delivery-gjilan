@@ -108,6 +108,16 @@ export default function TabLayout() {
                 }}
             />
             <Tabs.Screen
+                name="orders"
+                options={{
+                    href: canViewAnalytics ? undefined : null,
+                    title: t('tabs.orders', 'Orders'),
+                    tabBarIcon: ({ color }) => (
+                        <Ionicons name="receipt-outline" size={26} color={color} />
+                    ),
+                }}
+            />
+            <Tabs.Screen
                 name="settings"
                 options={{
                     href: canManageSettings ? undefined : null,

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Animated, PanResponder, ActivityIndicator, ScrollView, useWindowDimensions } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Animated, PanResponder, ActivityIndicator, ScrollView, useWindowDimensions, Image } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -20,6 +20,20 @@ const DD_ORANGE_BORDER = 'rgba(249,115,22,0.30)';
 
 type InspectMode = 'available' | 'assigned';
 
+function ItemThumbnail({ imageUrl, name }: { imageUrl?: string | null; name: string }) {
+    if (imageUrl) {
+        return <Image source={{ uri: imageUrl }} style={itemThumbStyle} />;
+    }
+    return (
+        <View style={itemThumbFallbackStyle}>
+            <Text style={itemThumbTextStyle}>{name.charAt(0).toUpperCase()}</Text>
+        </View>
+    );
+}
+const itemThumbStyle = { width: 30, height: 30, borderRadius: 6, marginRight: 8, flexShrink: 0 as const };
+const itemThumbFallbackStyle = { width: 30, height: 30, borderRadius: 6, backgroundColor: '#1e293b', alignItems: 'center' as const, justifyContent: 'center' as const, marginRight: 8, flexShrink: 0 as const };
+const itemThumbTextStyle = { fontSize: 11, fontWeight: '700' as const, color: '#64748b' };
+
 interface Props {
     mode: InspectMode;
     order: DriverOrder;
@@ -33,6 +47,7 @@ interface Props {
     onHeightChange?: (h: number) => void;
     takenByOther?: boolean;
     routeInfo?: { distanceKm: number; durationMin: number } | null;
+    hasActiveOrder?: boolean;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -62,6 +77,7 @@ export function OrderInspectSheet({
     onHeightChange,
     takenByOther = false,
     routeInfo: externalRouteInfo = null,
+    hasActiveOrder = false,
 }: Props) {
     const insets = useSafeAreaInsets();
     const { height: viewportHeight } = useWindowDimensions();
@@ -73,20 +89,25 @@ export function OrderInspectSheet({
     const [markingPickedUp, setMarkingPickedUp] = useState(false);
     const [nowTs, setNowTs] = useState(() => Date.now());
     const [fallbackRouteInfo, setFallbackRouteInfo] = useState<{ distanceKm: number; durationMin: number } | null>(null);
-    const [itemsExpanded, setItemsExpanded] = useState(true);
+    // Compute early so we can use hasInventory for initial itemsExpanded state
+    const _earlyAllItems = (order.businesses ?? []).flatMap((b) => b.items ?? []);
+    const _earlyHasInventory = _earlyAllItems.reduce((sum, it) => sum + (it.inventoryQuantity ?? 0), 0) > 0;
+    const [itemsExpanded, setItemsExpanded] = useState(_earlyHasInventory);
+    const [isCollapsed, setIsCollapsed] = useState(mode === 'available' && hasActiveOrder);
     const acceptPulse = useRef(new Animated.Value(1)).current;
     const { data: metricsData } = useQuery(GET_MY_DRIVER_METRICS, { fetchPolicy: 'cache-first' });
 
     const isAvailable = mode === 'available';
     const isAssigned = mode === 'assigned';
-    const isDirectDispatch = order.channel === 'DIRECT_DISPATCH';
-    const recipientLabel = order.recipientName ?? order.recipientPhone ?? null;
+    const isDirectDispatch = order.channel === 'DIRECT_DISPATCH';    const recipientLabel = order.recipientName ?? order.recipientPhone ?? null;
     const bizName = order.businesses?.[0]?.business?.name ?? 'Business';
     const allItems = (order.businesses ?? []).flatMap((b) => b.items ?? []);
     const itemCount = allItems.length;
     const totalStockUnits = allItems.reduce((sum, it) => sum + (it.inventoryQuantity ?? 0), 0);
     const totalMarketUnits = allItems.reduce((sum, it) => sum + Math.max(0, it.quantity - (it.inventoryQuantity ?? 0)), 0);
     const hasInventory = totalStockUnits > 0;
+        const businessItems = allItems.filter((it) => Math.max(0, it.quantity - (it.inventoryQuantity ?? 0)) > 0);
+        const stockItems = allItems.filter((it) => (it.inventoryQuantity ?? 0) > 0);
     const orderPrice = Number((order as any).orderPrice ?? 0);
     const inventoryPrice = Number((order as any).inventoryPrice ?? 0);
     const businessPrice = Math.max(0, orderPrice - inventoryPrice);
@@ -134,7 +155,12 @@ export function OrderInspectSheet({
     }, [acceptPulse, accepting, isAvailable, takenByOther]);
 
     useEffect(() => {
-        setItemsExpanded(true);
+        // Auto-expand items only when order has inventory coverage
+        setItemsExpanded(allItems.reduce((s, it) => s + (it.inventoryQuantity ?? 0), 0) > 0);
+        // Reset to collapsed when a new order arrives and driver has an active order
+        if (mode === 'available' && hasActiveOrder) {
+            setIsCollapsed(true);
+        }
     }, [order?.id]);
 
     useEffect(() => {
@@ -294,6 +320,71 @@ export function OrderInspectSheet({
 
     const primaryDisabled = primaryAction.loading || markingPickedUp || (isAvailable && takenByOther);
 
+    // ── Collapsed pill (shown when driver already has an active order) ──
+    if (isCollapsed && isAvailable) {
+        return (
+            <View style={[styles.collapsedRoot, { bottom: insets.bottom + 82 }]}>
+                <Pressable style={[styles.collapsedBar, isDirectDispatch && styles.collapsedBarDD]} onPress={() => setIsCollapsed(false)}>
+                    {/* Countdown ring */}
+                    {autoCountdown && !takenByOther && (
+                        <View style={styles.collapsedRingWrap}>
+                            <Svg width={32} height={32} viewBox="0 0 52 52">
+                                <Circle cx={26} cy={26} r={RING_R} stroke="rgba(255,255,255,0.1)" strokeWidth={3.5} fill="none" />
+                                <Circle
+                                    cx={26} cy={26} r={RING_R}
+                                    stroke={ringColor}
+                                    strokeWidth={3.5}
+                                    fill="none"
+                                    strokeDasharray={`${RING_C} ${RING_C}`}
+                                    strokeDashoffset={ringOffset}
+                                    strokeLinecap="round"
+                                    rotation="-90"
+                                    origin="26, 26"
+                                />
+                            </Svg>
+                            <Text style={[styles.collapsedCountdownText, { color: ringColor }]}>{countdown}</Text>
+                        </View>
+                    )}
+
+                    {/* Info */}
+                    <View style={styles.collapsedInfo}>
+                        <View style={styles.collapsedInfoRow}>
+                            <Text style={styles.collapsedBizName} numberOfLines={1}>{bizName}</Text>
+                            {isDirectDispatch && (
+                                <View style={styles.collapsedDDChip}>
+                                    <Text style={styles.collapsedDDChipText}>Direct</Text>
+                                </View>
+                            )}
+                        </View>
+                        <Text style={styles.collapsedEarnings}>€{netEarnings.toFixed(2)} · {etaLabel}</Text>
+                    </View>
+
+                    {/* Expand hint */}
+                    <View style={styles.collapsedExpandHint}>
+                        <Ionicons name="chevron-up" size={13} color="#475569" />
+                    </View>
+
+                    {/* Accept */}
+                    <Pressable
+                        style={[styles.collapsedAcceptBtn, isDirectDispatch && styles.collapsedAcceptBtnDD, (accepting || takenByOther) && { opacity: 0.5 }]}
+                        onPress={handleAccept}
+                        disabled={accepting || takenByOther}
+                    >
+                        {accepting
+                            ? <ActivityIndicator size={16} color="#fff" />
+                            : <Ionicons name="checkmark" size={18} color="#fff" />
+                        }
+                    </Pressable>
+
+                    {/* Skip */}
+                    <Pressable style={styles.collapsedSkipBtn} onPress={onClose}>
+                        <Ionicons name="close" size={18} color="#6b7280" />
+                    </Pressable>
+                </Pressable>
+            </View>
+        );
+    }
+
     return (
         <Animated.View style={[styles.root, { transform: [{ translateY: slideY }] }]}>
             <View
@@ -406,7 +497,7 @@ export function OrderInspectSheet({
                                             <Text style={styles.itemsSectionTitle}>{itemCount} {itemCount === 1 ? s.item : s.items}</Text>
                                             <Text style={styles.itemsSectionSubtitle}>
                                                 {hasInventory
-                                                    ? `Inventory split: ${totalStockUnits} stock, ${totalMarketUnits} business.`
+                                                    ? `${itemCount} ${itemCount === 1 ? 'item' : 'items'} in this order.`
                                                     : `${itemCount} ${itemCount === 1 ? 'item' : 'items'} to collect at the business.`}
                                             </Text>
                                         </View>
@@ -427,31 +518,66 @@ export function OrderInspectSheet({
                                     </View>
                                 )}
 
-                                {itemsExpanded && allItems.slice(0, 8).map((item, idx: number) => {
-                                    const fromStock = item.inventoryQuantity ?? 0;
-                                    const fromMarket = Math.max(0, item.quantity - fromStock);
-                                    return (
-                                        <View key={idx} style={[styles.itemRow, idx < Math.min(allItems.length, 8) - 1 && styles.itemRowBorder]}>
-                                            <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-                                            <View style={styles.itemBadges}>
-                                                {fromStock > 0 && (
-                                                    <View style={styles.stockTag}>
-                                                        <Ionicons name="cube" size={9} color="#7c3aed" />
-                                                        <Text style={styles.stockTagText}>×{fromStock}</Text>
-                                                    </View>
-                                                )}
-                                                {fromMarket > 0 && (
-                                                    <View style={styles.marketTag}>
-                                                        <Ionicons name="storefront-outline" size={9} color="#0369a1" />
-                                                        <Text style={styles.marketTagText}>×{fromMarket}</Text>
-                                                    </View>
+                                {itemsExpanded && hasInventory && (
+                                    <View style={styles.inventoryBusinessColumns}>
+                                        <View style={styles.splitColumn}>
+                                            <View style={styles.itemsSplitHeader}>
+                                                <Ionicons name="cube" size={12} color="#7c3aed" />
+                                                <Text style={[styles.itemsSplitTitle, { color: '#7c3aed' }]}>Inventory</Text>
+                                                <Text style={[styles.itemsSplitCount, { color: '#7c3aed' }]}>×{totalStockUnits}</Text>
+                                            </View>
+                                            <View style={styles.splitColumnList}>
+                                                {stockItems.length === 0 ? (
+                                                    <Text style={styles.itemsMore}>None</Text>
+                                                ) : (
+                                                    stockItems.map((item, idx) => (
+                                                        <View key={`stock-${idx}`} style={[styles.splitItemRow, idx < stockItems.length - 1 && styles.itemRowBorder]}>
+                                                            <ItemThumbnail imageUrl={item.imageUrl} name={item.name} />
+                                                            <Text style={styles.splitItemName} numberOfLines={1}>{item.name}</Text>
+                                                            <Text style={styles.stockTagText}>×{item.inventoryQuantity ?? 0}</Text>
+                                                        </View>
+                                                    ))
                                                 )}
                                             </View>
                                         </View>
-                                    );
-                                })}
 
-                                {itemsExpanded && allItems.length > 8 && <Text style={styles.itemsMore}>+{allItems.length - 8} more items</Text>}
+                                        <View style={styles.splitDivider} />
+
+                                        <View style={styles.splitColumn}>
+                                            <View style={styles.itemsSplitHeader}>
+                                                <Ionicons name="storefront-outline" size={12} color="#0369a1" />
+                                                <Text style={styles.itemsSplitTitle}>Business</Text>
+                                                <Text style={styles.itemsSplitCount}>×{totalMarketUnits}</Text>
+                                            </View>
+                                            <View style={styles.splitColumnList}>
+                                                {businessItems.length === 0 ? (
+                                                    <Text style={styles.itemsMore}>None</Text>
+                                                ) : (
+                                                    businessItems.map((item, idx) => {
+                                                        const qty = Math.max(0, item.quantity - (item.inventoryQuantity ?? 0));
+                                                        return (
+                                                            <View key={`biz-${idx}`} style={[styles.splitItemRow, idx < businessItems.length - 1 && styles.itemRowBorder]}>
+                                                                <ItemThumbnail imageUrl={item.imageUrl} name={item.name} />
+                                                                <Text style={styles.splitItemName} numberOfLines={1}>{item.name}</Text>
+                                                                <Text style={styles.marketTagText}>×{qty}</Text>
+                                                            </View>
+                                                        );
+                                                    })
+                                                )}
+                                            </View>
+                                        </View>
+                                    </View>
+                                )}
+
+                                {itemsExpanded && !hasInventory && allItems.slice(0, 8).map((item, idx: number) => (
+                                    <View key={idx} style={[styles.itemRow, idx < Math.min(allItems.length, 8) - 1 && styles.itemRowBorder]}>
+                                        <ItemThumbnail imageUrl={item.imageUrl} name={item.name} />
+                                        <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+                                        <Text style={styles.itemQtyText}>×{item.quantity}</Text>
+                                    </View>
+                                ))}
+
+                                {itemsExpanded && !hasInventory && allItems.length > 8 && <Text style={styles.itemsMore}>+{allItems.length - 8} more items</Text>}
                             </View>
                         </>
                     )}
@@ -470,9 +596,45 @@ export function OrderInspectSheet({
                                             <Text style={styles.cashRowHint}>Market items paid at pickup</Text>
                                         </View>
                                     </View>
-                                    <Text style={[styles.cashRowAmount, { color: '#EF4444', fontWeight: '700' }]}>−€{businessPrice.toFixed(2)}</Text>
+                                    <Text style={[styles.cashRowAmount, { color: '#EF4444', fontWeight: '700' }]}>€{businessPrice.toFixed(2)}</Text>
                                 </View>
                             )}
+
+                            {inventoryPrice > 0 && (
+                                <View style={styles.cashRow}>
+                                    <View style={styles.cashRowLeft}>
+                                        <View style={[styles.cashDot, { backgroundColor: '#7C3AED' }]} />
+                                        <View>
+                                            <Text style={[styles.cashRowLabel, { fontWeight: '700' }]}>Owed to platform</Text>
+                                            <Text style={styles.cashRowHint}>Inventory coverage to settle</Text>
+                                        </View>
+                                    </View>
+                                    <Text style={[styles.cashRowAmount, { color: '#7C3AED', fontWeight: '700' }]}>€{inventoryPrice.toFixed(2)}</Text>
+                                </View>
+                            )}
+
+                            {!isDirectDispatch && commissionAmount > 0 && (
+                                <View style={styles.cashRow}>
+                                    <View style={styles.cashRowLeft}>
+                                        <View style={[styles.cashDot, { backgroundColor: '#F59E0B' }]} />
+                                        <View>
+                                            <Text style={[styles.cashRowLabel, { fontWeight: '700' }]}>Delivery commission</Text>
+                                            <Text style={styles.cashRowHint}>{commissionPct.toFixed(0)}% of delivery fee (€{deliveryFee})</Text>
+                                        </View>
+                                    </View>
+                                    <Text style={[styles.cashRowAmount, { color: '#F59E0B', fontWeight: '700' }]}>€{commissionAmount.toFixed(2)}</Text>
+                                </View>
+                            )}
+
+                            <View style={styles.cashRow}>
+                                <View style={styles.cashRowLeft}>
+                                    <View style={[styles.cashDot, { backgroundColor: '#16A34A' }]} />
+                                    <View>
+                                        <Text style={[styles.cashRowLabel, { fontWeight: '700' }]}>Your cut</Text>
+                                    </View>
+                                </View>
+                                <Text style={[styles.cashRowAmount, { color: '#16A34A', fontWeight: '800' }]}>€{netEarnings.toFixed(2)}</Text>
+                            </View>
 
                             <View style={styles.cashRow}>
                                 <View style={styles.cashRowLeft}>
@@ -483,7 +645,7 @@ export function OrderInspectSheet({
                                     </View>
                                 </View>
                                 <Text style={[styles.cashRowAmount, { color: '#10B981' }]}>
-                                    {showCollectAmount ? `+€${collectFromCustomer.toFixed(2)}` : 'Confirm at pickup'}
+                                    {showCollectAmount ? `€${collectFromCustomer.toFixed(2)}` : 'Confirm at pickup'}
                                 </Text>
                             </View>
 
@@ -847,6 +1009,60 @@ const styles = StyleSheet.create({
         paddingVertical: 6,
         textAlign: 'center',
     },
+    inventoryBusinessColumns: {
+        flexDirection: 'row',
+        gap: 10,
+    },
+    splitColumn: {
+        flex: 1,
+    },
+    splitDivider: {
+        width: 1,
+        backgroundColor: 'rgba(148,163,184,0.2)',
+        marginVertical: 4,
+    },
+    itemsSplitHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingVertical: 5,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(148,163,184,0.12)',
+        marginBottom: 3,
+    },
+    itemsSplitTitle: {
+        fontSize: 10,
+        fontWeight: '800',
+        color: '#0369a1',
+        flex: 1,
+        textTransform: 'uppercase',
+        letterSpacing: 0.4,
+    },
+    itemsSplitCount: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#0369a1',
+    },
+    splitColumnList: {
+        paddingTop: 2,
+    },
+    splitItemRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 5,
+    },
+    splitItemName: {
+        color: '#374151',
+        fontSize: 12,
+        flex: 1,
+        marginRight: 6,
+    },
+    itemQtyText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#64748B',
+        marginLeft: 4,
+    },
     cashBreakdown: {
         backgroundColor: '#F9FAFB',
         borderRadius: 12,
@@ -1054,5 +1270,108 @@ const styles = StyleSheet.create({
         color: '#475569',
         fontSize: 12,
         fontWeight: '500',
+    },
+
+    /* ── Collapsed pill ── */
+    collapsedRoot: {
+        position: 'absolute',
+        left: 12,
+        right: 12,
+        zIndex: 300,
+    },
+    collapsedBar: {
+        backgroundColor: 'rgba(12,16,28,0.96)',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        gap: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.45,
+        shadowRadius: 12,
+        elevation: 14,
+    },
+    collapsedBarDD: {
+        borderColor: 'rgba(249,115,22,0.35)',
+        backgroundColor: 'rgba(20,10,4,0.96)',
+    },
+    collapsedRingWrap: {
+        width: 32,
+        height: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+    },
+    collapsedCountdownText: {
+        position: 'absolute',
+        fontSize: 10,
+        fontWeight: '800',
+    },
+    collapsedInfo: {
+        flex: 1,
+        gap: 3,
+    },
+    collapsedInfoRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    collapsedBizName: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#e2e8f0',
+        flex: 1,
+    },
+    collapsedDDChip: {
+        backgroundColor: '#F97316',
+        borderRadius: 999,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+    },
+    collapsedDDChipText: {
+        fontSize: 9,
+        fontWeight: '800',
+        color: '#fff',
+    },
+    collapsedEarnings: {
+        fontSize: 11,
+        color: '#22c55e',
+        fontWeight: '600',
+    },
+    collapsedExpandHint: {
+        paddingHorizontal: 4,
+    },
+    collapsedAcceptBtn: {
+        width: 38,
+        height: 38,
+        borderRadius: 10,
+        backgroundColor: '#10B981',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        shadowColor: '#10B981',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.4,
+        shadowRadius: 6,
+        elevation: 4,
+    },
+    collapsedAcceptBtnDD: {
+        backgroundColor: '#F97316',
+        shadowColor: '#F97316',
+    },
+    collapsedSkipBtn: {
+        width: 38,
+        height: 38,
+        borderRadius: 10,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
     },
 });

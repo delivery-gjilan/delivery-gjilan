@@ -83,6 +83,8 @@ export default function BusinessSettlementsPage() {
   const { toast } = useToast();
   const businessId = admin?.businessId ?? '';
 
+  const PAGE_SIZE = 25;
+  const [page, setPage] = useState(0);
   const [directionFilter, setDirectionFilter] = useState<'all' | SettlementDirection>('all');
   const [settledFilter, setSettledFilter] = useState<'all' | 'settled' | 'unsettled'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -172,9 +174,18 @@ export default function BusinessSettlementsPage() {
     );
   }, [filtered]);
 
+  const totalPages = Math.max(1, Math.ceil(orderGroups.length / PAGE_SIZE));
+  const pagedGroups = orderGroups.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
   const handleRefresh = async () => {
     await Promise.all([refetch(), refetchBalance(), refetchRequests()]);
+    setPage(0);
   };
+
+  // Reset page when filters change
+  const handleDirectionFilter = (val: typeof directionFilter) => { setDirectionFilter(val); setPage(0); };
+  const handleSettledFilter = (val: typeof settledFilter) => { setSettledFilter(val); setPage(0); };
+  const handleSearch = (val: string) => { setSearchQuery(val); setPage(0); };
 
   const openRequestDialog = () => {
     const pending = balance?.totalPending ?? 0;
@@ -309,7 +320,7 @@ export default function BusinessSettlementsPage() {
                   key={val}
                   variant={directionFilter === val ? 'default' : 'ghost'}
                   size="sm"
-                  onClick={() => setDirectionFilter(val)}
+                  onClick={() => handleDirectionFilter(val)}
                   className="h-7 px-3 capitalize"
                 >
                   {val === 'all' ? 'All' : val}
@@ -326,7 +337,7 @@ export default function BusinessSettlementsPage() {
                   key={val}
                   variant={settledFilter === val ? 'default' : 'ghost'}
                   size="sm"
-                  onClick={() => setSettledFilter(val)}
+                  onClick={() => handleSettledFilter(val)}
                   className="h-7 px-3 capitalize"
                 >
                   {val}
@@ -339,7 +350,7 @@ export default function BusinessSettlementsPage() {
             <Input
               placeholder="Search by order ID or business…"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearch(e.target.value)}
               className="bg-gray-800 border-gray-700 text-white pl-3"
             />
           </div>
@@ -375,7 +386,7 @@ export default function BusinessSettlementsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                orderGroups.map((og) => {
+                pagedGroups.map((og) => {
                   const netAmount = og.totalPayable - og.totalReceivable;
                   const allSettled = og.settlements.every((s: SettlementRecord) => !!s.isSettled);
                   return (
@@ -413,6 +424,33 @@ export default function BusinessSettlementsPage() {
             </TableBody>
           </Table>
         </div>
+
+        {/* Pagination footer */}
+        {orderGroups.length > PAGE_SIZE && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-800">
+            <span className="text-xs text-zinc-500">
+              Page {page + 1} of {totalPages} &middot; {orderGroups.length} order groups
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={page === 0}
+              >
+                Prev
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                disabled={page >= totalPages - 1}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Request Settlement Dialog */}

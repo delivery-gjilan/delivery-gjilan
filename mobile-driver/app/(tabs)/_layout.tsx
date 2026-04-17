@@ -5,7 +5,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useAuth } from '@/hooks/useAuth';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigationStore } from '@/store/navigationStore';
 import { isValidCoordinatePair } from '@/utils/locationValidation';
 
@@ -17,8 +17,21 @@ export default function TabLayout() {
     const { logout } = useAuth();
     const isNavigating = useNavigationStore((s) => s.isNavigating);
     const isNavigationMinimized = useNavigationStore((s) => s.isNavigationMinimized);
+    const navOrder = useNavigationStore((s) => s.order);
     const destination = useNavigationStore((s) => s.destination);
     const stopNavigation = useNavigationStore((s) => s.stopNavigation);
+    const [navHydrated, setNavHydrated] = useState(() => useNavigationStore.persist.hasHydrated());
+
+    useEffect(() => {
+        if (useNavigationStore.persist.hasHydrated()) {
+            setNavHydrated(true);
+            return;
+        }
+        const unsubscribe = useNavigationStore.persist.onFinishHydration(() => {
+            setNavHydrated(true);
+        });
+        return unsubscribe;
+    }, []);
 
     // Session restore: if the driver had an active navigation session before the
     // app was killed, send them back to the navigation screen on mount.
@@ -27,21 +40,34 @@ export default function TabLayout() {
     // it would double-navigate and cause a crash.
     const hasRestoredNavigationRef = useRef(false);
     useEffect(() => {
+        if (!navHydrated) return;
         if (hasRestoredNavigationRef.current) return;
         hasRestoredNavigationRef.current = true;
+
+        if (!isNavigating || !navOrder) {
+            return;
+        }
+
         if (
-            isNavigating &&
             destination &&
             !isValidCoordinatePair(destination.latitude, destination.longitude)
         ) {
             stopNavigation();
             return;
         }
-        if (isNavigating && !isNavigationMinimized) {
+
+        const isDirectCallSession = navOrder?.channel === 'DIRECT_DISPATCH';
+        const isOutForDelivery = navOrder?.status === 'OUT_FOR_DELIVERY';
+        const canResumeOutForDelivery = !isOutForDelivery || (navOrder?.channel === 'PLATFORM' && !!navOrder?.dropoff);
+        if (isDirectCallSession || !canResumeOutForDelivery) {
+            stopNavigation();
+            return;
+        }
+
+        if (!isNavigationMinimized) {
             router.replace('/navigation' as any);
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [destination, isNavigating, isNavigationMinimized, navHydrated, navOrder, router, stopNavigation]);
 
     const handleLogout = async () => {
         try {
@@ -88,6 +114,14 @@ export default function TabLayout() {
                 options={{
                     title: t.tabs.earnings,
                     tabBarIcon: ({ color, size }) => <Ionicons name="cash-outline" size={size} color={color} />,
+                }}
+            />
+
+            <Tabs.Screen
+                name="orders"
+                options={{
+                    title: t.tabs.orders ?? 'Orders',
+                    tabBarIcon: ({ color, size }) => <Ionicons name="receipt-outline" size={size} color={color} />,
                 }}
             />
 

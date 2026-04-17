@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -107,14 +107,23 @@ export function AppOverlays() {
         },
     });
 
-    // Startup redirect: once networkReady + auth, go to drive tab if orders are assigned
-    useEffect(() => {
+    // Startup redirect: once networkReady + auth, move to drive tab for assigned direct calls.
+    // useLayoutEffect avoids a visible first paint on another tab during cold start.
+    useLayoutEffect(() => {
         if (!isAuthenticated || isNavigationActive || !networkReady) return;
         if (didStartupAssignedRedirectRef.current) return;
         if (assignedOrders.length === 0) return;
+
+        const hasAssignedDirectCall = assignedOrders.some((o) => o.channel === 'DIRECT_DISPATCH');
+        const isOnDriveTab = pathname === '/(tabs)/drive' || pathname === '/drive';
+        if (!hasAssignedDirectCall || isOnDriveTab) {
+            didStartupAssignedRedirectRef.current = true;
+            return;
+        }
+
         didStartupAssignedRedirectRef.current = true;
         router.replace('/(tabs)/drive' as any);
-    }, [assignedOrders.length, isAuthenticated, isNavigationActive, networkReady, router]);
+    }, [assignedOrders, isAuthenticated, isNavigationActive, networkReady, pathname, router]);
 
     const showPoolFab = isAuthenticated && !dispatchModeEnabled && isOnline && poolOrders.length > 0;
 
@@ -206,6 +215,7 @@ export function AppOverlays() {
                         accepting={accepting}
                         autoCountdown={autoCountdown}
                         takenByOther={takenByOther}
+                        hasActiveOrder={assignedOrders.length > 0}
                     />
                 </>
             )}

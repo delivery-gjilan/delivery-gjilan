@@ -1,6 +1,6 @@
 import type { QueryResolvers } from './../../../../generated/types.generated';
 import { GraphQLError } from 'graphql';
-import { eq, and, gte, lte, sql } from 'drizzle-orm';
+import { eq, and, gte, lte, sql, desc } from 'drizzle-orm';
 import { orders as ordersTable, drivers as driversTable, settlements } from '@/database/schema';
 
 export const driverCashSummary: NonNullable<QueryResolvers['driverCashSummary']> = async (
@@ -83,6 +83,21 @@ export const driverCashSummary: NonNullable<QueryResolvers['driverCashSummary']>
     const netSettlement = platformOwesYou - youOwePlatform;
     const takeHome = cashCollected + netSettlement;
 
+    // Last paid settlement date — most recent updatedAt when isSettled=true for this driver
+    const lastPaidRow = await db
+        .select({ updatedAt: settlements.updatedAt })
+        .from(settlements)
+        .where(and(
+            eq(settlements.type, 'DRIVER'),
+            eq(settlements.driverId, driverId),
+            eq(settlements.isSettled, true),
+        ))
+        .orderBy(desc(settlements.updatedAt))
+        .limit(1)
+        .then((rows) => rows[0]);
+
+    const lastPaidDate = lastPaidRow?.updatedAt ? String(lastPaidRow.updatedAt) : null;
+
     return {
         cashCollected,
         totalDeliveries,
@@ -90,5 +105,6 @@ export const driverCashSummary: NonNullable<QueryResolvers['driverCashSummary']>
         platformOwesYou,
         netSettlement,
         takeHome,
+        lastPaidDate,
     };
 };

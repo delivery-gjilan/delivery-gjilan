@@ -39,6 +39,7 @@ export function buildNavOrder(order: DriverOrder): NavigationOrder | null {
     return {
         id: order.id,
         status: order.status,
+        channel: order.channel,
         businessName: order.businesses?.[0]?.business?.name ?? 'Business',
         customerName,
         customerPhone,
