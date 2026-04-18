@@ -476,3 +476,33 @@ export const GET_ORDER_DETAIL_FOR_SETTLEMENT = graphql(`
         }
     }
 `);
+
+export const RESPOND_TO_SETTLEMENT_REQUEST = graphql(`
+    mutation RespondToSettlementRequest(
+        $requestId: ID!
+        $action: SettlementRequestAction!
+        $reason: String
+    ) {
+        respondToSettlementRequest(
+            requestId: $requestId
+            action: $action
+            reason: $reason
+        ) {
+            id
+            status
+            reason
+            respondedAt
+            respondedBy {
+                id
+                firstName
+                lastName
+            }
+            settlementPayment {
+                id
+                amount
+                direction
+                createdAt
+            }
+        }
+    }
+`);

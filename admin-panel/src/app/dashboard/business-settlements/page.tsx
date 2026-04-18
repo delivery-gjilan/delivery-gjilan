@@ -24,15 +24,17 @@ import {
   Wallet,
   Clock,
   CheckCircle2,
-  TrendingUp,
-  TrendingDown,
   ChevronRight,
   X,
+  Check,
+  XCircle,
+  DollarSign,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   SettlementType,
   SettlementDirection,
+  SettlementRequestAction,
   type GetBusinessOrderFinancialsQuery,
   type GetOrderDetailForSettlementQuery,
   type GetSettlementRequestsQuery,
@@ -50,6 +52,7 @@ import {
   GET_SETTLEMENT_BREAKDOWN,
   GET_SETTLEMENT_REQUESTS,
   CREATE_SETTLEMENT_REQUEST,
+  RESPOND_TO_SETTLEMENT_REQUEST,
   GET_BUSINESS_ORDER_FINANCIALS,
   GET_ORDER_DETAIL_FOR_SETTLEMENT,
 } from '@/graphql/operations/settlements/queries';
@@ -239,6 +242,12 @@ export default function BusinessSettlementsPage() {
   });
 
   const [createSettlementRequest] = useMutation(CREATE_SETTLEMENT_REQUEST);
+  const [respondToSettlementRequest] = useMutation(RESPOND_TO_SETTLEMENT_REQUEST);
+
+  // Settlement request respond dialog
+  const [respondRequest, setRespondRequest] = useState<SettlementRequestRecord | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [respondSubmitting, setRespondSubmitting] = useState(false);
 
   // ── Derived data ──
 
@@ -344,6 +353,37 @@ export default function BusinessSettlementsPage() {
     }
   };
 
+  const handleRespondToRequest = async (action: SettlementRequestAction) => {
+    if (!respondRequest) return;
+    if (action === SettlementRequestAction.Reject && !rejectReason.trim()) {
+      toast({ title: 'Reason required', description: 'Please provide a reason for rejecting.', variant: 'destructive' });
+      return;
+    }
+    setRespondSubmitting(true);
+    try {
+      await respondToSettlementRequest({
+        variables: {
+          requestId: respondRequest.id,
+          action,
+          reason: action === SettlementRequestAction.Reject ? rejectReason.trim() : undefined,
+        },
+      });
+      toast({
+        title: action === SettlementRequestAction.Accept ? 'Request accepted' : 'Request rejected',
+        description: action === SettlementRequestAction.Accept
+          ? `Settlement of €${Number(respondRequest.amount).toFixed(2)} accepted.`
+          : 'Settlement request rejected.',
+      });
+      setRespondRequest(null);
+      setRejectReason('');
+      await Promise.all([refetchRequests(), refetchSummary(), refetchBreakdown(), refetch()]);
+    } catch (error) {
+      toast({ title: 'Error', description: getErrorMessage(error), variant: 'destructive' });
+    } finally {
+      setRespondSubmitting(false);
+    }
+  };
+
   if (!businessId) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -422,18 +462,18 @@ export default function BusinessSettlementsPage() {
       </div>
 
       {/* ── Summary cards ── */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         <SummaryCard
-          icon={<Wallet className="h-4 w-4 text-zinc-400" />}
-          label="Total"
-          value={Number(summary?.totalAmount ?? 0)}
+          icon={<DollarSign className="h-4 w-4 text-green-400" />}
+          label="Gross Income"
+          value={Number(summary?.totalPayable ?? 0)}
           sub={`${summary?.count ?? 0} settlements`}
-          color="text-zinc-100"
+          color="text-green-400"
           loading={summaryLoading && !summary}
         />
         <SummaryCard
           icon={<Clock className="h-4 w-4 text-yellow-400" />}
-          label="Pending"
+          label="Unsettled"
           value={Number(summary?.totalPending ?? 0)}
           sub={`${summary?.pendingCount ?? 0} unsettled`}
           color="text-yellow-400"
@@ -447,50 +487,53 @@ export default function BusinessSettlementsPage() {
           color="text-green-400"
           loading={summaryLoading && !summary}
         />
-        <SummaryCard
-          icon={netEarnings >= 0
-            ? <TrendingUp className="h-4 w-4 text-green-400" />
-            : <TrendingDown className="h-4 w-4 text-red-400" />}
-          label="Net Earnings"
-          value={netEarnings}
-          sub={netEarnings >= 0 ? 'Platform owes you' : 'You owe platform'}
-          color={netEarnings >= 0 ? 'text-green-400' : 'text-red-400'}
-          signed
-          loading={breakdownLoading && breakdown.length === 0}
-        />
       </div>
 
       {/* ── Settlement Requests ── */}
-      {(settlementRequests.length > 0 || requestsLoading) && (
-        <Card className="p-0 overflow-hidden">
-          <div className="px-5 py-3 border-b border-zinc-800 bg-zinc-900/50">
-            <span className="text-sm font-medium text-zinc-200">Settlement Requests</span>
-          </div>
-          <div className="p-3 space-y-1.5">
-            {requestsLoading ? (
-              <Skeleton className="h-10 w-full" />
-            ) : (
-              settlementRequests.map((req) => (
-                <div
-                  key={req.id}
-                  className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/50 px-4 py-2.5"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-semibold tabular-nums text-zinc-100">
-                      €{Number(req.amount).toFixed(2)}
+      <Card className="p-0 overflow-hidden">
+        <div className="px-5 py-3 border-b border-zinc-800 bg-zinc-900/50 flex items-center justify-between">
+          <span className="text-sm font-medium text-zinc-200">Settlement Requests</span>
+          <span className="text-[11px] text-zinc-500 tabular-nums">
+            {settlementRequests.filter((r) => r.status === 'PENDING').length} pending
+          </span>
+        </div>
+        <div className="p-3 space-y-1.5">
+          {requestsLoading ? (
+            <Skeleton className="h-10 w-full" />
+          ) : settlementRequests.length === 0 ? (
+            <div className="py-6 text-center text-sm text-zinc-500">No settlement requests yet</div>
+          ) : (
+            settlementRequests.map((req) => (
+              <button
+                key={req.id}
+                onClick={() => {
+                  setRespondRequest(req);
+                  setRejectReason('');
+                }}
+                className={cn(
+                  'w-full flex items-center justify-between rounded-lg border px-4 py-2.5 text-left transition-colors',
+                  req.status === 'PENDING'
+                    ? 'border-yellow-600/30 bg-yellow-950/20 hover:bg-yellow-950/30 cursor-pointer'
+                    : 'border-zinc-800 bg-zinc-950/50 cursor-pointer hover:bg-zinc-900/50',
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-semibold tabular-nums text-zinc-100">
+                    €{Number(req.amount).toFixed(2)}
+                  </span>
+                  <span className="text-xs text-zinc-500">
+                    {new Date(req.createdAt).toLocaleDateString()}
+                  </span>
+                  {req.note && (
+                    <span className="text-xs text-zinc-500 italic truncate max-w-[200px]">
+                      &ldquo;{req.note}&rdquo;
                     </span>
-                    <span className="text-xs text-zinc-500">
-                      {new Date(req.createdAt).toLocaleDateString()}
-                    </span>
-                    {req.note && (
-                      <span className="text-xs text-zinc-500 italic truncate max-w-[200px]">
-                        &ldquo;{req.note}&rdquo;
-                      </span>
-                    )}
-                    {req.reason && (
-                      <span className="text-xs text-red-400">Reason: {req.reason}</span>
-                    )}
-                  </div>
+                  )}
+                  {req.reason && (
+                    <span className="text-xs text-red-400 truncate max-w-[200px]">Reason: {req.reason}</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
                   <Badge
                     className={cn(
                       'text-[11px]',
@@ -502,12 +545,13 @@ export default function BusinessSettlementsPage() {
                   >
                     {req.status}
                   </Badge>
+                  <ChevronRight className="h-3.5 w-3.5 text-zinc-600" />
                 </div>
-              ))
-            )}
-          </div>
-        </Card>
-      )}
+              </button>
+            ))
+          )}
+        </div>
+      </Card>
 
       {/* ── Breakdown by Category ── */}
       <Card className="p-0 overflow-hidden">
@@ -807,6 +851,120 @@ export default function BusinessSettlementsPage() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Settlement Request Detail / Respond Dialog ── */}
+      <Dialog open={respondRequest !== null} onOpenChange={(open) => { if (!open) { setRespondRequest(null); setRejectReason(''); } }}>
+        <DialogContent className="bg-zinc-900 border-zinc-700 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle>Settlement Request</DialogTitle>
+          </DialogHeader>
+          {respondRequest && (() => {
+            const req = respondRequest;
+            const isPending = req.status === 'PENDING';
+            return (
+              <div className="space-y-4 mt-2">
+                {/* Request info */}
+                <div className="rounded-lg bg-zinc-800 border border-zinc-700 p-4 space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-zinc-400">Amount</span>
+                    <span className="text-lg font-bold text-zinc-100 tabular-nums">€{Number(req.amount).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-zinc-400">Status</span>
+                    <Badge
+                      className={cn(
+                        'text-[11px]',
+                        req.status === 'PENDING' && 'bg-yellow-600/20 text-yellow-400 border-yellow-600/30',
+                        req.status === 'ACCEPTED' && 'bg-green-600/20 text-green-400 border-green-600/30',
+                        req.status === 'REJECTED' && 'bg-red-600/20 text-red-400 border-red-600/30',
+                      )}
+                      variant="outline"
+                    >
+                      {req.status}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-zinc-400">Requested</span>
+                    <span className="text-zinc-300">{new Date(req.createdAt).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                  </div>
+                  {req.note && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-zinc-400">Note</span>
+                      <span className="text-zinc-300 text-right max-w-[220px]">{req.note}</span>
+                    </div>
+                  )}
+                  {req.respondedAt && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-zinc-400">Responded</span>
+                      <span className="text-zinc-300">{new Date(req.respondedAt).toLocaleDateString()}</span>
+                    </div>
+                  )}
+                  {req.respondedBy && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-zinc-400">Responded by</span>
+                      <span className="text-zinc-300">{req.respondedBy.firstName} {req.respondedBy.lastName}</span>
+                    </div>
+                  )}
+                  {req.reason && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-zinc-400">Reason</span>
+                      <span className="text-red-400 text-right max-w-[220px]">{req.reason}</span>
+                    </div>
+                  )}
+                  {req.settlementPayment && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-zinc-400">Payment</span>
+                      <span className="text-green-400 font-medium tabular-nums">€{Number(req.settlementPayment.amount).toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Accept / Reject actions for PENDING requests */}
+                {isPending && (
+                  <div className="space-y-3">
+                    <div>
+                      <Label className="text-zinc-300 text-xs">Rejection reason (required if rejecting)</Label>
+                      <Input
+                        value={rejectReason}
+                        onChange={(e) => setRejectReason(e.target.value)}
+                        className="mt-1 bg-zinc-800 border-zinc-700 text-white"
+                        placeholder="Reason for rejecting…"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => handleRespondToRequest(SettlementRequestAction.Accept)}
+                        disabled={respondSubmitting}
+                        className="flex-1 gap-1.5 bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        <Check className="h-4 w-4" />
+                        {respondSubmitting ? 'Processing…' : 'Accept'}
+                      </Button>
+                      <Button
+                        onClick={() => handleRespondToRequest(SettlementRequestAction.Reject)}
+                        disabled={respondSubmitting}
+                        variant="outline"
+                        className="flex-1 gap-1.5 border-red-600/40 text-red-400 hover:bg-red-950/30 hover:text-red-300"
+                      >
+                        <XCircle className="h-4 w-4" />
+                        {respondSubmitting ? 'Processing…' : 'Reject'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {!isPending && (
+                  <div className="flex justify-end">
+                    <Button variant="outline" onClick={() => { setRespondRequest(null); setRejectReason(''); }}>
+                      Close
+                    </Button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 

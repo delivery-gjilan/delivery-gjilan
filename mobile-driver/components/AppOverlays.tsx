@@ -151,7 +151,7 @@ export function AppOverlays() {
     const cardBottomApprox = isDriveTab && assignedOrders.length > 0
         ? tabBarHeight + (isCompactHeight ? 155 : 165)
         : isNavigationScreen && assignedOrders.length > 0
-        ? insets.bottom + (isCompactHeight ? 210 : 230)
+        ? insets.bottom + (isCompactHeight ? 250 : 270)
         : insets.bottom + 80;
     const poolFabBottom = (isDriveTab || isNavigationScreen) ? cardBottomApprox + 8 : 100;
     const micBottom = poolFabBottom + (showPoolFab ? 68 : 0) + 16;

@@ -473,7 +473,7 @@ export default function NavigationScreen() {
             </Pressable>
 
             {/* â•â•â• Right-side buttons (recenter) â•â•â• */}
-            <View style={[styles.rightButtons, { bottom: 300 + insets.bottom }]}>
+            <View style={[styles.rightButtons, { bottom: 340 + insets.bottom }]}>
                 <Pressable
                     style={styles.mapBtn}
                     onPress={handleRecenter}
@@ -559,9 +559,6 @@ export default function NavigationScreen() {
                         <View style={styles.navCardInner}>
                             {/* HEADER ROW */}
                             <View style={styles.cardHeader}>
-                                <View style={[styles.cardAvatar, { backgroundColor: cardStatusColor }]}>
-                                    <Text style={styles.cardAvatarText}>{cardInitial}</Text>
-                                </View>
                                 <View style={styles.cardHeaderInfo}>
                                     <View style={styles.cardNameRow}>
                                         <Text style={styles.cardBizName} numberOfLines={1}>{cardBizName}</Text>

@@ -781,9 +781,6 @@ export default function MapScreen() {
                         <Pressable style={styles.singleCard} {...(swipePanResponder.panHandlers as any)}>
                         {/* MAIN ROW */}
                         <View style={styles.cardHeader}>
-                            <View style={[styles.cardAvatar, { backgroundColor: statusColor }]}>
-                                <Text style={styles.cardAvatarText}>{initial}</Text>
-                            </View>
                             <View style={styles.cardHeaderInfo}>
                                 {/* biz name + status badge inline */}
                                 <View style={styles.cardNameRow}>
@@ -810,7 +807,7 @@ export default function MapScreen() {
                                             <Ionicons name="location-outline" size={11} color="#475569" /> {shortDrop}
                                         </Text>
                                     ) : null}
-                                    {routeInfo && focusedOrderId === order.id ? (
+                                    {routeInfo && focusedOrderId === order.id && !isPreparing ? (
                                         <Text style={styles.cardEtaText}>
                                             {order.status === 'OUT_FOR_DELIVERY'
                                                 ? t.drive.min_to_drop.replace('{{min}}', String(Math.ceil(routeInfo.durationMin)))
