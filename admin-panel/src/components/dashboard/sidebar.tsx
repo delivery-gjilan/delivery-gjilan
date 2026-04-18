@@ -25,6 +25,7 @@ import {
   Star,
   Warehouse,
   BarChart3,
+  Wallet,
 } from "lucide-react";
 
 interface NavItem {
@@ -48,6 +49,7 @@ const sections: NavSection[] = [
     superAdminOnly: true,
     items: [
       { name: "Orders", href: "/dashboard/orders", icon: ClipboardList, businessAdminVisible: true },
+      { name: "Settlements", href: "/dashboard/business-settlements", icon: Wallet, businessAdminVisible: true },
       { name: "Cancelled Orders", href: "/dashboard/orders/cancelled", icon: ClipboardList, superAdminOnly: true },
       { name: "Map", href: "/dashboard/map", icon: Map, superAdminOnly: true },
       { name: "Businesses", href: "/dashboard/businesses", icon: Store, superAdminOnly: true },
