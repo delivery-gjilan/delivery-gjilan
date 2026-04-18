@@ -65,6 +65,7 @@ export default function MapScreen() {
 
     const [focusedOrderId, setFocusedOrderId] = useState<string | null>(null);
     const [showOrderDetails, setShowOrderDetails] = useState(false);
+    const [cardItemsOpen, setCardItemsOpen] = useState<Set<string>>(new Set());
     const isOnline = useAuthStore((state) => state.isOnline);
     const connectionStatus = useAuthStore((state) => state.connectionStatus);
     const { dispatchModeEnabled, googleMapsNavEnabled, inventoryModeEnabled } = useStoreStatus();
@@ -752,6 +753,14 @@ export default function MapScreen() {
                 const allItems = order.businesses?.flatMap((b) => b.items ?? []) ?? [];
                 const totalStockUnits = allItems.reduce((sum, it) => sum + (it.inventoryQuantity ?? 0), 0);
                 const cardCashToCollect = Number((order as any).cashToCollect ?? 0);
+                const cardOrderPrice = Number((order as any).orderPrice ?? 0);
+                const cardInventoryPrice = Number((order as any).inventoryPrice ?? 0);
+                const cardBusinessPrice = Math.max(0, cardOrderPrice - cardInventoryPrice);
+                const cardTotalPrice = Number(order.totalPrice ?? 0);
+                const cardCollectFromCustomer = isDirectDispatch ? cardCashToCollect : cardTotalPrice;
+                const cardItemsExpanded = cardItemsOpen.has(order.id);
+                const businessItems = allItems.filter((it: any) => Math.max(0, it.quantity - (it.inventoryQuantity ?? 0)) > 0);
+                const stockItems = allItems.filter((it: any) => (it.inventoryQuantity ?? 0) > 0);
 
                 return (
                     <View
@@ -769,81 +778,129 @@ export default function MapScreen() {
                             <View style={styles.cardStackBehind} pointerEvents="none" />
                         )}
 
-                        <Pressable style={styles.singleCard} {...(swipePanResponder.panHandlers as any)} onPress={() => setShowOrderDetails(p => !p)}>
-                        {/* READY glow border */}
-                        {isReady && (
-                            <Animated.View
-                                style={[styles.readyGlow, { opacity: readyPulse, borderColor: statusColor }]}
-                                pointerEvents="none"
-                            />
-                        )}
-
-                        {/* STATUS STRIP */}
-                        <View style={[styles.cardStatusStrip, { backgroundColor: statusColor }]}>
-                            <View style={styles.cardStatusStripDot} />
-                            <Text style={styles.cardStatusStripText}>
-                                {STATUS_LABELS[order.status] ?? order.status}
-                            </Text>
-                            {routeInfo && focusedOrderId === order.id ? (
-                                <Text style={styles.cardStatusStripEta}>
-                                    {' · '}{order.status === 'OUT_FOR_DELIVERY'
-                                        ? t.drive.min_to_drop.replace('{{min}}', String(Math.ceil(routeInfo.durationMin)))
-                                        : t.drive.min_to_pickup.replace('{{min}}', String(Math.ceil(routeInfo.durationMin)))}
-                                </Text>
-                            ) : isPreparing && prepMinsLeft !== null ? (
-                                <Text style={styles.cardStatusStripEta}>
-                                    {' · '}{prepMinsLeft === 0 ? t.drive.almost_ready : t.drive.ready_min.replace('{{min}}', String(prepMinsLeft))}
-                                </Text>
-                            ) : null}
-                            {isDirectDispatch && (
-                                <View style={styles.cardDirectBadge}>
-                                    <Ionicons name="call" size={9} color="#fff" />
-                                    <Text style={styles.cardDirectBadgeText}>Direct</Text>
-                                </View>
-                            )}
-                            {total > 1 && (
-                                <View style={styles.cardCounter}>
-                                    <Text style={styles.cardCounterText}>{idx + 1} / {total}</Text>
-                                </View>
-                            )}
-                        </View>
-
+                        <Pressable style={styles.singleCard} {...(swipePanResponder.panHandlers as any)}>
                         {/* MAIN ROW */}
                         <View style={styles.cardHeader}>
                             <View style={[styles.cardAvatar, { backgroundColor: statusColor }]}>
                                 <Text style={styles.cardAvatarText}>{initial}</Text>
                             </View>
                             <View style={styles.cardHeaderInfo}>
-                                <Text style={styles.cardBizName} numberOfLines={1}>{bizName}</Text>
-                                {recipientLabel ? (
-                                    <Text style={[styles.cardAddress, isDirectDispatch && styles.cardRecipient]} numberOfLines={1}>{recipientLabel}</Text>
-                                ) : shortDrop ? (
-                                    <Text style={styles.cardAddress} numberOfLines={1}>
-                                        <Ionicons name="location-outline" size={11} color="#475569" /> {shortDrop}
-                                    </Text>
-                                ) : null}
+                                {/* biz name + status badge inline */}
+                                <View style={styles.cardNameRow}>
+                                    <Text style={styles.cardBizName} numberOfLines={1}>{bizName}</Text>
+                                    <View style={[styles.cardStatusPill, { backgroundColor: statusColor + '28', borderColor: statusColor + '55' }]}>
+                                        <View style={[styles.cardStatusPillDot, { backgroundColor: statusColor }]} />
+                                        <Text style={[styles.cardStatusPillText, { color: statusColor }]}>
+                                            {STATUS_LABELS[order.status] ?? order.status}
+                                        </Text>
+                                    </View>
+                                    {isDirectDispatch && (
+                                        <View style={styles.cardDirectBadge}>
+                                            <Ionicons name="call" size={9} color="#fff" />
+                                            <Text style={styles.cardDirectBadgeText}>Direct</Text>
+                                        </View>
+                                    )}
+                                </View>
+                                {/* address / recipient + ETA */}
+                                <View style={styles.cardSubRow}>
+                                    {recipientLabel ? (
+                                        <Text style={[styles.cardAddress, isDirectDispatch && styles.cardRecipient]} numberOfLines={1}>{recipientLabel}</Text>
+                                    ) : shortDrop ? (
+                                        <Text style={styles.cardAddress} numberOfLines={1}>
+                                            <Ionicons name="location-outline" size={11} color="#475569" /> {shortDrop}
+                                        </Text>
+                                    ) : null}
+                                    {routeInfo && focusedOrderId === order.id ? (
+                                        <Text style={styles.cardEtaText}>
+                                            {order.status === 'OUT_FOR_DELIVERY'
+                                                ? t.drive.min_to_drop.replace('{{min}}', String(Math.ceil(routeInfo.durationMin)))
+                                                : t.drive.min_to_pickup.replace('{{min}}', String(Math.ceil(routeInfo.durationMin)))}
+                                        </Text>
+                                    ) : isPreparing && prepMinsLeft !== null ? (
+                                        <Text style={styles.cardEtaText}>
+                                            {prepMinsLeft === 0 ? t.drive.almost_ready : t.drive.ready_min.replace('{{min}}', String(prepMinsLeft))}
+                                        </Text>
+                                    ) : null}
+                                </View>
                             </View>
-                            <View style={styles.cardEarningsBadge}>
-                                <Text style={styles.cardEarningsText}>€{earnings}</Text>
+                            {/* Earnings + business amount stacked */}
+                            <View style={styles.cardEarningsCol}>
+                                <View style={styles.cardEarningsBadge}>
+                                    <Text style={styles.cardEarningsText}>€{earnings}</Text>
+                                </View>
+                                {isOutForDelivery && cardCollectFromCustomer > 0 ? (
+                                    <View style={[styles.cardSecondaryBadge, { borderColor: 'rgba(16,185,129,0.35)' }]}>
+                                        <Ionicons name="cash-outline" size={10} color="#10b981" />
+                                        <Text style={[styles.cardSecondaryBadgeText, { color: '#10b981' }]}>€{cardCollectFromCustomer.toFixed(2)}</Text>
+                                    </View>
+                                ) : !isOutForDelivery && cardBusinessPrice > 0 ? (
+                                    <View style={[styles.cardSecondaryBadge, { borderColor: 'rgba(239,68,68,0.35)' }]}>
+                                        <Ionicons name="storefront-outline" size={10} color="#ef4444" />
+                                        <Text style={[styles.cardSecondaryBadgeText, { color: '#ef4444' }]}>€{cardBusinessPrice.toFixed(2)}</Text>
+                                    </View>
+                                ) : null}
+                                {total > 1 && (
+                                    <View style={styles.cardCounter}>
+                                        <Text style={styles.cardCounterText}>{idx + 1}/{total}</Text>
+                                    </View>
+                                )}
                             </View>
                         </View>
 
-                        {/* ITEMS */}
+                        {/* ITEMS expandable */}
                         {allItems.length > 0 && (
-                            <View style={styles.cardItemsRow}>
-                                {allItems.slice(0, 5).map((item: any, i: number) => (
-                                    <View key={i} style={styles.cardItemChip}>
-                                        <Text style={styles.cardItemChipQty}>{item.quantity}×</Text>
-                                        <Text style={styles.cardItemChipName} numberOfLines={1}>{item.name}</Text>
-                                    </View>
-                                ))}
-                                {allItems.length > 5 && (
-                                    <View style={styles.cardItemChipMore}>
-                                        <Text style={styles.cardItemChipMoreText}>+{allItems.length - 5}</Text>
+                            <View style={styles.cardItemsSection}>
+                                <Pressable
+                                    style={styles.cardItemsHeader}
+                                    onPress={() => setCardItemsOpen(prev => {
+                                        const next = new Set(prev);
+                                        if (next.has(order.id)) next.delete(order.id); else next.add(order.id);
+                                        return next;
+                                    })}
+                                >
+                                    <Ionicons name="bag-handle-outline" size={13} color="#94a3b8" />
+                                    <Text style={styles.cardItemsHeaderText}>{allItems.length} item{allItems.length !== 1 ? 's' : ''}</Text>
+                                    <Ionicons name={cardItemsExpanded ? 'chevron-up' : 'chevron-down'} size={13} color="#64748b" style={{ marginLeft: 'auto' }} />
+                                </Pressable>
+                                {cardItemsExpanded && (
+                                    <View style={styles.cardItemsList}>
+                                        {allItems.map((item: any, i: number) => {
+                                            const bizQty = Math.max(0, item.quantity - (item.inventoryQuantity ?? 0));
+                                            const stockQty = item.inventoryQuantity ?? 0;
+                                            return (
+                                                <View key={i} style={styles.cardItemRow}>
+                                                    {item.imageUrl ? (
+                                                        <Image source={{ uri: item.imageUrl }} style={styles.cardItemImage} />
+                                                    ) : (
+                                                        <View style={[styles.cardItemImage, styles.cardItemImageFallback]}>
+                                                            <Ionicons name="fast-food-outline" size={16} color="#475569" />
+                                                        </View>
+                                                    )}
+                                                    <View style={styles.cardItemInfo}>
+                                                        <Text style={styles.cardItemName} numberOfLines={1}>{item.quantity}× {item.name}</Text>
+                                                        {item.notes ? <Text style={styles.cardItemNotes} numberOfLines={1}>{item.notes}</Text> : null}
+                                                        <View style={styles.cardItemBadges}>
+                                                            {bizQty > 0 && (
+                                                                <View style={styles.cardItemBadgeBiz}>
+                                                                    <Text style={styles.cardItemBadgeBizText}>Biz: {bizQty}</Text>
+                                                                </View>
+                                                            )}
+                                                            {stockQty > 0 && (
+                                                                <View style={styles.cardItemBadgeStock}>
+                                                                    <Text style={styles.cardItemBadgeStockText}>Stock: {stockQty}</Text>
+                                                                </View>
+                                                            )}
+                                                        </View>
+                                                    </View>
+                                                </View>
+                                            );
+                                        })}
                                     </View>
                                 )}
                             </View>
                         )}
+
+
 
                         {/* SWIPE HINT */}
                         {total > 1 && (
@@ -1100,12 +1157,6 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(148,163,184,0.35)',
     },
 
-    readyGlow: {
-        position: 'absolute',
-        top: 0, left: 0, right: 0, bottom: 0,
-        borderRadius: 20,
-        borderWidth: 2,
-    },
     cardCounter: {
         marginLeft: 'auto',
         backgroundColor: 'rgba(255,255,255,0.2)',
@@ -1120,25 +1171,63 @@ const styles = StyleSheet.create({
     },
     cardHeader: {
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         gap: 10,
     },
     cardAvatar: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         alignItems: 'center',
         justifyContent: 'center',
         flexShrink: 0,
+        marginTop: 2,
     },
     cardAvatarText: {
-        fontSize: 11,
+        fontSize: 13,
         fontWeight: '800',
         color: '#fff',
     },
     cardHeaderInfo: {
         flex: 1,
         gap: 3,
+    },
+    cardNameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        flexWrap: 'wrap',
+    },
+    cardSubRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        flexWrap: 'wrap',
+    },
+    cardStatusPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        borderRadius: 999,
+        borderWidth: 1,
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+    },
+    cardStatusPillDot: {
+        width: 5,
+        height: 5,
+        borderRadius: 2.5,
+    },
+    cardStatusPillText: {
+        fontSize: 10,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+    },
+    cardEarningsCol: {
+        alignItems: 'flex-end',
+        gap: 5,
+        flexShrink: 0,
     },
     cardMainRow: {
         flexDirection: 'row',
@@ -1185,15 +1274,28 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(22,163,74,0.18)',
         borderRadius: 8,
         paddingHorizontal: 8,
-        paddingVertical: 3,
-        flexShrink: 0,
+        paddingVertical: 4,
         borderWidth: 1,
         borderColor: 'rgba(34,197,94,0.28)',
     },
     cardEarningsText: {
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: '800',
         color: '#22c55e',
+    },
+    cardSecondaryBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        borderRadius: 7,
+        borderWidth: 1,
+        paddingHorizontal: 7,
+        paddingVertical: 3,
+        backgroundColor: 'rgba(0,0,0,0.18)',
+    },
+    cardSecondaryBadgeText: {
+        fontSize: 11,
+        fontWeight: '700',
     },
     cardMidRow: {
         flexDirection: 'row',
@@ -1230,40 +1332,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
 
-    /* -- Status strip -- */
-    cardStatusStrip: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        borderTopLeftRadius: 16,
-        borderTopRightRadius: 16,
-        paddingHorizontal: 12,
-        paddingVertical: 7,
-        marginHorizontal: -10,
-        marginTop: -10,
-        marginBottom: 2,
-    },
-    cardStatusStripDot: {
-        width: 7,
-        height: 7,
-        borderRadius: 3.5,
-        backgroundColor: 'rgba(255,255,255,0.6)',
-    },
-    cardStatusStripText: {
-        fontSize: 11,
-        fontWeight: '800',
-        color: '#fff',
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-    },
-    cardStatusStripEta: {
-        fontSize: 11,
-        fontWeight: '600',
-        color: 'rgba(255,255,255,0.85)',
-        flex: 1,
-    },
-
-    /* -- Item chips -- */
+    /* -- Item chips (legacy, kept for ref) -- */
     cardItemsRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
@@ -1302,6 +1371,107 @@ const styles = StyleSheet.create({
     cardItemChipMoreText: {
         fontSize: 11,
         color: '#64748b',
+        fontWeight: '700',
+    },
+
+    /* -- Expandable items section -- */
+    cardItemsSection: {
+        borderRadius: 10,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
+        overflow: 'hidden',
+    },
+    cardItemsHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+    },
+    cardItemsHeaderText: {
+        fontSize: 12,
+        color: '#94a3b8',
+        fontWeight: '600',
+    },
+    cardItemsList: {
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255,255,255,0.07)',
+        gap: 0,
+    },
+    cardItemRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255,255,255,0.05)',
+    },
+    cardItemImage: {
+        width: 40,
+        height: 40,
+        borderRadius: 8,
+        flexShrink: 0,
+    },
+    cardItemImageFallback: {
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    cardItemInfo: {
+        flex: 1,
+        gap: 2,
+    },
+    cardItemName: {
+        fontSize: 13,
+        color: '#e2e8f0',
+        fontWeight: '600',
+    },
+    cardItemNotes: {
+        fontSize: 11,
+        color: '#64748b',
+        fontStyle: 'italic',
+    },
+    cardItemBadges: {
+        flexDirection: 'row',
+        gap: 5,
+    },
+    cardItemBadgeBiz: {
+        backgroundColor: 'rgba(239,68,68,0.12)',
+        borderRadius: 4,
+        paddingHorizontal: 5,
+        paddingVertical: 1,
+    },
+    cardItemBadgeBizText: {
+        fontSize: 10,
+        color: '#ef4444',
+        fontWeight: '700',
+    },
+    cardItemBadgeStock: {
+        backgroundColor: 'rgba(124,58,237,0.12)',
+        borderRadius: 4,
+        paddingHorizontal: 5,
+        paddingVertical: 1,
+    },
+    cardItemBadgeStockText: {
+        fontSize: 10,
+        color: '#a78bfa',
+        fontWeight: '700',
+    },
+
+    /* -- Financial banner -- */
+    cardFinanceBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        borderRadius: 8,
+        borderWidth: 1,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+    },
+    cardFinanceBannerText: {
+        fontSize: 13,
         fontWeight: '700',
     },
 

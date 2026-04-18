@@ -20,6 +20,7 @@ const businessUserAllowedPrefixes = [
     "/dashboard/orders",
     "/dashboard/categories",
     "/dashboard/products",
+    "/dashboard/business-settlements",
 ];
 
 function pathStartsWithAny(pathname: string, prefixes: string[]): boolean {

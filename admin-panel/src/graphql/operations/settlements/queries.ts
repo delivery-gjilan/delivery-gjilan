@@ -9,6 +9,7 @@ export const GET_SETTLEMENTS_PAGE = graphql(`
         $businessId: ID
         $orderId: ID
         $promotionId: ID
+        $category: String
         $startDate: Date
         $endDate: Date
         $limit: Int
@@ -22,6 +23,7 @@ export const GET_SETTLEMENTS_PAGE = graphql(`
             businessId: $businessId
             orderId: $orderId
             promotionId: $promotionId
+            category: $category
             startDate: $startDate
             endDate: $endDate
             limit: $limit
