@@ -193,4 +193,10 @@
     "notes_placeholder": "UdhÃ«zime opsionale pÃ«r shofer",
     "request_driver": "KÃ«rko Shofer"
   }
+,
+  "connection": {
+    "offline": "Offline: po lidhet përsëri...",
+    "reconnected": "Konektuar përsëri"
+  }
 }
+

@@ -193,4 +193,10 @@
     "notes_placeholder": "Optional instructions for the driver",
     "request_driver": "Request Driver"
   }
+,
+  "connection": {
+    "offline": "Offline: reconnecting...",
+    "reconnected": "Reconnected"
+  }
 }
+

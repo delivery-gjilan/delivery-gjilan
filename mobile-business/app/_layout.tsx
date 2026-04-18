@@ -13,6 +13,7 @@ import { View, ActivityIndicator } from 'react-native';
 import BusinessMessageBanner from '@/components/BusinessMessageBanner';
 import type { AlertType } from '@/components/BusinessMessageBanner';
 import StoreClosedOverlay from '@/components/StoreClosedOverlay';
+import { ConnectionStatusBadge } from '@/components/ConnectionStatusBadge';
 import { BUSINESS_MESSAGE_RECEIVED_SUB } from '@/graphql/messages';
 
 function AppContent() {
@@ -81,6 +82,7 @@ function AppContent() {
     return (
         <>
             <StatusBar style="light" />
+            <ConnectionStatusBadge isAuthenticated={isAuthenticated} />
             {incomingMessage && (
                 <BusinessMessageBanner
                     senderName="Admin"

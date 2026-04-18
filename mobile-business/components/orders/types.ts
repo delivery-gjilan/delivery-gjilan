@@ -116,7 +116,6 @@ export type ScreenState = {
     addTimeModal: { order: Order | null; amount: number; customTime: string };
     removeItemModal: { data: { orderId: string; itemId: string; itemName: string; itemQuantity: number } | null; reason: string; quantityToRemove: number };
     completedView: { show: boolean; page: number };
-    selectedOrder: Order | null;
 };
 
 export type ScreenAction =
@@ -142,5 +141,4 @@ export type ScreenAction =
     | { type: 'SET_REMOVE_ITEM_REASON'; reason: string }
     | { type: 'SET_REMOVE_ITEM_QUANTITY'; quantity: number }
     | { type: 'TOGGLE_COMPLETED' }
-    | { type: 'SET_COMPLETED_PAGE'; page: number }
-    | { type: 'SELECT_ORDER'; order: Order | null };
+    | { type: 'SET_COMPLETED_PAGE'; page: number };

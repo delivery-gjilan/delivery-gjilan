@@ -6,7 +6,7 @@ import { useTranslations } from '@/hooks/useTranslations';
 import type { DriverOrder } from '@/utils/types';
 
 const THUMB = 56;
-const TRACK_H = 62;
+const TRACK_H = 66;
 const PING_UNLOCK_S = 180;   // 3 min after I'm Here
 const CANCEL_UNLOCK_S = 600; // 10 min after arrival
 
@@ -146,119 +146,149 @@ export function DeliverySlider({
         }),
     ).current;
 
+    const bottomPad = insetBottom + 24;
+
     return (
-        <View style={[styles.panel, { paddingBottom: done || showCancelSheet ? insetBottom + 16 : 0 }]}>
+        <View style={styles.panel}>
             {!done && (
                 !showCancelSheet ? (
                     <>
                         <View style={styles.handle} />
 
-                        {/* Header */}
+                        {/* ── Header row ── */}
                         <View style={styles.header}>
-                            {onDismiss && (
-                                <Pressable style={styles.dismissBtn} onPress={onDismiss} hitSlop={10}>
-                                    <Ionicons name="close" size={18} color="#64748b" />
-                                </Pressable>
-                            )}
                             <View style={styles.iconRing}>
-                                <Ionicons name="checkmark-circle-outline" size={22} color="#22c55e" />
+                                <Ionicons name="location" size={20} color="#22c55e" />
                             </View>
                             <View style={{ flex: 1 }}>
                                 <Text style={styles.title}>{s.arrived_at_dropoff}</Text>
                                 <Text style={styles.sub} numberOfLines={1}>{customerName}</Text>
                             </View>
-                            {!!customerPhone && (
-                                <Pressable
-                                    style={styles.callBtn}
-                                    onPress={() => Linking.openURL(`tel:${customerPhone}`)}
-                                    hitSlop={8}
-                                >
-                                    <Ionicons name="call-outline" size={17} color="#22d3ee" />
+                            <Pressable
+                                style={[styles.callBtn, !customerPhone && { opacity: 0.3 }]}
+                                onPress={() => customerPhone && Linking.openURL(`tel:${customerPhone}`)}
+                                disabled={!customerPhone}
+                                hitSlop={8}
+                            >
+                                <Ionicons name="call" size={16} color="#22d3ee" />
+                            </Pressable>
+                            {onDismiss && (
+                                <Pressable style={styles.dismissBtn} onPress={onDismiss} hitSlop={10}>
+                                    <Ionicons name="close" size={18} color="#64748b" />
                                 </Pressable>
                             )}
-                            <Pressable
-                                style={[styles.notifBtn, arrivedNotifSent && styles.notifBtnSent]}
-                                disabled={arrivedNotifSent}
-                                onPress={onNotify}
-                            >
-                                <Ionicons
-                                    name={arrivedNotifSent ? 'checkmark-circle' : 'notifications-outline'}
-                                    size={16}
-                                    color={arrivedNotifSent ? '#22c55e' : '#f1f5f9'}
-                                />
-                                <Text style={[styles.notifText, arrivedNotifSent && { color: '#22c55e' }]}>
-                                    {arrivedNotifSent ? s.notified : s.im_here}
-                                </Text>
-                            </Pressable>
                         </View>
 
-                        <View style={styles.collectCard}>
-                            <Text style={styles.collectLabel}>Collect from customer</Text>
-                            <Text style={styles.collectAmount}>
-                                {customerPaymentAmount != null ? `€${customerPaymentAmount.toFixed(2)}` : 'Confirm amount'}
+                        {/* ── Notify customer pill ── */}
+                        <Pressable
+                            style={[styles.notifBtn, arrivedNotifSent && styles.notifBtnSent]}
+                            disabled={arrivedNotifSent}
+                            onPress={onNotify}
+                        >
+                            <Ionicons
+                                name={arrivedNotifSent ? 'checkmark-circle' : 'notifications'}
+                                size={17}
+                                color={arrivedNotifSent ? '#22c55e' : '#f1f5f9'}
+                            />
+                            <Text style={[styles.notifText, arrivedNotifSent && { color: '#22c55e' }]}>
+                                {arrivedNotifSent ? s.notified : s.im_here}
                             </Text>
-                        </View>
+                            {!arrivedNotifSent && (
+                                <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.3)" style={{ marginLeft: 'auto' }} />
+                            )}
+                        </Pressable>
 
-                        {!!order && (
-                            <View style={styles.itemsSection}>
-                                <ScrollView style={{ maxHeight: 120 }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+                        {/* ── Scrollable body ── */}
+                        <ScrollView
+                            style={styles.body}
+                            contentContainerStyle={{ gap: 12, paddingBottom: 4 }}
+                            showsVerticalScrollIndicator={false}
+                            nestedScrollEnabled
+                        >
+                            {/* Collect card */}
+                            <View style={styles.collectCard}>
+                                <View style={styles.collectLeft}>
+                                    <Ionicons name="cash" size={18} color="#4ade80" />
+                                    <Text style={styles.collectLabel}>Collect from customer</Text>
+                                </View>
+                                <Text style={styles.collectAmount}>
+                                    {customerPaymentAmount != null ? `€${customerPaymentAmount.toFixed(2)}` : '—'}
+                                </Text>
+                            </View>
+
+                            {/* Order breakdown */}
+                            {!!order && (
+                                <View style={styles.breakdownCard}>
+                                    <Text style={styles.breakdownHeader}>Order contents</Text>
                                     {breakdownItems.map((item) => (
                                         <View key={item.id} style={styles.itemRow}>
+                                            <View style={styles.itemQtyBadge}>
+                                                <Text style={styles.itemQtyText}>{item.quantity}×</Text>
+                                            </View>
                                             <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-                                            <Text style={styles.itemQty}>x{item.quantity}</Text>
                                         </View>
                                     ))}
-                                </ScrollView>
-                                <View style={styles.pricingRow}>
-                                    <Text style={styles.pricingLabel}>{s.subtotal}</Text>
-                                    <Text style={styles.pricingValue}>€{subtotal.toFixed(2)}</Text>
-                                </View>
-                                <View style={styles.pricingRow}>
-                                    <Text style={styles.pricingLabel}>{s.delivery_fee}</Text>
-                                    <Text style={styles.pricingValue}>€{deliveryFee.toFixed(2)}</Text>
-                                </View>
-                                <View style={[styles.pricingRow, styles.pricingTotal]}>
-                                    <Text style={styles.pricingTotalLabel}>{s.total}</Text>
-                                    <Text style={styles.pricingTotalValue}>€{orderTotal.toFixed(2)}</Text>
-                                </View>
-                            </View>
-                        )}
 
-                        {/* Action buttons */}
-                        <View style={styles.actionButtons}>
-                            {pingUnlocked && (
-                                <Pressable style={styles.pingAgainBtn} onPress={onPingAgain}>
-                                    <Ionicons name="radio-button-on" size={14} color="#06b6d4" />
-                                    <Text style={styles.pingAgainText}>{s.ping_again}</Text>
-                                    {pingRemaining > 0 && <Text style={styles.pingTimer}>{fmtTime(pingRemaining)}</Text>}
-                                </Pressable>
+                                    <View style={styles.pricingDivider} />
+
+                                    <View style={styles.pricingRow}>
+                                        <Text style={styles.pricingLabel}>{s.subtotal}</Text>
+                                        <Text style={styles.pricingValue}>€{subtotal.toFixed(2)}</Text>
+                                    </View>
+                                    <View style={styles.pricingRow}>
+                                        <Text style={styles.pricingLabel}>{s.delivery_fee}</Text>
+                                        <Text style={styles.pricingValue}>€{deliveryFee.toFixed(2)}</Text>
+                                    </View>
+                                    <View style={[styles.pricingRow, styles.pricingTotalRow]}>
+                                        <Text style={styles.pricingTotalLabel}>{s.total}</Text>
+                                        <Text style={styles.pricingTotalValue}>€{orderTotal.toFixed(2)}</Text>
+                                    </View>
+                                </View>
                             )}
-                            <Pressable
-                                style={[styles.cancelBtn, !cancelUnlocked && { opacity: 0.35 }]}
-                                disabled={!cancelUnlocked}
-                                onPress={() => setShowCancelSheet(true)}
-                            >
-                                <Ionicons name="close-outline" size={14} color="#f87171" />
-                                <Text style={styles.cancelBtnText}>{s.cancel_order}</Text>
-                                {cancelRemaining > 0 && <Text style={styles.cancelTimer}>{fmtTime(cancelRemaining)}</Text>}
-                            </Pressable>
-                        </View>
 
-                        {/* Delivery confirmation slider */}
-                        <View
-                            style={styles.track}
-                            onLayout={(e) => { trackWidth.current = e.nativeEvent.layout.width; }}
-                        >
-                            <Animated.View style={[styles.fill, { opacity: fillOpacity }]} />
-                            <Animated.Text style={[styles.trackLabel, { opacity: labelOpacity }]}>
-                                {s.slide_confirm}
-                            </Animated.Text>
-                            <Animated.View
-                                style={[styles.thumb, { transform: [{ translateX }] }]}
-                                {...deliveryPan.panHandlers}
+                            {/* Ping / cancel action row */}
+                            <View style={styles.actionRow}>
+                                <Pressable
+                                    style={[styles.actionBtn, styles.pingBtn, !pingUnlocked && { opacity: 0.38 }]}
+                                    disabled={!pingUnlocked}
+                                    onPress={onPingAgain}
+                                >
+                                    <Ionicons name="radio-button-on" size={15} color="#06b6d4" />
+                                    <Text style={[styles.actionBtnText, { color: '#06b6d4' }]}>
+                                        {pingUnlocked ? s.ping_again : fmtTime(pingRemaining)}
+                                    </Text>
+                                </Pressable>
+                                <Pressable
+                                    style={[styles.actionBtn, styles.cancelActionBtn, !cancelUnlocked && { opacity: 0.38 }]}
+                                    disabled={!cancelUnlocked}
+                                    onPress={() => setShowCancelSheet(true)}
+                                >
+                                    <Ionicons name="close-circle-outline" size={15} color="#f87171" />
+                                    <Text style={[styles.actionBtnText, { color: '#f87171' }]}>
+                                        {cancelUnlocked ? s.cancel_order : fmtTime(cancelRemaining)}
+                                    </Text>
+                                </Pressable>
+                            </View>
+                        </ScrollView>
+
+                        {/* ── Confirmation slider (pinned above home indicator) ── */}
+                        <View style={[styles.sliderWrapper, { paddingBottom: bottomPad }]}>
+                            <Text style={styles.sliderHint}>Slide to confirm delivery</Text>
+                            <View
+                                style={styles.track}
+                                onLayout={(e) => { trackWidth.current = e.nativeEvent.layout.width; }}
                             >
-                                <Ionicons name="checkmark" size={26} color="#fff" />
-                            </Animated.View>
+                                <Animated.View style={[styles.fill, { opacity: fillOpacity }]} />
+                                <Animated.Text style={[styles.trackLabel, { opacity: labelOpacity }]}>
+                                    {s.slide_confirm}
+                                </Animated.Text>
+                                <Animated.View
+                                    style={[styles.thumb, { transform: [{ translateX }] }]}
+                                    {...deliveryPan.panHandlers}
+                                >
+                                    <Ionicons name="checkmark" size={26} color="#fff" />
+                                </Animated.View>
+                            </View>
                         </View>
                     </>
                 ) : (
@@ -288,20 +318,22 @@ export function DeliverySlider({
                             ))}
                         </View>
 
-                        <View
-                            style={[styles.track, styles.cancelTrack, !selectedReason && { opacity: 0.35 }]}
-                            onLayout={(e) => { cancelTrackWidth.current = e.nativeEvent.layout.width; }}
-                        >
-                            <Animated.View style={[styles.fill, styles.cancelFill, { opacity: cancelFillOpacity }]} />
-                            <Animated.Text style={[styles.trackLabel, { opacity: cancelLabelOpacity }]}>
-                                {selectedReason ? s.slide_cancel : s.select_reason_first}
-                            </Animated.Text>
-                            <Animated.View
-                                style={[styles.thumb, styles.cancelThumb, { transform: [{ translateX: cancelTranslateX }] }]}
-                                {...(selectedReason ? cancelPan.panHandlers : {})}
+                        <View style={{ paddingBottom: bottomPad }}>
+                            <View
+                                style={[styles.track, styles.cancelTrack, !selectedReason && { opacity: 0.35 }]}
+                                onLayout={(e) => { cancelTrackWidth.current = e.nativeEvent.layout.width; }}
                             >
-                                <Ionicons name="close" size={22} color="#fff" />
-                            </Animated.View>
+                                <Animated.View style={[styles.fill, styles.cancelFill, { opacity: cancelFillOpacity }]} />
+                                <Animated.Text style={[styles.trackLabel, { opacity: cancelLabelOpacity }]}>
+                                    {selectedReason ? s.slide_cancel : s.select_reason_first}
+                                </Animated.Text>
+                                <Animated.View
+                                    style={[styles.thumb, styles.cancelThumb, { transform: [{ translateX: cancelTranslateX }] }]}
+                                    {...(selectedReason ? cancelPan.panHandlers : {})}
+                                >
+                                    <Ionicons name="close" size={22} color="#fff" />
+                                </Animated.View>
+                            </View>
                         </View>
                     </>
                 )
@@ -317,14 +349,15 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         backgroundColor: '#0a0f1a',
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
+        borderTopLeftRadius: 26,
+        borderTopRightRadius: 26,
         paddingHorizontal: 20,
         paddingTop: 10,
+        maxHeight: '82%',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: -6 },
-        shadowOpacity: 0.5,
-        shadowRadius: 16,
+        shadowOffset: { width: 0, height: -8 },
+        shadowOpacity: 0.55,
+        shadowRadius: 20,
         elevation: 24,
         zIndex: 120,
     },
@@ -334,28 +367,21 @@ const styles = StyleSheet.create({
         borderRadius: 2,
         backgroundColor: 'rgba(255,255,255,0.12)',
         alignSelf: 'center',
-        marginBottom: 14,
-    },
-    dismissBtn: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
-        backgroundColor: 'rgba(255,255,255,0.06)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 4,
+        marginBottom: 16,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 10,
-        marginBottom: 18,
+        marginBottom: 14,
     },
     iconRing: {
         width: 42,
         height: 42,
         borderRadius: 21,
         backgroundColor: 'rgba(34,197,94,0.12)',
+        borderWidth: 1,
+        borderColor: 'rgba(34,197,94,0.25)',
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -369,16 +395,35 @@ const styles = StyleSheet.create({
         fontSize: 12,
         marginTop: 1,
     },
+    callBtn: {
+        width: 38,
+        height: 38,
+        borderRadius: 12,
+        backgroundColor: 'rgba(34,211,238,0.08)',
+        borderWidth: 1,
+        borderColor: 'rgba(34,211,238,0.22)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    dismissBtn: {
+        width: 32,
+        height: 32,
+        borderRadius: 10,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     notifBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 5,
-        paddingHorizontal: 10,
-        paddingVertical: 7,
-        borderRadius: 10,
-        backgroundColor: 'rgba(255,255,255,0.07)',
+        gap: 8,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderRadius: 14,
+        backgroundColor: 'rgba(255,255,255,0.06)',
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.1)',
+        marginBottom: 14,
     },
     notifBtnSent: {
         borderColor: 'rgba(34,197,94,0.3)',
@@ -386,31 +431,28 @@ const styles = StyleSheet.create({
     },
     notifText: {
         color: '#f1f5f9',
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: '700',
+        flex: 1,
     },
-    callBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
-        backgroundColor: 'rgba(34,211,238,0.08)',
-        borderWidth: 1,
-        borderColor: 'rgba(34,211,238,0.2)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 6,
+    body: {
+        flexShrink: 1,
     },
     collectCard: {
-        backgroundColor: 'rgba(16,185,129,0.1)',
-        borderRadius: 12,
+        backgroundColor: 'rgba(74,222,128,0.09)',
+        borderRadius: 16,
         borderWidth: 1,
-        borderColor: 'rgba(16,185,129,0.32)',
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        marginBottom: 12,
+        borderColor: 'rgba(74,222,128,0.25)',
+        paddingHorizontal: 16,
+        paddingVertical: 14,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+    },
+    collectLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
     },
     collectLabel: {
         color: '#86efac',
@@ -418,120 +460,125 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     collectAmount: {
-        color: '#22c55e',
-        fontSize: 22,
+        color: '#4ade80',
+        fontSize: 26,
         fontWeight: '900',
-        letterSpacing: -0.4,
-    },    actionButtons: {
-        flexDirection: 'row',
-        gap: 10,
-        marginBottom: 16,
+        letterSpacing: -0.5,
     },
-    pingAgainBtn: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 6,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 8,
-        backgroundColor: 'rgba(6,182,212,0.12)',
-        borderWidth: 1,
-        borderColor: 'rgba(6,182,212,0.2)',
-    },
-    pingAgainText: {
-        color: '#06b6d4',
-        fontSize: 12,
-        fontWeight: '600',
-    },
-    pingTimer: {
-        color: 'rgba(6,182,212,0.6)',
-        fontSize: 10,
-        fontWeight: '600',
-    },
-    cancelBtn: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 6,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 8,
-        backgroundColor: 'rgba(248,113,113,0.12)',
-        borderWidth: 1,
-        borderColor: 'rgba(248,113,113,0.2)',
-    },
-    cancelBtnText: {
-        color: '#f87171',
-        fontSize: 12,
-        fontWeight: '600',
-    },
-    cancelTimer: {
-        color: 'rgba(248,113,113,0.6)',
-        fontSize: 10,
-        fontWeight: '600',
-    },
-    itemsSection: {
-        marginBottom: 12,
+    breakdownCard: {
         backgroundColor: 'rgba(255,255,255,0.03)',
-        borderRadius: 12,
-        padding: 10,
+        borderRadius: 16,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(255,255,255,0.07)',
+        paddingHorizontal: 14,
+        paddingTop: 12,
+        paddingBottom: 14,
+        gap: 8,
+    },
+    breakdownHeader: {
+        color: '#475569',
+        fontSize: 11,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: 0.8,
+        marginBottom: 2,
     },
     itemRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 3,
+        gap: 10,
+    },
+    itemQtyBadge: {
+        width: 28,
+        height: 22,
+        borderRadius: 6,
+        backgroundColor: 'rgba(255,255,255,0.07)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    itemQtyText: {
+        color: '#64748b',
+        fontSize: 11,
+        fontWeight: '700',
     },
     itemName: {
         color: '#94a3b8',
-        fontSize: 12,
+        fontSize: 13,
         flex: 1,
     },
-    itemQty: {
-        color: '#475569',
-        fontSize: 12,
-        fontWeight: '600',
-        marginLeft: 8,
+    pricingDivider: {
+        height: StyleSheet.hairlineWidth,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        marginTop: 4,
     },
     pricingRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingTop: 5,
-        marginTop: 4,
-        borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: 'rgba(255,255,255,0.06)',
     },
     pricingLabel: {
         color: '#475569',
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: '600',
     },
     pricingValue: {
-        color: '#94a3b8',
-        fontSize: 11,
+        color: '#64748b',
+        fontSize: 12,
         fontWeight: '700',
     },
-    pricingTotal: {
-        borderTopColor: 'rgba(255,255,255,0.1)',
-        borderTopWidth: 1,
+    pricingTotalRow: {
         marginTop: 6,
-        paddingTop: 6,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255,255,255,0.1)',
     },
     pricingTotalLabel: {
         color: '#f1f5f9',
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: '800',
     },
     pricingTotalValue: {
-        color: '#22d3ee',
-        fontSize: 14,
+        color: '#ffffff',
+        fontSize: 16,
         fontWeight: '900',
+    },
+    actionRow: {
+        flexDirection: 'row',
+        gap: 10,
+    },
+    actionBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        borderRadius: 12,
+        borderWidth: 1,
+    },
+    pingBtn: {
+        backgroundColor: 'rgba(6,182,212,0.1)',
+        borderColor: 'rgba(6,182,212,0.22)',
+    },
+    cancelActionBtn: {
+        backgroundColor: 'rgba(248,113,113,0.1)',
+        borderColor: 'rgba(248,113,113,0.22)',
+    },
+    actionBtnText: {
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    sliderWrapper: {
+        paddingTop: 16,
+        gap: 8,
+    },
+    sliderHint: {
+        color: 'rgba(255,255,255,0.22)',
+        fontSize: 11,
+        fontWeight: '600',
+        textAlign: 'center',
+        letterSpacing: 0.3,
     },
     track: {
         height: TRACK_H,
@@ -556,7 +603,7 @@ const styles = StyleSheet.create({
     },
     thumb: {
         position: 'absolute',
-        left: 3,
+        left: 5,
         width: THUMB,
         height: THUMB,
         borderRadius: THUMB / 2,
@@ -565,45 +612,9 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         shadowColor: '#22c55e',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.5,
-        shadowRadius: 10,
+        shadowOpacity: 0.55,
+        shadowRadius: 12,
         elevation: 10,
-    },
-    troubleRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        marginTop: 12,
-        paddingBottom: 16,
-    },
-    troubleLabel: {
-        color: '#475569',
-        fontSize: 11,
-        fontWeight: '600',
-        flex: 1,
-    },
-    troubleBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        paddingHorizontal: 9,
-        paddingVertical: 6,
-        borderRadius: 8,
-        backgroundColor: 'rgba(245,158,11,0.08)',
-        borderWidth: 1,
-        borderColor: 'rgba(245,158,11,0.2)',
-    },
-    troubleBtnCancel: {
-        backgroundColor: 'rgba(239,68,68,0.08)',
-        borderColor: 'rgba(239,68,68,0.2)',
-    },
-    troubleBtnLocked: {
-        backgroundColor: 'rgba(255,255,255,0.04)',
-        borderColor: 'rgba(255,255,255,0.06)',
-    },
-    troubleBtnText: {
-        fontSize: 11,
-        fontWeight: '700',
     },
     cancelHeader: {
         flexDirection: 'row',
@@ -619,20 +630,20 @@ const styles = StyleSheet.create({
     cancelSubtitle: {
         color: '#64748b',
         fontSize: 12,
-        marginBottom: 12,
+        marginBottom: 14,
         textAlign: 'center',
     },
     reasonList: {
         gap: 6,
-        marginBottom: 16,
+        marginBottom: 18,
     },
     reasonRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 10,
-        paddingVertical: 10,
+        paddingVertical: 11,
         paddingHorizontal: 14,
-        borderRadius: 12,
+        borderRadius: 13,
         backgroundColor: 'rgba(255,255,255,0.04)',
         borderWidth: 1,
         borderColor: 'transparent',
@@ -669,3 +680,4 @@ const styles = StyleSheet.create({
         shadowColor: '#ef4444',
     },
 });
+

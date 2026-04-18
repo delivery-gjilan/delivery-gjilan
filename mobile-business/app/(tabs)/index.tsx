@@ -36,7 +36,6 @@ import {
 } from '@/components/orders/types';
 import { StatusRail } from '@/components/orders/StatusRail';
 import { OrderCard } from '@/components/orders/OrderCard';
-import { OrderDetailPanel } from '@/components/orders/OrderDetailPanel';
 import { EtaModal } from '@/components/orders/EtaModal';
 import { StoreCloseModal } from '@/components/orders/StoreCloseModal';
 import { PrepTimeModal } from '@/components/orders/PrepTimeModal';
@@ -79,7 +78,6 @@ const initialScreenState: ScreenState = {
     addTimeModal: { order: null, amount: 10, customTime: '' },
     removeItemModal: { data: null, reason: '', quantityToRemove: 1 },
     completedView: { show: false, page: 0 },
-    selectedOrder: null,
 };
 
 function screenReducer(state: ScreenState, action: ScreenAction): ScreenState {
@@ -130,8 +128,6 @@ function screenReducer(state: ScreenState, action: ScreenAction): ScreenState {
             return { ...state, completedView: { show: !state.completedView.show, page: !state.completedView.show ? 0 : state.completedView.page } };
         case 'SET_COMPLETED_PAGE':
             return { ...state, completedView: { ...state.completedView, page: action.page } };
-        case 'SELECT_ORDER':
-            return { ...state, selectedOrder: action.order };
         default:
             return state;
     }
@@ -158,7 +154,6 @@ export default function OrdersScreen() {
         addTimeModal,
         removeItemModal: removeItemModalState,
         completedView,
-        selectedOrder,
     } = screenState;
 
     const { width } = useWindowDimensions();
@@ -398,17 +393,7 @@ export default function OrdersScreen() {
         return () => clearInterval(interval);
     }, [hasPendingOrders, playTwoPeriods]);
 
-    // ── Sync selectedOrder with live data ──
-    useEffect(() => {
-        if (!selectedOrder) return;
-        const updated = sortedOrders.find((o) => o.id === selectedOrder.id);
-        if (updated) {
-            dispatch({ type: 'SELECT_ORDER', order: updated });
-        } else {
-            // Order left active list (completed/cancelled)
-            dispatch({ type: 'SELECT_ORDER', order: null });
-        }
-    }, [sortedOrders]);
+
 
     // ── Tap handlers ──
     const handleCardPress = useCallback((order: Order) => {
@@ -434,14 +419,13 @@ export default function OrdersScreen() {
             lastTapRef.current[order.id] = 0;
         } else {
             lastTapRef.current[order.id] = now;
-            // Single tap — open detail panel
-            singleTapTimerRef.current = setTimeout(() => {
-                singleTapTimerRef.current = null;
-                dispatch({ type: 'SELECT_ORDER', order });
-                if (isMarket && !isTablet) {
+            // Single tap — open product modal (market only)
+            if (isMarket && !isTablet) {
+                singleTapTimerRef.current = setTimeout(() => {
+                    singleTapTimerRef.current = null;
                     dispatch({ type: 'OPEN_PRODUCT_MODAL', order });
-                }
-            }, 420);
+                }, 420);
+            }
         }
     }, [isMarket, isTablet]);
 
@@ -499,7 +483,6 @@ export default function OrdersScreen() {
                         try {
                             await updateStatus({ variables: { id: orderId, status: GqlOrderStatus.Cancelled } });
                             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-                            dispatch({ type: 'SELECT_ORDER', order: null });
                             refetch();
                         } catch (error: unknown) {
                             Alert.alert(t('common.error', 'Error'), error instanceof Error ? error.message : 'Failed');
@@ -643,7 +626,7 @@ export default function OrdersScreen() {
                                 isTablet={isTablet}
                                 isMarket={isMarket}
                                 tick={tick}
-                                isSelected={selectedOrder?.id === order.id}
+                                isSelected={false}
                                 isExpanded={expandedOrderIds.has(order.id)}
                                 onPress={() => handleCardPress(order)}
                                 onDoubleTap={() => {}}
@@ -745,23 +728,7 @@ export default function OrdersScreen() {
                     />
                 )}
 
-                {/* Detail panel (tablet: persistent sidebar; phone: bottom-sheet modal) */}
-                <OrderDetailPanel
-                    order={selectedOrder}
-                    businessId={businessId}
-                    isTablet={isTablet}
-                    isMarket={isMarket}
-                    tick={tick}
-                    onClose={() => dispatch({ type: 'SELECT_ORDER', order: null })}
-                    onAccept={handleAcceptTap}
-                    onMarkReady={handleMarkReady}
-                    onReject={handleRejectOrder}
-                    onAddTime={(order) => {
-                        dispatch({ type: 'OPEN_ADD_TIME_MODAL', order });
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    }}
-                    onRemoveItem={(data) => dispatch({ type: 'OPEN_REMOVE_ITEM_MODAL', data })}
-                />
+
             </View>
 
             {/* ── Modals ── */}

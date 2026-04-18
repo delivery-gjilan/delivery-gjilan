@@ -16,6 +16,8 @@ import DriverMessageBanner from '@/components/DriverMessageBanner';
 import type { AlertType } from '@/components/DriverMessageBanner';
 import { OrderAcceptSheet } from '@/components/OrderAcceptSheet';
 import { OrderPoolSheet } from '@/components/OrderPoolSheet';
+import { NewOrderAssignedModal } from '@/components/NewOrderAssignedModal';
+import type { DriverOrder } from '@/utils/types';
 
 interface IncomingMessage {
     id: string;
@@ -67,6 +69,21 @@ export function AppOverlays() {
 
     const [poolOpen, setPoolOpen] = useState(false);
     const poolPulse = useRef(new Animated.Value(1)).current;
+
+    // Track newly admin-assigned orders while driver already has active orders.
+    const [newlyAssignedOrder, setNewlyAssignedOrder] = useState<DriverOrder | null>(null);
+    const prevAssignedIdsRef = useRef<Set<string>>(new Set());
+    useEffect(() => {
+        const prevIds = prevAssignedIdsRef.current;
+        const newOrders = assignedOrders.filter((o) => !prevIds.has(o.id));
+        // Only show modal when driver already had active orders (not on first load)
+        if (prevIds.size > 0 && newOrders.length > 0) {
+            // Prefer DIRECT_DISPATCH channel — that's admin-assigned
+            const adminAssigned = newOrders.find((o) => o.channel === 'DIRECT_DISPATCH') ?? newOrders[0];
+            setNewlyAssignedOrder(adminAssigned);
+        }
+        prevAssignedIdsRef.current = new Set(assignedOrders.map((o) => o.id));
+    }, [assignedOrders]);
 
     useEffect(() => {
         if (!showPoolFab) return;
@@ -334,6 +351,14 @@ export function AppOverlays() {
                         handleAcceptAndNavigate(order.id);
                     }}
                     onClose={() => setPoolOpen(false)}
+                />
+            )}
+
+            {/* New order assigned modal (admin direct dispatch while driver is busy) */}
+            {isAuthenticated && newlyAssignedOrder && (
+                <NewOrderAssignedModal
+                    order={newlyAssignedOrder}
+                    onDismiss={() => setNewlyAssignedOrder(null)}
                 />
             )}
         </>

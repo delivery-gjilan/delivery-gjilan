@@ -266,6 +266,8 @@ export function notifyDriverOrderAssigned(
             },
         },
         data: { orderId, screen: 'order-detail', type: 'ORDER_ASSIGNED' },
+        timeSensitive: true,
+        relevanceScore: 1.0,
     };
 
     notificationService

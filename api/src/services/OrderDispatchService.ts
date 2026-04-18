@@ -15,7 +15,7 @@
  *      and remove the Redis state so the expansion never fires.
  */
 
-import { eq } from 'drizzle-orm';
+import { eq, notInArray } from 'drizzle-orm';
 import type { DbType } from '@/database';
 import {
     businesses as businessesTable,
@@ -272,14 +272,20 @@ export class OrderDispatchService {
                 return;
             }
 
-            // 3. Sort connected drivers by straight-line distance from the pickup point.
+            // 3. Sort connected drivers by: (primary) distance, (secondary) fewest active orders.
+            //    Fetching active order counts in a single batch query avoids N+1.
+            const activeOrderCounts = await this._getActiveOrderCounts(connected.map((d) => d.userId));
             const sorted = connected
                 .map((d) => ({
                     userId: d.userId,
                     vehicleType: d.vehicleType,
                     distanceKm: haversineKm(d.driverLat!, d.driverLng!, pickup.lat, pickup.lng),
+                    activeOrders: activeOrderCounts.get(d.userId) ?? 0,
                 }))
-                .sort((a, b) => a.distanceKm - b.distanceKm);
+                .sort((a, b) => {
+                    if (a.distanceKm !== b.distanceKm) return a.distanceKm - b.distanceKm;
+                    return a.activeOrders - b.activeOrders;
+                });
 
             // 4. Build the first wave: closest connected drivers + all push-only (offline-online) drivers.
             const inRadius = sorted.filter((d) => d.distanceKm <= FIRST_WAVE_RADIUS_KM);
@@ -577,6 +583,31 @@ export class OrderDispatchService {
         }
 
         return new Set(filtered);
+    }
+
+    /**
+     * Batch-fetch active order counts for a list of driver user IDs.
+     * Returns a Map<userId, count>. Drivers not in the map have 0 active orders.
+     */
+    private async _getActiveOrderCounts(driverUserIds: string[]): Promise<Map<string, number>> {
+        const counts = new Map<string, number>();
+        if (driverUserIds.length === 0) return counts;
+        try {
+            const rows = await this.db
+                .select({ userId: ordersTable.userId })
+                .from(ordersTable)
+                .where(
+                    notInArray(ordersTable.status, ['DELIVERED', 'CANCELLED'] as const),
+                );
+            for (const row of rows) {
+                if (row.userId && driverUserIds.includes(row.userId)) {
+                    counts.set(row.userId, (counts.get(row.userId) ?? 0) + 1);
+                }
+            }
+        } catch (err) {
+            log.warn({ err }, 'dispatch:activeOrderCounts:error — falling back to 0 for all');
+        }
+        return counts;
     }
 
     /** Fetch the lat/lng + name of the first business attached to this order. */

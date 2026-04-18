@@ -85,6 +85,7 @@ export default function NavigationScreen() {
     const etaNotificationSentRef = useRef<Set<string>>(new Set());
     const [markingPickedUpIds, setMarkingPickedUpIds] = useState<Set<string>>(new Set());
     const [cardItemsOpen, setCardItemsOpen] = useState<Set<string>>(new Set());
+    const [showCardPickupSlider, setShowCardPickupSlider] = useState(false);
     const [nowTs, setNowTs] = useState(() => Date.now());
     useEffect(() => {
         const id = setInterval(() => setNowTs(Date.now()), 10_000);
@@ -480,20 +481,34 @@ export default function NavigationScreen() {
                 >
                     <Ionicons name="locate" size={22} color="#4285F4" />
                 </Pressable>
-                {/* DEV: mock arrival */}
-                <Pressable
-                    style={[styles.mapBtn, { borderWidth: 1, borderColor: '#f59e0b' }]}
-                    onPress={handleFinalDestinationArrival}
-                >
-                    <Text style={{ color: '#f59e0b', fontSize: 10, fontWeight: '800' }}>ARR</Text>
-                </Pressable>
-                {/* DEV: mock pickup arrival */}
-                <Pressable
-                    style={[styles.mapBtn, { borderWidth: 1, borderColor: '#3b82f6' }]}
-                    onPress={handleWaypointArrival}
-                >
-                    <Text style={{ color: '#3b82f6', fontSize: 10, fontWeight: '800' }}>PKP</Text>
-                </Pressable>
+                {/* Simulate arrival at pickup — only relevant when order is READY */}
+                {order && (() => {
+                    const liveOrder = assignedOrders.find(o => o.id === order.id);
+                    const isReady = liveOrder?.status === 'READY';
+                    const isOFD = liveOrder?.status === 'OUT_FOR_DELIVERY';
+                    return (
+                        <>
+                            {isReady && (
+                                <Pressable
+                                    style={styles.devBtn}
+                                    onPress={handleWaypointArrival}
+                                >
+                                    <Ionicons name="bag-handle" size={16} color="#3b82f6" />
+                                    <Text style={[styles.devBtnText, { color: '#3b82f6' }]}>Pickup</Text>
+                                </Pressable>
+                            )}
+                            {isOFD && (
+                                <Pressable
+                                    style={[styles.devBtn, { borderColor: 'rgba(245,158,11,0.4)' }]}
+                                    onPress={handleFinalDestinationArrival}
+                                >
+                                    <Ionicons name="location" size={16} color="#f59e0b" />
+                                    <Text style={[styles.devBtnText, { color: '#f59e0b' }]}>Arrived</Text>
+                                </Pressable>
+                            )}
+                        </>
+                    );
+                })()}
             </View>
 
             {/* â•â•â• Driver message banner â•â•â• */}
@@ -646,21 +661,15 @@ export default function NavigationScreen() {
                                 </View>
                             )}
 
-                            {/* CTA */}
+                            {/* CTA: picked up / arrived */}
                             {cardIsReady && (
                                 <Pressable
-                                    style={[styles.cardCta, { backgroundColor: '#16a34a' }]}
-                                    onPress={() => handleMarkPickedUp(displayOrder.id)}
-                                    disabled={cardIsPickingUp}
+                                    style={styles.cardPickupBtn}
+                                    onPress={() => setShowCardPickupSlider(true)}
                                 >
-                                    {cardIsPickingUp ? (
-                                        <ActivityIndicator size={16} color="#fff" />
-                                    ) : (
-                                        <>
-                                            <Ionicons name="checkmark-circle" size={18} color="#fff" />
-                                            <Text style={styles.cardCtaText}>{t.drive.arrived}</Text>
-                                        </>
-                                    )}
+                                    <Ionicons name="bag-check" size={22} color="#fff" />
+                                    <Text style={styles.cardPickupBtnText}>Picked up the food</Text>
+                                    <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.5)" style={{ marginLeft: 'auto' }} />
                                 </Pressable>
                             )}
                         </View>
@@ -684,7 +693,36 @@ export default function NavigationScreen() {
                 </View>
             )}
 
-            {/* â•â•â• Pickup arrival panel â•â•â• */}
+                        {/* Card-triggered pickup slider */}
+            {showCardPickupSlider && (() => {
+                const liveOrder = assignedOrders.find((o) => o.id === order?.id);
+                const pickupPrepMins = (() => {
+                    if (liveOrder?.status !== 'PREPARING' || !liveOrder?.estimatedReadyAt) return null;
+                    const diff = Math.ceil((new Date(liveOrder.estimatedReadyAt).getTime() - nowTs) / 60_000);
+                    return diff > 0 ? diff : 0;
+                })();
+                return (
+                    <PickupSlider
+                        businessName={order?.businessName ?? ''}
+                        etaMins={null}
+                        prepMinsLeft={pickupPrepMins}
+                        disabled={liveOrder?.status === 'PREPARING'}
+                        insetBottom={insets.bottom}
+                        onConfirm={async () => {
+                            try {
+                                await updateOrderStatus({ variables: { id: order?.id, status: 'OUT_FOR_DELIVERY' } });
+                            } catch {
+                                Alert.alert(t.common.error, t.navigation.status_update_failed);
+                            }
+                            advanceToDropoff();
+                            setShowCardPickupSlider(false);
+                        }}
+                        onCancel={() => setShowCardPickupSlider(false)}
+                    />
+                );
+            })()}
+
+{/* â•â•â• Pickup arrival panel â•â•â• */}
             {showPickupPanel && (() => {
                 // durationRemainingS is ~0 at waypoint arrival (we just arrived at pickup).
                 // The dropoff ETA will come from the nav SDK once the next leg loads — pass null for now.
@@ -851,43 +889,41 @@ export default function NavigationScreen() {
                     onSuccessAnimStart={() => {
                         resetSuccessAnimation();
                         successAnimationActiveRef.current = true;
-                        // Dim the map behind everything
-                        Animated.timing(mapDimOpacity, { toValue: 1, duration: 350, useNativeDriver: true }).start();
+                        // Lightly dim the map
+                        Animated.timing(mapDimOpacity, { toValue: 0.45, duration: 220, useNativeDriver: true }).start();
 
-                        // Spring the success card up from the panel area to screen centre
                         const fo2 = assignedOrders.find((o) => o.id === order?.id);
                         setSuccessCardPrice(getDriverTakeHome(fo2));
                         successCardStartTimerRef.current = setTimeout(() => {
                             if (!successAnimationActiveRef.current) return;
-                            successCardY.setValue(320);
+                            successCardY.setValue(200);
                             successCardHoverY.setValue(0);
-                            successCardScale.setValue(0.72);
+                            successCardScale.setValue(0.85);
                             successCardOpacity.setValue(0);
                             setShowSuccessCard(true);
                             Animated.parallel([
-                                Animated.timing(successCardOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
-                                Animated.spring(successCardY,       { toValue: 0, tension: 46, friction: 8, useNativeDriver: true }),
-                                Animated.spring(successCardScale,   { toValue: 1, tension: 50, friction: 7, useNativeDriver: true }),
+                                Animated.timing(successCardOpacity, { toValue: 1, duration: 150, useNativeDriver: true }),
+                                Animated.spring(successCardY,       { toValue: 0, tension: 70, friction: 10, useNativeDriver: true }),
+                                Animated.spring(successCardScale,   { toValue: 1, tension: 70, friction: 9, useNativeDriver: true }),
                             ]).start(() => {
-                                // Hover loop on its own value â€” never touches successCardY so no reset flicker
                                 Animated.loop(
                                     Animated.sequence([
-                                        Animated.timing(successCardHoverY, { toValue: -14, duration: 700, useNativeDriver: true }),
-                                        Animated.timing(successCardHoverY, { toValue: 0,   duration: 700, useNativeDriver: true }),
+                                        Animated.timing(successCardHoverY, { toValue: -8, duration: 500, useNativeDriver: true }),
+                                        Animated.timing(successCardHoverY, { toValue: 0,  duration: 500, useNativeDriver: true }),
                                     ]),
                                 ).start();
                             });
-                            // Confetti burst (staggered, JS driver)
-                            confettiData.forEach((p, i) => {
+                            // Lighter confetti — half the particles, shorter duration
+                            confettiData.slice(0, Math.ceil(confettiData.length * 0.5)).forEach((p, i) => {
                                 p.anim.setValue(0);
                                 const confettiTimer = setTimeout(() => {
                                     if (!successAnimationActiveRef.current) return;
-                                    Animated.timing(p.anim, { toValue: 1, duration: 1200 + i * 10, useNativeDriver: false }).start();
-                                }, i * 18);
+                                    Animated.timing(p.anim, { toValue: 1, duration: 700 + i * 8, useNativeDriver: false }).start();
+                                }, i * 12);
                                 confettiTimerRefs.current.push(confettiTimer);
                             });
                             successCardStartTimerRef.current = null;
-                        }, 280);
+                        }, 150);
                     }}
                     onCancel={async (reason) => {
                         try {
@@ -1176,6 +1212,23 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '700',
     },
+    cardPickupBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        backgroundColor: 'rgba(22,163,74,0.18)',
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(34,197,94,0.35)',
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+    },
+    cardPickupBtnText: {
+        color: '#4ade80',
+        fontSize: 16,
+        fontWeight: '800',
+        flex: 1,
+    },
     navView: {
         flex: 1,
     },
@@ -1344,6 +1397,26 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.18,
         shadowRadius: 6,
         elevation: 5,
+    },
+    devBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: 'rgba(15,23,42,0.92)',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(59,130,246,0.4)',
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 6,
+        elevation: 5,
+    },
+    devBtnText: {
+        fontSize: 12,
+        fontWeight: '700',
     },
 
     bottomBar: {
