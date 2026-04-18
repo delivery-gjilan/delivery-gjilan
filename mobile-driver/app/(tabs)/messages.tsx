@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
-import { useApolloClient } from '@apollo/client';
 import {
     View,
     Text,
@@ -30,7 +29,7 @@ function mergeMessagesById(messages: DriverMessage[]): DriverMessage[] {
 }
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useMutation, useQuery, useSubscription } from '@apollo/client/react';
+import { useApolloClient, useMutation, useQuery, useSubscription } from '@apollo/client/react';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslations } from '@/hooks/useTranslations';
@@ -132,19 +131,23 @@ export default function MessagesScreen() {
     }, []);
 
     const syncMessagesToCache = useCallback((incomingMessages: DriverMessage[]) => {
-        apolloClient.cache.updateQuery<{ myDriverMessages: DriverMessage[] }>(
-            { query: MY_DRIVER_MESSAGES, variables: { limit: 100 } },
-            (existing) => {
-                const merged = mergeMessagesById([
-                    ...(existing?.myDriverMessages ?? []),
-                    ...incomingMessages,
-                ]);
+        try {
+            apolloClient.cache.updateQuery<{ myDriverMessages: DriverMessage[] }>(
+                { query: MY_DRIVER_MESSAGES, variables: { limit: 100 } },
+                (existing) => {
+                    const merged = mergeMessagesById([
+                        ...(existing?.myDriverMessages ?? []),
+                        ...incomingMessages,
+                    ]);
 
-                return {
-                    myDriverMessages: merged.slice(-100),
-                };
-            },
-        );
+                    return {
+                        myDriverMessages: merged.slice(-100),
+                    };
+                },
+            );
+        } catch {
+            // Keep chat usable even if cache entry is temporarily unavailable.
+        }
     }, [apolloClient]);
 
     // Load persisted clear timestamp and persisted extra messages

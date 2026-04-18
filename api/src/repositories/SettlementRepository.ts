@@ -477,12 +477,18 @@ export class SettlementRepository {
                     or(isNull(settlements.reason), not(like(settlements.reason, 'Driver tip%'))),
                     or(isNull(settlements.reason), not(like(settlements.reason, 'Catalog product%'))),
                     or(isNull(settlements.reason), not(like(settlements.reason, 'Direct call fixed payment%'))),
+                    or(isNull(settlements.reason), not(like(settlements.reason, 'Driver delivery commission%'))),
+                    or(isNull(settlements.reason), not(like(settlements.reason, 'Driver commission (%'))),
                 );
             case 'PROMOTION_COST':
                 // Has a rule that has a promotionId
                 return sql`${settlements.ruleId} IN (SELECT ${settlementRules.id} FROM ${settlementRules} WHERE ${settlementRules.promotionId} IS NOT NULL)`;
             case 'DELIVERY_COMMISSION':
-                return sql`${settlements.ruleId} IN (SELECT ${settlementRules.id} FROM ${settlementRules} WHERE ${settlementRules.type} = 'DELIVERY_PRICE' AND ${settlementRules.promotionId} IS NULL)`;
+                return or(
+                    sql`${settlements.ruleId} IN (SELECT ${settlementRules.id} FROM ${settlementRules} WHERE ${settlementRules.type} = 'DELIVERY_PRICE' AND ${settlementRules.promotionId} IS NULL)`,
+                    and(nullRuleId, like(settlements.reason, 'Driver delivery commission%')),
+                    and(nullRuleId, like(settlements.reason, 'Driver commission (%')),
+                );
             case 'PLATFORM_COMMISSION':
                 return sql`${settlements.ruleId} IN (SELECT ${settlementRules.id} FROM ${settlementRules} WHERE ${settlementRules.type} = 'ORDER_PRICE' AND ${settlementRules.promotionId} IS NULL)`;
             default:

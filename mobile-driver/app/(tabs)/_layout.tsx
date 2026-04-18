@@ -1,13 +1,32 @@
 import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
+import Reanimated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '@/hooks/useTheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslations } from '@/hooks/useTranslations';
 import { useAuth } from '@/hooks/useAuth';
-import { useEffect, useRef, useState } from 'react';
 import { useNavigationStore } from '@/store/navigationStore';
 import { isValidCoordinatePair } from '@/utils/locationValidation';
+
+function TabLabel({ label, focused, color, primaryColor }: { label: string; focused: boolean; color: string; primaryColor: string }) {
+    const indicatorWidth = useSharedValue(focused ? 24 : 0);
+    const indicatorStyle = useAnimatedStyle(() => ({ width: indicatorWidth.value }));
+    useEffect(() => {
+        indicatorWidth.value = withSpring(focused ? 24 : 0, { damping: 14, stiffness: 220 });
+    }, [focused]);
+    return (
+        <View style={{ alignItems: 'center', marginTop: 2 }}>
+            <Text style={{ color, fontSize: 10, fontWeight: focused ? '700' : '500', letterSpacing: 0.2 }}>
+                {label}
+            </Text>
+            <Reanimated.View
+                style={[indicatorStyle, { marginTop: 4, height: 3, borderRadius: 999, backgroundColor: focused ? primaryColor : 'transparent' }]}
+            />
+        </View>
+    );
+}
 
 export default function TabLayout() {
     const theme = useTheme();
@@ -87,57 +106,62 @@ export default function TabLayout() {
                 tabBarStyle: {
                     backgroundColor: theme.colors.card,
                     borderTopColor: theme.colors.border,
-                    height: 54 + insets.bottom,
+                    borderTopWidth: 1,
+                    height: 58 + insets.bottom,
+                    paddingTop: 8,
+                    paddingBottom: Math.max(insets.bottom, 8),
                 },
-                tabBarActiveTintColor: theme.colors.primary,
+                tabBarActiveTintColor: theme.colors.text,
                 tabBarInactiveTintColor: theme.colors.subtext,
+                tabBarItemStyle: { paddingVertical: 2 },
             }}
         >
             <Tabs.Screen
                 name="home"
                 options={{
                     title: t.tabs.orders,
-                    tabBarIcon: ({ color, size }) => <Ionicons name="list" size={size} color={color} />,
+                    tabBarLabel: ({ focused, color }) => <TabLabel label={t.tabs.orders} focused={focused} color={color} primaryColor={theme.colors.primary} />,
+                    tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? 'list' : 'list-outline'} size={size} color={color} />,
                 }}
             />
-
             <Tabs.Screen
                 name="drive"
                 options={{
                     title: t.tabs.map,
-                    tabBarIcon: ({ color, size }) => <Ionicons name="map" size={size} color={color} />,
+                    tabBarLabel: ({ focused, color }) => <TabLabel label={t.tabs.map} focused={focused} color={color} primaryColor={theme.colors.primary} />,
+                    tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? 'map' : 'map-outline'} size={size} color={color} />,
                 }}
             />
-
             <Tabs.Screen
                 name="earnings"
                 options={{
                     title: t.tabs.earnings,
-                    tabBarIcon: ({ color, size }) => <Ionicons name="cash-outline" size={size} color={color} />,
+                    tabBarLabel: ({ focused, color }) => <TabLabel label={t.tabs.earnings} focused={focused} color={color} primaryColor={theme.colors.primary} />,
+                    tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? 'cash' : 'cash-outline'} size={size} color={color} />,
                 }}
             />
-
             <Tabs.Screen
                 name="orders"
                 options={{
                     title: t.tabs.orders ?? 'Orders',
-                    tabBarIcon: ({ color, size }) => <Ionicons name="receipt-outline" size={size} color={color} />,
+                    tabBarLabel: ({ focused, color }) => <TabLabel label={t.tabs.orders ?? 'Orders'} focused={focused} color={color} primaryColor={theme.colors.primary} />,
+                    tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? 'receipt' : 'receipt-outline'} size={size} color={color} />,
                 }}
             />
-
             <Tabs.Screen
                 name="messages"
                 options={{
                     title: t.tabs.messages,
-                    tabBarIcon: ({ color, size }) => <Ionicons name="chatbubbles-outline" size={size} color={color} />,
+                    tabBarLabel: ({ focused, color }) => <TabLabel label={t.tabs.messages} focused={focused} color={color} primaryColor={theme.colors.primary} />,
+                    tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={size} color={color} />,
                 }}
             />
-
             <Tabs.Screen
                 name="profile"
                 options={{
                     title: t.tabs.profile,
-                    tabBarIcon: ({ color, size }) => <Ionicons name="person" size={size} color={color} />,
+                    tabBarLabel: ({ focused, color }) => <TabLabel label={t.tabs.profile} focused={focused} color={color} primaryColor={theme.colors.primary} />,
+                    tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? 'person' : 'person-outline'} size={size} color={color} />,
                 }}
             />
         </Tabs>

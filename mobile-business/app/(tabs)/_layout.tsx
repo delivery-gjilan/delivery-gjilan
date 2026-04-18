@@ -4,10 +4,32 @@ import { useQuery } from '@apollo/client/react';
 import { GET_BUSINESS_ORDERS } from '@/graphql/orders';
 import { useAuthStore } from '@/store/authStore';
 import { View, Text, Platform } from 'react-native';
+import Reanimated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import { useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { hasBusinessPermission } from '@/lib/rbac';
 import { UserPermission } from '@/gql/graphql';
 import { useTranslation } from '@/hooks/useTranslation';
+
+const PRIMARY = '#7C3AED';
+
+function TabLabel({ label, focused, color }: { label: string; focused: boolean; color: string }) {
+    const indicatorWidth = useSharedValue(focused ? 24 : 0);
+    const indicatorStyle = useAnimatedStyle(() => ({ width: indicatorWidth.value }));
+    useEffect(() => {
+        indicatorWidth.value = withSpring(focused ? 24 : 0, { damping: 14, stiffness: 220 });
+    }, [focused]);
+    return (
+        <View style={{ alignItems: 'center', marginTop: 2 }}>
+            <Text style={{ color, fontSize: 10, fontWeight: focused ? '700' : '500', letterSpacing: 0.2 }}>
+                {label}
+            </Text>
+            <Reanimated.View
+                style={[indicatorStyle, { marginTop: 4, height: 3, borderRadius: 999, backgroundColor: focused ? PRIMARY : 'transparent' }]}
+            />
+        </View>
+    );
+}
 
 export default function TabLayout() {
     const { t } = useTranslation();
@@ -28,49 +50,34 @@ export default function TabLayout() {
         <Tabs
             screenOptions={{
                 headerShown: false,
-                tabBarActiveTintColor: '#7C3AED',
+                tabBarActiveTintColor: '#e2e8f0',
                 tabBarInactiveTintColor: '#94A3B8',
                 tabBarStyle: {
                     backgroundColor: '#1E293B',
                     borderTopColor: '#334155',
-                    height: (Platform.OS === 'android' ? 62 : 64) + insets.bottom,
-                    paddingBottom: Math.max(insets.bottom, Platform.OS === 'android' ? 8 : 10),
-                    paddingTop: 10,
+                    borderTopWidth: 1,
+                    height: 58 + insets.bottom,
+                    paddingTop: 8,
+                    paddingBottom: Math.max(insets.bottom, 8),
                 },
-                tabBarLabelStyle: {
-                    fontSize: 13,
-                    fontWeight: '700',
-                },
-                tabBarIconStyle: {
-                    marginBottom: -2,
-                },
+                tabBarItemStyle: { paddingVertical: 2 },
             }}
         >
             <Tabs.Screen
                 name="index"
                 options={{
                     title: t('tabs.orders', 'Orders'),
-                    tabBarIcon: ({ color }) => (
+                    tabBarLabel: ({ focused, color }) => <TabLabel label={t('tabs.orders', 'Orders')} focused={focused} color={color} />,
+                    tabBarIcon: ({ focused, color }) => (
                         <View>
-                            <Ionicons name="receipt" size={26} color={color} />
+                            <Ionicons name={focused ? 'receipt' : 'receipt-outline'} size={24} color={color} />
                             {pendingCount > 0 && (
-                                <View
-                                    style={{
-                                        position: 'absolute',
-                                        top: -4,
-                                        right: -8,
-                                        backgroundColor: '#f59e0b',
-                                        borderRadius: 10,
-                                        minWidth: 20,
-                                        height: 20,
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        paddingHorizontal: 4,
-                                    }}
-                                >
-                                    <Text style={{ color: '#000', fontSize: 11, fontWeight: '800' }}>
-                                        {pendingCount}
-                                    </Text>
+                                <View style={{
+                                    position: 'absolute', top: -4, right: -8,
+                                    backgroundColor: '#f59e0b', borderRadius: 10,
+                                    minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
+                                }}>
+                                    <Text style={{ color: '#000', fontSize: 10, fontWeight: '800' }}>{pendingCount}</Text>
                                 </View>
                             )}
                         </View>
@@ -82,9 +89,8 @@ export default function TabLayout() {
                 options={{
                     href: canManageProducts ? undefined : null,
                     title: t('tabs.products', 'Products'),
-                    tabBarIcon: ({ color }) => (
-                        <Ionicons name="fast-food" size={26} color={color} />
-                    ),
+                    tabBarLabel: ({ focused, color }) => <TabLabel label={t('tabs.products', 'Products')} focused={focused} color={color} />,
+                    tabBarIcon: ({ focused, color }) => <Ionicons name={focused ? 'fast-food' : 'fast-food-outline'} size={24} color={color} />,
                 }}
             />
             <Tabs.Screen
@@ -92,9 +98,8 @@ export default function TabLayout() {
                 options={{
                     href: null,
                     title: t('tabs.dashboard', 'Dashboard'),
-                    tabBarIcon: ({ color }) => (
-                        <Ionicons name="analytics" size={26} color={color} />
-                    ),
+                    tabBarLabel: ({ focused, color }) => <TabLabel label={t('tabs.dashboard', 'Dashboard')} focused={focused} color={color} />,
+                    tabBarIcon: ({ focused, color }) => <Ionicons name={focused ? 'analytics' : 'analytics-outline'} size={24} color={color} />,
                 }}
             />
             <Tabs.Screen
@@ -102,9 +107,8 @@ export default function TabLayout() {
                 options={{
                     href: canViewAnalytics ? undefined : null,
                     title: t('tabs.finances', 'Finances'),
-                    tabBarIcon: ({ color }) => (
-                        <Ionicons name="cash-outline" size={26} color={color} />
-                    ),
+                    tabBarLabel: ({ focused, color }) => <TabLabel label={t('tabs.finances', 'Finances')} focused={focused} color={color} />,
+                    tabBarIcon: ({ focused, color }) => <Ionicons name={focused ? 'cash' : 'cash-outline'} size={24} color={color} />,
                 }}
             />
             <Tabs.Screen
@@ -112,9 +116,8 @@ export default function TabLayout() {
                 options={{
                     href: canViewAnalytics ? undefined : null,
                     title: t('tabs.orders', 'Orders'),
-                    tabBarIcon: ({ color }) => (
-                        <Ionicons name="receipt-outline" size={26} color={color} />
-                    ),
+                    tabBarLabel: ({ focused, color }) => <TabLabel label={t('tabs.orders', 'Orders')} focused={focused} color={color} />,
+                    tabBarIcon: ({ focused, color }) => <Ionicons name={focused ? 'receipt' : 'receipt-outline'} size={24} color={color} />,
                 }}
             />
             <Tabs.Screen
@@ -122,18 +125,16 @@ export default function TabLayout() {
                 options={{
                     href: canManageSettings ? undefined : null,
                     title: t('tabs.settings', 'Settings'),
-                    tabBarIcon: ({ color }) => (
-                        <Ionicons name="settings" size={26} color={color} />
-                    ),
+                    tabBarLabel: ({ focused, color }) => <TabLabel label={t('tabs.settings', 'Settings')} focused={focused} color={color} />,
+                    tabBarIcon: ({ focused, color }) => <Ionicons name={focused ? 'settings' : 'settings-outline'} size={24} color={color} />,
                 }}
             />
             <Tabs.Screen
                 name="messages"
                 options={{
                     title: t('tabs.messages', 'Messages'),
-                    tabBarIcon: ({ color }) => (
-                        <Ionicons name="chatbubbles-outline" size={26} color={color} />
-                    ),
+                    tabBarLabel: ({ focused, color }) => <TabLabel label={t('tabs.messages', 'Messages')} focused={focused} color={color} />,
+                    tabBarIcon: ({ focused, color }) => <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={24} color={color} />,
                 }}
             />
             <Tabs.Screen

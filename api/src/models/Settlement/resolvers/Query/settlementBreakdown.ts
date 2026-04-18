@@ -60,6 +60,7 @@ export const settlementBreakdown: NonNullable<QueryResolvers['settlementBreakdow
             isDriverTip: sql<boolean>`BOOL_OR(${settlements.reason} LIKE 'Driver tip%')`,
             isCatalogRevenue: sql<boolean>`BOOL_OR(${settlements.reason} LIKE 'Catalog product%')`,
             isDirectCallFixedFee: sql<boolean>`BOOL_OR(${settlements.reason} LIKE 'Direct call fixed payment%')`,
+            isDriverDeliveryCommission: sql<boolean>`BOOL_OR(${settlements.reason} LIKE 'Driver delivery commission%' OR ${settlements.reason} LIKE 'Driver commission (%')`,
             // Grab rule info via left join
             ruleName: settlementRules.name,
             ruleType: settlementRules.type,
@@ -81,6 +82,7 @@ export const settlementBreakdown: NonNullable<QueryResolvers['settlementBreakdow
             sql`(${settlements.reason} LIKE 'Driver tip%')`,
             sql`(${settlements.reason} LIKE 'Catalog product%')`,
             sql`(${settlements.reason} LIKE 'Direct call fixed payment%')`,
+            sql`(${settlements.reason} LIKE 'Driver delivery commission%' OR ${settlements.reason} LIKE 'Driver commission (%')`,
         );
 
     return rows.map((row) => {
@@ -100,6 +102,9 @@ export const settlementBreakdown: NonNullable<QueryResolvers['settlementBreakdow
             } else if (row.isDirectCallFixedFee) {
                 category = 'DIRECT_CALL_FIXED_FEE';
                 label = 'Direct Call Fixed Payment';
+            } else if (row.isDriverDeliveryCommission) {
+                category = 'DELIVERY_COMMISSION';
+                label = 'Delivery Commission';
             } else {
                 // Auto-remittances (markup, priority surcharge)
                 category = 'AUTO_REMITTANCE';

@@ -486,6 +486,9 @@ export default function EarningsScreen() {
         if (s.reason?.startsWith("Priority")) return { label: t.earnings.priority ?? "Priority Fee", color: "#ef4444" };
         if (s.reason?.startsWith("Driver tip")) return { label: t.earnings.tip_label ?? "Tip", color: "#22c55e" };
         if (s.reason?.startsWith("Catalog product")) return { label: t.earnings.catalog_label ?? "Catalog", color: "#ef4444" };
+        if (s.reason?.startsWith("Driver delivery commission") || s.reason?.startsWith("Driver commission (")) {
+            return { label: t.earnings.delivery_fee ?? "Delivery Fee", color: "#f59e0b" };
+        }
         if (s.rule?.type === "DELIVERY_PRICE") return { label: t.earnings.delivery_fee ?? "Delivery Fee", color: "#f59e0b" };
         return { label: t.earnings.commission, color: "#f59e0b" };
     };
@@ -497,6 +500,7 @@ export default function EarningsScreen() {
             if (s.reason?.startsWith("Stock item")) return "STOCK_REMITTANCE";
             if (s.reason?.startsWith("Driver tip")) return "DRIVER_TIP";
             if (s.reason?.startsWith("Catalog product")) return "CATALOG_REVENUE";
+            if (s.reason?.startsWith("Driver delivery commission") || s.reason?.startsWith("Driver commission (")) return "DELIVERY_COMMISSION";
             return "AUTO_REMITTANCE";
         }
         if (s.rule.promotion?.id) return "PROMOTION_COST";

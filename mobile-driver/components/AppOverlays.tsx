@@ -145,9 +145,11 @@ export function AppOverlays() {
 
     const showPoolFab = isAuthenticated && !dispatchModeEnabled && isOnline && poolOrders.length > 0 && isDriveTab;
 
-    // Position pool FAB + mic above the active order card when on drive tab
+    // Position pool FAB + mic above the active order card when on drive tab.
+    // Card is flush at bottom: 0 of the screen (tab bar clips it naturally).
+    const tabBarHeight = 58 + insets.bottom;
     const cardBottomApprox = isDriveTab && assignedOrders.length > 0
-        ? insets.bottom + (isCompactHeight ? 290 : 320)
+        ? tabBarHeight + (isCompactHeight ? 155 : 165)
         : insets.bottom + 80;
     const poolFabBottom = isDriveTab ? cardBottomApprox + 8 : 100;
     const micBottom = poolFabBottom + (showPoolFab ? 68 : 0);
