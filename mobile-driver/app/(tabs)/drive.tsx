@@ -823,22 +823,20 @@ export default function MapScreen() {
                                     ) : null}
                                 </View>
                             </View>
-                            {/* Earnings + business amount stacked */}
+                            {/* Financial column: primary = what matters to wallet, secondary = driver cut */}
                             <View style={styles.cardEarningsCol}>
-                                <View style={styles.cardEarningsBadge}>
-                                    <Text style={styles.cardEarningsText}>€{earnings}</Text>
-                                </View>
                                 {isOutForDelivery && cardCollectFromCustomer > 0 ? (
-                                    <View style={[styles.cardSecondaryBadge, { borderColor: 'rgba(16,185,129,0.35)' }]}>
-                                        <Ionicons name="cash-outline" size={10} color="#10b981" />
-                                        <Text style={[styles.cardSecondaryBadgeText, { color: '#10b981' }]}>€{cardCollectFromCustomer.toFixed(2)}</Text>
+                                    <View style={[styles.cardPrimaryBadge, { backgroundColor: 'rgba(16,185,129,0.15)', borderColor: 'rgba(16,185,129,0.4)' }]}>
+                                        <Ionicons name="cash" size={13} color="#10b981" />
+                                        <Text style={[styles.cardPrimaryBadgeText, { color: '#10b981' }]}>€{cardCollectFromCustomer.toFixed(2)}</Text>
                                     </View>
-                                ) : !isOutForDelivery && cardBusinessPrice > 0 ? (
-                                    <View style={[styles.cardSecondaryBadge, { borderColor: 'rgba(239,68,68,0.35)' }]}>
-                                        <Ionicons name="storefront-outline" size={10} color="#ef4444" />
-                                        <Text style={[styles.cardSecondaryBadgeText, { color: '#ef4444' }]}>€{cardBusinessPrice.toFixed(2)}</Text>
+                                ) : cardBusinessPrice > 0 ? (
+                                    <View style={[styles.cardPrimaryBadge, { backgroundColor: 'rgba(239,68,68,0.13)', borderColor: 'rgba(239,68,68,0.4)' }]}>
+                                        <Ionicons name="storefront" size={13} color="#ef4444" />
+                                        <Text style={[styles.cardPrimaryBadgeText, { color: '#ef4444' }]}>€{cardBusinessPrice.toFixed(2)}</Text>
                                     </View>
                                 ) : null}
+                                <Text style={styles.cardCutLabel}>cut €{earnings}</Text>
                                 {total > 1 && (
                                     <View style={styles.cardCounter}>
                                         <Text style={styles.cardCounterText}>{idx + 1}/{total}</Text>
@@ -1282,6 +1280,24 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '800',
         color: '#22c55e',
+    },
+    cardPrimaryBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        borderRadius: 9,
+        borderWidth: 1,
+        paddingHorizontal: 9,
+        paddingVertical: 5,
+    },
+    cardPrimaryBadgeText: {
+        fontSize: 15,
+        fontWeight: '800',
+    },
+    cardCutLabel: {
+        fontSize: 11,
+        color: 'rgba(148,163,184,0.55)',
+        fontWeight: '600',
     },
     cardSecondaryBadge: {
         flexDirection: 'row',

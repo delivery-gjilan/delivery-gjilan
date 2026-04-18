@@ -1,5 +1,5 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ActivityIndicator, Animated, Alert, ScrollView, Linking } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, Animated, Alert, ScrollView, Linking, Image } from 'react-native';
 import { PickupSlider } from '@/components/PickupSlider';
 import { DeliverySlider } from '@/components/DeliverySlider';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,7 +21,6 @@ import { useTranslations } from '@/hooks/useTranslations';
 import type { DriverOrder } from '@/utils/types';
 import { normalizeCoordinate } from '@/utils/locationValidation';
 import * as Haptics from 'expo-haptics';
-import { OrderDetailsPanel } from '@/components/OrderDetailsPanel';
 
 /* â”€â”€â”€ Screen constants â”€â”€â”€ */
 const STATUS_COLORS: Record<string, string> = {
@@ -71,8 +70,6 @@ export default function NavigationScreen() {
     const [notifiedAt, setNotifiedAt] = useState<number | null>(null);
     const [newOrderToast, setNewOrderToast] = useState<{ id: string; businessName: string } | null>(null);
     const [navIncomingMessage, setNavIncomingMessage] = useState<{ id: string; body: string; alertType: AlertType; adminId: string } | null>(null);
-    const [navCardExpanded, setNavCardExpanded] = useState(false);
-
     useSubscription(DRIVER_MESSAGE_RECEIVED_SUB, {
         onData: ({ data: subData }) => {
             const msg = subData.data?.driverMessageReceived;
@@ -87,6 +84,7 @@ export default function NavigationScreen() {
     // the mutation on every 2 s progress tick once below the threshold.
     const etaNotificationSentRef = useRef<Set<string>>(new Set());
     const [markingPickedUpIds, setMarkingPickedUpIds] = useState<Set<string>>(new Set());
+    const [cardItemsOpen, setCardItemsOpen] = useState<Set<string>>(new Set());
     const [nowTs, setNowTs] = useState(() => Date.now());
     useEffect(() => {
         const id = setInterval(() => setNowTs(Date.now()), 10_000);
@@ -435,17 +433,6 @@ export default function NavigationScreen() {
 
     return (
         <View style={styles.container}>
-            {/* Order details card (collapsible) */}
-            {order && (
-                <View style={[styles.orderCardContainer, { top: insets.top + 12 }]}>
-                    <OrderDetailsPanel
-                        order={order}
-                        isExpanded={navCardExpanded}
-                        onToggle={() => setNavCardExpanded(prev => !prev)}
-                    />
-                </View>
-            )}
-
             {/* â•â•â• Full-screen Mapbox Navigation â•â•â• */}
             <MapboxNavigationView
                 ref={mapViewRef}
@@ -486,7 +473,7 @@ export default function NavigationScreen() {
             </Pressable>
 
             {/* â•â•â• Right-side buttons (recenter) â•â•â• */}
-            <View style={[styles.rightButtons, { bottom: 180 + insets.bottom }]}>
+            <View style={[styles.rightButtons, { bottom: 300 + insets.bottom }]}>
                 <Pressable
                     style={styles.mapBtn}
                     onPress={handleRecenter}
@@ -537,109 +524,156 @@ export default function NavigationScreen() {
                 </View>
             )}
 
-            {/* ETA and phase are shown in the top NavigationOrderCard to avoid overlay collisions */}
+            {/* ═══ Active order card (bottom) ═══ */}
+            {assignedOrders.length > 0 && (() => {
+                const displayOrder = (assignedOrders.find(o => o.id === order?.id) ?? assignedOrders[0])!;
+                if (!displayOrder) return null;
+                const total = assignedOrders.length;
+                const cardStatusColor = STATUS_COLORS[displayOrder.status] ?? '#6B7280';
+                const cardBizName = displayOrder.businesses?.[0]?.business?.name ?? '?';
+                const cardInitial = cardBizName.charAt(0).toUpperCase();
+                const cardEarnings = getDriverTakeHome(displayOrder).toFixed(2);
+                const cardDropAddress = displayOrder.dropOffLocation?.address ?? '';
+                const cardShortDrop = cardDropAddress.split(',')[0] || '';
+                const cardIsReady = displayOrder.status === 'READY';
+                const cardIsPreparing = displayOrder.status === 'PREPARING';
+                const cardIsOFD = displayOrder.status === 'OUT_FOR_DELIVERY';
+                const cardIsDirectDispatch = displayOrder.channel === 'DIRECT_DISPATCH';
+                const cardIsPickingUp = markingPickedUpIds.has(displayOrder.id);
+                const cardRecipientLabel = displayOrder.recipientName ?? displayOrder.recipientPhone ?? null;
+                const cardPrepMinsLeft = cardIsPreparing && displayOrder.estimatedReadyAt
+                    ? Math.max(0, Math.ceil((new Date(displayOrder.estimatedReadyAt).getTime() - nowTs) / 60000))
+                    : null;
+                const cardAllItems = displayOrder.businesses?.flatMap((b: any) => b.items ?? []) ?? [];
+                const cardItemsExpanded = cardItemsOpen.has(displayOrder.id);
+                const cardOrderPrice = Number((displayOrder as any).orderPrice ?? 0);
+                const cardInventoryPrice = Number((displayOrder as any).inventoryPrice ?? 0);
+                const cardBusinessPrice = Math.max(0, cardOrderPrice - cardInventoryPrice);
+                const cardCashToCollect = Number((displayOrder as any).cashToCollect ?? 0);
+                const cardTotalPrice = Number(displayOrder.totalPrice ?? 0);
+                const cardCollectFromCustomer = cardIsDirectDispatch ? cardCashToCollect : cardTotalPrice;
 
-            {/* â•â•â• Order cards bar (bottom) â•â•â• */}
-            {assignedOrders.length >= 1 && (
-                <View style={[styles.bottomBar, { bottom: insets.bottom + 8 }]}>
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.barContent}
-                        snapToInterval={250}
-                        snapToAlignment="start"
-                        decelerationRate="fast"
-                    >
-                        {assignedOrders.map((o) => {
-                            const statusColor = STATUS_COLORS[o.status] ?? '#6B7280';
-                            const isFocused = o.id === order?.id;
-                            const bizName = o.businesses?.[0]?.business?.name ?? '?';
-                            const initial = bizName.charAt(0).toUpperCase();
-                            const earnings = getDriverTakeHome(o).toFixed(2);
-                            const dropAddress = o.dropOffLocation?.address ?? '';
-                            const shortDrop = dropAddress.split(',')[0] || '';
-                            const isReady = o.status === 'READY';
-                            const isPreparing = o.status === 'PREPARING';
-                            const isPickingUp = markingPickedUpIds.has(o.id);
-                            const prepMinsLeft = (() => {
-                                if (!isPreparing || !o.estimatedReadyAt) return null;
-                                const diff = Math.ceil((new Date(o.estimatedReadyAt).getTime() - nowTs) / 60000);
-                                return diff > 0 ? diff : 0;
-                            })();
-
-                            return (
-                                <Pressable
-                                    key={o.id}
-                                    style={[
-                                        styles.barCard,
-                                        { borderLeftColor: statusColor },
-                                        isFocused && styles.barCardFocused,
-                                    ]}
-                                    onPress={() => switchToOrder(o)}
-                                >
-                                    {/* Row 1: avatar + name/address + earnings */}
-                                    <View style={styles.barCardTop}>
-                                        <View style={[styles.barAvatar, { backgroundColor: statusColor }]}>
-                                            <Text style={styles.barAvatarText}>{initial}</Text>
-                                        </View>
-                                        <View style={styles.barCardInfo}>
-                                            <Text style={styles.barBizName} numberOfLines={1}>{bizName}</Text>
-                                            {shortDrop ? (
-                                                <Text style={styles.barDropAddress} numberOfLines={1}>{shortDrop}</Text>
-                                            ) : null}
-                                        </View>
-                                        <View style={styles.barEarnings}>
-                                            <Text style={styles.barEarningsText}>€{earnings}</Text>
-                                        </View>
-                                    </View>
-
-                                    {/* Row 2: status badge + action buttons */}
-                                    <View style={styles.barCardBottom}>
-                                        <View style={[styles.barStatusBadge, { backgroundColor: statusColor + '22' }]}>
-                                            <View style={[styles.barStatusDot, { backgroundColor: statusColor }]} />
-                                            <Text style={[styles.barStatusText, { color: statusColor }]}>
-                                                {({ PENDING: t.map.status_pending, PREPARING: t.map.status_preparing, READY: t.map.status_ready, OUT_FOR_DELIVERY: t.map.status_delivering } as Record<string, string>)[o.status] ?? o.status}
+                return (
+                    <View style={styles.navCard}>
+                        {total > 1 && <View style={styles.navCardStackBehind} pointerEvents="none" />}
+                        <View style={styles.navCardInner}>
+                            {/* HEADER ROW */}
+                            <View style={styles.cardHeader}>
+                                <View style={[styles.cardAvatar, { backgroundColor: cardStatusColor }]}>
+                                    <Text style={styles.cardAvatarText}>{cardInitial}</Text>
+                                </View>
+                                <View style={styles.cardHeaderInfo}>
+                                    <View style={styles.cardNameRow}>
+                                        <Text style={styles.cardBizName} numberOfLines={1}>{cardBizName}</Text>
+                                        <View style={[styles.cardStatusPill, { backgroundColor: cardStatusColor + '28', borderColor: cardStatusColor + '55' }]}>
+                                            <View style={[styles.cardStatusPillDot, { backgroundColor: cardStatusColor }]} />
+                                            <Text style={[styles.cardStatusPillText, { color: cardStatusColor }]}>
+                                                {({ PENDING: 'Pending', PREPARING: 'Preparing', READY: 'Ready', OUT_FOR_DELIVERY: 'Delivering' } as Record<string,string>)[displayOrder.status] ?? displayOrder.status}
                                             </Text>
                                         </View>
-                                        <View style={styles.barActions}>
-                                            {isReady && (
-                                                <Pressable
-                                                    style={[styles.barActionBtn, styles.barPickupBtn]}
-                                                    onPress={() => handleMarkPickedUp(o.id)}
-                                                    disabled={isPickingUp}
-                                                >
-                                                    {isPickingUp
-                                                        ? <ActivityIndicator size={12} color="#fff" />
-                                                        : <Ionicons name="checkmark-outline" size={16} color="#fff" />
-                                                    }
-                                                </Pressable>
-                                            )}
-                                        </View>
+                                        {cardIsDirectDispatch && (
+                                            <View style={styles.cardDirectBadge}>
+                                                <Ionicons name="call" size={9} color="#fff" />
+                                                <Text style={styles.cardDirectBadgeText}>Direct</Text>
+                                            </View>
+                                        )}
                                     </View>
-
-                                    {/* Row 3: preparing countdown */}
-                                    {isPreparing && (
-                                        <View style={styles.prepRow}>
-                                            <Ionicons name="restaurant-outline" size={11} color="#06b6d4" />
-                                            <Text style={styles.prepText}>
-                                                {prepMinsLeft === null
-                                                    ? t.navigation.preparing_ellipsis
-                                                    : prepMinsLeft === 0
-                                                    ? t.navigation.almost_ready
-                                                    : t.navigation.ready_in.replace('{{min}}', String(prepMinsLeft))}
+                                    <View style={styles.cardSubRow}>
+                                        {cardRecipientLabel ? (
+                                            <Text style={[styles.cardAddress, cardIsDirectDispatch && styles.cardRecipient]} numberOfLines={1}>{cardRecipientLabel}</Text>
+                                        ) : cardShortDrop ? (
+                                            <Text style={styles.cardAddress} numberOfLines={1}>{cardShortDrop}</Text>
+                                        ) : null}
+                                        {cardIsPreparing && cardPrepMinsLeft !== null && (
+                                            <Text style={styles.cardEtaText}>
+                                                {cardPrepMinsLeft === 0 ? t.drive.almost_ready : t.drive.ready_min.replace('{{min}}', String(cardPrepMinsLeft))}
                                             </Text>
+                                        )}
+                                    </View>
+                                </View>
+                                <View style={styles.cardEarningsCol}>
+                                    {cardIsOFD && cardCollectFromCustomer > 0 ? (
+                                        <View style={[styles.cardPrimaryBadge, { backgroundColor: 'rgba(16,185,129,0.15)', borderColor: 'rgba(16,185,129,0.4)' }]}>
+                                            <Ionicons name="cash" size={13} color="#10b981" />
+                                            <Text style={[styles.cardPrimaryBadgeText, { color: '#10b981' }]}>€{cardCollectFromCustomer.toFixed(2)}</Text>
+                                        </View>
+                                    ) : cardBusinessPrice > 0 ? (
+                                        <View style={[styles.cardPrimaryBadge, { backgroundColor: 'rgba(239,68,68,0.13)', borderColor: 'rgba(239,68,68,0.4)' }]}>
+                                            <Ionicons name="storefront" size={13} color="#ef4444" />
+                                            <Text style={[styles.cardPrimaryBadgeText, { color: '#ef4444' }]}>€{cardBusinessPrice.toFixed(2)}</Text>
+                                        </View>
+                                    ) : null}
+                                    <Text style={styles.cardCutLabel}>cut €{cardEarnings}</Text>
+                                    {total > 1 && (
+                                        <View style={styles.cardCounter}>
+                                            <Text style={styles.cardCounterText}>1/{total}</Text>
                                         </View>
                                     )}
+                                </View>
+                            </View>
+
+                            {/* ITEMS expandable */}
+                            {cardAllItems.length > 0 && (
+                                <View style={styles.cardItemsSection}>
+                                    <Pressable
+                                        style={styles.cardItemsHeader}
+                                        onPress={() => setCardItemsOpen(prev => {
+                                            const next = new Set(prev);
+                                            if (next.has(displayOrder.id)) next.delete(displayOrder.id); else next.add(displayOrder.id);
+                                            return next;
+                                        })}
+                                    >
+                                        <Ionicons name="bag-handle-outline" size={13} color="#94a3b8" />
+                                        <Text style={styles.cardItemsHeaderText}>{cardAllItems.length} item{cardAllItems.length !== 1 ? 's' : ''}</Text>
+                                        <Ionicons name={cardItemsExpanded ? 'chevron-up' : 'chevron-down'} size={13} color="#64748b" style={{ marginLeft: 'auto' }} />
+                                    </Pressable>
+                                    {cardItemsExpanded && (
+                                        <View style={styles.cardItemsList}>
+                                            {cardAllItems.map((item: any, i: number) => (
+                                                <View key={i} style={styles.cardItemRow}>
+                                                    {item.imageUrl ? (
+                                                        <Image source={{ uri: item.imageUrl }} style={styles.cardItemImage} />
+                                                    ) : (
+                                                        <View style={[styles.cardItemImage, styles.cardItemImageFallback]}>
+                                                            <Ionicons name="fast-food-outline" size={16} color="#475569" />
+                                                        </View>
+                                                    )}
+                                                    <View style={styles.cardItemInfo}>
+                                                        <Text style={styles.cardItemName} numberOfLines={1}>{item.quantity}× {item.name}</Text>
+                                                        {item.notes ? <Text style={styles.cardItemNotes} numberOfLines={1}>{item.notes}</Text> : null}
+                                                    </View>
+                                                </View>
+                                            ))}
+                                        </View>
+                                    )}
+                                </View>
+                            )}
+
+                            {/* CTA */}
+                            {cardIsReady && (
+                                <Pressable
+                                    style={[styles.cardCta, { backgroundColor: '#16a34a' }]}
+                                    onPress={() => handleMarkPickedUp(displayOrder.id)}
+                                    disabled={cardIsPickingUp}
+                                >
+                                    {cardIsPickingUp ? (
+                                        <ActivityIndicator size={16} color="#fff" />
+                                    ) : (
+                                        <>
+                                            <Ionicons name="checkmark-circle" size={18} color="#fff" />
+                                            <Text style={styles.cardCtaText}>{t.drive.arrived}</Text>
+                                        </>
+                                    )}
                                 </Pressable>
-                            );
-                        })}
-                    </ScrollView>
-                </View>
-            )}
+                            )}
+                        </View>
+                    </View>
+                );
+            })()}
 
             {/* â•â•â• Near-end action bar â•â•â• */}
             {showNearEndBar && !showPickupPanel && !showDeliveryPanel && (
-                <View style={[styles.nearEndBar, { bottom: (assignedOrders.length > 1 ? 160 : 80) + insets.bottom }]}>
+                <View style={[styles.nearEndBar, { bottom: 160 + insets.bottom }]}>
                     {/* Call customer */}
                     {!!order?.customerPhone && (
                         <Pressable
@@ -888,12 +922,262 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#0f172a',
     },
-    orderCardContainer: {
+    navCard: {
         position: 'absolute',
-        left: 12,
-        right: 12,
-        zIndex: 50,
-        maxWidth: '100%',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 25,
+    },
+    navCardStackBehind: {
+        position: 'absolute',
+        left: 8,
+        right: 8,
+        bottom: -6,
+        height: 20,
+        backgroundColor: 'rgba(10,12,24,0.55)',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        borderWidth: 1,
+        borderBottomWidth: 0,
+        borderColor: 'rgba(255,255,255,0.06)',
+    },
+    navCardInner: {
+        backgroundColor: 'rgba(12,16,30,0.95)',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        borderWidth: 1,
+        borderBottomWidth: 0,
+        borderColor: 'rgba(255,255,255,0.08)',
+        padding: 18,
+        gap: 14,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.35,
+        shadowRadius: 10,
+        elevation: 10,
+    },
+    cardHeader: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 10,
+    },
+    cardAvatar: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        marginTop: 2,
+    },
+    cardAvatarText: {
+        fontSize: 16,
+        fontWeight: '800',
+        color: '#fff',
+    },
+    cardHeaderInfo: {
+        flex: 1,
+        gap: 3,
+    },
+    cardNameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        flexWrap: 'wrap',
+    },
+    cardSubRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        flexWrap: 'wrap',
+    },
+    cardStatusPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        borderRadius: 999,
+        borderWidth: 1,
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+    },
+    cardStatusPillDot: {
+        width: 5,
+        height: 5,
+        borderRadius: 2.5,
+    },
+    cardStatusPillText: {
+        fontSize: 10,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+    },
+    cardEarningsCol: {
+        alignItems: 'flex-end',
+        gap: 5,
+        flexShrink: 0,
+    },
+    cardBizName: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#f1f5f9',
+        flexShrink: 1,
+    },
+    cardDirectBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: '#F97316',
+        borderRadius: 999,
+        paddingHorizontal: 7,
+        paddingVertical: 3,
+    },
+    cardDirectBadgeText: {
+        fontSize: 9,
+        fontWeight: '800',
+        color: '#fff',
+        letterSpacing: 0.2,
+    },
+    cardAddress: {
+        fontSize: 11,
+        color: '#64748b',
+    },
+    cardRecipient: {
+        color: '#fdba74',
+        fontWeight: '700',
+    },
+    cardEtaText: {
+        color: '#94a3b8',
+        fontSize: 11,
+        fontWeight: '600',
+    },
+    cardEarningsBadge: {
+        backgroundColor: 'rgba(22,163,74,0.18)',
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderWidth: 1,
+        borderColor: 'rgba(34,197,94,0.28)',
+    },
+    cardEarningsText: {
+        fontSize: 16,
+        fontWeight: '800',
+        color: '#22c55e',
+    },
+    cardPrimaryBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        borderRadius: 9,
+        borderWidth: 1,
+        paddingHorizontal: 9,
+        paddingVertical: 5,
+    },
+    cardPrimaryBadgeText: {
+        fontSize: 15,
+        fontWeight: '800',
+    },
+    cardCutLabel: {
+        fontSize: 11,
+        color: 'rgba(148,163,184,0.55)',
+        fontWeight: '600',
+    },
+    cardSecondaryBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        borderRadius: 7,
+        borderWidth: 1,
+        paddingHorizontal: 7,
+        paddingVertical: 3,
+        backgroundColor: 'rgba(0,0,0,0.18)',
+    },
+    cardSecondaryBadgeText: {
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    cardCounter: {
+        marginLeft: 'auto',
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        borderRadius: 10,
+        paddingHorizontal: 9,
+        paddingVertical: 2,
+    },
+    cardCounterText: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '900',
+    },
+    cardItemsSection: {
+        borderRadius: 10,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
+        overflow: 'hidden',
+    },
+    cardItemsHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+    },
+    cardItemsHeaderText: {
+        fontSize: 12,
+        color: '#94a3b8',
+        fontWeight: '600',
+    },
+    cardItemsList: {
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255,255,255,0.07)',
+        gap: 0,
+    },
+    cardItemRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255,255,255,0.05)',
+    },
+    cardItemImage: {
+        width: 40,
+        height: 40,
+        borderRadius: 8,
+        flexShrink: 0,
+    },
+    cardItemImageFallback: {
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    cardItemInfo: {
+        flex: 1,
+        gap: 2,
+    },
+    cardItemName: {
+        fontSize: 13,
+        color: '#e2e8f0',
+        fontWeight: '600',
+    },
+    cardItemNotes: {
+        fontSize: 11,
+        color: '#64748b',
+        fontStyle: 'italic',
+    },
+    cardCta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        borderRadius: 10,
+        paddingVertical: 9,
+    },
+    cardCtaText: {
+        color: '#fff',
+        fontSize: 13,
+        fontWeight: '700',
     },
     navView: {
         flex: 1,

@@ -431,3 +431,48 @@ export const GET_BUSINESS_ORDER_FINANCIALS = graphql(`
         }
     }
 `);
+
+export const GET_ORDER_DETAIL_FOR_SETTLEMENT = graphql(`
+    query GetOrderDetailForSettlement($orderId: ID!) {
+        order(id: $orderId) {
+            id
+            displayId
+            orderDate
+            status
+            deliveryPrice
+            totalPrice
+            businesses {
+                business {
+                    id
+                    name
+                }
+                items {
+                    id
+                    name
+                    quantity
+                    unitPrice
+                    notes
+                    imageUrl
+                    selectedOptions {
+                        id
+                        optionGroupName
+                        optionName
+                        priceAtOrder
+                    }
+                    childItems {
+                        id
+                        name
+                        quantity
+                        unitPrice
+                    }
+                }
+            }
+            orderPromotions {
+                id
+                appliesTo
+                discountAmount
+                promoCode
+            }
+        }
+    }
+`);

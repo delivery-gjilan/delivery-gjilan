@@ -34,6 +34,7 @@ import {
   SettlementType,
   SettlementDirection,
   type GetBusinessOrderFinancialsQuery,
+  type GetOrderDetailForSettlementQuery,
   type GetSettlementRequestsQuery,
   type SettlementsPageQuery,
 } from '@/gql/graphql';
@@ -50,6 +51,7 @@ import {
   GET_SETTLEMENT_REQUESTS,
   CREATE_SETTLEMENT_REQUEST,
   GET_BUSINESS_ORDER_FINANCIALS,
+  GET_ORDER_DETAIL_FOR_SETTLEMENT,
 } from '@/graphql/operations/settlements/queries';
 
 // ── Types ──
@@ -168,6 +170,10 @@ export default function BusinessSettlementsPage() {
   const [selectedOrderGroup, setSelectedOrderGroup] = useState<OrderGroup | null>(null);
   const [fetchFinancials, { data: financialsData, loading: financialsLoading }] = useLazyQuery<GetBusinessOrderFinancialsQuery>(
     GET_BUSINESS_ORDER_FINANCIALS,
+    { fetchPolicy: 'network-only' },
+  );
+  const [fetchOrderDetail, { data: orderDetailData, loading: orderDetailLoading }] = useLazyQuery<GetOrderDetailForSettlementQuery>(
+    GET_ORDER_DETAIL_FOR_SETTLEMENT,
     { fetchPolicy: 'network-only' },
   );
 
@@ -701,6 +707,7 @@ export default function BusinessSettlementsPage() {
                         setSelectedOrderGroup(og);
                         if (og.order?.id) {
                           fetchFinancials({ variables: { orderId: og.order.id, businessId } });
+                          fetchOrderDetail({ variables: { orderId: og.order.id } });
                         }
                       }}
                     >
@@ -805,130 +812,220 @@ export default function BusinessSettlementsPage() {
 
       {/* ── Order Financial Breakdown Dialog ── */}
       <Dialog open={selectedOrderGroup !== null} onOpenChange={(open) => { if (!open) setSelectedOrderGroup(null); }}>
-        <DialogContent className="bg-zinc-900 border-zinc-700 text-white max-w-md">
+        <DialogContent className="bg-zinc-900 border-zinc-700 text-white max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Order Financial Breakdown</DialogTitle>
+            <DialogTitle>Order Details</DialogTitle>
           </DialogHeader>
           {selectedOrderGroup && (() => {
             const og = selectedOrderGroup;
             const fin = financialsData?.businessOrderFinancials;
+            const orderDetail = orderDetailData?.order;
             const netAmount = og.totalPayable - og.totalReceivable;
             const allSettled = og.settlements.every((s: SettlementRecord) => !!s.isSettled);
+
+            // Items from the order detail query, scoped to this business
+            const businessOrder = (orderDetail?.businesses ?? []).find(
+              (b) => b.business.id === businessId,
+            );
+            const items = businessOrder?.items ?? [];
+            const itemsSubtotal = items.reduce(
+              (sum, item) => sum + Number(item.unitPrice) * item.quantity, 0,
+            );
+
+            // Promotions / discounts
+            const promotions = orderDetail?.orderPromotions ?? [];
+            const itemDiscounts = promotions
+              .filter((p) => p.appliesTo === 'PRICE')
+              .reduce((acc, p) => acc + Number(p.discountAmount ?? 0), 0);
+            const deliveryDiscounts = promotions
+              .filter((p) => p.appliesTo === 'DELIVERY')
+              .reduce((acc, p) => acc + Number(p.discountAmount ?? 0), 0);
+            const totalDiscounts = itemDiscounts + deliveryDiscounts;
+
             return (
               <div className="space-y-4 mt-2">
-                {/* Order info */}
-                <div className="rounded-lg bg-zinc-800 border border-zinc-700 p-3 space-y-1.5">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-zinc-400">Order</span>
-                    <span className="font-mono text-zinc-200">{og.orderDisplayId}</span>
+                {/* Order header */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-lg font-bold text-zinc-100">Order #{og.orderDisplayId}</p>
+                    <p className="text-xs text-zinc-500 mt-0.5">
+                      {orderDetail?.orderDate
+                        ? new Date(orderDetail.orderDate).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })
+                        : og.latestCreatedAt ? new Date(og.latestCreatedAt).toLocaleDateString() : '—'}
+                    </p>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-zinc-400">Date</span>
-                    <span className="text-zinc-200">{og.latestCreatedAt ? new Date(og.latestCreatedAt).toLocaleDateString() : '—'}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-zinc-400">Net</span>
-                    <span className={cn('font-semibold', netAmount >= 0 ? 'text-green-400' : 'text-red-400')}>
-                      {netAmount >= 0 ? '+' : ''}€{netAmount.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-zinc-400">Status</span>
-                    {statusBadge(allSettled)}
-                  </div>
+                  <Badge
+                    className={cn(
+                      'text-[10px] px-2 py-0.5',
+                      netAmount >= 0
+                        ? 'bg-green-600/20 text-green-400 border-green-600/30'
+                        : 'bg-red-600/20 text-red-400 border-red-600/30',
+                    )}
+                    variant="outline"
+                  >
+                    {netAmount >= 0 ? 'NET PAYOUT' : 'OWES PLATFORM'}
+                  </Badge>
                 </div>
 
-                {/* Settlement lines */}
-                <div className="rounded-lg bg-zinc-800 border border-zinc-700 p-3 space-y-2">
-                  <p className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-2">Settlement Lines</p>
-                  {og.settlements.map((s: SettlementRecord) => (
-                    <div key={s.id} className="flex justify-between text-sm items-center">
-                      <div className="flex items-center gap-2">
-                        {directionBadge(s.direction)}
-                        {statusBadge(!!s.isSettled)}
-                      </div>
-                      <span className={cn('font-medium tabular-nums', s.direction === SettlementDirection.Payable ? 'text-green-400' : 'text-red-400')}>
-                        {s.direction === SettlementDirection.Payable ? '+' : '-'}€{Number(s.amount ?? 0).toFixed(2)}
-                      </span>
-                    </div>
-                  ))}
-                  <div className="h-px bg-zinc-700 my-1" />
-                  <div className="flex justify-between text-sm font-semibold">
-                    <span className="text-white">Net</span>
-                    <span className={cn('tabular-nums', netAmount >= 0 ? 'text-green-400' : 'text-red-400')}>
-                      {netAmount >= 0 ? '+' : ''}€{netAmount.toFixed(2)}
-                    </span>
+                {/* Status pills */}
+                <div className="flex gap-2 flex-wrap">
+                  <div className="rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-1.5">
+                    <p className="text-[9px] text-zinc-500 uppercase tracking-wider">Lines</p>
+                    <p className="text-xs font-semibold text-zinc-200">{og.settlements.length}</p>
                   </div>
-                </div>
-
-                {/* Financial breakdown from API */}
-                {financialsLoading ? (
-                  <Skeleton className="h-24 w-full rounded-lg" />
-                ) : fin ? (
-                  <div className="rounded-lg bg-zinc-800 border border-zinc-700 p-3 space-y-2">
-                    <p className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-2">Price Breakdown</p>
-
-                    <div className="flex justify-between text-sm">
-                      <span className="text-zinc-400">Payment Method</span>
-                      <Badge
-                        className={cn(
-                          fin.paymentCollection === 'CASH_TO_DRIVER'
-                            ? 'bg-amber-600/20 text-amber-400 border-amber-600/30'
-                            : 'bg-blue-600/20 text-blue-400 border-blue-600/30',
-                        )}
-                        variant="outline"
-                      >
+                  <div className="rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-1.5">
+                    <p className="text-[9px] text-zinc-500 uppercase tracking-wider">Status</p>
+                    <p className={cn('text-xs font-semibold', allSettled ? 'text-green-400' : 'text-yellow-400')}>
+                      {allSettled ? 'Paid' : 'Pending'}
+                    </p>
+                  </div>
+                  {fin && (
+                    <div className="rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-1.5">
+                      <p className="text-[9px] text-zinc-500 uppercase tracking-wider">Payment</p>
+                      <p className="text-xs font-semibold text-zinc-200">
                         {fin.paymentCollection === 'CASH_TO_DRIVER' ? 'Cash' : 'Prepaid'}
-                      </Badge>
+                      </p>
                     </div>
+                  )}
+                </div>
 
-                    <div className="h-px bg-zinc-700 my-1" />
-
-                    <div className="flex justify-between text-sm">
-                      <span className="text-zinc-400">Business Price</span>
-                      <span className="text-zinc-200 tabular-nums">€{fin.businessPrice.toFixed(2)}</span>
-                    </div>
-
-                    {fin.markupAmount > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-zinc-400">Platform Markup</span>
-                        <span className="text-zinc-500 tabular-nums">+€{fin.markupAmount.toFixed(2)}</span>
+                {/* Settlement Breakdown */}
+                <div className="rounded-lg bg-zinc-800 border border-zinc-700 overflow-hidden">
+                  <p className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider px-3 pt-3 pb-2">Settlement Breakdown</p>
+                  {og.settlements.map((s: SettlementRecord, i: number) => {
+                    const isPayable = s.direction === SettlementDirection.Payable;
+                    return (
+                      <div
+                        key={s.id}
+                        className={cn(
+                          'flex items-center justify-between px-3 py-2.5',
+                          i % 2 === 0 ? 'bg-zinc-800/80' : 'bg-zinc-850/50',
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className={cn('w-2 h-2 rounded-full shrink-0', isPayable ? 'bg-green-500' : 'bg-red-500')} />
+                          {directionBadge(s.direction)}
+                          {statusBadge(!!s.isSettled)}
+                        </div>
+                        <span className={cn('text-sm font-bold tabular-nums', isPayable ? 'text-green-400' : 'text-red-400')}>
+                          {isPayable ? '+' : '-'}€{Number(s.amount ?? 0).toFixed(2)}
+                        </span>
                       </div>
-                    )}
+                    );
+                  })}
+                  <div className="flex justify-between px-3 py-2.5 border-t border-zinc-700 bg-zinc-800">
+                    <span className="text-sm font-bold text-white">Net</span>
+                    <span className={cn('text-sm font-bold tabular-nums', netAmount >= 0 ? 'text-green-400' : 'text-red-400')}>
+                      {netAmount >= 0 ? '+' : ''}€{netAmount.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
 
-                    <div className="flex justify-between text-sm">
-                      <span className="text-zinc-400">Customer Paid</span>
-                      <span className="text-zinc-200 tabular-nums">€{fin.customerPaid.toFixed(2)}</span>
-                    </div>
-
-                    <div className="h-px bg-zinc-700 my-1" />
-
-                    {fin.amountOwedToBusiness > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-zinc-400">Owed to Business</span>
-                        <span className="text-green-400 font-medium tabular-nums">+€{fin.amountOwedToBusiness.toFixed(2)}</span>
+                {/* Items */}
+                {orderDetailLoading ? (
+                  <Skeleton className="h-32 w-full rounded-lg" />
+                ) : items.length > 0 ? (
+                  <div className="rounded-lg bg-zinc-800 border border-zinc-700 overflow-hidden">
+                    <p className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider px-3 pt-3 pb-2">Items</p>
+                    {items.map((item, i) => (
+                      <div key={item.id}>
+                        <div className={cn('flex justify-between items-start px-3 py-2.5', i % 2 === 0 ? 'bg-zinc-800/80' : 'bg-zinc-850/50')}>
+                          <div className="flex-1 min-w-0 mr-3">
+                            <p className="text-sm font-medium text-zinc-200">
+                              {item.quantity}× {item.name}
+                            </p>
+                            {item.notes && (
+                              <p className="text-[11px] text-zinc-500 mt-0.5 italic">Note: {item.notes}</p>
+                            )}
+                            {item.selectedOptions.length > 0 && (
+                              <div className="mt-1 space-y-0.5">
+                                {item.selectedOptions.map((opt) => (
+                                  <p key={opt.id} className="text-[11px] text-zinc-500">
+                                    + {opt.optionGroupName}: {opt.optionName}
+                                    {opt.priceAtOrder > 0 ? ` (+€${Number(opt.priceAtOrder).toFixed(2)})` : ''}
+                                  </p>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <span className="text-sm font-semibold text-zinc-100 tabular-nums shrink-0">
+                            €{(Number(item.unitPrice) * item.quantity).toFixed(2)}
+                          </span>
+                        </div>
+                        {item.childItems.map((child) => (
+                          <div
+                            key={child.id}
+                            className="flex justify-between px-3 py-1.5 pl-7 bg-zinc-900/50"
+                          >
+                            <span className="text-xs text-zinc-500">↳ {child.quantity}× {child.name}</span>
+                            <span className="text-xs text-zinc-500 tabular-nums">
+                              €{(Number(child.unitPrice) * child.quantity).toFixed(2)}
+                            </span>
+                          </div>
+                        ))}
                       </div>
-                    )}
+                    ))}
+                  </div>
+                ) : null}
 
-                    {fin.amountOwedByBusiness > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-zinc-400">Owed by Business</span>
-                        <span className="text-red-400 font-medium tabular-nums">-€{fin.amountOwedByBusiness.toFixed(2)}</span>
+                {/* Price Breakdown */}
+                {(financialsLoading || orderDetailLoading) && !fin ? (
+                  <Skeleton className="h-24 w-full rounded-lg" />
+                ) : (orderDetail || fin) ? (
+                  <div className="rounded-lg bg-zinc-800 border border-zinc-700 overflow-hidden">
+                    <p className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider px-3 pt-3 pb-2">Price Breakdown</p>
+                    {[
+                      items.length > 0
+                        ? { label: 'Items subtotal', value: `€${itemsSubtotal.toFixed(2)}`, color: 'text-zinc-200' }
+                        : fin ? { label: 'Business Price', value: `€${fin.businessPrice.toFixed(2)}`, color: 'text-zinc-200' } : null,
+                      orderDetail ? { label: 'Delivery fee', value: `€${Number(orderDetail.deliveryPrice ?? 0).toFixed(2)}`, color: 'text-zinc-200' } : null,
+                      itemDiscounts > 0 ? { label: 'Item discount', value: `−€${itemDiscounts.toFixed(2)}`, color: 'text-green-400' } : null,
+                      deliveryDiscounts > 0 ? { label: 'Delivery discount', value: `−€${deliveryDiscounts.toFixed(2)}`, color: 'text-green-400' } : null,
+                      fin?.markupAmount && fin.markupAmount > 0 ? { label: 'Platform markup', value: `+€${fin.markupAmount.toFixed(2)}`, color: 'text-zinc-500' } : null,
+                      orderDetail ? { label: 'Order total', value: `€${Number(orderDetail.totalPrice ?? 0).toFixed(2)}`, color: 'text-white', bold: true } : null,
+                      fin ? { label: 'Platform commission', value: `−€${og.totalReceivable.toFixed(2)}`, color: 'text-amber-400' } : null,
+                      fin ? { label: 'Net earnings', value: `${netAmount >= 0 ? '+' : ''}€${netAmount.toFixed(2)}`, color: netAmount >= 0 ? 'text-green-400' : 'text-red-400', bold: true } : null,
+                    ].filter(Boolean).map((row: NonNullable<typeof row>, i: number) => (
+                      <div
+                        key={i}
+                        className={cn(
+                          'flex justify-between px-3 py-2.5',
+                          row!.bold ? 'border-t border-zinc-700' : '',
+                          i % 2 === 0 ? 'bg-zinc-800/80' : 'bg-zinc-850/50',
+                        )}
+                      >
+                        <span className="text-sm text-zinc-400">{row!.label}</span>
+                        <span className={cn('text-sm tabular-nums', row!.bold ? 'font-bold' : 'font-medium', row!.color)}>
+                          {row!.value}
+                        </span>
                       </div>
-                    )}
+                    ))}
+                  </div>
+                ) : null}
 
-                    <div className="h-px bg-zinc-700 my-1" />
-
-                    <div className="flex justify-between text-sm font-semibold">
-                      <span className="text-white">Business Net Earnings</span>
-                      <span className={cn('tabular-nums', fin.businessNetEarnings >= 0 ? 'text-green-400' : 'text-red-400')}>
-                        {fin.businessNetEarnings >= 0 ? '+' : ''}€{fin.businessNetEarnings.toFixed(2)}
+                {/* Discounts */}
+                {totalDiscounts > 0 && (
+                  <div className="rounded-lg bg-green-950/30 border border-green-800/30 overflow-hidden">
+                    <p className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider px-3 pt-3 pb-2">Discounts Applied</p>
+                    {promotions.map((p) => (
+                      <div key={p.id} className="flex justify-between px-3 py-2.5">
+                        <span className="text-sm text-green-300">
+                          {p.appliesTo === 'DELIVERY' ? '🚚 Delivery discount' : '🏷️ Item discount'}
+                          {p.promoCode ? ` (${p.promoCode})` : ''}
+                        </span>
+                        <span className="text-sm font-bold text-green-400 tabular-nums">
+                          −€{Number(p.discountAmount).toFixed(2)}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between px-3 py-2.5 border-t border-green-800/30">
+                      <span className="text-sm font-bold text-green-400">Total saved</span>
+                      <span className="text-sm font-bold text-green-400 tabular-nums">
+                        −€{totalDiscounts.toFixed(2)}
                       </span>
                     </div>
                   </div>
-                ) : og.order?.id ? (
-                  <p className="text-sm text-zinc-500 text-center py-4">No financial data available.</p>
-                ) : null}
+                )}
               </div>
             );
           })()}
