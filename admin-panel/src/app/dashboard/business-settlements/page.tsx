@@ -466,7 +466,7 @@ export default function BusinessSettlementsPage() {
         <SummaryCard
           icon={<DollarSign className="h-4 w-4 text-green-400" />}
           label="Gross Income"
-          value={Number(summary?.totalPayable ?? 0)}
+          value={Number(summary?.totalAmount ?? 0)}
           sub={`${summary?.count ?? 0} settlements`}
           color="text-green-400"
           loading={summaryLoading && !summary}
