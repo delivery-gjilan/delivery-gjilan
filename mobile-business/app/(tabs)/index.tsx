@@ -740,6 +740,7 @@ export default function OrdersScreen() {
                                 </View>
                             ) : null
                         }
+                        ListFooterComponentStyle={{ marginTop: 'auto' }}
                         contentContainerStyle={{ flexGrow: 1, paddingTop: 6, paddingBottom: 20, paddingHorizontal: 4 }}
                     />
                 )}

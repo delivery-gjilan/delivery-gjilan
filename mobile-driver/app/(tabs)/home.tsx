@@ -7,6 +7,7 @@ import {
     Pressable,
     Alert,
     ActivityIndicator,
+    Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation } from "@apollo/client/react";
@@ -18,9 +19,6 @@ import { useAuthStore } from "@/store/authStore";
 import { UPDATE_DRIVER_ONLINE_STATUS } from "@/graphql/operations/driverLocation";
 import { useStoreStatus } from "@/hooks/useStoreStatus";
 import { useSharedOrderAccept } from "@/hooks/GlobalOrderAcceptContext";
-import { useOrderAcceptStore } from "@/store/orderAcceptStore";
-import { useRouter } from "expo-router";
-import { OrderDetailSheet } from "@/components/OrderDetailSheet";
 import type { DriverOrder } from "@/utils/types";
 
 const UI = {
@@ -32,6 +30,37 @@ const UI = {
     accentDeep: "#006da3",
 };
 
+function formatBizToDropoffKm(order: DriverOrder): string | null {
+    const bizLoc = order.businesses?.[0]?.business?.location;
+    const dropLoc = order.dropOffLocation;
+    const lat1 = Number(bizLoc?.latitude);
+    const lon1 = Number(bizLoc?.longitude);
+    const lat2 = Number(dropLoc?.latitude);
+    const lon2 = Number(dropLoc?.longitude);
+    if (![lat1, lon1, lat2, lon2].every(Number.isFinite)) return null;
+
+    const toRad = (d: number) => (d * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const km = 6371 * c;
+    return `${km.toFixed(1)} km`;
+}
+
+function ItemThumb({ imageUrl, name }: { imageUrl?: string | null; name: string }) {
+    if (imageUrl) {
+        return <Image source={{ uri: imageUrl }} style={{ width: 22, height: 22, borderRadius: 5 }} />;
+    }
+    return (
+        <View style={{ width: 22, height: 22, borderRadius: 5, backgroundColor: "rgba(148,163,184,0.22)", alignItems: "center", justifyContent: "center" }}>
+            <Text style={{ color: "#cbd5e1", fontSize: 10, fontWeight: "800" }}>{name.charAt(0).toUpperCase()}</Text>
+        </View>
+    );
+}
+
 // ─── Order Card ──────────────────────────────────────────────────────────────
 
 type CardVariant = "available" | "assigned";
@@ -41,15 +70,15 @@ function OrderCard({
     variant,
     onAccept,
     onOpenDetails,
-    onNavigate,
     currentDriverId,
+    accepting,
 }: {
     order: DriverOrder;
     variant: CardVariant;
     onAccept?: (id: string) => void;
     onOpenDetails?: (order: DriverOrder) => void;
-    onNavigate?: (order: DriverOrder) => void;
     currentDriverId: string | undefined;
+    accepting?: boolean;
 }) {
     const theme = useTheme();
 
@@ -61,6 +90,10 @@ function OrderCard({
     const inventoryPrice = Number((order as any).inventoryPrice ?? 0);
     const businessPrice = Math.max(0, orderPrice - inventoryPrice);
     const isDirectDispatch = order.channel === "DIRECT_DISPATCH";
+    const cashToCollect = Number((order as any).cashToCollect ?? 0);
+    const totalPrice = Number(order.totalPrice ?? 0);
+    const collectFromCustomer = isDirectDispatch ? cashToCollect : totalPrice;
+    const showCollectAmount = !isDirectDispatch || cashToCollect > 0;
     const recipientLabel = order.recipientName ?? order.recipientPhone ?? null;
 
     const items = order.businesses?.flatMap((b) => b.items ?? []) ?? [];
@@ -69,11 +102,10 @@ function OrderCard({
         (sum, item) => sum + Math.max(0, item.quantity - (item.inventoryQuantity ?? 0)),
         0,
     );
-    const itemSummary = items
-        .map((i) => `${i.quantity}× ${i.name}`)
-        .slice(0, 3)
-        .join(", ");
-    const moreCount = items.length > 3 ? items.length - 3 : 0;
+    const hasInventoryCoverage = totalStockUnits > 0;
+    const stockItems = items.filter((item) => (item.inventoryQuantity ?? 0) > 0);
+    const businessItems = items.filter((item) => Math.max(0, item.quantity - (item.inventoryQuantity ?? 0)) > 0);
+    const dropoffDistanceLabel = formatBizToDropoffKm(order);
 
     // ETA badge for PREPARING orders
     const etaBadge = useMemo(() => {
@@ -100,6 +132,7 @@ function OrderCard({
         : order.status === "PREPARING" ? "Preparing"
         : order.status === "OUT_FOR_DELIVERY" ? "Out for delivery"
         : order.status;
+    const pickupSummary = etaBadge ?? (order.status === "READY" ? "Pickup now" : statusLabel);
 
     return (
         <Pressable
@@ -174,12 +207,68 @@ function OrderCard({
                 </View>
             )}
 
-            {/* Items */}
-            {itemSummary.length > 0 && (
-                <View style={{ paddingHorizontal: 16, paddingBottom: 10 }}>
-                    <Text style={{ fontSize: 13, color: UI.subtext }} numberOfLines={1}>
-                        {itemSummary}{moreCount > 0 ? ` +${moreCount} more` : ""}
+            {/* Items / pickup plan */}
+            {items.length > 0 && (
+                <View style={{ paddingHorizontal: 16, paddingBottom: 10, gap: 8 }}>
+                    <Text style={{ fontSize: 10, fontWeight: "800", color: UI.subtext, textTransform: "uppercase", letterSpacing: 0.4 }}>
+                        Pickup Plan
                     </Text>
+
+                    {hasInventoryCoverage ? (
+                        <View style={{ flexDirection: "row", gap: 10 }}>
+                            <View style={{ flex: 1 }}>
+                                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                                    <Text style={{ fontSize: 11, fontWeight: "800", color: "#c4b5fd" }}>Inventory</Text>
+                                    <Text style={{ fontSize: 11, fontWeight: "700", color: "#a78bfa" }}>×{totalStockUnits}</Text>
+                                </View>
+                                {stockItems.slice(0, 3).map((item, idx) => (
+                                    <View key={`stock-${idx}`} style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 3 }}>
+                                        <ItemThumb imageUrl={item.imageUrl} name={item.name} />
+                                        <Text style={{ flex: 1, fontSize: 12, color: UI.text }} numberOfLines={1}>{item.name}</Text>
+                                        <Text style={{ fontSize: 11, fontWeight: "700", color: "#a78bfa" }}>×{item.inventoryQuantity ?? 0}</Text>
+                                    </View>
+                                ))}
+                                {stockItems.length > 3 && (
+                                    <Text style={{ fontSize: 10, color: UI.subtext, marginTop: 2 }}>+{stockItems.length - 3} more</Text>
+                                )}
+                            </View>
+
+                            <View style={{ width: 1, backgroundColor: "rgba(148,163,184,0.2)" }} />
+
+                            <View style={{ flex: 1 }}>
+                                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                                    <Text style={{ fontSize: 11, fontWeight: "800", color: "#7dd3fc" }}>Business</Text>
+                                    <Text style={{ fontSize: 11, fontWeight: "700", color: "#38bdf8" }}>×{totalMarketUnits}</Text>
+                                </View>
+                                {businessItems.slice(0, 3).map((item, idx) => {
+                                    const fromBusiness = Math.max(0, item.quantity - (item.inventoryQuantity ?? 0));
+                                    return (
+                                        <View key={`biz-${idx}`} style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 3 }}>
+                                            <ItemThumb imageUrl={item.imageUrl} name={item.name} />
+                                            <Text style={{ flex: 1, fontSize: 12, color: UI.text }} numberOfLines={1}>{item.name}</Text>
+                                            <Text style={{ fontSize: 11, fontWeight: "700", color: "#38bdf8" }}>×{fromBusiness}</Text>
+                                        </View>
+                                    );
+                                })}
+                                {businessItems.length > 3 && (
+                                    <Text style={{ fontSize: 10, color: UI.subtext, marginTop: 2 }}>+{businessItems.length - 3} more</Text>
+                                )}
+                            </View>
+                        </View>
+                    ) : (
+                        <View>
+                            {items.slice(0, 4).map((item, idx) => (
+                                <View key={`item-${idx}`} style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 3 }}>
+                                    <ItemThumb imageUrl={item.imageUrl} name={item.name} />
+                                    <Text style={{ flex: 1, fontSize: 12, color: UI.text }} numberOfLines={1}>{item.name}</Text>
+                                    <Text style={{ fontSize: 11, fontWeight: "700", color: UI.subtext }}>×{item.quantity}</Text>
+                                </View>
+                            ))}
+                            {items.length > 4 && (
+                                <Text style={{ fontSize: 10, color: UI.subtext, marginTop: 2 }}>+{items.length - 4} more</Text>
+                            )}
+                        </View>
+                    )}
                 </View>
             )}
 
@@ -187,16 +276,65 @@ function OrderCard({
                 <View style={{ flexDirection: "row", gap: 6, paddingHorizontal: 16, paddingBottom: 10, flexWrap: "wrap" }}>
                     {totalStockUnits > 0 && (
                         <View style={{ backgroundColor: "rgba(114,9,183,0.18)", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 }}>
-                            <Text style={{ fontSize: 11, fontWeight: "700", color: "#c4b5fd" }}>📦 {totalStockUnits} stock</Text>
+                            <Text style={{ fontSize: 11, fontWeight: "700", color: "#c4b5fd" }}>📦 {totalStockUnits} inventory</Text>
                         </View>
                     )}
                     {totalMarketUnits > 0 && totalStockUnits > 0 && (
                         <View style={{ backgroundColor: "rgba(0,157,224,0.16)", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 }}>
-                            <Text style={{ fontSize: 11, fontWeight: "700", color: "#7dd3fc" }}>🛒 {totalMarketUnits} market</Text>
+                            <Text style={{ fontSize: 11, fontWeight: "700", color: "#7dd3fc" }}>🛒 {totalMarketUnits} business</Text>
                         </View>
                     )}
                 </View>
             )}
+
+            {/* Card summary (mirrors accept sheet flow) */}
+            {
+                <View style={{ paddingHorizontal: 16, paddingBottom: 12, gap: 8 }}>
+                    <View style={{ backgroundColor: "rgba(2,132,199,0.12)", borderRadius: 10, borderWidth: 1, borderColor: "rgba(56,189,248,0.25)", paddingHorizontal: 10, paddingVertical: 8, gap: 6 }}>
+                        <Text style={{ fontSize: 10, fontWeight: "800", color: "#7dd3fc", textTransform: "uppercase", letterSpacing: 0.4 }}>
+                            Route Summary
+                        </Text>
+                        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                            <Text style={{ fontSize: 12, color: "#bae6fd" }}>{order.status === "OUT_FOR_DELIVERY" ? "Route" : "Pickup"}</Text>
+                            <Text style={{ fontSize: 12, fontWeight: "700", color: "#e0f2fe" }}>{pickupSummary}</Text>
+                        </View>
+                        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                            <Text style={{ fontSize: 12, color: "#bae6fd" }}>Drop-off</Text>
+                            <Text style={{ fontSize: 12, fontWeight: "700", color: "#e0f2fe" }}>
+                                {dropoffDistanceLabel ? `${dropoffDistanceLabel} from pickup` : "Address set"}
+                            </Text>
+                        </View>
+                    </View>
+
+                    <View style={{ backgroundColor: "rgba(15,23,42,0.45)", borderRadius: 12, borderWidth: 1, borderColor: "rgba(148,163,184,0.18)", paddingHorizontal: 10, paddingVertical: 8, gap: 6 }}>
+                        <Text style={{ fontSize: 10, fontWeight: "800", color: UI.subtext, textTransform: "uppercase", letterSpacing: 0.4 }}>
+                            Order Summary
+                        </Text>
+                        {!isDirectDispatch && (
+                            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                                <Text style={{ fontSize: 12, color: "#fca5a5" }}>Give business</Text>
+                                <Text style={{ fontSize: 12, fontWeight: "700", color: "#f87171" }}>€{businessPrice.toFixed(2)}</Text>
+                            </View>
+                        )}
+                        {inventoryPrice > 0 && (
+                            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                                <Text style={{ fontSize: 12, color: "#c4b5fd" }}>Owed to platform</Text>
+                                <Text style={{ fontSize: 12, fontWeight: "700", color: "#a78bfa" }}>€{inventoryPrice.toFixed(2)}</Text>
+                            </View>
+                        )}
+                        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                            <Text style={{ fontSize: 12, color: "#93c5fd" }}>Collect from customer</Text>
+                            <Text style={{ fontSize: 12, fontWeight: "700", color: "#38bdf8" }}>
+                                {showCollectAmount ? `€${collectFromCustomer.toFixed(2)}` : "Confirm at pickup"}
+                            </Text>
+                        </View>
+                        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                            <Text style={{ fontSize: 12, color: "#86efac", fontWeight: "700" }}>Your cut</Text>
+                            <Text style={{ fontSize: 12, fontWeight: "700", color: "#22c55e" }}>€{driverTakeHome.toFixed(2)}</Text>
+                        </View>
+                    </View>
+                </View>
+            }
 
             {/* Drop-off address */}
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, paddingBottom: 14 }}>
@@ -226,12 +364,6 @@ function OrderCard({
                             incl. €{order.driverTip.toFixed(2)} tip
                         </Text>
                     )}
-                    
-                    {variant === "available" && onOpenDetails && (
-                        <Text style={{ fontSize: 10, color: UI.subtext, marginTop: 2 }}>
-                            Tap card for details
-                        </Text>
-                    )}
                 </View>
 
                 {/* Action button */}
@@ -241,6 +373,7 @@ function OrderCard({
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                             onAccept(order.id);
                         }}
+                        disabled={!!accepting}
                         activeOpacity={0.8}
                         style={{
                             backgroundColor: UI.accentDeep,
@@ -250,34 +383,15 @@ function OrderCard({
                             flexDirection: "row",
                             alignItems: "center",
                             gap: 6,
+                            opacity: accepting ? 0.6 : 1,
                         }}
                     >
-                        <Ionicons name="checkmark-circle" size={17} color="#fff" />
-                        <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>Accept</Text>
-                    </TouchableOpacity>
-                )}
-
-                {variant === "assigned" && onNavigate && (
-                    <TouchableOpacity
-                        onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                            onNavigate(order);
-                        }}
-                        activeOpacity={0.8}
-                        style={{
-                            backgroundColor: "#1a1a2e",
-                            borderWidth: 1,
-                            borderColor: "rgba(148,163,184,0.25)",
-                            borderRadius: 14,
-                            paddingVertical: 12,
-                            paddingHorizontal: 22,
-                            flexDirection: "row",
-                            alignItems: "center",
-                            gap: 6,
-                        }}
-                    >
-                        <Ionicons name="eye-outline" size={15} color="#fff" />
-                        <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>Details</Text>
+                        {accepting ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                            <Ionicons name="checkmark-circle" size={17} color="#fff" />
+                        )}
+                        <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>{accepting ? "Accepting..." : "Accept"}</Text>
                     </TouchableOpacity>
                 )}
             </View>
@@ -292,7 +406,6 @@ type TabFilter = "available" | "assigned";
 export default function Home() {
     const theme = useTheme();
     const { t } = useTranslations();
-    const router = useRouter();
     const isOnline = useAuthStore((s) => s.isOnline);
     const setOnline = useAuthStore((s) => s.setOnline);
     const setUser = useAuthStore((s) => s.setUser);
@@ -302,7 +415,6 @@ export default function Home() {
 
     const currentDriverId = user?.id;
     const [tab, setTab] = useState<TabFilter>("available");
-    const [selectedAssignedOrder, setSelectedAssignedOrder] = useState<DriverOrder | null>(null);
     const [updatingStatus, setUpdatingStatus] = useState(false);
     const [updateOnlineStatus] = useMutation(UPDATE_DRIVER_ONLINE_STATUS);
 
@@ -311,15 +423,8 @@ export default function Home() {
         poolOrders,
         isOrdersBootstrapping,
         accepting,
+        handleAcceptOrder,
     } = useSharedOrderAccept();
-
-    const openAcceptModal = useCallback((order: DriverOrder) => {
-        useOrderAcceptStore.getState().setPendingOrder(order, false);
-    }, []);
-
-    const openAssignedDetails = useCallback((order: DriverOrder) => {
-        setSelectedAssignedOrder(order);
-    }, []);
 
     const handleOnlineStatusChange = useCallback(async () => {
         const newStatus = !isOnline;
@@ -337,10 +442,6 @@ export default function Home() {
             setUpdatingStatus(false);
         }
     }, [isOnline, setOnline, setUser, updateOnlineStatus, t]);
-
-    const handleNavigate = useCallback((order: DriverOrder) => {
-        router.push("/(tabs)/drive" as any);
-    }, [router]);
 
     const connColor =
         connectionStatus === "CONNECTED" ? "#22c55e"
@@ -368,11 +469,8 @@ export default function Home() {
                 paddingBottom: 12,
             }}>
                 <View>
-                    <Text style={{ fontSize: 26, fontWeight: "900", color: UI.text, letterSpacing: -0.5 }}>
-                        {t.tabs.orders}
-                    </Text>
                     {/* Connection pill */}
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 3 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
                         <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: connColor }} />
                         <Text style={{ fontSize: 11, fontWeight: "600", color: UI.subtext }}>
                             {connLabel}
@@ -480,10 +578,10 @@ export default function Home() {
                     <OrderCard
                         order={item}
                         variant={tab}
-                        onAccept={tab === "available" ? (_id) => { openAcceptModal(item); } : undefined}
-                        onOpenDetails={tab === "available" ? openAcceptModal : openAssignedDetails}
-                        onNavigate={tab === "assigned" ? openAssignedDetails : undefined}
+                        onAccept={tab === "available" ? handleAcceptOrder : undefined}
+                        onOpenDetails={undefined}
                         currentDriverId={currentDriverId}
+                        accepting={accepting}
                     />
                 )}
                 ListHeaderComponent={ListHeader}
@@ -524,26 +622,6 @@ export default function Home() {
                     </View>
                 }
             />
-
-            {selectedAssignedOrder && (
-                <>
-                    <Pressable
-                        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(2,6,23,0.45)" }}
-                        onPress={() => setSelectedAssignedOrder(null)}
-                    />
-                    <OrderDetailSheet
-                        order={selectedAssignedOrder}
-                        routeInfo={null}
-                        previewRouteInfo={null}
-                        isAssignedToMe={true}
-                        onStartNavigation={() => {
-                            handleNavigate(selectedAssignedOrder);
-                            setSelectedAssignedOrder(null);
-                        }}
-                        onClose={() => setSelectedAssignedOrder(null)}
-                    />
-                </>
-            )}
         </SafeAreaView>
     );
 }

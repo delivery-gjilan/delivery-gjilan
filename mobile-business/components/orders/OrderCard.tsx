@@ -272,7 +272,7 @@ export function OrderCard({
                                     </Text>
                                 </View>
 
-                                {isMarket && item.imageUrl ? (
+                                {item.imageUrl ? (
                                     <Image
                                         source={{ uri: item.imageUrl }}
                                         style={{ width: isTablet ? 52 : 44, height: isTablet ? 52 : 44, borderRadius: 10, marginRight: 10, backgroundColor: '#1e293b' }}

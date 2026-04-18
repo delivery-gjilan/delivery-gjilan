@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Animated, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useSubscription } from '@apollo/client/react';
@@ -66,11 +66,29 @@ export function AppOverlays() {
     } = useSharedOrderAccept();
 
     const [poolOpen, setPoolOpen] = useState(false);
+    const poolPulse = useRef(new Animated.Value(1)).current;
+
+    useEffect(() => {
+        if (!showPoolFab) return;
+        const loop = Animated.loop(
+            Animated.sequence([
+                Animated.timing(poolPulse, { toValue: 1.18, duration: 700, useNativeDriver: true }),
+                Animated.timing(poolPulse, { toValue: 1, duration: 700, useNativeDriver: true }),
+            ])
+        );
+        loop.start();
+        return () => loop.stop();
+    }, [showPoolFab]);
     const didStartupAssignedRedirectRef = useRef(false);
     const isDriveTab = pathname === '/(tabs)/drive' || pathname === '/drive';
     const isNavigationScreen = pathname === '/navigation';
+    const hideMicOnTab =
+        pathname === '/(tabs)/earnings' || pathname === '/earnings' ||
+        pathname === '/(tabs)/orders' || pathname === '/orders' ||
+        pathname === '/(tabs)/home' || pathname === '/home' ||
+        pathname === '/(tabs)/messages' || pathname === '/messages' ||
+        pathname === '/(tabs)/profile' || pathname === '/profile';
     const isCompactHeight = viewportHeight < 760;
-    const driveFloatingTopBase = insets.top + (isCompactHeight ? 240 : 272);
 
     // Vibrate when a new order pops up
     useEffect(() => {
@@ -125,7 +143,14 @@ export function AppOverlays() {
         router.replace('/(tabs)/drive' as any);
     }, [assignedOrders, isAuthenticated, isNavigationActive, networkReady, pathname, router]);
 
-    const showPoolFab = isAuthenticated && !dispatchModeEnabled && isOnline && poolOrders.length > 0;
+    const showPoolFab = isAuthenticated && !dispatchModeEnabled && isOnline && poolOrders.length > 0 && isDriveTab;
+
+    // Position pool FAB + mic above the active order card when on drive tab
+    const cardBottomApprox = isDriveTab && assignedOrders.length > 0
+        ? insets.bottom + (isCompactHeight ? 290 : 320)
+        : insets.bottom + 80;
+    const poolFabBottom = isDriveTab ? cardBottomApprox + 8 : 100;
+    const micBottom = poolFabBottom + (showPoolFab ? 68 : 0);
 
     return (
         <>
@@ -201,12 +226,10 @@ export function AppOverlays() {
             {/* Order accept sheet + dismiss backdrop */}
             {isAuthenticated && pendingOrder && (
                 <>
-                    {!isDriveTab && !isNavigationScreen && (
-                        <Pressable
-                            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 299 }}
-                            onPress={() => !accepting && handleSkipOrder()}
-                        />
-                    )}
+                    <Pressable
+                        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 299 }}
+                        onPress={() => !accepting && handleSkipOrder()}
+                    />
                     <OrderAcceptSheet
                         order={pendingOrder}
                         onAccept={handleAcceptOrder}
@@ -221,12 +244,10 @@ export function AppOverlays() {
             )}
 
             {/* PTT floating button */}
-            {isAuthenticated && isOnline && (
+            {isAuthenticated && isOnline && !hideMicOnTab && (
                 <View style={{
                     position: 'absolute', right: 16, zIndex: 60,
-                    ...(isDriveTab
-                        ? { top: driveFloatingTopBase }
-                        : { bottom: 120 }),
+                    bottom: micBottom,
                     alignItems: 'flex-end', gap: 4,
                 }}>
                     {isTalking && (
@@ -259,30 +280,35 @@ export function AppOverlays() {
 
             {/* Pool FAB */}
             {showPoolFab && (
-                <Pressable
-                    onPress={() => setPoolOpen(true)}
-                    style={{
-                        position: 'absolute', right: 16, zIndex: 60,
-                        ...(isDriveTab
-                            ? { top: driveFloatingTopBase + 70 }
-                            : { bottom: 100 }),
-                        backgroundColor: '#0b1120', borderRadius: 18, width: 58, height: 58,
-                        alignItems: 'center', justifyContent: 'center',
-                        borderWidth: 1, borderColor: 'rgba(34,211,238,0.25)',
-                        shadowColor: '#22d3ee', shadowOffset: { width: 0, height: 0 },
-                        shadowOpacity: 0.25, shadowRadius: 12, elevation: 12,
-                    }}
-                >
-                    <Ionicons name="layers" size={22} color="#22d3ee" />
-                    <View style={{
-                        position: 'absolute', top: -4, right: -4,
-                        backgroundColor: '#f97316', borderRadius: 10,
-                        minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center',
-                        paddingHorizontal: 4, borderWidth: 2, borderColor: '#0b1120',
-                    }}>
-                        <Text style={{ color: 'white', fontSize: 10, fontWeight: '800' }}>{poolOrders.length}</Text>
-                    </View>
-                </Pressable>
+                <View style={{ position: 'absolute', right: 16, zIndex: 60, bottom: poolFabBottom, alignItems: 'center', justifyContent: 'center' }}>
+                    {/* Pulsing glow ring behind the button */}
+                    <Animated.View
+                        style={{
+                            position: 'absolute',
+                            width: 58, height: 58, borderRadius: 18,
+                            backgroundColor: 'rgba(34,211,238,0.18)',
+                            transform: [{ scale: poolPulse }],
+                        }}
+                    />
+                    <Pressable
+                        onPress={() => setPoolOpen(true)}
+                        style={{
+                            backgroundColor: '#0b1120', borderRadius: 18, width: 58, height: 58,
+                            alignItems: 'center', justifyContent: 'center',
+                            elevation: 8,
+                        }}
+                    >
+                        <Ionicons name="layers" size={22} color="#22d3ee" />
+                        <View style={{
+                            position: 'absolute', top: -4, right: -4,
+                            backgroundColor: '#f97316', borderRadius: 10,
+                            minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center',
+                            paddingHorizontal: 4, borderWidth: 2, borderColor: '#0b1120',
+                        }}>
+                            <Text style={{ color: 'white', fontSize: 10, fontWeight: '800' }}>{poolOrders.length}</Text>
+                        </View>
+                    </Pressable>
+                </View>
             )}
 
             {/* Order pool sheet */}

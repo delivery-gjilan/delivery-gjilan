@@ -124,11 +124,17 @@ export class OrderRepository {
             .select()
             .from(ordersTable)
             .where(
-                and(
-                    notInArray(ordersTable.status, ['DELIVERED', 'CANCELLED'] as OrderStatus[]),
-                    or(
+                or(
+                    and(
+                        eq(ordersTable.status, 'DELIVERED' as OrderStatus),
                         eq(ordersTable.driverId, driverId),
-                        inArray(ordersTable.status, ['PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'] as OrderStatus[]),
+                    ),
+                    and(
+                        notInArray(ordersTable.status, ['DELIVERED', 'CANCELLED'] as OrderStatus[]),
+                        or(
+                            eq(ordersTable.driverId, driverId),
+                            inArray(ordersTable.status, ['PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'] as OrderStatus[]),
+                        ),
                     ),
                 ),
             )
@@ -138,13 +144,22 @@ export class OrderRepository {
 
     async findForDriverByStatus(driverId: string, status: OrderStatus): Promise<DbOrder[]> {
         const db = await getDB();
+
+        // Historical statuses must be scoped to the assigned driver.
+        if (status === 'DELIVERED' || status === 'CANCELLED') {
+            return await db
+                .select()
+                .from(ordersTable)
+                .where(and(eq(ordersTable.status, status), eq(ordersTable.driverId, driverId)))
+                .orderBy(desc(ordersTable.createdAt));
+        }
+
         return await db
             .select()
             .from(ordersTable)
             .where(
                 and(
                     eq(ordersTable.status, status),
-                    notInArray(ordersTable.status, ['DELIVERED', 'CANCELLED'] as OrderStatus[]),
                     or(
                         eq(ordersTable.driverId, driverId),
                         inArray(ordersTable.status, ['PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'] as OrderStatus[]),

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
+import { useApolloClient } from '@apollo/client';
 import {
     View,
     Text,
@@ -20,6 +21,12 @@ const MAX_EXTRA_MESSAGES = 200;
 /** Keep only the most-recent N messages to prevent unbounded AsyncStorage growth. */
 function capMessages<T>(msgs: T[]): T[] {
     return msgs.length > MAX_EXTRA_MESSAGES ? msgs.slice(msgs.length - MAX_EXTRA_MESSAGES) : msgs;
+}
+
+function mergeMessagesById(messages: DriverMessage[]): DriverMessage[] {
+    const byId = new Map(messages.map((message) => [message.id, message]));
+    return Array.from(byId.values())
+        .sort((a, b) => parseDate(a.createdAt).getTime() - parseDate(b.createdAt).getTime());
 }
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -109,6 +116,7 @@ function buildListItems(messages: DriverMessage[]): ListItem[] {
 }
 
 export default function MessagesScreen() {
+    const apolloClient = useApolloClient();
     const theme = useTheme();
     const isDark = theme.colors.background === '#000000';
     const ALERT_CONFIG = React.useMemo(() => getAlertConfig(isDark), [isDark]);
@@ -118,6 +126,26 @@ export default function MessagesScreen() {
     const [replyText, setReplyText] = useState('');
     const [clearedAt, setClearedAt] = useState<number | null>(null);
     const flatListRef = useRef<FlatList>(null);
+
+    const persistExtraMessages = useCallback((messagesToPersist: DriverMessage[]) => {
+        void AsyncStorage.setItem(EXTRA_MESSAGES_KEY, JSON.stringify(messagesToPersist));
+    }, []);
+
+    const syncMessagesToCache = useCallback((incomingMessages: DriverMessage[]) => {
+        apolloClient.cache.updateQuery<{ myDriverMessages: DriverMessage[] }>(
+            { query: MY_DRIVER_MESSAGES, variables: { limit: 100 } },
+            (existing) => {
+                const merged = mergeMessagesById([
+                    ...(existing?.myDriverMessages ?? []),
+                    ...incomingMessages,
+                ]);
+
+                return {
+                    myDriverMessages: merged.slice(-100),
+                };
+            },
+        );
+    }, [apolloClient]);
 
     // Load persisted clear timestamp and persisted extra messages
     useEffect(() => {
@@ -146,16 +174,32 @@ export default function MessagesScreen() {
     // Derive base messages directly from query data (survives remount/cache)
     const baseMessages = queryData?.myDriverMessages ?? [];
 
+    const allMessages = React.useMemo(() => {
+        return mergeMessagesById([...baseMessages, ...extraMessages]);
+    }, [baseMessages, extraMessages]);
+
+    useEffect(() => {
+        if (baseMessages.length === 0 || extraMessages.length === 0) return;
+
+        const baseIds = new Set(baseMessages.map((message) => message.id));
+        setExtraMessages((prev) => {
+            const next = prev.filter((message) => !baseIds.has(message.id));
+            if (next.length !== prev.length) {
+                persistExtraMessages(next);
+            }
+            return next;
+        });
+    }, [baseMessages, extraMessages.length, persistExtraMessages]);
+
     // Merge base messages with any extras that arrived via subscription/mutation, filtered by clearedAt
     const messages = React.useMemo(() => {
-        const byId = new Map(baseMessages.map((m) => [m.id, m]));
-        for (const m of extraMessages) {
-            if (!byId.has(m.id)) byId.set(m.id, m);
-        }
-        return Array.from(byId.values())
-            .filter((m) => !clearedAt || parseDate(m.createdAt).getTime() > clearedAt)
-            .sort((a, b) => parseDate(a.createdAt).getTime() - parseDate(b.createdAt).getTime());
-    }, [baseMessages, extraMessages, clearedAt]);
+        return allMessages.filter((m) => !clearedAt || parseDate(m.createdAt).getTime() > clearedAt);
+    }, [allMessages, clearedAt]);
+
+    const hasHiddenMessages = React.useMemo(() => {
+        if (!clearedAt) return false;
+        return allMessages.some((m) => parseDate(m.createdAt).getTime() <= clearedAt);
+    }, [allMessages, clearedAt]);
 
     // Prefer the latest admin message from the merged stream so send works even when
     // the first admin message arrived via subscription and is not yet present in query data.
@@ -171,9 +215,10 @@ export default function MessagesScreen() {
     const [reply, { loading: replying }] = useMutation(REPLY_TO_DRIVER_MESSAGE, {
         onCompleted: (data) => {
             if (data?.replyToDriverMessage) {
+                syncMessagesToCache([data.replyToDriverMessage]);
                 setExtraMessages((prev) => {
-                    const next = capMessages([...prev, data.replyToDriverMessage]);
-                    AsyncStorage.setItem(EXTRA_MESSAGES_KEY, JSON.stringify(next));
+                    const next = capMessages(mergeMessagesById([...prev, data.replyToDriverMessage]));
+                    persistExtraMessages(next);
                     return next;
                 });
                 scrollToBottom();
@@ -185,12 +230,14 @@ export default function MessagesScreen() {
         onData: ({ data: subData }) => {
             const msg = subData.data?.driverMessageReceived as DriverMessage | undefined;
             if (!msg) return;
+            syncMessagesToCache([msg]);
             setExtraMessages((prev) => {
                 if (prev.some((m) => m.id === msg.id)) return prev;
-                const next = capMessages([...prev, msg]);
-                AsyncStorage.setItem(EXTRA_MESSAGES_KEY, JSON.stringify(next));
+                const next = capMessages(mergeMessagesById([...prev, msg]));
+                persistExtraMessages(next);
                 return next;
             });
+            void refetch();
             scrollToBottom();
         },
     });
@@ -218,6 +265,7 @@ export default function MessagesScreen() {
         setReplyText('');
         try {
             await reply({ variables: { adminId: adminId ?? '', body } });
+            await refetch();
         } catch (error) {
             setReplyText(body);
             Alert.alert(t.common.error, error instanceof Error ? error.message : 'Failed to send message');
@@ -244,6 +292,12 @@ export default function MessagesScreen() {
             ],
         );
     };
+
+    const handleRestoreHistory = useCallback(async () => {
+        await AsyncStorage.removeItem(CLEAR_STORAGE_KEY);
+        setClearedAt(null);
+        refetch();
+    }, [refetch]);
 
     // Resolve __today__ / __yesterday__ sentinel values from date label builder
     const resolveDateLabel = (raw: string): string => {
@@ -402,15 +456,27 @@ export default function MessagesScreen() {
                     </Text>
                 </View>
 
-                {messages.length > 0 && (
-                    <Pressable
-                        onPress={handleClearChat}
-                        hitSlop={8}
-                        style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, padding: 4 })}
-                    >
-                        <Ionicons name="trash-outline" size={20} color={theme.colors.subtext} />
-                    </Pressable>
-                )}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    {hasHiddenMessages && (
+                        <Pressable
+                            onPress={handleRestoreHistory}
+                            hitSlop={8}
+                            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, padding: 4 })}
+                        >
+                            <Ionicons name="refresh-outline" size={20} color={theme.colors.primary} />
+                        </Pressable>
+                    )}
+
+                    {(messages.length > 0 || hasHiddenMessages) && (
+                        <Pressable
+                            onPress={handleClearChat}
+                            hitSlop={8}
+                            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, padding: 4 })}
+                        >
+                            <Ionicons name="trash-outline" size={20} color={theme.colors.subtext} />
+                        </Pressable>
+                    )}
+                </View>
             </View>
 
             <KeyboardAvoidingView
@@ -438,11 +504,28 @@ export default function MessagesScreen() {
                             <Ionicons name="chatbubble-ellipses-outline" size={32} color={theme.colors.subtext} />
                         </View>
                         <Text style={{ color: theme.colors.text, fontSize: 15, fontWeight: '700', textAlign: 'center', marginBottom: 4 }}>
-                            {t.messages.no_messages_title}
+                            {hasHiddenMessages ? t.messages.history_hidden_title : t.messages.no_messages_title}
                         </Text>
                         <Text style={{ color: theme.colors.subtext, fontSize: 13, textAlign: 'center' }}>
-                            {t.messages.no_messages_sub}
+                            {hasHiddenMessages ? t.messages.history_hidden_sub : t.messages.no_messages_sub}
                         </Text>
+                        {hasHiddenMessages && (
+                            <Pressable
+                                onPress={handleRestoreHistory}
+                                style={({ pressed }) => ({
+                                    marginTop: 16,
+                                    paddingHorizontal: 16,
+                                    paddingVertical: 10,
+                                    borderRadius: 999,
+                                    backgroundColor: theme.colors.primary,
+                                    opacity: pressed ? 0.85 : 1,
+                                })}
+                            >
+                                <Text style={{ color: '#fff', fontSize: 13, fontWeight: '800' }}>
+                                    {t.messages.show_history}
+                                </Text>
+                            </Pressable>
+                        )}
                     </View>
                 ) : (
                     <FlatList

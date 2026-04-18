@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useRef, useState, useEffect } from 'react';
+﻿import React, { useMemo, useCallback, useRef, useState, useEffect } from 'react';
 import { View, Text, Image, StyleSheet, ActivityIndicator, Pressable, Alert, ActionSheetIOS, Platform, Linking, useColorScheme, Animated, PanResponder, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -147,13 +147,6 @@ export default function MapScreen() {
     const isInitialOrdersLoading = hasHydrated && !!currentDriverId && isOrdersBootstrapping;
     const singleCardBottomOffset = insets.bottom + (isCompactHeight ? 8 : 10);
     const stackedCardBottomOffset = insets.bottom + (isCompactHeight ? 10 : 14);
-    const floatingControlsBottom =
-        assignedOrders.length > 0
-            ? insets.bottom + (assignedOrders.length === 1
-                ? (isCompactHeight ? 290 : 320)
-                : (isCompactHeight ? 230 : 260))
-            : 20 + insets.bottom;
-    const floatingControlsTop = insets.top + (isCompactHeight ? 148 : 176);
     const dotPagerBottom = BOTTOM_BAR_HEIGHT - (isCompactHeight ? 30 : 24);
 
     // â”€â”€ Focused order object â”€â”€
@@ -705,14 +698,11 @@ export default function MapScreen() {
                                     anchor={{ x: 0.5, y: 1 }}
                                     onSelected={() => focusOrder(order)}
                                 >
-                                    <View style={[styles.dropoffPin, { transform: [{ scale: isFocused ? 1.2 : 1 }] }]}>
-                                        <View style={[
-                                            styles.dropoffPinHead,
-                                            isFocused && styles.dropoffPinHeadFocused,
-                                        ]}>
-                                            <Ionicons name="flag" size={12} color="#fff" />
+                                    <View style={styles.dropoffPin}>
+                                        <View style={styles.dropoffPinDot}>
+                                            <Ionicons name="home" size={9} color="#fff" />
                                         </View>
-                                        <View style={styles.dropoffPinTip} />
+                                        <View style={styles.dropoffPinTail} />
                                     </View>
                                 </Mapbox.PointAnnotation>
                             )}
@@ -720,49 +710,6 @@ export default function MapScreen() {
                     );
                 })}
             </Mapbox.MapView>
-
-            {/* â•â•â• Right-side buttons â•â•â• */}
-            <View style={[styles.rightButtons, { top: floatingControlsTop }]}>
-                {/* Arrived at pickup shortcut */}
-                {(() => {
-                    const t = assignedOrders.length === 1
-                        ? assignedOrders[0]
-                        : assignedOrders.find((o) => o.id === focusedOrderId) ?? null;
-                    if (t?.status !== 'READY') return null;
-                    return (
-                        <Pressable
-                            style={[styles.mapBtn, styles.mapBtnArrived]}
-                            onPress={() => handleMarkPickedUp(t.id)}
-                            disabled={markingPickedUpIds.has(t.id)}
-                        >
-                            {markingPickedUpIds.has(t.id)
-                                ? <ActivityIndicator size={16} color="#fff" />
-                                : <Ionicons name="checkmark-circle" size={22} color="#fff" />
-                            }
-                        </Pressable>
-                    );
-                })()}
-                {/* Lock camera + Recenter side rail */}
-                <View style={styles.mapControlRail}>
-                    <Pressable
-                        style={[styles.mapControlBtn, followDriver && styles.mapControlBtnActive]}
-                        onPress={toggleFollowDriver}
-                    >
-                        <Ionicons
-                            name={followDriver ? 'lock-closed' : 'lock-open-outline'}
-                            size={17}
-                            color={followDriver ? '#4285F4' : '#6B7280'}
-                        />
-                    </Pressable>
-                    <View style={styles.mapControlDividerVertical} />
-                    <Pressable
-                        style={styles.mapControlBtn}
-                        onPress={recenterOnDriver}
-                    >
-                        <Ionicons name="locate" size={18} color="#4285F4" />
-                    </Pressable>
-                </View>
-            </View>
 
             {/* â•â•â• Connection status pill â•â•â• */}
 
@@ -897,26 +844,6 @@ export default function MapScreen() {
                         {/* Multi-order swipe hint */}
                         {total > 1 && (
                             <Text style={styles.cardSwipeHint}>{t.drive.swipe_hint}</Text>
-                        )}
-
-                        {(isDirectDispatch || totalStockUnits > 0) && (
-                            <View style={styles.cardSignalRow}>
-                                {totalStockUnits > 0 && (
-                                    <View style={styles.cardSignalStock}>
-                                        <Text style={styles.cardSignalStockText}>📦 Contains inventory items</Text>
-                                    </View>
-                                )}
-                                {isDirectDispatch && cardCashToCollect > 0 && (
-                                    <View style={[styles.cardSignalPay, { backgroundColor: '#10B98120' }]}>
-                                        <Text style={[styles.cardSignalPayText, { color: '#10B981' }]}>💵 collect €{cardCashToCollect.toFixed(2)}</Text>
-                                    </View>
-                                )}
-                                {isDirectDispatch && cardCashToCollect === 0 && (
-                                    <View style={[styles.cardSignalPay, { backgroundColor: '#9CA3AF20' }]}>
-                                        <Text style={[styles.cardSignalPayText, { color: '#9CA3AF' }]}>💵 confirm at pickup</Text>
-                                    </View>
-                                )}
-                            </View>
                         )}
 
                         {/* Primary CTA */}
@@ -1079,32 +1006,30 @@ const styles = StyleSheet.create({
     },
     dropoffPin: {
         alignItems: 'center',
-        width: 28,
-        height: 38,
+        width: 20,
+        height: 26,
     },
-    dropoffPinHead: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
+    dropoffPinDot: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
         backgroundColor: '#f97316',
+        borderWidth: 2,
+        borderColor: '#fff',
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#f97316',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.55,
-        shadowRadius: 5,
-        elevation: 7,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 5,
     },
-    dropoffPinHeadFocused: {
-        borderWidth: 2.5,
-        borderColor: '#fff',
-    },
-    dropoffPinTip: {
+    dropoffPinTail: {
         width: 0,
         height: 0,
-        borderLeftWidth: 5,
-        borderRightWidth: 5,
-        borderTopWidth: 9,
+        borderLeftWidth: 3,
+        borderRightWidth: 3,
+        borderTopWidth: 6,
         borderLeftColor: 'transparent',
         borderRightColor: 'transparent',
         borderTopColor: '#f97316',
@@ -1112,82 +1037,6 @@ const styles = StyleSheet.create({
     },
 
     /* â”€â”€ Right-side buttons â”€â”€ */
-    rightButtons: {
-        position: 'absolute',
-        right: 16,
-        alignItems: 'center',
-        gap: 10,
-        zIndex: 10,
-    },
-    mapBtn: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: 'rgba(15,23,42,0.92)',
-        borderWidth: 1,
-        borderColor: 'rgba(148,163,184,0.28)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.18,
-        shadowRadius: 6,
-        elevation: 5,
-    },
-    mapBtnActive: {
-        backgroundColor: 'rgba(0,157,224,0.2)',
-        borderWidth: 1.5,
-        borderColor: '#009de0',
-    },
-    mapBtnArrived: {
-        backgroundColor: '#16a34a',
-    },
-    mapControlRail: {
-        alignItems: 'center',
-        backgroundColor: 'rgba(15,23,42,0.92)',
-        borderRadius: 18,
-        borderWidth: 1,
-        borderColor: 'rgba(148,163,184,0.28)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.18,
-        shadowRadius: 6,
-        elevation: 5,
-        overflow: 'hidden',
-    },
-    mapControlBtn: {
-        width: 42,
-        height: 42,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    mapControlBtnActive: {
-        backgroundColor: 'rgba(0,157,224,0.2)',
-    },
-    mapControlDividerVertical: {
-        width: 24,
-        height: 1,
-        backgroundColor: 'rgba(148,163,184,0.3)',
-    },
-    poolBadge: {
-        position: 'absolute',
-        top: 6,
-        right: 6,
-        width: 16,
-        height: 16,
-        borderRadius: 8,
-        backgroundColor: '#22d3ee',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    poolBadgeText: {
-        color: '#0f172a',
-        fontSize: 9,
-        fontWeight: '800',
-    },
-
-    /* â”€â”€ Single swipeable active order card â”€â”€ */
-    /* â”€â”€ Multi-order card wrap + stack â”€â”€ */
     singleCardWrap: {
         position: 'absolute',
         left: 12,
@@ -1205,17 +1054,17 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(255,255,255,0.06)',
     },
     singleCard: {
-        backgroundColor: 'rgba(12,16,30,0.90)',
-        borderRadius: 18,
+        backgroundColor: 'rgba(12,16,30,0.92)',
+        borderRadius: 16,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.08)',
-        padding: 12,
-        gap: 8,
+        padding: 10,
+        gap: 6,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.45,
-        shadowRadius: 14,
-        elevation: 14,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.35,
+        shadowRadius: 10,
+        elevation: 10,
     },
     /* â”€â”€ Dot pager â”€â”€ */
     dotPager: {
@@ -1270,15 +1119,15 @@ const styles = StyleSheet.create({
         paddingRight: 44,
     },
     cardAvatar: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
+        width: 26,
+        height: 26,
+        borderRadius: 13,
         alignItems: 'center',
         justifyContent: 'center',
         flexShrink: 0,
     },
     cardAvatarText: {
-        fontSize: 13,
+        fontSize: 11,
         fontWeight: '800',
         color: '#fff',
     },
@@ -1374,43 +1223,14 @@ const styles = StyleSheet.create({
         fontSize: 10,
         fontWeight: '500',
     },
-    cardSignalRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        flexWrap: 'wrap',
-        marginTop: -1,
-    },
-    cardSignalStock: {
-        backgroundColor: 'rgba(124,58,237,0.16)',
-        borderRadius: 999,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-    },
-    cardSignalStockText: {
-        color: '#c4b5fd',
-        fontSize: 11,
-        fontWeight: '700',
-    },
-    cardSignalPay: {
-        backgroundColor: 'rgba(239,68,68,0.14)',
-        borderRadius: 999,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-    },
-    cardSignalPayText: {
-        color: '#fca5a5',
-        fontSize: 11,
-        fontWeight: '700',
-        marginLeft: 'auto' as any,
-    },
+
     cardCta: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 7,
+        gap: 6,
         borderRadius: 10,
-        paddingVertical: 10,
+        paddingVertical: 9,
     },
     cardCtaRow: {
         flexDirection: 'row',

@@ -10,6 +10,12 @@ interface Props {
     onNavigate?: () => void;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  OrderDetailsPanel — compact card shown at the top of the map while an order
+//  is active.  Has a coloured status strip, key info row, and optional item
+//  list when expanded.
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function OrderDetailsPanel({
     order,
     isExpanded = false,
@@ -22,6 +28,9 @@ export function OrderDetailsPanel({
     const netEarnings = Number(order.driverTakeHomePreview ?? 0);
     const allItems = (order.businesses ?? []).flatMap((b) => b.items ?? []);
     const itemCount = allItems.length;
+    const shortAddress = order.dropOffLocation?.address
+        ? order.dropOffLocation.address.split(',')[0]
+        : null;
 
     const statusColor =
         order.status === 'READY' ? '#22c55e'
@@ -30,254 +39,216 @@ export function OrderDetailsPanel({
         : '#6b7280';
 
     const statusLabel =
-        order.status === 'READY' ? 'Ready'
+        order.status === 'READY' ? 'Ready for pickup'
         : order.status === 'PREPARING' ? 'Preparing'
         : order.status === 'OUT_FOR_DELIVERY' ? 'Delivering'
         : order.status;
 
+    const etaMins = order.estimatedReadyAt && order.status === 'PREPARING'
+        ? Math.ceil((new Date(order.estimatedReadyAt).getTime() - Date.now()) / 60000)
+        : null;
+
     return (
-        <View style={[styles.container, isDirectDispatch && styles.containerDD]}>
-            {/* Left status accent bar */}
-            <View style={[styles.accentBar, { backgroundColor: statusColor }]} />
-
-            <View style={styles.inner}>
-                {/* Main row — always visible */}
-                <Pressable style={styles.mainRow} onPress={onToggle}>
-                    <View style={styles.infoBlock}>
-                        <View style={styles.bizRow}>
-                            <Text style={styles.bizName} numberOfLines={1}>{bizName}</Text>
-                            {isDirectDispatch && (
-                                <View style={styles.ddChip}>
-                                    <Ionicons name="call" size={9} color="#fff" />
-                                    <Text style={styles.ddChipText}>Direct</Text>
-                                </View>
-                            )}
-                        </View>
-                        {recipientLabel ? (
-                            <Text style={styles.subText} numberOfLines={1}>{recipientLabel}</Text>
-                        ) : (
-                            <Text style={styles.subText} numberOfLines={1}>
-                                {statusLabel}{itemCount > 0 ? ` · ${itemCount} item${itemCount !== 1 ? 's' : ''}` : ''}
-                            </Text>
-                        )}
-                    </View>
-
-                    <View style={styles.rightBlock}>
-                        <View style={styles.earningsChip}>
-                            <Text style={styles.earningsText}>€{netEarnings.toFixed(2)}</Text>
-                        </View>
-                        <Ionicons
-                            name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                            size={15}
-                            color="#475569"
-                        />
-                    </View>
-                </Pressable>
-
-                {/* Expanded content */}
-                {isExpanded && (
-                    <View style={styles.expandedContent}>
-                        <View style={styles.expandedTopRow}>
-                            <View style={[styles.statusPill, { backgroundColor: statusColor + '18', borderColor: statusColor + '35' }]}>
-                                <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-                                <Text style={[styles.statusPillText, { color: statusColor }]}>{statusLabel}</Text>
-                            </View>
-                            {order.estimatedReadyAt && order.status === 'PREPARING' && (() => {
-                                const mins = Math.ceil((new Date(order.estimatedReadyAt).getTime() - Date.now()) / 60000);
-                                return (
-                                    <Text style={styles.etaText}>
-                                        {mins > 0 ? `Ready in ${mins} min` : 'Almost ready'}
-                                    </Text>
-                                );
-                            })()}
-                        </View>
-
-                        {order.dropOffLocation?.address && (
-                            <View style={styles.detailRow}>
-                                <Ionicons name="location-outline" size={12} color="#475569" />
-                                <Text style={styles.detailText} numberOfLines={1}>
-                                    {order.dropOffLocation.address.split(',')[0]}
-                                </Text>
-                            </View>
-                        )}
-
-                        {itemCount > 0 && (
-                            <View style={styles.itemsList}>
-                                {allItems.slice(0, 5).map((item, idx) => (
-                                    <View key={idx} style={styles.itemsListRow}>
-                                        {(item as any).imageUrl ? (
-                                            <Image source={{ uri: (item as any).imageUrl }} style={styles.itemThumb} />
-                                        ) : (
-                                            <View style={styles.itemThumbFallback}>
-                                                <Text style={styles.itemThumbText}>{item.name.charAt(0).toUpperCase()}</Text>
-                                            </View>
-                                        )}
-                                        <Text style={styles.itemsListName} numberOfLines={1}>{item.name}</Text>
-                                        <Text style={styles.itemsListQty}>×{item.quantity}</Text>
-                                    </View>
-                                ))}
-                                {itemCount > 5 && (
-                                    <Text style={styles.itemsMore}>+{itemCount - 5} more items</Text>
-                                )}
-                            </View>
-                        )}
+        <View style={[styles.card, isDirectDispatch && styles.cardDD]}>
+            {/* Top status strip */}
+            <View style={[styles.statusStrip, { backgroundColor: statusColor }]}>
+                <View style={styles.statusDot} />
+                <Text style={styles.statusText}>{statusLabel}</Text>
+                {etaMins !== null && etaMins > 0 && (
+                    <Text style={styles.etaText}>· ready in {etaMins} min</Text>
+                )}
+                {isDirectDispatch && (
+                    <View style={styles.ddPill}>
+                        <Ionicons name="call" size={8} color="#fff" />
+                        <Text style={styles.ddPillText}>Direct</Text>
                     </View>
                 )}
             </View>
+
+            {/* Main content — tappable to expand items */}
+            <Pressable style={styles.body} onPress={onToggle}>
+                {/* Row 1: biz + earnings */}
+                <View style={styles.mainRow}>
+                    <Text style={styles.bizName} numberOfLines={1}>{bizName}</Text>
+                    <View style={styles.earningsChip}>
+                        <Text style={styles.earningsText}>€{netEarnings.toFixed(2)}</Text>
+                    </View>
+                    <Ionicons
+                        name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                        size={13}
+                        color="#334155"
+                    />
+                </View>
+
+                {/* Row 2: recipient / address */}
+                <View style={styles.subRow}>
+                    <Ionicons name="person-outline" size={11} color="#475569" />
+                    <Text style={styles.subText} numberOfLines={1}>
+                        {recipientLabel ?? `${itemCount} item${itemCount !== 1 ? 's' : ''}`}
+                    </Text>
+                    {shortAddress ? (
+                        <>
+                            <Text style={styles.subSep}>·</Text>
+                            <Ionicons name="location-outline" size={11} color="#475569" />
+                            <Text style={styles.addressText} numberOfLines={1}>{shortAddress}</Text>
+                        </>
+                    ) : null}
+                </View>
+
+                {/* Expanded item list */}
+                {isExpanded && itemCount > 0 && (
+                    <View style={styles.itemsList}>
+                        {allItems.slice(0, 5).map((item, idx) => (
+                            <View key={idx} style={styles.itemRow}>
+                                {(item as any).imageUrl ? (
+                                    <Image source={{ uri: (item as any).imageUrl }} style={styles.itemThumb} />
+                                ) : (
+                                    <View style={styles.itemThumbFallback}>
+                                        <Text style={styles.itemThumbText}>{item.name.charAt(0).toUpperCase()}</Text>
+                                    </View>
+                                )}
+                                <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+                                <Text style={styles.itemQty}>×{item.quantity}</Text>
+                            </View>
+                        ))}
+                        {itemCount > 5 && (
+                            <Text style={styles.itemsMore}>+{itemCount - 5} more</Text>
+                        )}
+                    </View>
+                )}
+            </Pressable>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        backgroundColor: 'rgba(10,14,26,0.90)',
-        borderRadius: 14,
+    card: {
+        backgroundColor: 'rgba(10,14,26,0.92)',
+        borderRadius: 12,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.09)',
-        marginBottom: 10,
+        borderColor: 'rgba(255,255,255,0.08)',
+        marginBottom: 8,
         overflow: 'hidden',
-        flexDirection: 'row',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.30,
-        shadowRadius: 10,
-        elevation: 8,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+        elevation: 6,
     },
-    containerDD: {
-        borderColor: 'rgba(249,115,22,0.28)',
-        backgroundColor: 'rgba(18,10,4,0.92)',
+    cardDD: {
+        borderColor: 'rgba(249,115,22,0.30)',
+        backgroundColor: 'rgba(18,10,4,0.94)',
     },
-    accentBar: {
-        width: 4,
-        borderTopLeftRadius: 14,
-        borderBottomLeftRadius: 14,
-    },
-    inner: {
-        flex: 1,
-    },
-    mainRow: {
+    statusStrip: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        gap: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        gap: 5,
     },
-    infoBlock: {
-        flex: 1,
-        gap: 3,
+    statusDot: {
+        width: 5,
+        height: 5,
+        borderRadius: 3,
+        backgroundColor: 'rgba(255,255,255,0.55)',
     },
-    bizRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    },
-    bizName: {
-        fontSize: 14,
+    statusText: {
+        fontSize: 10,
         fontWeight: '700',
-        color: '#e2e8f0',
-        flex: 1,
+        color: 'rgba(255,255,255,0.9)',
+        letterSpacing: 0.4,
+        textTransform: 'uppercase',
     },
-    ddChip: {
+    etaText: {
+        fontSize: 10,
+        color: 'rgba(255,255,255,0.6)',
+        fontWeight: '500',
+    },
+    ddPill: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 3,
-        backgroundColor: '#F97316',
+        backgroundColor: 'rgba(0,0,0,0.2)',
         borderRadius: 999,
         paddingHorizontal: 6,
         paddingVertical: 2,
+        marginLeft: 'auto' as any,
     },
-    ddChipText: {
+    ddPillText: {
         fontSize: 8,
         fontWeight: '800',
         color: '#fff',
     },
-    subText: {
-        fontSize: 11,
-        color: '#64748b',
+    body: {
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        gap: 4,
     },
-    rightBlock: {
+    mainRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
-        flexShrink: 0,
+        gap: 7,
+    },
+    bizName: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#e2e8f0',
+        flex: 1,
     },
     earningsChip: {
         backgroundColor: 'rgba(22,163,74,0.18)',
-        borderRadius: 8,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
+        borderRadius: 7,
+        paddingHorizontal: 7,
+        paddingVertical: 3,
         borderWidth: 1,
         borderColor: 'rgba(34,197,94,0.28)',
+        flexShrink: 0,
     },
     earningsText: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '800',
         color: '#22c55e',
     },
-    expandedContent: {
-        paddingHorizontal: 12,
-        paddingBottom: 12,
-        paddingTop: 2,
-        gap: 7,
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(255,255,255,0.06)',
-    },
-    expandedTopRow: {
+    subRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: 4,
     },
-    statusPill: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 5,
-        borderRadius: 8,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderWidth: 1,
-    },
-    statusDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-    },
-    statusPillText: {
-        fontSize: 11,
-        fontWeight: '700',
-    },
-    etaText: {
+    subText: {
         fontSize: 11,
         color: '#64748b',
-        fontWeight: '500',
+        flexShrink: 1,
     },
-    detailRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
+    subSep: {
+        fontSize: 11,
+        color: '#334155',
     },
-    detailText: {
-        fontSize: 12,
+    addressText: {
+        fontSize: 11,
         color: '#64748b',
         flex: 1,
     },
     itemsList: {
         gap: 5,
-        marginTop: 2,
+        marginTop: 5,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255,255,255,0.05)',
+        paddingTop: 7,
     },
-    itemsListRow: {
+    itemRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
     },
     itemThumb: {
-        width: 26,
-        height: 26,
+        width: 24,
+        height: 24,
         borderRadius: 5,
         flexShrink: 0,
     },
     itemThumbFallback: {
-        width: 26,
-        height: 26,
+        width: 24,
+        height: 24,
         borderRadius: 5,
         backgroundColor: 'rgba(255,255,255,0.06)',
         alignItems: 'center',
@@ -285,16 +256,16 @@ const styles = StyleSheet.create({
         flexShrink: 0,
     },
     itemThumbText: {
-        fontSize: 10,
+        fontSize: 9,
         fontWeight: '700',
         color: '#475569',
     },
-    itemsListName: {
-        fontSize: 12,
+    itemName: {
+        fontSize: 11,
         color: '#94a3b8',
         flex: 1,
     },
-    itemsListQty: {
+    itemQty: {
         fontSize: 11,
         fontWeight: '600',
         color: '#475569',
@@ -303,6 +274,5 @@ const styles = StyleSheet.create({
         fontSize: 10,
         color: '#475569',
         textAlign: 'center',
-        marginTop: 2,
     },
 });

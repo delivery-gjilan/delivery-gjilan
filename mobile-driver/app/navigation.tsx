@@ -21,7 +21,7 @@ import { useTranslations } from '@/hooks/useTranslations';
 import type { DriverOrder } from '@/utils/types';
 import { normalizeCoordinate } from '@/utils/locationValidation';
 import * as Haptics from 'expo-haptics';
-import { NavigationOrderCard } from '@/components/NavigationOrderCard';
+import { OrderDetailsPanel } from '@/components/OrderDetailsPanel';
 
 /* â”€â”€â”€ Screen constants â”€â”€â”€ */
 const STATUS_COLORS: Record<string, string> = {
@@ -71,6 +71,7 @@ export default function NavigationScreen() {
     const [notifiedAt, setNotifiedAt] = useState<number | null>(null);
     const [newOrderToast, setNewOrderToast] = useState<{ id: string; businessName: string } | null>(null);
     const [navIncomingMessage, setNavIncomingMessage] = useState<{ id: string; body: string; alertType: AlertType; adminId: string } | null>(null);
+    const [navCardExpanded, setNavCardExpanded] = useState(false);
 
     useSubscription(DRIVER_MESSAGE_RECEIVED_SUB, {
         onData: ({ data: subData }) => {
@@ -437,11 +438,10 @@ export default function NavigationScreen() {
             {/* Order details card (collapsible) */}
             {order && (
                 <View style={[styles.orderCardContainer, { top: insets.top + 12 }]}>
-                    <NavigationOrderCard
+                    <OrderDetailsPanel
                         order={order}
-                        isDirectDispatch={order.channel === 'DIRECT_DISPATCH'}
-                        etaMins={durationRemainingS != null ? Math.ceil(durationRemainingS / 60) : null}
-                        phase={phase}
+                        isExpanded={navCardExpanded}
+                        onToggle={() => setNavCardExpanded(prev => !prev)}
                     />
                 </View>
             )}

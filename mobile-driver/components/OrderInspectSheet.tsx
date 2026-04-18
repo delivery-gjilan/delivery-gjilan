@@ -93,7 +93,7 @@ export function OrderInspectSheet({
     const _earlyAllItems = (order.businesses ?? []).flatMap((b) => b.items ?? []);
     const _earlyHasInventory = _earlyAllItems.reduce((sum, it) => sum + (it.inventoryQuantity ?? 0), 0) > 0;
     const [itemsExpanded, setItemsExpanded] = useState(_earlyHasInventory);
-    const [isCollapsed, setIsCollapsed] = useState(mode === 'available' && hasActiveOrder);
+
     const acceptPulse = useRef(new Animated.Value(1)).current;
     const { data: metricsData } = useQuery(GET_MY_DRIVER_METRICS, { fetchPolicy: 'cache-first' });
 
@@ -157,10 +157,7 @@ export function OrderInspectSheet({
     useEffect(() => {
         // Auto-expand items only when order has inventory coverage
         setItemsExpanded(allItems.reduce((s, it) => s + (it.inventoryQuantity ?? 0), 0) > 0);
-        // Reset to collapsed when a new order arrives and driver has an active order
-        if (mode === 'available' && hasActiveOrder) {
-            setIsCollapsed(true);
-        }
+
     }, [order?.id]);
 
     useEffect(() => {
@@ -320,70 +317,6 @@ export function OrderInspectSheet({
 
     const primaryDisabled = primaryAction.loading || markingPickedUp || (isAvailable && takenByOther);
 
-    // ── Collapsed pill (shown when driver already has an active order) ──
-    if (isCollapsed && isAvailable) {
-        return (
-            <View style={[styles.collapsedRoot, { bottom: insets.bottom + 82 }]}>
-                <Pressable style={[styles.collapsedBar, isDirectDispatch && styles.collapsedBarDD]} onPress={() => setIsCollapsed(false)}>
-                    {/* Countdown ring */}
-                    {autoCountdown && !takenByOther && (
-                        <View style={styles.collapsedRingWrap}>
-                            <Svg width={32} height={32} viewBox="0 0 52 52">
-                                <Circle cx={26} cy={26} r={RING_R} stroke="rgba(255,255,255,0.1)" strokeWidth={3.5} fill="none" />
-                                <Circle
-                                    cx={26} cy={26} r={RING_R}
-                                    stroke={ringColor}
-                                    strokeWidth={3.5}
-                                    fill="none"
-                                    strokeDasharray={`${RING_C} ${RING_C}`}
-                                    strokeDashoffset={ringOffset}
-                                    strokeLinecap="round"
-                                    rotation="-90"
-                                    origin="26, 26"
-                                />
-                            </Svg>
-                            <Text style={[styles.collapsedCountdownText, { color: ringColor }]}>{countdown}</Text>
-                        </View>
-                    )}
-
-                    {/* Info */}
-                    <View style={styles.collapsedInfo}>
-                        <View style={styles.collapsedInfoRow}>
-                            <Text style={styles.collapsedBizName} numberOfLines={1}>{bizName}</Text>
-                            {isDirectDispatch && (
-                                <View style={styles.collapsedDDChip}>
-                                    <Text style={styles.collapsedDDChipText}>Direct</Text>
-                                </View>
-                            )}
-                        </View>
-                        <Text style={styles.collapsedEarnings}>€{netEarnings.toFixed(2)} · {etaLabel}</Text>
-                    </View>
-
-                    {/* Expand hint */}
-                    <View style={styles.collapsedExpandHint}>
-                        <Ionicons name="chevron-up" size={13} color="#475569" />
-                    </View>
-
-                    {/* Accept */}
-                    <Pressable
-                        style={[styles.collapsedAcceptBtn, isDirectDispatch && styles.collapsedAcceptBtnDD, (accepting || takenByOther) && { opacity: 0.5 }]}
-                        onPress={handleAccept}
-                        disabled={accepting || takenByOther}
-                    >
-                        {accepting
-                            ? <ActivityIndicator size={16} color="#fff" />
-                            : <Ionicons name="checkmark" size={18} color="#fff" />
-                        }
-                    </Pressable>
-
-                    {/* Skip */}
-                    <Pressable style={styles.collapsedSkipBtn} onPress={onClose}>
-                        <Ionicons name="close" size={18} color="#6b7280" />
-                    </Pressable>
-                </Pressable>
-            </View>
-        );
-    }
 
     return (
         <Animated.View style={[styles.root, { transform: [{ translateY: slideY }] }]}>
@@ -1272,106 +1205,5 @@ const styles = StyleSheet.create({
         fontWeight: '500',
     },
 
-    /* ── Collapsed pill ── */
-    collapsedRoot: {
-        position: 'absolute',
-        left: 12,
-        right: 12,
-        zIndex: 300,
-    },
-    collapsedBar: {
-        backgroundColor: 'rgba(12,16,28,0.96)',
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        gap: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.45,
-        shadowRadius: 12,
-        elevation: 14,
-    },
-    collapsedBarDD: {
-        borderColor: 'rgba(249,115,22,0.35)',
-        backgroundColor: 'rgba(20,10,4,0.96)',
-    },
-    collapsedRingWrap: {
-        width: 32,
-        height: 32,
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexShrink: 0,
-    },
-    collapsedCountdownText: {
-        position: 'absolute',
-        fontSize: 10,
-        fontWeight: '800',
-    },
-    collapsedInfo: {
-        flex: 1,
-        gap: 3,
-    },
-    collapsedInfoRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    },
-    collapsedBizName: {
-        fontSize: 13,
-        fontWeight: '700',
-        color: '#e2e8f0',
-        flex: 1,
-    },
-    collapsedDDChip: {
-        backgroundColor: '#F97316',
-        borderRadius: 999,
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-    },
-    collapsedDDChipText: {
-        fontSize: 9,
-        fontWeight: '800',
-        color: '#fff',
-    },
-    collapsedEarnings: {
-        fontSize: 11,
-        color: '#22c55e',
-        fontWeight: '600',
-    },
-    collapsedExpandHint: {
-        paddingHorizontal: 4,
-    },
-    collapsedAcceptBtn: {
-        width: 38,
-        height: 38,
-        borderRadius: 10,
-        backgroundColor: '#10B981',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexShrink: 0,
-        shadowColor: '#10B981',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.4,
-        shadowRadius: 6,
-        elevation: 4,
-    },
-    collapsedAcceptBtnDD: {
-        backgroundColor: '#F97316',
-        shadowColor: '#F97316',
-    },
-    collapsedSkipBtn: {
-        width: 38,
-        height: 38,
-        borderRadius: 10,
-        backgroundColor: 'rgba(255,255,255,0.06)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexShrink: 0,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-    },
+
 });

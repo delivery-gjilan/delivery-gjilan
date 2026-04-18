@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useRef } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, Animated, ActivityIndicator } from 'react-native';
+import { View, Text, Image, Pressable, ScrollView, StyleSheet, Animated, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslations } from '@/hooks/useTranslations';
@@ -12,6 +12,213 @@ interface Props {
     onAcceptAndNavigate: (order: DriverOrder) => void;
     onViewDetails: (order: DriverOrder) => void;
     onClose: () => void;
+}
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
+
+function formatBizToDropoffKm(order: DriverOrder): string | null {
+    const bizLoc = order.businesses?.[0]?.business?.location;
+    const dropLoc = order.dropOffLocation;
+    const lat1 = Number(bizLoc?.latitude), lon1 = Number(bizLoc?.longitude);
+    const lat2 = Number(dropLoc?.latitude), lon2 = Number(dropLoc?.longitude);
+    if (![lat1, lon1, lat2, lon2].every(Number.isFinite)) return null;
+    const toRad = (d: number) => (d * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    return `${(6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(1)} km`;
+}
+
+function ItemThumb({ imageUrl, name }: { imageUrl?: string | null; name: string }) {
+    if (imageUrl) return <Image source={{ uri: imageUrl }} style={{ width: 20, height: 20, borderRadius: 4 }} />;
+    return (
+        <View style={{ width: 20, height: 20, borderRadius: 4, backgroundColor: 'rgba(148,163,184,0.2)', alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ color: '#cbd5e1', fontSize: 9, fontWeight: '800' }}>{name.charAt(0).toUpperCase()}</Text>
+        </View>
+    );
+}
+
+// ─── Pool card ────────────────────────────────────────────────────────────────
+
+function PoolCard({ order, accepting, onAccept, onAcceptAndNavigate, onViewDetails, s }: {
+    order: DriverOrder;
+    accepting: boolean;
+    onAccept: (o: DriverOrder) => void;
+    onAcceptAndNavigate: (o: DriverOrder) => void;
+    onViewDetails: (o: DriverOrder) => void;
+    s: Record<string, string>;
+}) {
+    const biz = order.businesses?.[0]?.business;
+    const bizName = biz?.name ?? 'Business';
+    const dropAddress = order.dropOffLocation?.address ?? '—';
+    const isDirectDispatch = order.channel === 'DIRECT_DISPATCH';
+    const recipientLabel = order.recipientName ?? order.recipientPhone ?? null;
+
+    const orderPrice = Number((order as any).orderPrice ?? 0);
+    const inventoryPrice = Number((order as any).inventoryPrice ?? 0);
+    const businessPrice = Math.max(0, orderPrice - inventoryPrice);
+    const cashToCollect = Number((order as any).cashToCollect ?? 0);
+    const totalPrice = Number(order.totalPrice ?? 0);
+    const collectFromCustomer = isDirectDispatch ? cashToCollect : totalPrice;
+    const showCollectAmount = !isDirectDispatch || cashToCollect > 0;
+    const driverTakeHome = Number(order.driverTakeHomePreview ?? order.deliveryPrice ?? 0);
+
+    const items = order.businesses?.flatMap((b) => b.items ?? []) ?? [];
+    const totalStockUnits = items.reduce((sum, it) => sum + (it.inventoryQuantity ?? 0), 0);
+    const totalMarketUnits = items.reduce((sum, it) => sum + Math.max(0, it.quantity - (it.inventoryQuantity ?? 0)), 0);
+    const stockItems = items.filter((it) => (it.inventoryQuantity ?? 0) > 0);
+    const bizItems = items.filter((it) => Math.max(0, it.quantity - (it.inventoryQuantity ?? 0)) > 0);
+    const hasInventoryCoverage = totalStockUnits > 0;
+    const dropoffDistanceLabel = formatBizToDropoffKm(order);
+
+    const isReady = order.status === 'READY';
+    const isPreparing = order.status === 'PREPARING';
+    const etaLabel = (() => {
+        if (isReady) return s.ready_now ?? 'Ready now';
+        if (order.estimatedReadyAt) {
+            const diff = Math.ceil((new Date(order.estimatedReadyAt).getTime() - Date.now()) / 60_000);
+            if (diff > 0) return (s.min ?? '{{min}} min').replace('{{min}}', String(diff));
+            return s.almost_ready ?? 'Almost ready';
+        }
+        return s.preparing ?? 'Preparing';
+    })();
+
+    const statusColor = isReady ? '#22c55e' : isPreparing ? '#f59e0b' : '#6b7280';
+
+    return (
+        <View style={[styles.card, isDirectDispatch && styles.cardDirect]}>
+            {isDirectDispatch && <View style={{ height: 3, backgroundColor: '#f97316' }} />}
+
+            {/* Top bar */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingTop: 12, paddingBottom: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#f1f5f9', flexShrink: 1 }} numberOfLines={1}>{bizName}</Text>
+                    {isDirectDispatch && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(249,115,22,0.12)', borderColor: 'rgba(249,115,22,0.5)', borderWidth: 1, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 2 }}>
+                            <Ionicons name="call" size={9} color="#f97316" />
+                            <Text style={{ fontSize: 9, fontWeight: '800', color: '#ea580c' }}>DIRECT</Text>
+                        </View>
+                    )}
+                    <View style={{ backgroundColor: 'rgba(148,163,184,0.18)', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1 }}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#94a3b8' }}>#{order.displayId}</Text>
+                    </View>
+                </View>
+                <View style={{ backgroundColor: statusColor + '20', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 }}>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: statusColor }}>{etaLabel}</Text>
+                </View>
+            </View>
+
+            {isDirectDispatch && recipientLabel && (
+                <View style={{ paddingHorizontal: 12, paddingBottom: 6 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#f97316' }} numberOfLines={1}>{recipientLabel}</Text>
+                </View>
+            )}
+
+            {/* Pickup plan */}
+            {items.length > 0 && (
+                <View style={{ paddingHorizontal: 12, paddingBottom: 8, gap: 6 }}>
+                    <Text style={{ fontSize: 9, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.4 }}>Pickup Plan</Text>
+                    {hasInventoryCoverage ? (
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                            <View style={{ flex: 1 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
+                                    <Text style={{ fontSize: 10, fontWeight: '800', color: '#c4b5fd' }}>Inventory</Text>
+                                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#a78bfa' }}>×{totalStockUnits}</Text>
+                                </View>
+                                {stockItems.slice(0, 3).map((item, idx) => (
+                                    <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 2 }}>
+                                        <ItemThumb imageUrl={item.imageUrl} name={item.name} />
+                                        <Text style={{ flex: 1, fontSize: 11, color: '#e2e8f0' }} numberOfLines={1}>{item.name}</Text>
+                                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#a78bfa' }}>×{item.inventoryQuantity ?? 0}</Text>
+                                    </View>
+                                ))}
+                                {stockItems.length > 3 && <Text style={{ fontSize: 9, color: '#94a3b8', marginTop: 1 }}>+{stockItems.length - 3} more</Text>}
+                            </View>
+                            <View style={{ width: 1, backgroundColor: 'rgba(148,163,184,0.18)' }} />
+                            <View style={{ flex: 1 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
+                                    <Text style={{ fontSize: 10, fontWeight: '800', color: '#7dd3fc' }}>Business</Text>
+                                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#38bdf8' }}>×{totalMarketUnits}</Text>
+                                </View>
+                                {bizItems.slice(0, 3).map((item, idx) => {
+                                    const fromBiz = Math.max(0, item.quantity - (item.inventoryQuantity ?? 0));
+                                    return (
+                                        <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 2 }}>
+                                            <ItemThumb imageUrl={item.imageUrl} name={item.name} />
+                                            <Text style={{ flex: 1, fontSize: 11, color: '#e2e8f0' }} numberOfLines={1}>{item.name}</Text>
+                                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#38bdf8' }}>×{fromBiz}</Text>
+                                        </View>
+                                    );
+                                })}
+                                {bizItems.length > 3 && <Text style={{ fontSize: 9, color: '#94a3b8', marginTop: 1 }}>+{bizItems.length - 3} more</Text>}
+                            </View>
+                        </View>
+                    ) : (
+                        <View>
+                            {items.slice(0, 3).map((item, idx) => (
+                                <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 2 }}>
+                                    <ItemThumb imageUrl={item.imageUrl} name={item.name} />
+                                    <Text style={{ flex: 1, fontSize: 11, color: '#e2e8f0' }} numberOfLines={1}>{item.name}</Text>
+                                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#94a3b8' }}>×{item.quantity}</Text>
+                                </View>
+                            ))}
+                            {items.length > 3 && <Text style={{ fontSize: 9, color: '#94a3b8', marginTop: 1 }}>+{items.length - 3} more</Text>}
+                        </View>
+                    )}
+                </View>
+            )}
+
+            {/* Route + Order Summary */}
+            <View style={{ paddingHorizontal: 12, paddingBottom: 10, gap: 6 }}>
+                <View style={{ backgroundColor: 'rgba(2,132,199,0.1)', borderRadius: 8, borderWidth: 1, borderColor: 'rgba(56,189,248,0.2)', paddingHorizontal: 8, paddingVertical: 6, gap: 4 }}>
+                    <Text style={{ fontSize: 9, fontWeight: '800', color: '#7dd3fc', textTransform: 'uppercase', letterSpacing: 0.4 }}>Route</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Text style={{ fontSize: 11, color: '#bae6fd' }}>Drop-off</Text>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#e0f2fe' }} numberOfLines={1}>
+                            {dropoffDistanceLabel ? `${dropoffDistanceLabel} from pickup` : dropAddress.split(',')[0] || '—'}
+                        </Text>
+                    </View>
+                </View>
+
+                <View style={{ backgroundColor: 'rgba(15,23,42,0.45)', borderRadius: 8, borderWidth: 1, borderColor: 'rgba(148,163,184,0.15)', paddingHorizontal: 8, paddingVertical: 6, gap: 4 }}>
+                    <Text style={{ fontSize: 9, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.4 }}>Order</Text>
+                    {!isDirectDispatch && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Text style={{ fontSize: 11, color: '#fca5a5' }}>Give business</Text>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#f87171' }}>€{businessPrice.toFixed(2)}</Text>
+                        </View>
+                    )}
+                    {inventoryPrice > 0 && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Text style={{ fontSize: 11, color: '#c4b5fd' }}>Owed to platform</Text>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#a78bfa' }}>€{inventoryPrice.toFixed(2)}</Text>
+                        </View>
+                    )}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Text style={{ fontSize: 11, color: '#93c5fd' }}>Collect from customer</Text>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#38bdf8' }}>
+                            {showCollectAmount ? `€${collectFromCustomer.toFixed(2)}` : 'Confirm at pickup'}
+                        </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Text style={{ fontSize: 11, color: '#86efac', fontWeight: '700' }}>Your cut</Text>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#22c55e' }}>€{driverTakeHome.toFixed(2)}</Text>
+                    </View>
+                </View>
+            </View>
+
+            {/* CTAs */}
+            <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingBottom: 12 }}>
+                <Pressable style={[styles.ctaBtn, styles.ctaBtnAccept]} onPress={() => onAccept(order)} disabled={accepting}>
+                    {accepting ? <ActivityIndicator size={13} color="#fff" /> : <Ionicons name="checkmark" size={14} color="#fff" />}
+                    <Text style={styles.ctaBtnText}>{s.accept ?? 'Accept'}</Text>
+                </Pressable>
+                <Pressable style={[styles.ctaBtn, styles.ctaBtnNavigate]} onPress={() => onAcceptAndNavigate(order)} disabled={accepting}>
+                    {accepting ? <ActivityIndicator size={13} color="#fff" /> : <Ionicons name="navigate" size={14} color="#fff" />}
+                    <Text style={styles.ctaBtnText}>{s.accept_go ?? 'Accept & Go'}</Text>
+                </Pressable>
+            </View>
+        </View>
+    );
 }
 
 export function OrderPoolSheet({ orders, accepting = false, onAccept, onAcceptAndNavigate, onViewDetails, onClose }: Props) {
@@ -81,148 +288,17 @@ export function OrderPoolSheet({ orders, accepting = false, onAccept, onAcceptAn
                         contentContainerStyle={styles.list}
                         keyboardShouldPersistTaps="handled"
                     >
-                        {orders.map((order) => {
-                            const biz = order.businesses?.[0]?.business;
-                            const bizName = biz?.name ?? 'Business';
-                            const recipientLabel = order.recipientName ?? order.recipientPhone ?? null;
-                            const itemCount = (order.businesses ?? []).reduce(
-                                (acc: number, b) => acc + (b.items?.length ?? 0), 0,
-                            );
-                            const items = (order.businesses ?? []).flatMap((b) => b.items ?? []);
-                            const totalStockUnits = items.reduce((sum, item) => sum + (item.inventoryQuantity ?? 0), 0);
-                            const totalMarketUnits = items.reduce(
-                                (sum, item) => sum + Math.max(0, item.quantity - (item.inventoryQuantity ?? 0)),
-                                0,
-                            );
-                            const orderPrice = Number((order as any).orderPrice ?? 0);
-                            const inventoryPrice = Number((order as any).inventoryPrice ?? 0);
-                            const businessPrice = Math.max(0, orderPrice - inventoryPrice);
-                            const dropAddress = order.dropOffLocation?.address ?? '';
-                            const shortAddress = dropAddress.split(',')[0] || s.see_map;
-                            const takeHome = Number(order.driverTakeHomePreview ?? order.deliveryPrice ?? 0).toFixed(2);
-                            const isReady = order.status === 'READY';
-                            const isDirectDispatch = order.channel === 'DIRECT_DISPATCH';
-                            const etaLabel = (() => {
-                                if (isReady) return s.ready_now;
-                                if (order.estimatedReadyAt) {
-                                    const diff = Math.ceil((new Date(order.estimatedReadyAt).getTime() - Date.now()) / 60_000);
-                                    if (diff > 0) return s.min.replace('{{min}}', String(diff));
-                                    return s.almost_ready;
-                                }
-                                return s.preparing;
-                            })();
-
-                            return (
-                                <Pressable key={order.id} style={[styles.card, isDirectDispatch && styles.cardDirect]} onPress={() => onViewDetails(order)}>
-                                    {/* Left accent */}
-                                    <View style={[styles.cardAccent, isReady && styles.cardAccentReady, isDirectDispatch && styles.cardAccentDirect]} />
-
-                                    <View style={styles.cardBody}>
-                                        {/* Row 1: Business + Fee */}
-                                        <View style={styles.cardTop}>
-                                            {/* Business avatar */}
-                                            <View style={styles.bizAvatarWrap}>
-                                                <View style={styles.bizInitialWrap}>
-                                                        <Ionicons
-                                                            name="storefront"
-                                                            size={16}
-                                                            color="#a78bfa"
-                                                        />
-                                                    </View>
-                                            </View>
-
-                                            <View style={styles.bizInfo}>
-                                                <View style={styles.bizNameRow}>
-                                                    <Text style={styles.bizName} numberOfLines={1}>{bizName}</Text>
-                                                    {isDirectDispatch && (
-                                                        <View style={styles.directCallBadge}>
-                                                            <Ionicons name="call" size={9} color="#fff" />
-                                                            <Text style={styles.directCallText}>Direct Call</Text>
-                                                        </View>
-                                                    )}
-                                                </View>
-                                                <Text style={styles.orderId}>#{order.displayId ?? '—'}</Text>
-                                                {isDirectDispatch && recipientLabel ? (
-                                                    <Text style={styles.directCallRecipient} numberOfLines={1}>{recipientLabel}</Text>
-                                                ) : null}
-                                            </View>
-
-                                            {/* Earnings */}
-                                            <View style={styles.earningsBadge}>
-                                                <Text style={styles.earningsLabel}>{s.earn}</Text>
-                                                <Text style={styles.earningsValue}>€{takeHome}</Text>
-                                            </View>
-                                        </View>
-
-                                        {/* Row 2: meta chips */}
-                                        <View style={styles.metaRow}>
-                                            <View style={[styles.chip, isReady ? styles.chipReady : styles.chipPreparing]}>
-                                                <View style={[styles.chipDot, isReady ? styles.chipDotReady : styles.chipDotPreparing]} />
-                                                <Text style={[styles.chipText, isReady ? styles.chipTextReady : styles.chipTextPreparing]}>
-                                                    {etaLabel}
-                                                </Text>
-                                            </View>
-
-                                            <View style={styles.chip}>
-                                                <Ionicons name="bag-handle-outline" size={11} color="#64748b" />
-                                                <Text style={styles.chipText}>
-                                                    {itemCount} {itemCount === 1 ? s.item : s.items}
-                                                </Text>
-                                            </View>
-
-                                            <View style={[styles.chip, styles.chipFlex]}>
-                                                <Ionicons name="navigate-outline" size={11} color="#64748b" />
-                                                <Text style={styles.chipText} numberOfLines={1}>{shortAddress}</Text>
-                                            </View>
-                                        </View>
-
-                                        {(totalStockUnits > 0 || isDirectDispatch) && (
-                                            <View style={styles.signalRow}>
-                                                {totalStockUnits > 0 && (
-                                                    <View style={styles.signalChipStock}>
-                                                        <Text style={styles.signalChipStockText}>📦 {totalStockUnits} stock</Text>
-                                                    </View>
-                                                )}
-                                                {totalMarketUnits > 0 && totalStockUnits > 0 && (
-                                                    <View style={styles.signalChipMarket}>
-                                                        <Text style={styles.signalChipMarketText}>🛒 {totalMarketUnits} market</Text>
-                                                    </View>
-                                                )}
-                                                <Text style={styles.inspectHint}>Tap card for details</Text>
-                                            </View>
-                                        )}
-
-                                        {/* Row 3: direct action CTAs */}
-                                        <View style={styles.ctaRow}>
-                                            <Pressable
-                                                style={[styles.ctaBtn, styles.ctaBtnAccept]}
-                                                onPress={() => onAccept(order)}
-                                                disabled={accepting}
-                                            >
-                                                {accepting ? (
-                                                    <ActivityIndicator size={13} color="#fff" />
-                                                ) : (
-                                                    <Ionicons name="checkmark" size={14} color="#fff" />
-                                                )}
-                                                <Text style={styles.ctaBtnText}>{s.accept}</Text>
-                                            </Pressable>
-                                            <Pressable
-                                                style={[styles.ctaBtn, styles.ctaBtnNavigate]}
-                                                onPress={() => onAcceptAndNavigate(order)}
-                                                disabled={accepting}
-                                            >
-                                                {accepting ? (
-                                                    <ActivityIndicator size={13} color="#fff" />
-                                                ) : (
-                                                    <Ionicons name="navigate" size={14} color="#fff" />
-                                                )}
-                                                <Text style={styles.ctaBtnText}>{s.accept_go}</Text>
-                                            </Pressable>
-                                        </View>
-                                    </View>
-                                </Pressable>
-                            );
-                        })}
+                        {orders.map((order) => (
+                            <PoolCard
+                                key={order.id}
+                                order={order}
+                                accepting={accepting}
+                                onAccept={onAccept}
+                                onAcceptAndNavigate={onAcceptAndNavigate}
+                                onViewDetails={onViewDetails}
+                                s={s}
+                            />
+                        ))}
                     </ScrollView>
                 )}
             </Animated.View>
@@ -348,239 +424,30 @@ const styles = StyleSheet.create({
     /* List */
     list: {
         padding: 14,
-        gap: 10,
+        gap: 12,
     },
 
     /* Card */
     card: {
-        flexDirection: 'row',
-        backgroundColor: 'rgba(255,255,255,0.04)',
+        backgroundColor: 'rgba(17,24,39,0.95)',
         borderRadius: 16,
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: 'rgba(255,255,255,0.08)',
+        borderWidth: 1,
+        borderColor: 'rgba(0,157,224,0.3)',
         overflow: 'hidden',
     },
     cardDirect: {
-        backgroundColor: 'rgba(249,115,22,0.07)',
-        borderColor: 'rgba(249,115,22,0.22)',
-    },
-    cardAccent: {
-        width: 3,
-        backgroundColor: '#6366f1',
-        borderRadius: 3,
-        marginVertical: 12,
-        marginLeft: 12,
-        minHeight: 60,
-    },
-    cardAccentReady: {
-        backgroundColor: '#22c55e',
-    },
-    cardAccentDirect: {
-        backgroundColor: '#F97316',
-    },
-    cardBody: {
-        flex: 1,
-        padding: 12,
-        gap: 9,
-    },
-
-    /* Card top row */
-    cardTop: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-    },
-    bizAvatarWrap: {
-        width: 38,
-        height: 38,
-        borderRadius: 12,
-        overflow: 'hidden',
-    },
-    bizImage: {
-        width: 38,
-        height: 38,
-        borderRadius: 12,
-    },
-    bizInitialWrap: {
-        width: 38,
-        height: 38,
-        borderRadius: 12,
-        backgroundColor: 'rgba(167,139,250,0.12)',
-        borderWidth: 1,
-        borderColor: 'rgba(167,139,250,0.2)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    bizInfo: {
-        flex: 1,
-    },
-    bizNameRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 5,
-    },
-    directCallBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 3,
-        backgroundColor: '#F97316',
-        borderRadius: 4,
-        paddingHorizontal: 4,
-        paddingVertical: 2,
-    },
-    directCallText: {
-        color: '#fff',
-        fontSize: 8,
-        fontWeight: '700',
-        letterSpacing: 0.2,
-    },
-    directCallRecipient: {
-        color: '#fdba74',
-        fontSize: 12,
-        fontWeight: '700',
-        marginTop: 3,
-    },
-    bizName: {
-        color: '#f1f5f9',
-        fontSize: 14,
-        fontWeight: '700',
-        letterSpacing: -0.2,
-    },
-    orderId: {
-        color: '#475569',
-        fontSize: 11,
-        marginTop: 1,
-    },
-    earningsBadge: {
-        alignItems: 'flex-end',
-    },
-    earningsLabel: {
-        color: '#475569',
-        fontSize: 9,
-        fontWeight: '600',
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-    },
-    earningsValue: {
-        color: '#4ade80',
-        fontSize: 16,
-        fontWeight: '800',
-        letterSpacing: -0.5,
-    },
-
-    /* Meta chips row */
-    metaRow: {
-        flexDirection: 'row',
-        gap: 6,
-        flexWrap: 'wrap',
-    },
-    signalRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        flexWrap: 'wrap',
-        marginTop: -2,
-    },
-    signalChipStock: {
-        backgroundColor: 'rgba(124,58,237,0.16)',
-        borderRadius: 999,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-    },
-    signalChipStockText: {
-        color: '#c4b5fd',
-        fontSize: 11,
-        fontWeight: '700',
-    },
-    signalChipMarket: {
-        backgroundColor: 'rgba(3,105,161,0.16)',
-        borderRadius: 999,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-    },
-    signalChipMarketText: {
-        color: '#7dd3fc',
-        fontSize: 11,
-        fontWeight: '700',
-    },
-    signalChipPay: {
-        backgroundColor: 'rgba(239,68,68,0.14)',
-        borderRadius: 999,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-    },
-    signalChipPayText: {
-        color: '#fca5a5',
-        fontSize: 11,
-        fontWeight: '700',
-    },
-    inspectHint: {
-        color: '#94a3b8',
-        fontSize: 11,
-        fontWeight: '600',
-        marginLeft: 'auto',
-    },
-    chip: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        borderRadius: 6,
-        paddingHorizontal: 7,
-        paddingVertical: 4,
-    },
-    chipFlex: {
-        flex: 1,
-        minWidth: 0,
-    },
-    chipReady: {
-        backgroundColor: 'rgba(34,197,94,0.1)',
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: 'rgba(34,197,94,0.2)',
-    },
-    chipPreparing: {
-        backgroundColor: 'rgba(251,191,36,0.08)',
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: 'rgba(251,191,36,0.15)',
-    },
-    chipDot: {
-        width: 5,
-        height: 5,
-        borderRadius: 3,
-    },
-    chipDotReady: {
-        backgroundColor: '#22c55e',
-    },
-    chipDotPreparing: {
-        backgroundColor: '#fbbf24',
-    },
-    chipText: {
-        color: '#64748b',
-        fontSize: 11,
-        fontWeight: '500',
-    },
-    chipTextReady: {
-        color: '#4ade80',
-        fontWeight: '600',
-    },
-    chipTextPreparing: {
-        color: '#fbbf24',
-        fontWeight: '600',
+        backgroundColor: 'rgba(249,115,22,0.06)',
+        borderColor: 'rgba(249,115,22,0.3)',
     },
 
     /* Card footer / CTA */
-    ctaRow: {
-        flexDirection: 'row',
-        gap: 8,
-        marginTop: 2,
-    },
     ctaBtn: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 5,
-        paddingVertical: 9,
+        paddingVertical: 10,
         borderRadius: 10,
     },
     ctaBtnAccept: {
@@ -591,7 +458,7 @@ const styles = StyleSheet.create({
     },
     ctaBtnText: {
         color: '#fff',
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: '700',
     },
 });
