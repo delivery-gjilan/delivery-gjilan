@@ -1143,18 +1143,18 @@ export default function BusinessSettlementsPage() {
                       orderDetail ? { label: 'Order total', value: `€${Number(orderDetail.totalPrice ?? 0).toFixed(2)}`, color: 'text-white', bold: true } : null,
                       fin ? { label: 'Platform commission', value: `−€${og.totalReceivable.toFixed(2)}`, color: 'text-amber-400' } : null,
                       fin ? { label: 'Net earnings', value: `${netAmount >= 0 ? '+' : ''}€${netAmount.toFixed(2)}`, color: netAmount >= 0 ? 'text-green-400' : 'text-red-400', bold: true } : null,
-                    ].filter(Boolean).map((row: NonNullable<typeof row>, i: number) => (
+                    ].filter((r): r is { label: string; value: string; color: string; bold?: boolean } => Boolean(r)).map((row, i) => (
                       <div
                         key={i}
                         className={cn(
                           'flex justify-between px-3 py-2.5',
-                          row!.bold ? 'border-t border-zinc-700' : '',
+                          row.bold ? 'border-t border-zinc-700' : '',
                           i % 2 === 0 ? 'bg-zinc-800/80' : 'bg-zinc-850/50',
                         )}
                       >
-                        <span className="text-sm text-zinc-400">{row!.label}</span>
-                        <span className={cn('text-sm tabular-nums', row!.bold ? 'font-bold' : 'font-medium', row!.color)}>
-                          {row!.value}
+                        <span className="text-sm text-zinc-400">{row.label}</span>
+                        <span className={cn('text-sm tabular-nums', row.bold ? 'font-bold' : 'font-medium', row.color)}>
+                          {row.value}
                         </span>
                       </div>
                     ))}
